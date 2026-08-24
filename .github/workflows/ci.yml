@@ -1,0 +1,66 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Dependency audit (high and critical)
+        run: npm run audit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Functions build
+        run: npm run functions:build
+
+      - name: Production build
+        run: npm run build
+
+      - name: Firebase Rules tests
+        run: npm run test:rules
+
+      - name: Emulator seed verification
+        run: npm run seed:verify
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Phase 3 Auth emulator browser tests
+        run: npm run test:e2e:auth

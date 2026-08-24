@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "No exploitable Security Rules bypass was found within the Phase 2 client-access scope. Reads require typed signed claims plus an active matching authz record, verified admin access adds Google-provider and server-approval checks, and all client mutations and Storage operations remain denied. This score does not cover future Admin SDK server authorization, which bypasses Rules and requires separate integration tests.",
+  "findings": []
+}

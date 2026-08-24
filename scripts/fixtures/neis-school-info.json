@@ -1,0 +1,106 @@
+{
+  "pageSize": 3,
+  "pages": {
+    "1": {
+      "schoolInfo": [
+        {
+          "head": [
+            { "list_total_count": 5 },
+            { "RESULT": { "CODE": "INFO-000", "MESSAGE": "정상 처리되었습니다." } }
+          ]
+        },
+        {
+          "row": [
+            {
+              "ATPT_OFCDC_SC_CODE": "G10",
+              "ATPT_OFCDC_SC_NM": "대전광역시교육청",
+              "SD_SCHUL_CODE": "G100100001",
+              "SCHUL_NM": "대전 꿈나무 초등학교",
+              "ENG_SCHUL_NM": "Daejeon Dream Elementary School",
+              "SCHUL_KND_SC_NM": "초등학교",
+              "LCTN_SC_NM": "대전광역시",
+              "JU_ORG_NM": "대전광역시서부교육지원청",
+              "FOND_SC_NM": "공립",
+              "ORG_RDNZC": "34100",
+              "ORG_RDNMA": "대전광역시 유성구 꿈나무로 10",
+              "ORG_RDNDA": "(꿈나무동)",
+              "ORG_TELNO": "042-100-0001",
+              "HMPG_ADRES": "dream-school.example",
+              "LOAD_DTM": "20260823090000"
+            },
+            {
+              "ATPT_OFCDC_SC_CODE": "G10",
+              "ATPT_OFCDC_SC_NM": "대전광역시교육청",
+              "SD_SCHUL_CODE": "G100100002",
+              "SCHUL_NM": "대전한빛중학교",
+              "SCHUL_KND_SC_NM": "중학교",
+              "LCTN_SC_NM": "대전광역시",
+              "ORG_RDNZC": "34900",
+              "ORG_RDNMA": "대전광역시 중구 한빛로 20",
+              "ORG_RDNDA": "",
+              "ORG_TELNO": "042-100-0002",
+              "HMPG_ADRES": "https://hanbit-school.example",
+              "LOAD_DTM": "20260823090000"
+            },
+            {
+              "ATPT_OFCDC_SC_CODE": "G10",
+              "ATPT_OFCDC_SC_NM": "대전광역시교육청",
+              "SD_SCHUL_CODE": "G100100003",
+              "SCHUL_NM": "대전미래고등학교",
+              "SCHUL_KND_SC_NM": "고등학교",
+              "LCTN_SC_NM": "대전광역시",
+              "ORG_RDNZC": "35200",
+              "ORG_RDNMA": "대전광역시 서구 미래로 30",
+              "ORG_RDNDA": "",
+              "ORG_TELNO": "",
+              "HMPG_ADRES": "",
+              "LOAD_DTM": "20260823090000"
+            }
+          ]
+        }
+      ]
+    },
+    "2": {
+      "schoolInfo": [
+        {
+          "head": [
+            { "list_total_count": 5 },
+            { "RESULT": { "CODE": "INFO-000", "MESSAGE": "정상 처리되었습니다." } }
+          ]
+        },
+        {
+          "row": [
+            {
+              "ATPT_OFCDC_SC_CODE": "G10",
+              "ATPT_OFCDC_SC_NM": "대전광역시교육청",
+              "SD_SCHUL_CODE": "G100100004",
+              "SCHUL_NM": "대전푸른특수학교",
+              "SCHUL_KND_SC_NM": "특수학교",
+              "LCTN_SC_NM": "대전광역시",
+              "ORG_RDNZC": "34300",
+              "ORG_RDNMA": "대전광역시 대덕구 푸른로 40",
+              "ORG_RDNDA": "",
+              "ORG_TELNO": "042-100-0004",
+              "HMPG_ADRES": "",
+              "LOAD_DTM": "20260823090000"
+            },
+            {
+              "ATPT_OFCDC_SC_CODE": "B10",
+              "ATPT_OFCDC_SC_NM": "서울특별시교육청",
+              "SD_SCHUL_CODE": "B100100005",
+              "SCHUL_NM": "서울외부초등학교",
+              "SCHUL_KND_SC_NM": "초등학교",
+              "LCTN_SC_NM": "서울특별시",
+              "ORG_RDNZC": "03000",
+              "ORG_RDNMA": "서울특별시 종로구 외부로 50",
+              "ORG_RDNDA": "",
+              "ORG_TELNO": "02-100-0005",
+              "HMPG_ADRES": "",
+              "LOAD_DTM": "20260823090000"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

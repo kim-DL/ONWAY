@@ -1,0 +1,38 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "salesVisits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "deleted", "order": "ASCENDING" },
+        { "fieldPath": "visitedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "salesVisits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visitedBy", "order": "ASCENDING" },
+        { "fieldPath": "visitedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "salesVisits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cycleId", "order": "ASCENDING" },
+        { "fieldPath": "visitedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "salesVisits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "followUp.required", "order": "ASCENDING" },
+        { "fieldPath": "followUp.dueDate", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

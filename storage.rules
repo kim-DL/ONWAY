@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // =============================================================
+    // Assumed object paths and server-only boundary
+    // =============================================================
+    // schools/{schoolId}/photos/{01|02|03}/{versionId}/
+    //   thumbnail.webp | preview.webp | original.webp
+    // temporaryUploads/{uid}/{uploadId}/{fileName}
+    // exports/{employeeId}/{jobId}/{fileName}
+    //
+    // ADR 0002 requires all photo upload/download, temporary upload and export
+    // access to pass through an HTTPS/Callable server boundary. Cloud Storage
+    // Rules cannot cross-check Firestore authz/sessionVersion, so no direct
+    // Client SDK access is granted, including to administrators. Server Admin
+    // SDK code bypasses these rules and must validate auth, App Check, role,
+    // session, slot, size, MIME, magic bytes and path before every operation.
+
+    match /schools/{schoolId}/photos/{slotId}/{versionId}/{fileName} {
+      allow read, write: if false;
+    }
+
+    match /temporaryUploads/{uid}/{uploadId}/{fileName} {
+      allow read, write: if false;
+    }
+
+    match /exports/{employeeId}/{jobId}/{fileName} {
+      allow read, write: if false;
+    }
+
+    match /{object=**} {
+      allow read, write: if false;
+    }
+  }
+}

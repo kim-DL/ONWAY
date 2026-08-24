@@ -1,0 +1,279 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // =============================================================
+    // Assumed data model and client access boundary
+    // =============================================================
+    // schools: base/source/name/search/address/location/status/revision fields.
+    // school photos: version/caption/status/revision/soft-delete metadata.
+    // schoolFieldProfiles: cafeteria/inspection/equipment/vehicle/revision.
+    // salesProfiles: interest/product/tag/latest visit/follow-up/revision.
+    // salesVisits: assignment snapshot, actors, delivery/sample/interest,
+    // activity/summary/follow-up/soft-delete/revision/timestamps.
+    // salesCycles: lifecycle plus nested assignments and derived stats.
+    // employeeDirectory: intentionally separated displayName/active/order.
+    // employees: uid/name/roles/permissions/status/session/timestamps.
+    // authCredentials and pinIndexes: server-only authentication material.
+    // authz: employeeId/active/sessionVersion/permissionsVersion/updatedAt.
+    // zones/products/tags: sales definitions. Catalogs are split by scope.
+    // exportJobs/auditLogs/neisSyncRuns/settings: system documents.
+    //
+    // Field roles may read school/field/photo metadata. Sales roles may also
+    // read sales data. Verified admins may read management data. There are
+    // intentionally no client create/update/delete grants: every business
+    // mutation uses trusted server Functions and the Admin SDK.
+
+    // =============================================================
+    // Authentication and authorization helpers
+    // =============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRequiredTokenClaims() {
+      return isSignedIn()
+        && request.auth.token.keys().hasAll([
+          'employeeId',
+          'sessionVersion',
+          'permissionsVersion',
+          'roleScopes'
+        ])
+        && request.auth.token.employeeId is string
+        && request.auth.token.employeeId.size() > 0
+        && request.auth.token.employeeId.size() <= 128
+        && request.auth.token.sessionVersion is int
+        && request.auth.token.sessionVersion >= 0
+        && request.auth.token.permissionsVersion is int
+        && request.auth.token.permissionsVersion >= 0
+        && request.auth.token.roleScopes is list
+        && request.auth.token.roleScopes.size() > 0
+        && request.auth.token.roleScopes.size() <= 4
+        && request.auth.token.roleScopes.hasOnly([
+          'delivery',
+          'sales',
+          'viewer',
+          'admin'
+        ]);
+    }
+
+    function hasValidAuthzRecord() {
+      let authorization = get(/databases/$(database)/documents/authz/$(request.auth.uid)).data;
+      return authorization is map
+        && authorization.keys().hasOnly([
+          'employeeId',
+          'active',
+          'sessionVersion',
+          'permissionsVersion',
+          'updatedAt'
+        ])
+        && authorization.employeeId is string
+        && authorization.active is bool
+        && authorization.sessionVersion is int
+        && authorization.permissionsVersion is int
+        && authorization.updatedAt is timestamp
+        && authorization.active == true
+        && authorization.employeeId == request.auth.token.employeeId
+        && authorization.sessionVersion == request.auth.token.sessionVersion
+        && authorization.permissionsVersion == request.auth.token.permissionsVersion;
+    }
+
+    function sessionValid() {
+      return hasRequiredTokenClaims() && hasValidAuthzRecord();
+    }
+
+    function employeeId() {
+      return request.auth.token.employeeId;
+    }
+
+    function tokenHasScope(scope) {
+      return scope in request.auth.token.roleScopes;
+    }
+
+    function hasVerifiedAdminClaims() {
+      return request.auth.token.keys().hasAll(['adminApproved', 'firebase'])
+        && request.auth.token.adminApproved == true
+        && request.auth.token.firebase is map
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function hasScope(scope) {
+      return sessionValid() && tokenHasScope(scope);
+    }
+
+    function isAdmin() {
+      return sessionValid()
+        && tokenHasScope('admin')
+        && hasVerifiedAdminClaims();
+    }
+
+    function canReadField() {
+      return sessionValid()
+        && (tokenHasScope('delivery')
+          || tokenHasScope('sales')
+          || tokenHasScope('viewer')
+          || (tokenHasScope('admin') && hasVerifiedAdminClaims()));
+    }
+
+    function canReadSales() {
+      return sessionValid()
+        && (tokenHasScope('sales')
+          || (tokenHasScope('admin') && hasVerifiedAdminClaims()));
+    }
+
+    function isPhotoSlot(slotId) {
+      return slotId in ['01', '02', '03'];
+    }
+
+    function isCommonOrFieldCatalog(catalogId) {
+      return catalogId.matches('^(common|field)(-|$).*');
+    }
+
+    function isSalesOrAssignmentCatalog(catalogId) {
+      return catalogId.matches('^(sales|assignment)(-|$).*');
+    }
+
+    // =============================================================
+    // Field data
+    // =============================================================
+
+    match /schools/{schoolId} {
+      allow read: if canReadField();
+
+      match /photos/{slotId} {
+        allow read: if canReadField() && isPhotoSlot(slotId);
+      }
+    }
+
+    match /schoolFieldProfiles/{schoolId} {
+      allow read: if canReadField();
+    }
+
+    // =============================================================
+    // Sales data
+    // =============================================================
+
+    match /salesProfiles/{schoolId} {
+      allow read: if canReadSales();
+    }
+
+    match /salesVisits/{visitId} {
+      allow read: if canReadSales();
+    }
+
+    match /salesCycles/{cycleId} {
+      allow read: if canReadSales();
+
+      match /assignments/{schoolId} {
+        allow read: if canReadSales();
+      }
+
+      match /employeeStats/{employeeId} {
+        allow read: if canReadSales();
+      }
+
+      match /stats/team {
+        allow read: if canReadSales();
+      }
+    }
+
+    match /zones/{zoneId} {
+      allow read: if canReadSales();
+    }
+
+    match /products/{productId} {
+      allow read: if canReadSales();
+    }
+
+    match /communicationTags/{tagId} {
+      allow read: if canReadSales();
+    }
+
+    match /activityTags/{tagId} {
+      allow read: if canReadSales();
+    }
+
+    // =============================================================
+    // Employee, authentication, catalog and system data
+    // =============================================================
+
+    match /employeeDirectory/{employeeId} {
+      allow read: if sessionValid();
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isAdmin();
+    }
+
+    match /authCredentials/{employeeId} {
+      allow read, write: if false;
+    }
+
+    match /pinIndexes/{lookupKey} {
+      allow read, write: if false;
+    }
+
+    match /pinReservations/{reservationId} {
+      allow read, write: if false;
+    }
+
+    match /authz/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /searchCatalogs/{catalogId} {
+      allow get: if (canReadField() && isCommonOrFieldCatalog(catalogId))
+        || (canReadSales() && isSalesOrAssignmentCatalog(catalogId));
+    }
+
+    match /catalogMeta/{metaId} {
+      allow get: if metaId == 'current' && canReadField();
+    }
+
+    match /exportJobs/{jobId} {
+      allow get: if isAdmin()
+        || (canReadSales()
+          && resource.data.requestedBy is string
+          && resource.data.requestedBy == employeeId());
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+    }
+
+    match /neisSyncRuns/{runId} {
+      allow read: if isAdmin();
+
+      match /changes/{changeId} {
+        allow read: if isAdmin();
+      }
+    }
+
+    match /appSettings/{settingsId} {
+      allow get: if settingsId == 'public' && canReadField();
+    }
+
+    match /secureSettings/{settingId} {
+      allow read, write: if false;
+    }
+
+    match /requestLocks/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /photoUploadSessions/{uploadId} {
+      allow read, write: if false;
+    }
+
+    match /photoUploadRateLimits/{limitId} {
+      allow read, write: if false;
+    }
+
+    // Every unknown path and every client write not explicitly granted above
+    // is denied. Trusted Admin SDK server code bypasses these client rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
