@@ -1,7 +1,10 @@
 import "client-only";
 
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from "firebase/app-check";
 import {
   connectAuthEmulator,
   getAuth,
@@ -58,7 +61,7 @@ export function getFirebaseClientServices(): FirebaseClientServices | null {
     appCheckSiteKey
   ) {
     initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(appCheckSiteKey),
+      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
       isTokenAutoRefreshEnabled: true,
     });
   }

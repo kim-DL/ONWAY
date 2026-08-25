@@ -206,6 +206,12 @@ Pilot은 납품 1~2명, 홍보 1~2명, 관리자 1명이 HTTPS Staging에서 72�
 
 설정의 `Pilot 기기 진단`은 느림이 발생한 순간의 앱 버전, 온라인·설치 상태, 집계 성능·캐시·Firestore 읽기 횟수를 복사하거나 JSON으로 저장한다. 직원·학교·검색어·연락처는 수집하거나 서버로 전송하지 않는다.
 
+### Phase 18 Staging 기반
+
+`onnuriway` Firebase 프로젝트는 Phase 18 Staging으로 사용한다. Firestore는 서울 리전의 Standard/Native이며 Google Authentication과 reCAPTCHA Enterprise App Check가 등록되어 있다. 웹 Client는 Enterprise Provider를 사용하고 공개 Site Key는 Git에서 제외되는 `.env.local`로 주입한다. PIN Lookup·Pepper와 NEIS·Kakao Key는 Functions Secret으로만 관리하며 원문을 Repository, 문서, Client Bundle에 넣지 않는다.
+
+App Check 강제 적용과 `ALLOW_LIVE_NEIS_*`, `ALLOW_LIVE_KAKAO_MATCH`는 Staging 배포·토큰 지표·비식별 데이터 검증 전까지 꺼 둔다. 이 기반 연결은 Pilot 시작 또는 Production 승인과 동일하지 않으며, 남은 조건은 `docs/phase-18-status.md`를 기준으로 판단한다.
+
 ## Google-approved Admin Console
 
 ```bash
