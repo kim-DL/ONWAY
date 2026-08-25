@@ -92,6 +92,12 @@ function adminLoginMessage(error: unknown) {
     if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
       return "Google 로그인이 취소되었습니다.";
     }
+    if (error.code === "auth/popup-blocked") {
+      return "브라우저의 팝업 차단을 해제한 뒤 다시 시도해주세요.";
+    }
+    if (error.code === "auth/unauthorized-domain") {
+      return "현재 접속 주소는 Google 로그인 허용 도메인이 아닙니다.";
+    }
     if (error.code === "functions/permission-denied") {
       return "관리자 허용목록과 역할을 확인해주세요.";
     }
@@ -344,7 +350,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     adminActivationRef.current = true;
     setState({ status: "resolving" });
     try {
-      await setPersistence(services.auth, browserLocalPersistence);
+      // Open the popup before any awaited work so browsers preserve the click gesture.
+      // Persistence is already initialized before the auth observer is attached above.
       const credential = await signInWithPopup(services.auth, new GoogleAuthProvider());
       const activateAdminSession = httpsCallable<
         { appVersion: string },
