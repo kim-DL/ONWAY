@@ -2286,7 +2286,14 @@ button { -webkit-tap-highlight-color: transparent; }
 
 @media (max-width: 760px) {
   .pwa-connectivity { top: max(.55rem, env(safe-area-inset-top)); max-width: calc(100% - 1.5rem); white-space: nowrap; }
-  .pwa-update { right: .75rem; bottom: calc(5.85rem + env(safe-area-inset-bottom)); width: calc(100% - 1.5rem); grid-template-columns: auto minmax(0,1fr); }
+  .pwa-update {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: calc(100% - 1.5rem);
+    margin: max(.75rem, env(safe-area-inset-top)) .75rem .25rem;
+    grid-template-columns: auto minmax(0,1fr);
+  }
   .pwa-update > div { grid-column: 1 / -1; }
   .pwa-update button { flex: 1; }
 }

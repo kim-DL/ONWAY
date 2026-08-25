@@ -10,6 +10,7 @@ coverage/
 !.env.example
 functions/.secret.local
 .firebase/
+.vercel/
 firebase-debug.log
 firebase-debug.*.log
 firestore-debug.log
@@ -26,6 +27,7 @@ output/acceptance/
 output/pilot/
 pilot/*.local.json
 .playwright-cli/
+.playwright-mcp/
 .pnpm-store/
 test-results/
 playwright-report/

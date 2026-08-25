@@ -185,13 +185,6 @@ export function PwaProvider({ children }: { children: ReactNode }) {
 
   return (
     <PwaContext.Provider value={value}>
-      {children}
-      {!isOnline ? (
-        <div className="pwa-connectivity" role="status" data-testid="pwa-offline-status">
-          <Icon name="wifi-off" size={18} />
-          <span><strong>오프라인</strong> · 저장된 정보를 표시하고 있습니다.</span>
-        </div>
-      ) : null}
       {updateReady ? (
         <aside className="pwa-update" role="status" aria-live="polite" data-testid="pwa-update-ready">
           <span className="pwa-update__icon"><Icon name="refresh" size={20} /></span>
@@ -201,6 +194,13 @@ export function PwaProvider({ children }: { children: ReactNode }) {
             <button type="button" className="pwa-update__apply" disabled={applyingUpdate} onClick={applyUpdate}>{applyingUpdate ? "적용 중…" : "업데이트"}</button>
           </div>
         </aside>
+      ) : null}
+      {children}
+      {!isOnline ? (
+        <div className="pwa-connectivity" role="status" data-testid="pwa-offline-status">
+          <Icon name="wifi-off" size={18} />
+          <span><strong>오프라인</strong> · 저장된 정보를 표시하고 있습니다.</span>
+        </div>
       ) : null}
     </PwaContext.Provider>
   );

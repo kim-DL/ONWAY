@@ -1,6 +1,6 @@
 # 급식길 (ONNURIWAY)
 
-대전 학교 급식실 납품·홍보 현장 운영을 위한 PWA 프로젝트다. Phase 17 Full Acceptance Test를 통과했고 Phase 18 실제 직원 Pilot 준비를 완료했다. 모바일 우선 현장 앱, 로컬 학교 검색, Cache-first 현장정보, 월별 영업 운영, 서버 Filter 기반 임시 CSV, NEIS Preview/Diff/선택 Apply, 검토형 Kakao 위치 매칭, 버전형 현장 사진과 PC 우선 운영 콘솔을 제공한다.
+대전 학교 급식실 납품·홍보 현장 운영을 위한 PWA 프로젝트다. Phase 17 Full Acceptance Test를 통과했고 Phase 18 HTTPS Staging 배포와 실제 직원 Pilot 준비를 완료했다. 모바일 우선 현장 앱, 로컬 학교 검색, Cache-first 현장정보, 월별 영업 운영, 서버 Filter 기반 임시 CSV, NEIS Preview/Diff/선택 Apply, 검토형 Kakao 위치 매칭, 버전형 현장 사진과 PC 우선 운영 콘솔을 제공한다.
 
 ## 개발 기준
 
@@ -208,9 +208,9 @@ Pilot은 납품 1~2명, 홍보 1~2명, 관리자 1명이 HTTPS Staging에서 72�
 
 ### Phase 18 Staging 기반
 
-`onnuriway` Firebase 프로젝트는 Phase 18 Staging으로 사용한다. Firestore는 서울 리전의 Standard/Native이며 Google Authentication과 reCAPTCHA Enterprise App Check가 등록되어 있다. 웹 Client는 Enterprise Provider를 사용하고 공개 Site Key는 Git에서 제외되는 `.env.local`로 주입한다. PIN Lookup·Pepper와 NEIS·Kakao Key는 Functions Secret으로만 관리하며 원문을 Repository, 문서, Client Bundle에 넣지 않는다.
+`onnuriway` Firebase 프로젝트는 Phase 18 Staging으로 사용한다. Firestore는 서울 리전의 Standard/Native이며 Google Authentication과 reCAPTCHA Enterprise App Check가 등록되어 있다. 웹 Client는 Enterprise Provider를 사용하고 공개 Site Key는 Git에서 제외되는 `.env.local`로 주입한다. PIN Lookup·Pepper와 NEIS·Kakao Key는 Functions Secret으로만 관리하며 원문을 Repository, 문서, Client Bundle에 넣지 않는다. Next.js Frontend는 Vercel Preview에 배포하고 [onnuriway.vercel.app](https://onnuriway.vercel.app)을 Staging 안정 주소로 사용한다.
 
-App Check 강제 적용과 `ALLOW_LIVE_NEIS_*`, `ALLOW_LIVE_KAKAO_MATCH`는 Staging 배포·토큰 지표·비식별 데이터 검증 전까지 꺼 둔다. 이 기반 연결은 Pilot 시작 또는 Production 승인과 동일하지 않으며, 남은 조건은 `docs/phase-18-status.md`를 기준으로 판단한다.
+Callable Functions는 `enforceAppCheck`로 보호하며 Staging에서 정상 Token 교환과 차단 경계를 검증했다. Firebase Console의 제품별 App Check 강제 적용과 `ALLOW_LIVE_NEIS_*`, `ALLOW_LIVE_KAKAO_MATCH`는 호출 지표·비식별 데이터 검증 전까지 단계적으로 관리한다. 이 배포는 Pilot 시작 또는 Production 승인과 동일하지 않으며, 남은 조건은 `docs/phase-18-status.md`를 기준으로 판단한다.
 
 ## Google-approved Admin Console
 

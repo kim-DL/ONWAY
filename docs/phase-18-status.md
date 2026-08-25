@@ -3,7 +3,7 @@
 - 준비일: 2026-08-24
 - Staging 기반 연결일: 2026-08-25
 - Phase: 18 — Pilot
-- 상태: `PREPARED · STAGING CONNECTED · PILOT NOT STARTED`
+- 상태: `PREPARED · STAGING DEPLOYED · PILOT NOT STARTED`
 
 ## 준비 완료
 
@@ -19,21 +19,33 @@
 
 - Firebase CLI의 `staging` 별칭을 `onnuriway` 프로젝트에 고정
 - Firestore Standard/Native를 서울 리전(`asia-northeast3`)에 생성하고 Rules·Index 배포 및 Rules 회귀 검증 완료
-- Firebase Authentication Google Provider 활성화, 공개 프로젝트 이름·지원 이메일 및 기본 Authorized Domain 3개 확인
+- Firebase Authentication Google Provider 활성화, 공개 프로젝트 이름·지원 이메일 및 Authorized Domain 4개 확인
 - 웹 앱을 reCAPTCHA Enterprise App Check에 등록하고 토큰 TTL을 1시간으로 설정
-- reCAPTCHA Enterprise 허용 Domain을 `localhost`, `onnuriway.web.app`, `onnuriway.firebaseapp.com`으로 제한
+- Authentication과 reCAPTCHA Enterprise 허용 Domain에 `onnuriway.vercel.app`을 기존 3개 Domain을 보존하는 병합 방식으로 추가
 - 앱의 App Check Provider를 `ReCaptchaEnterpriseProvider`로 전환하고 공개 Site Key는 Git 제외 환경 파일에만 반영
 - 환경별 PIN HMAC Lookup·scrypt Pepper Secret을 각각 독립 난수로 생성하여 Secret Manager `version 1 / ENABLED` 확인
 - `NEIS_API_KEY` `version 1 / ENABLED`, `KAKAO_REST_API_KEY` `version 2 / ENABLED` 확인
 - 중단된 입력 과정에서 생긴 신뢰할 수 없는 Kakao `version 1`은 즉시 `DESTROYED` 처리
-- Cloud Functions API 활성화 및 원격 함수가 아직 0개임을 확인하여 Secret 등록 외의 함수 배포가 없었음을 검증
+- Cloud Functions 32개를 서울 리전(`asia-northeast3`)·Node.js 22로 배포하고 전부 `ACTIVE` 확인
+- Firestore Rules·Index와 Storage Rules를 Staging에 배포하고 익명 Firestore REST 조회가 403으로 차단됨을 확인
+- Functions Artifact Registry 정리 정책을 7일로 설정
+- Vercel Preview 환경에 Next.js 16 앱을 배포하고 안정 주소 [onnuriway.vercel.app](https://onnuriway.vercel.app)을 해당 Staging 배포에 연결
+- Vercel Preview·Production 환경에 동일한 공개 Firebase Web 설정 8개를 등록하되 Secret과 OIDC Token은 Client 환경에 포함하지 않음
 
-App Check API 강제 적용은 아직 켜지 않았다. Staging Functions·Hosting 배포 후 정상 App Check Token 수신과 실제 호출 지표를 먼저 확인한 다음 API별로 단계적으로 강제한다. 외부 NEIS·Kakao 실제 호출 Gate도 계속 꺼 둔다.
+Callable Functions는 배포 코드의 `enforceAppCheck`로 보호한다. App Check 없는 `phase0Health` 요청은 401로 차단됐고, 실제 Staging 브라우저에서는 reCAPTCHA Enterprise Token 교환 200과 App Check가 포함된 `employeeLogin` 호출의 정상적인 PIN 거부 응답을 확인했다. Firebase Console의 제품별 강제 적용은 실제 호출 지표를 더 관찰한 뒤 단계적으로 켠다. 외부 NEIS·Kakao 실제 호출 Gate는 계속 꺼 둔다.
+
+## Staging 브라우저 검증 완료
+
+- HTTPS 로그인 화면과 핵심 접근성 구조 렌더링
+- `/api/connectivity` HEAD 204, 브라우저 콘솔 경고·오류 0개
+- App Check Token 교환 200과 Callable UI 오류 처리 확인
+- Service Worker `active`·페이지 제어 상태, Web App Manifest, Cache 2개 확인
+- 390×844 모바일에서 가로 넘침 없음
+- 새 버전 알림이 PIN 제출 버튼을 덮는 문제를 수정·재배포하고 겹침 없음 확인
 
 ## 완료되지 않은 외부 조건
 
 - 실제 납품 직원 1~2명, 홍보 직원 1~2명, 관리자 1명 선정
-- Staging Functions·Firebase Hosting 배포와 실제 HTTPS URL 검증
 - 비식별 Staging 데이터와 실제 Pilot 계정 준비
 - 개인정보 안내 및 Pilot 책임자 승인
 - 72시간 이상 실제 사용과 피드백 회수
@@ -54,5 +66,6 @@ App Check API 강제 적용은 아직 켜지 않았다. Staging Functions·Hosti
 - Next.js 16 Webpack Production Build, PWA Artifact, Production Bundle 성능 Gate 재통과
 - `npm audit --audit-level=high`: High·Critical 0개, 개발·관리 도구 전이 의존성의 Moderate 항목만 존재
 - `pilot:readiness`: 실제 Local 계획 파일이 없어 의도대로 `blocked`
+- Staging 배포 수정 후 PWA 단위 테스트 8개, ESLint, App/Functions TypeScript, Next.js 16 Production Build 재통과
 
-로컬 Webpack 증분 캐시가 resolve dependency snapshot을 저장하지 못했다는 경고가 두 Build에서 반복됐지만, 매번 optimized compile·TypeScript·정적 생성·PWA·Bundle 검증은 통과했다. Pilot 시작 전 Staging CI의 깨끗한 Linux 환경에서 동일 Build Gate를 다시 확인한다.
+Vercel의 깨끗한 Linux Build에서도 optimized compile·TypeScript·정적 생성과 Service Worker 생성이 통과했다. Pilot 시작 전 GitHub 기준 후보 Commit과 현재 Staging Deployment가 같은지 다시 확인한다.

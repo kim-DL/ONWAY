@@ -6,7 +6,11 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
   globalIgnores([
+    ".cache/**",
+    ".firebase/**",
     ".next/**",
+    ".tools/**",
+    ".vercel/**",
     "coverage/**",
     "functions/lib/**",
     "node_modules/**",

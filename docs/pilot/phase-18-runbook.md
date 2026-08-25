@@ -2,9 +2,9 @@
 
 ## 현재 상태
 
-`PREPARED · NOT STARTED`
+`PREPARED · STAGING DEPLOYED · PILOT NOT STARTED`
 
-자동화와 운영 양식은 준비됐지만 실제 직원 참여, HTTPS Staging, 전용 Firebase Project가 아직 연결되지 않았다. 이 세 조건 없이 Pilot을 통과 처리하거나 Production을 승인하지 않는다.
+자동화와 운영 양식, HTTPS Staging([onnuriway.vercel.app](https://onnuriway.vercel.app)), 전용 Firebase Project와 보호된 Functions 배포는 준비됐다. 실제 직원 참여, 비식별 데이터·계정 준비, 개인정보 안내와 책임자 승인은 아직 완료되지 않았다. 이 조건 없이 Pilot을 시작하거나 Production을 승인하지 않는다.
 
 ## 목적과 범위
 
@@ -24,6 +24,7 @@
 3. 개인정보 안내와 Pilot 책임자 승인을 받은 뒤 두 승인 값을 `true`로 바꾼다.
 4. `npm run pilot:readiness`가 `ready`여야 한다.
 5. 관리자가 비상 연락 채널, Maintenance Mode, 계정 비활성화, 세션 폐기 절차를 실제 Staging에서 확인한다.
+6. GitHub 후보 Commit, Vercel Staging Deployment, `docs/phase-18-status.md`의 검증 기록이 같은 후보를 가리키는지 확인한다.
 
 Local 계획 파일과 생성 결과는 Git에 커밋하지 않는다. 참여자의 이름, PIN, 전화번호, 이메일, 학교 방문 내용은 Pilot 문서에 기록하지 않는다.
 
