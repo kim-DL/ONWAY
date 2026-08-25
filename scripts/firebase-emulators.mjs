@@ -72,7 +72,7 @@ if (mode === "start") {
     ...commonArgs,
     seedCommand,
   ];
-} else if (mode === "phase3" || mode === "phase4" || mode === "phase6e2e" || mode === "phase7e2e" || mode === "phase8e2e" || mode === "phase9e2e" || mode === "phase9focus" || mode === "phase10e2e" || mode === "phase10focus" || mode === "phase11e2e" || mode === "phase11focus" || mode === "phase12e2e" || mode === "phase12focus" || mode === "phase13e2e" || mode === "phase13focus" || mode === "phase16e2e") {
+} else if (mode === "phase3" || mode === "phase4" || mode === "phase6e2e" || mode === "phase7e2e" || mode === "phase8e2e" || mode === "phase9e2e" || mode === "phase9focus" || mode === "phase10e2e" || mode === "phase10focus" || mode === "phase11e2e" || mode === "phase11focus" || mode === "phase12e2e" || mode === "phase12focus" || mode === "phase13e2e" || mode === "phase13focus" || mode === "phase16e2e" || mode === "phase17e2e" || mode === "phase18e2e") {
   environment.CI = "true";
   const tscCli = join(projectRoot, "node_modules", "typescript", "bin", "tsc");
   const buildResult = spawnSync(process.execPath, [tscCli], {
@@ -88,7 +88,11 @@ if (mode === "start") {
   }
 
   const tsxCli = join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
-  const e2eRunner = mode === "phase16e2e"
+  const e2eRunner = mode === "phase18e2e"
+    ? "run-phase18-e2e.ts"
+    : mode === "phase17e2e"
+    ? "run-phase17-e2e.ts"
+    : mode === "phase16e2e"
     ? "run-phase16-e2e.ts"
     : mode === "phase9focus"
       ? "run-phase9-e2e.ts"
@@ -108,6 +112,24 @@ if (mode === "start") {
     "auth,firestore,functions,storage",
     ...commonArgs,
     phase3Command,
+  ];
+} else if (mode === "phase17") {
+  environment.CI = "true";
+  const tscCli = join(projectRoot, "node_modules", "typescript", "bin", "tsc");
+  const buildResult = spawnSync(process.execPath, [tscCli], {
+    cwd: join(projectRoot, "functions"),
+    env: environment,
+    stdio: "inherit",
+  });
+  if (buildResult.error) console.error(buildResult.error.message);
+  if (buildResult.status !== 0) process.exit(buildResult.status ?? 1);
+  const phase17Command = `"${process.execPath}" "${join(projectRoot, "scripts", "run-phase17-emulator-suite.mjs")}"`;
+  firebaseArgs = [
+    "emulators:exec",
+    "--only",
+    "auth,firestore,functions,storage",
+    ...commonArgs,
+    phase17Command,
   ];
 } else if (mode === "phase5") {
   environment.CI = "true";
@@ -266,7 +288,7 @@ if (mode === "start") {
     commandParts.join(" "),
   ];
 } else {
-  console.error("Usage: node scripts/firebase-emulators.mjs <start|rules|seed|phase3|phase4|phase5|phase6|phase6e2e|phase7|phase7e2e|phase8|phase8e2e|phase9|phase9e2e|phase9focus|phase10|phase10e2e|phase10focus|phase11|phase11e2e|phase11focus|phase12|phase12e2e|phase12focus|phase13|phase13e2e|phase13focus|phase15|phase16e2e|exec> [command]");
+  console.error("Usage: node scripts/firebase-emulators.mjs <start|rules|seed|phase3|phase4|phase5|phase6|phase6e2e|phase7|phase7e2e|phase8|phase8e2e|phase9|phase9e2e|phase9focus|phase10|phase10e2e|phase10focus|phase11|phase11e2e|phase11focus|phase12|phase12e2e|phase12focus|phase13|phase13e2e|phase13focus|phase15|phase16e2e|phase17|phase17e2e|phase18e2e|exec> [command]");
   process.exit(1);
 }
 

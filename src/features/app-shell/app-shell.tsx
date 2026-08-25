@@ -16,6 +16,11 @@ import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
 import { usePwa } from "@/features/pwa/pwa-provider";
 import { isVerifiedAdminSession } from "@/domain/auth";
+import {
+  createPilotDeviceDiagnostics,
+  serializePilotDeviceDiagnostics,
+} from "@/features/pilot/pilot-diagnostics";
+import { APP_METADATA } from "@/lib/app-metadata";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import {
   getAvailableModes,
@@ -302,6 +307,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
   const { showToast } = useToast();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [exportingDiagnostics, setExportingDiagnostics] = useState(false);
 
   const roleLabels = session.claims.roleScopes.map((scope) => ({
     delivery: "납품",
@@ -318,6 +324,31 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
       setLoggingOut(false);
       setConfirmingLogout(false);
       showToast("로그아웃하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+  };
+
+  const exportDeviceDiagnostics = async () => {
+    setExportingDiagnostics(true);
+    const serialized = serializePilotDeviceDiagnostics(createPilotDeviceDiagnostics({
+      online: isOnline,
+      installed: installState === "installed",
+    }));
+    try {
+      await navigator.clipboard.writeText(serialized);
+      showToast("개인정보 없는 기기 진단을 복사했습니다.");
+    } catch {
+      const objectUrl = URL.createObjectURL(new Blob([serialized], { type: "application/json" }));
+      const download = document.createElement("a");
+      download.href = objectUrl;
+      download.download = `onnuriway-device-diagnostics-${Date.now()}.json`;
+      download.hidden = true;
+      document.body.append(download);
+      download.click();
+      download.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      showToast("개인정보 없는 기기 진단을 저장했습니다.");
+    } finally {
+      setExportingDiagnostics(false);
     }
   };
 
@@ -342,6 +373,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
           <div><span className="settings-list__icon"><Icon name={isOnline ? "refresh" : "wifi-off"} /></span><span><strong>네트워크</strong><small>{isOnline ? "최신 정보와 권한을 확인할 수 있습니다." : "저장된 학교 정보만 표시합니다."}</small></span><StatusBadge tone={isOnline ? "success" : "attention"}>{isOnline ? "온라인" : "오프라인"}</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="sparkles" /></span><span><strong>디자인 시스템</strong><small>Aurora · Soft Solid · Liquid Glass</small></span><StatusBadge>v1.0</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>기기 데이터</strong><small>로그아웃하면 비공개 로컬 상태를 정리합니다.</small></span><StatusBadge tone="info">이 기기</StatusBadge></div>
+          <div><span className="settings-list__icon"><Icon name="clipboard" /></span><span><strong>Pilot 기기 진단</strong><small>개인정보 없이 성능·캐시·연결 상태만 내보냅니다. {APP_METADATA.buildVersion}</small></span><button className="pwa-install-action" type="button" disabled={exportingDiagnostics} onClick={() => void exportDeviceDiagnostics()}>{exportingDiagnostics ? "준비 중…" : "진단 내보내기"}</button></div>
         </SoftCard>
 
         <GlassButton className="settings-logout" variant="quiet" onClick={() => setConfirmingLogout(true)}>

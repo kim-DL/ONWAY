@@ -12,11 +12,16 @@ import {
   collection,
   deleteDoc,
   doc,
+  documentId,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
+  query,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
   type Firestore,
 } from "firebase/firestore";
@@ -221,6 +226,39 @@ describe("Firestore role read matrix", () => {
 
     await Promise.all(paths.map((path) => assertSucceeds(getDoc(doc(firestore, path)))));
     await assertSucceeds(getDocs(collection(firestore, "salesVisits")));
+  });
+
+  it("supports the production client query shapes without widening role access", async () => {
+    const delivery = firestoreFor(IDENTITIES.delivery);
+    const sales = firestoreFor(IDENTITIES.sales);
+
+    await assertSucceeds(getDocs(query(
+      collection(delivery, "schools"),
+      orderBy("name", "asc"),
+      limit(8),
+    )));
+    await assertFails(getDocs(query(
+      collection(delivery, "salesCycles"),
+      orderBy("cycleId", "desc"),
+      limit(18),
+    )));
+    await assertSucceeds(getDocs(query(
+      collection(sales, "salesCycles"),
+      orderBy("cycleId", "desc"),
+      limit(18),
+    )));
+    await assertSucceeds(getDocs(query(
+      collection(sales, "salesVisits"),
+      where("schoolId", "==", "SCH-001"),
+      where("deleted", "==", false),
+      orderBy("visitedAt", "desc"),
+      orderBy(documentId(), "desc"),
+      limit(51),
+    )));
+    await assertSucceeds(getDocs(query(
+      collection(sales, "employeeDirectory"),
+      orderBy("displayOrder", "asc"),
+    )));
   });
 
   it("allows Viewer to read field data only", async () => {

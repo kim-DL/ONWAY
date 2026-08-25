@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "pilotId": "phase18-2026-09-01",
+  "environment": {
+    "kind": "staging",
+    "url": "https://replace-with-staging-url.example.invalid",
+    "firebaseProjectId": "replace-with-staging-project",
+    "dataMode": "sanitized"
+  },
+  "window": {
+    "startsAt": "2026-09-01T09:00:00+09:00",
+    "endsAt": "2026-09-04T18:00:00+09:00"
+  },
+  "participants": {
+    "delivery": [],
+    "sales": [],
+    "admin": []
+  },
+  "operations": {
+    "supportOwnerParticipantId": "PILOT-ADM-01",
+    "rollbackOwnerParticipantId": "PILOT-ADM-01",
+    "incidentChannel": "replace-with-internal-channel"
+  },
+  "approvals": {
+    "privacyNoticeAcknowledged": false,
+    "pilotOwnerApproved": false
+  },
+  "acceptanceReportPath": "output/acceptance/phase17-report.json"
+}

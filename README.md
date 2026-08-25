@@ -1,6 +1,6 @@
 # 급식길 (ONNURIWAY)
 
-대전 학교 급식실 납품·홍보 현장 운영을 위한 PWA 프로젝트다. Phase 16 Performance Hardening까지 구현했으며 모바일 우선 현장 앱, 로컬 학교 검색, Cache-first 현장정보, 월별 영업 운영, 서버 Filter 기반 임시 CSV, NEIS Preview/Diff/선택 Apply, 검토형 Kakao 위치 매칭, 버전형 현장 사진과 PC 우선 운영 콘솔을 제공한다.
+대전 학교 급식실 납품·홍보 현장 운영을 위한 PWA 프로젝트다. Phase 17 Full Acceptance Test를 통과했고 Phase 18 실제 직원 Pilot 준비를 완료했다. 모바일 우선 현장 앱, 로컬 학교 검색, Cache-first 현장정보, 월별 영업 운영, 서버 Filter 기반 임시 CSV, NEIS Preview/Diff/선택 Apply, 검토형 Kakao 위치 매칭, 버전형 현장 사진과 PC 우선 운영 콘솔을 제공한다.
 
 ## 개발 기준
 
@@ -177,6 +177,35 @@ npm run test:e2e:phase16
 
 로컬 계측기는 Boot·Catalog·Search·Detail·Image Duration, Cache Hit/Miss, 기능별 논리 Firestore Read, CLS·Long Task만 최근 120개까지 Memory에 유지한다. 학교·직원·UID·검색어·URL·문서 경로는 수집하거나 외부로 전송하지 않는다.
 
+## Full Acceptance Test
+
+```bash
+# 정적 분석, 단위·성능, Production Build/PWA/Bundle, 브라우저, Emulator 전체 Gate
+npm run test:acceptance
+
+# Auth/Firestore/Functions/Storage Emulator 기반 기능·Rules·Production 사용자 여정
+npm run test:acceptance:emulator
+
+# Production PWA 전체 브라우저 시나리오만 실행
+npm run test:e2e:phase17
+```
+
+Phase 17은 P0 11개, P1 17개, 보안 회귀 6개 공격군을 자동 검증한다. 상세 항목과 증적은 `docs/phase-17-acceptance-matrix.md`, Rules 평가는 `docs/security/phase-17-rules-audit.json`에 기록한다. 이 단계는 기술적 릴리스 후보 Gate이며, 실제 직원 Pilot과 관리자 Production 승인은 Phase 18에서 별도로 수행한다.
+
+## Phase 18 Pilot
+
+```bash
+# 개인정보 없는 기기 진단 흐름 리허설
+npm run test:e2e:phase18
+
+# 실제 Pilot 계획·Staging·참여자·최근 수용 리포트 확인
+npm run pilot:readiness
+```
+
+Pilot은 납품 1~2명, 홍보 1~2명, 관리자 1명이 HTTPS Staging에서 72시간 이상 실제 업무로 수행한다. `pilot/phase-18-plan.example.json`을 Git에서 제외되는 `pilot/phase-18-plan.local.json`으로 복사해 환경과 참여자 코드만 입력한다. 실명·PIN·연락처는 기록하지 않는다. 실행 절차와 PASS/중단 기준은 `docs/pilot/phase-18-runbook.md`, 현재 상태는 `docs/phase-18-status.md`에 있다.
+
+설정의 `Pilot 기기 진단`은 느림이 발생한 순간의 앱 버전, 온라인·설치 상태, 집계 성능·캐시·Firestore 읽기 횟수를 복사하거나 JSON으로 저장한다. 직원·학교·검색어·연락처는 수집하거나 서버로 전송하지 않는다.
+
 ## Google-approved Admin Console
 
 ```bash
@@ -291,6 +320,11 @@ npm run test:e2e:phase11
 npm run test:e2e:phase12
 npm run test:e2e:phase13
 npm run test:e2e:phase16
+npm run test:e2e:phase17
+npm run test:e2e:phase18
+npm run test:acceptance:emulator
+npm run test:acceptance
+npm run pilot:readiness
 ```
 
 `test:e2e:phase13`은 PIN 인증, 역할별 앱 셸, 학교 검색·상세·사진, A/B/C 영업 직원별 배정, 방문·이력·CSV에 더해 확정 좌표 길안내와 미확정 학교의 공식명 검색 Fallback을 누적 Chromium 시나리오로 통합 검증한다. `test:e2e:phase16`은 Emulator 설정으로 Production PWA를 Build하고 Chromium CPU를 4배 감속해 Search·Cached Detail·Warm Relaunch·Image Cache·CLS·Read Counter·PII 부재를 검증한다. 이전 Phase의 E2E 명령은 호환 회귀 진입점으로 유지한다.

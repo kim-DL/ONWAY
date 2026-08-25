@@ -32,6 +32,14 @@
         { "fieldPath": "followUp.required", "order": "ASCENDING" },
         { "fieldPath": "followUp.dueDate", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "roleScopes", "arrayConfig": "CONTAINS" }
+      ]
     }
   ],
   "fieldOverrides": []

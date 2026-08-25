@@ -76,7 +76,9 @@ test("a previously viewed school opens from IndexedDB while offline", async ({ p
   await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
 
   await expect(page.locator(".field-priority")).toContainText("07:30 ~ 08:10");
-  await expect(page.getByText("오프라인 · 저장된 정보를 표시하고 있습니다.")).toBeVisible();
+  await expect(
+    page.getByLabel("대전온누리고등학교").getByText("오프라인 · 저장된 정보를 표시하고 있습니다."),
+  ).toBeVisible();
 });
 
 test("section updates use the callable and stale revisions surface a recoverable conflict", async ({ page, context }) => {

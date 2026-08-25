@@ -98,10 +98,6 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
-    function hasScope(scope) {
-      return sessionValid() && tokenHasScope(scope);
-    }
-
     function isAdmin() {
       return sessionValid()
         && tokenHasScope('admin')

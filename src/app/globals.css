@@ -2273,8 +2273,14 @@ button { -webkit-tap-highlight-color: transparent; }
 .pwa-update .pwa-update__apply { color: #173f35; background: #d8e563; }
 .pwa-update .pwa-update__later { color: rgba(255,255,255,.72); }
 
-.pwa-install-action { min-height: 36px; padding: .4rem .7rem; border: 1px solid color-mix(in srgb, var(--shell-accent) 32%, transparent); border-radius: 999px; color: var(--shell-accent-deep); background: var(--shell-accent-soft); font-size: .62rem; font-weight: 820; cursor: pointer; }
+.pwa-install-action { min-height: 44px; padding: .55rem .78rem; border: 1px solid color-mix(in srgb, var(--shell-accent) 32%, transparent); border-radius: 999px; color: var(--shell-accent-deep); background: var(--shell-accent-soft); font-size: .62rem; font-weight: 820; cursor: pointer; transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease; }
+.pwa-install-action:hover:not(:disabled) { transform: translateY(-1px); background: color-mix(in srgb, var(--shell-accent-soft) 84%, white); box-shadow: 0 8px 18px color-mix(in srgb, var(--shell-accent) 12%, transparent); }
+.pwa-install-action:disabled { cursor: wait; opacity: .62; }
 .pwa-install-action:focus-visible { outline: 3px solid var(--shell-accent-faint); outline-offset: 2px; }
+
+@media (max-width: 760px) {
+  .settings-list > div > .pwa-install-action { grid-column: 2; justify-self: start; }
+}
 
 @keyframes pwa-notice-in { from { opacity: 0; } }
 

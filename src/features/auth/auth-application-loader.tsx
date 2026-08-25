@@ -6,6 +6,7 @@ function ApplicationBootFallback() {
   return (
     <main className="auth-shell auth-shell--center" aria-busy="true">
       <div className="auth-splash" role="status" aria-live="polite">
+        <h1 className="sr-only">급식길 현장 앱 준비 중</h1>
         <div className="auth-brand" aria-label="급식길">
           <span className="auth-brand__mark" aria-hidden="true">길</span>
           <span><strong>급식길</strong><small>ONNURIWAY</small></span>

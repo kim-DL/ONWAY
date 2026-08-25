@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Firestore는 인증 상태와 서버 authz 문서를 교차 검증한 명시적 역할별 읽기만 허용하고 모든 클라이언트 쓰기를 거부한다. Storage는 모든 직접 읽기와 쓰기를 거부하며 파일 접근은 서버 Callable 경계로 제한한다. Delivery의 Sales 접근, employeeId/role 변조, Storage 직접 접근, Audit 변조, Auth Credential/PIN 접근을 포함한 23개 공격 회귀 테스트가 통과했다.",
+  "findings": []
+}

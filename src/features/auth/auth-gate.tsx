@@ -10,6 +10,7 @@ function AppShellFallback() {
   return (
     <main className="auth-shell auth-shell--center" aria-busy="true">
       <div className="auth-splash" role="status" aria-live="polite">
+        <h1 className="sr-only">급식길 업무 화면 준비 중</h1>
         <Brand />
         <span className="auth-spinner" aria-hidden="true" />
         <p>저장된 업무 화면을 여는 중이에요.</p>
@@ -36,6 +37,7 @@ function AuthSplash() {
   return (
     <main className="auth-shell auth-shell--center" aria-busy="true">
       <div className="auth-splash" role="status" aria-live="polite">
+        <h1 className="sr-only">급식길 로그인 확인 중</h1>
         <Brand />
         <span className="auth-spinner" aria-hidden="true" />
         <p>안전하게 로그인 정보를 확인하고 있어요.</p>

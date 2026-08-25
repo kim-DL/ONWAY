@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -47,20 +47,23 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Search and cache performance
+        run: npm run test:performance
+
       - name: Functions build
         run: npm run functions:build
 
       - name: Production build
         run: npm run build
 
-      - name: Firebase Rules tests
-        run: npm run test:rules
+      - name: PWA artifact gate
+        run: npm run verify:pwa:build
 
-      - name: Emulator seed verification
-        run: npm run seed:verify
+      - name: JavaScript budget gate
+        run: npm run verify:performance:build
 
-      - name: Browser tests
+      - name: Safe configuration browser tests
         run: npm run test:e2e
 
-      - name: Phase 3 Auth emulator browser tests
-        run: npm run test:e2e:auth
+      - name: Phase 17 emulator and production journey
+        run: npm run test:acceptance:emulator

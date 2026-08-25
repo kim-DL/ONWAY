@@ -17,10 +17,14 @@ ui-debug.log
 
 # Local toolchain
 .tools/
+.cache/
 
 # Test artifacts
 output/playwright/
 output/security/
+output/acceptance/
+output/pilot/
+pilot/*.local.json
 .playwright-cli/
 .pnpm-store/
 test-results/

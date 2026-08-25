@@ -91,18 +91,52 @@ async function emulatorIdToken(uid: string) {
   return body.idToken;
 }
 
+async function emulatorGoogleIdToken(uid: string) {
+  const currentIdToken = await emulatorIdToken(uid);
+  const fakeGoogleIdToken = JSON.stringify({
+    sub: "phase17-admin-google",
+    email: "admin@onnuriway.test",
+    email_verified: true,
+    name: "Phase 17 Admin",
+  });
+  const postBody = new URLSearchParams({
+    providerId: "google.com",
+    id_token: fakeGoogleIdToken,
+  }).toString();
+  const response = await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=demo-key`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      requestUri: "http://127.0.0.1",
+      postBody,
+      idToken: currentIdToken,
+      returnSecureToken: true,
+    }),
+  });
+  const body = await response.json() as { idToken?: string; error?: { message?: string } };
+  if (!body.idToken) {
+    throw new Error(`Emulator Google sign-in failed: ${body.error?.message ?? "missing ID token"}.`);
+  }
+  return body.idToken;
+}
+
 async function callFunction(name: string, idToken: string, data: unknown) {
   const response = await fetch(`http://127.0.0.1:5001/${PROJECT_ID}/asia-northeast3/${name}`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ data }),
   });
-  return response.json() as Promise<{ result?: Record<string, unknown>; error?: { status?: string } }>;
+  const payload = await response.json() as {
+    data?: Record<string, unknown>;
+    result?: Record<string, unknown>;
+    error?: { status?: string };
+  };
+  return { result: payload.data ?? payload.result, error: payload.error };
 }
 
 test("admin callables create and change assignments while sales users are denied", async () => {
   const [adminToken, salesToken] = await Promise.all([
-    emulatorIdToken("uid-admin"),
+    emulatorGoogleIdToken("uid-admin"),
     emulatorIdToken("uid-sales-a"),
   ]);
   const base = { appVersion: "phase9-e2e" };
