@@ -1,7 +1,8 @@
 {
   "projects": {
     "default": "demo-onnuriway",
-    "staging": "onnuriway"
+    "staging": "onnuriway",
+    "production": "onnuriway"
   },
   "targets": {},
   "etags": {}

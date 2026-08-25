@@ -51,6 +51,8 @@
     "test:acceptance:emulator": "node scripts/firebase-emulators.mjs phase17",
     "test:acceptance": "node scripts/run-phase17-acceptance.mjs",
     "pilot:readiness": "node scripts/run-phase18-pilot-readiness.ts",
+    "admin:provision-google": "node scripts/provision-google-admin.mjs",
+    "production:configure-runtime": "node scripts/configure-production-runtime.mjs",
     "test:rules": "node scripts/firebase-emulators.mjs rules",
     "test:rules:run": "vitest run --config vitest.rules.config.ts",
     "test:e2e": "tsx scripts/run-app-shell-e2e.ts",

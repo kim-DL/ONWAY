@@ -351,8 +351,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { ok: boolean; employeeId: string; displayName: string }
       >(services.functions, "activateAdminSession");
       await activateAdminSession({ appVersion: APP_METADATA.buildVersion });
-      adminActivationRef.current = false;
+      // Keep the observer guard active until Firebase exposes the refreshed admin claims.
       await credential.user.getIdToken(true);
+      adminActivationRef.current = false;
     } catch (error) {
       adminActivationRef.current = false;
       await signOut(services.auth).catch(() => undefined);
