@@ -172,6 +172,37 @@ describe("NEIS initial school import", () => {
     expect(repository.applyInitialImport).not.toHaveBeenCalled();
   });
 
+  it("canonicalizes the abbreviated Daejeon prefix returned by NEIS", () => {
+    const plan = buildInitialSchoolImportPlan([
+      row({
+        SD_SCHUL_CODE: "7441059",
+        SCHUL_NM: "대전동광초등학교",
+        ORG_RDNMA: "대전 동구 백룡로11번길 20",
+        ORG_RDNDA: ", 대전동광초등학교 (자양동,대전동광초등학교)",
+      }),
+      row({
+        SD_SCHUL_CODE: "7430065",
+        SCHUL_NM: "중일고등학교",
+        SCHUL_KND_SC_NM: "고등학교",
+        ORG_RDNMA: "대전 유성구 배울2로 68",
+        ORG_RDNDA: "(관평동,중일고등학교)",
+      }),
+    ], {
+      targetEducationOfficeCode: "G10",
+      syncedAt: SYNCED_AT,
+    });
+
+    expect(plan.schools).toHaveLength(2);
+    expect(plan.schools.find((school) => school.source.schoolCode === "7441059")).toMatchObject({
+      district: "dong",
+      address: { road: "대전광역시 동구 백룡로11번길 20 대전동광초등학교 (자양동,대전동광초등학교)" },
+    });
+    expect(plan.schools.find((school) => school.source.schoolCode === "7430065")).toMatchObject({
+      district: "yuseong",
+      address: { road: "대전광역시 유성구 배울2로 68 (관평동,중일고등학교)" },
+    });
+  });
+
   it("applies one validated plan with deterministic execution metadata", async () => {
     const repository = { applyInitialImport: vi.fn(async () => undefined) };
     const service = new InitialSchoolImportService({

@@ -76,10 +76,18 @@ export function mapNeisSchoolType(label: string): ImportedSchoolType | null {
 
 function combineRoadAddress(base: string, detail: string) {
   const normalizedBase = normalizeWhitespace(base);
-  const normalizedDetail = normalizeWhitespace(detail);
+  const normalizedDetail = normalizeWhitespace(detail).replace(/^,\s*/u, "");
   if (!normalizedBase) return "";
   if (!normalizedDetail || normalizedBase.includes(normalizedDetail)) return normalizedBase;
   return `${normalizedBase} ${normalizedDetail}`;
+}
+
+function canonicalizeDaejeonRoadAddress(address: string, locationName: string) {
+  if (normalizeWhitespace(locationName) !== "대전광역시") return address;
+  return address.replace(
+    /^대전(?=\s+(?:동구|중구|서구|유성구|대덕구)(?:\s|$))/u,
+    "대전광역시",
+  );
 }
 
 function districtFromAddress(address: string): ImportedDistrict | null {
@@ -118,7 +126,10 @@ export function mapNeisSchool(
 
   const name = normalizeWhitespace(row.SCHUL_NM);
   if (!name) throw new NeisSchoolMappingError(schoolCode, "School name is missing.");
-  const road = combineRoadAddress(row.ORG_RDNMA, row.ORG_RDNDA);
+  const road = canonicalizeDaejeonRoadAddress(
+    combineRoadAddress(row.ORG_RDNMA, row.ORG_RDNDA),
+    row.LCTN_SC_NM,
+  );
   const district = districtFromAddress(road);
   if (!road.startsWith("대전광역시") || !district) {
     throw new NeisSchoolMappingError(schoolCode, "School address is outside the Daejeon target.");
