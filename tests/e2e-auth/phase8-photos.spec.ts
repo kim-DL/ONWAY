@@ -117,8 +117,10 @@ test("mobile uploader replaces a version, then soft delete can be undone", async
   expect(uploaderScan.violations).toEqual([]);
   await uploader.screenshot({ path: `${VISUALS}/03-photo-upload-mobile.png` });
 
-  const replacement = await sharp({ create: { width: 1_200, height: 900, channels: 3, background: "#c76d4e" } }).png().toBuffer();
-  await uploader.locator('input[type="file"]').setInputFiles({ name: "new-approach.png", mimeType: "image/png", buffer: replacement });
+  const replacement = await sharp({ create: { width: 3_600, height: 2_700, channels: 3, background: "#c76d4e" } }).png().toBuffer();
+  await uploader.getByLabel("앨범에서 사진 선택").setInputFiles({ name: "new-approach.png", mimeType: "image/png", buffer: replacement });
+  await expect(uploader.getByText(/로 최적화/)).toBeVisible();
+  await expect(uploader.getByText("2560 × 1920")).toBeVisible();
   await uploader.getByLabel("사진 설명").fill("새로 확인한 정문 접근로");
   await uploader.getByRole("button", { name: "새 사진으로 교체" }).click();
   await expect(page.getByText("새 버전의 사진으로 교체했습니다.")).toBeVisible({ timeout: 30_000 });

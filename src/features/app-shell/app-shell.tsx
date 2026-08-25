@@ -11,7 +11,7 @@ import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { SoftCard } from "@/components/ui/soft-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ToastProvider, useToast } from "@/components/ui/toast";
-import type { School } from "@/domain/school";
+import type { School, SchoolFieldProfile } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
 import { usePwa } from "@/features/pwa/pwa-provider";
@@ -128,6 +128,20 @@ function schoolStatus(school: School) {
   return { label: "위치 확인 필요", tone: "info" as const };
 }
 
+function schoolCardFacts(profile: SchoolFieldProfile | null) {
+  if (!profile) return [];
+  const inspection = profile.inspection.startTime && profile.inspection.endTime
+    ? `${profile.inspection.startTime}–${profile.inspection.endTime}`
+    : profile.inspection.startTime ?? profile.inspection.endTime;
+  const location = [profile.cafeteria.building, profile.cafeteria.floor].filter(Boolean).join(" · ");
+  return [
+    inspection ? { icon: "clock" as const, label: `검수 ${inspection}` } : null,
+    profile.equipment.cartRequired !== "unknown" ? { icon: "clipboard" as const, label: `대차 ${profile.equipment.cartRequired === "required" ? "필요" : "불필요"}` } : null,
+    profile.equipment.elevator !== "unknown" ? { icon: "building" as const, label: `엘리베이터 ${profile.equipment.elevator === "available" ? "있음" : "없음"}` } : null,
+    location ? { icon: "location" as const, label: location } : null,
+  ].filter((fact): fact is NonNullable<typeof fact> => fact !== null);
+}
+
 function ShellHeader({
   session,
   mode,
@@ -195,12 +209,14 @@ function ShellNavigation({
 
 function SchoolList({
   schools,
+  profileBySchoolId,
   status,
   onRetry,
   onSelect,
   emptyMessage = "표시할 학교가 없습니다.",
 }: {
   schools: School[];
+  profileBySchoolId: Record<string, SchoolFieldProfile | null>;
   status: "loading" | "ready" | "error";
   onRetry: () => void;
   onSelect: (school: School) => void;
@@ -235,6 +251,7 @@ function SchoolList({
     <div className="school-grid">
       {schools.map((school) => {
         const schoolState = schoolStatus(school);
+        const fieldFacts = schoolCardFacts(profileBySchoolId[school.schoolId] ?? null);
         return (
           <button
             className="school-card"
@@ -250,6 +267,7 @@ function SchoolList({
             </span>
             <strong>{school.name}</strong>
             <span className="school-card__address"><Icon name="location" size={15} />{school.address.road ?? "주소 확인 필요"}</span>
+            {fieldFacts.length > 0 ? <span className="school-card__field-assets" aria-label="공동 현장정보">{fieldFacts.map((fact) => <span key={fact.label}><Icon name={fact.icon} size={15} />{fact.label}</span>)}</span> : null}
             <span className="school-card__footer">
               <span>{DISTRICT_LABELS[school.district]} · {SCHOOL_TYPE_LABELS[school.schoolType]}</span>
               <Icon name="chevron-right" size={18} />
@@ -457,7 +475,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   }
 
   return (
-    <main className="workspace-shell" data-mode={mode}>
+    <main className="workspace-shell" data-mode={mode} data-detail={selectedSchool ? "true" : "false"}>
       <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
       <ShellHeader session={session} mode={mode} availableModes={availableModes} onModeChange={changeMode} />
       <ShellNavigation mode={mode} view={view} onNavigate={navigate} />

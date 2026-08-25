@@ -43,6 +43,8 @@ test("delivery detail exposes the field brief, photo metadata, directions, and a
   const priority = page.locator(".field-priority");
   await expect(priority).toContainText("07:30 ~ 08:10");
   await expect(priority).toContainText("필요");
+  await expect(priority).toContainText("엘리베이터");
+  await expect(priority).toContainText("있음");
   await expect(priority).toContainText("본관 · 1층 · 정문에서 오른쪽 통로 끝");
   await expect(page.getByRole("heading", { name: "차량과 하역" })).toBeVisible();
   await expect(page.getByText("급식실 출입구", { exact: true })).toBeVisible();
@@ -50,6 +52,16 @@ test("delivery detail exposes the field brief, photo metadata, directions, and a
   const direction = page.getByRole("link", { name: "길안내" }).first();
   await expect(direction).toHaveAttribute("href", /https:\/\/map\.kakao\.com\/link\/to\//);
   await expect(direction).toHaveAttribute("target", "_blank");
+
+  await page.getByRole("button", { name: "전체 편집" }).click();
+  const completeEditor = page.getByRole("dialog", { name: "현장정보 한 번에 입력" });
+  await expect(completeEditor.getByLabel("급식실 위치")).toBeVisible();
+  await expect(completeEditor.getByLabel("검수 시작")).toBeVisible();
+  await expect(completeEditor.getByLabel("대차 필요")).toBeVisible();
+  await expect(completeEditor.getByLabel("엘리베이터")).toBeVisible();
+  await expect(completeEditor.getByLabel("하역 위치")).toBeVisible();
+  await expect(completeEditor.getByLabel("현장 특이사항")).toBeVisible();
+  await completeEditor.getByRole("button", { name: "닫기" }).click();
 
   const scan = await new AxeBuilder({ page }).include(".school-detail").analyze();
   expect(scan.violations).toEqual([]);
@@ -85,6 +97,10 @@ test("section updates use the callable and stale revisions surface a recoverable
   await openCompleteSchool(page);
   await page.getByRole("button", { name: "검수시간 상세 수정" }).click();
   await expect(page.getByRole("dialog", { name: "검수시간 수정" })).toBeVisible();
+  const inspectionNote = page.getByRole("textbox", { name: "추가 설명" });
+  await inspectionNote.fill("");
+  await inspectionNote.pressSequentially("학생 이동 시간 주의");
+  await expect(inspectionNote).toHaveValue("학생 이동 시간 주의");
 
   const concurrentPage = await context.newPage();
   await openCompleteSchool(concurrentPage, false);

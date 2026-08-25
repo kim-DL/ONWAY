@@ -2,15 +2,15 @@
 
 import "client-only";
 
-import { collection, limit, onSnapshot, orderBy, query, type Unsubscribe } from "firebase/firestore";
+import { collection, documentId, getDocs, limit, onSnapshot, orderBy, query, where, type Unsubscribe } from "firebase/firestore";
 
-import type { School } from "@/domain/school";
+import type { School, SchoolFieldProfile } from "@/domain/school";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
-import { schoolConverter } from "@/lib/firebase/firestore-converters";
+import { schoolConverter, schoolFieldProfileConverter } from "@/lib/firebase/firestore-converters";
 import { recordFirestoreReads } from "@/lib/performance/performance-monitor";
 
 export function subscribeToShellSchools(
-  onData: (schools: School[]) => void,
+  onData: (schools: School[], profileBySchoolId: Record<string, SchoolFieldProfile | null>) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
   const services = getFirebaseClientServices();
@@ -25,12 +25,37 @@ export function subscribeToShellSchools(
     limit(8),
   );
 
-  return onSnapshot(
+  let closed = false;
+  let generation = 0;
+  const unsubscribe = onSnapshot(
     schoolQuery,
-    (snapshot) => {
+    async (snapshot) => {
+      const currentGeneration = generation + 1;
+      generation = currentGeneration;
       recordFirestoreReads("shell", snapshot.docChanges().length);
-      onData(snapshot.docs.map((document) => document.data()));
+      const schools = snapshot.docs.map((document) => document.data());
+      onData(schools, {});
+      try {
+        if (schools.length === 0) {
+          return;
+        }
+        const profileSnapshots = await getDocs(query(
+          collection(services.firestore, "schoolFieldProfiles").withConverter(schoolFieldProfileConverter),
+          where(documentId(), "in", schools.map((school) => school.schoolId)),
+        ));
+        if (closed || generation !== currentGeneration) return;
+        recordFirestoreReads("shell", profileSnapshots.size);
+        const profiles = new Map(profileSnapshots.docs.map((profileSnapshot) => [profileSnapshot.id, profileSnapshot.data()]));
+        onData(schools, Object.fromEntries(schools.map((school) => [school.schoolId, profiles.get(school.schoolId) ?? null])));
+      } catch {
+        // Base school cards remain usable if the optional shared-field summary cannot refresh.
+      }
     },
     (error) => onError(error),
   );
+  return () => {
+    closed = true;
+    generation += 1;
+    unsubscribe();
+  };
 }

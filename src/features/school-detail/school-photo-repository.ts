@@ -51,7 +51,10 @@ type UploadInput = {
   appVersion: string;
   caption: string | null;
   file: File;
+  onStage?: ((stage: PhotoUploadStage) => void) | undefined;
 };
+
+export type PhotoUploadStage = "preparing" | "encoding" | "processing";
 
 type MutationInput = {
   schoolId: string;
@@ -93,6 +96,7 @@ export class SchoolPhotoRepository {
     if (input.file.size <= 0 || input.file.size > PHOTO_UPLOAD_MAX_BYTES) {
       throw new Error("사진은 10MB 이하여야 합니다.");
     }
+    input.onStage?.("preparing");
     const prepare = httpsCallable(services.functions, "preparePhotoUpload");
     const prepared = prepareResultSchema.parse((await prepare({
       schoolId: documentIdSchema.parse(input.schoolId),
@@ -105,10 +109,13 @@ export class SchoolPhotoRepository {
       byteSize: input.file.size,
       caption: input.caption,
     })).data);
+    input.onStage?.("encoding");
+    const fileBase64 = await fileToBase64(input.file);
+    input.onStage?.("processing");
     const finalize = httpsCallable(services.functions, "finalizePhotoUpload");
     return uploadResultSchema.parse((await finalize({
       uploadId: prepared.uploadId,
-      fileBase64: await fileToBase64(input.file),
+      fileBase64,
     })).data);
   }
 

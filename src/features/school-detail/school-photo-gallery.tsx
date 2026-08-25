@@ -5,6 +5,7 @@
 import {
   useEffect,
   useCallback,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -28,7 +29,13 @@ import {
   PHOTO_UPLOAD_MAX_BYTES,
   PHOTO_UPLOAD_TYPES,
   schoolPhotoRepository,
+  type PhotoUploadStage,
 } from "./school-photo-repository";
+import {
+  formatPhotoBytes,
+  optimizeSchoolPhoto,
+  type OptimizedSchoolPhoto,
+} from "./photo-upload-optimizer";
 import { useSchoolPhoto } from "./use-school-photo";
 
 const SLOT_LABELS: Record<PhotoSlotId, string> = {
@@ -100,28 +107,49 @@ function PhotoUploader({
 }) {
   const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
+  const [photoInfo, setPhotoInfo] = useState<OptimizedSchoolPhoto | null>(null);
   const [caption, setCaption] = useState(photo?.caption ?? SLOT_LABELS[slotId]);
   const [saving, setSaving] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [uploadStage, setUploadStage] = useState<PhotoUploadStage | null>(null);
+  const selectionId = useRef(0);
+  const galleryInputId = useId();
+  const cameraInputId = useId();
   const previewUrl = useMemo(() => file ? URL.createObjectURL(file) : null, [file]);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+  useEffect(() => () => { selectionId.current += 1; }, []);
 
-  const selectFile = (candidate: File | null) => {
+  const selectFile = async (candidate: File | null) => {
     if (!candidate) return;
-    if (!PHOTO_UPLOAD_TYPES.includes(candidate.type as typeof PHOTO_UPLOAD_TYPES[number])) {
-      showToast("JPEG, PNG, WebP 사진만 선택할 수 있습니다.");
-      return;
+    const requestId = selectionId.current + 1;
+    selectionId.current = requestId;
+    setOptimizing(true);
+    setPhotoInfo(null);
+    try {
+      const optimized = await optimizeSchoolPhoto(candidate);
+      if (selectionId.current !== requestId) return;
+      if (!PHOTO_UPLOAD_TYPES.includes(optimized.file.type as typeof PHOTO_UPLOAD_TYPES[number])) {
+        throw new Error("JPEG, PNG 또는 WebP 사진으로 변환하지 못했습니다.");
+      }
+      if (optimized.file.size <= 0 || optimized.file.size > PHOTO_UPLOAD_MAX_BYTES) {
+        throw new Error("최적화한 사진도 10MB를 넘습니다. 다른 사진을 선택해주세요.");
+      }
+      setFile(optimized.file);
+      setPhotoInfo(optimized);
+    } catch (error) {
+      if (selectionId.current !== requestId) return;
+      setFile(null);
+      showToast(error instanceof Error ? error.message : "사진을 준비하지 못했습니다.");
+    } finally {
+      if (selectionId.current === requestId) setOptimizing(false);
     }
-    if (candidate.size <= 0 || candidate.size > PHOTO_UPLOAD_MAX_BYTES) {
-      showToast("사진은 10MB 이하여야 합니다.");
-      return;
-    }
-    setFile(candidate);
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!file) return showToast("촬영하거나 선택한 사진이 필요합니다.");
     setSaving(true);
+    setUploadStage("preparing");
     try {
       await schoolPhotoRepository.upload({
         schoolId,
@@ -131,6 +159,7 @@ function PhotoUploader({
         appVersion: APP_METADATA.buildVersion,
         caption: caption.trim() || null,
         file,
+        onStage: setUploadStage,
       });
       showToast(photo ? "새 버전의 사진으로 교체했습니다." : "현장 사진을 등록했습니다.", "success");
       onDone();
@@ -139,24 +168,39 @@ function PhotoUploader({
       if (error instanceof FirebaseError && error.code === "functions/aborted") onDone();
     } finally {
       setSaving(false);
+      setUploadStage(null);
     }
   };
 
+  const savingLabel = uploadStage === "preparing"
+    ? "업로드 준비 중…"
+    : uploadStage === "encoding"
+      ? "사진 전송 중…"
+      : uploadStage === "processing"
+        ? "서버에서 마무리 중…"
+        : "저장 중…";
+
   return (
     <form className="photo-uploader" onSubmit={submit}>
-      <label
+      <div
         className="photo-dropzone"
         data-has-file={Boolean(file)}
         onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => { event.preventDefault(); selectFile(event.dataTransfer.files.item(0)); }}
+        onDrop={(event) => { event.preventDefault(); void selectFile(event.dataTransfer.files.item(0)); }}
       >
-        {previewUrl ? <img src={previewUrl} alt="업로드할 사진 미리보기" width={800} height={1_200} decoding="async" /> : <span><Icon name="camera" size={30} /><strong>촬영하거나 사진 선택</strong><small>JPEG · PNG · WebP / 최대 10MB<br />PC에서는 이곳에 끌어놓을 수 있어요.</small></span>}
-        <input className="sr-only" type="file" accept={PHOTO_UPLOAD_TYPES.join(",")} capture="environment" onChange={(event) => selectFile(event.target.files?.item(0) ?? null)} />
-        {previewUrl ? <em>다른 사진 선택</em> : null}
-      </label>
+        {previewUrl ? <img src={previewUrl} alt="업로드할 사진 미리보기" width={800} height={1_200} decoding="async" /> : <span><Icon name="camera" size={30} /><strong>{optimizing ? "사진을 빠르게 최적화하는 중" : "등록할 현장 사진"}</strong><small>{optimizing ? "해상도와 전송 용량을 안전하게 줄이고 있어요." : "앨범 또는 카메라를 선택해주세요. PC에서는 끌어놓기도 가능합니다."}</small></span>}
+        {optimizing ? <span className="photo-dropzone__progress"><i />모바일 전송 크기로 줄이는 중…</span> : null}
+      </div>
+      <div className="photo-source-actions" aria-label="사진 가져오기 방법">
+        <label htmlFor={galleryInputId}><Icon name="upload" /><span><strong>앨범에서 선택</strong><small>휴대폰 갤러리 · 파일</small></span></label>
+        <input id={galleryInputId} className="sr-only" type="file" accept="image/*" aria-label="앨범에서 사진 선택" onChange={(event) => { const selected = event.target.files?.item(0) ?? null; event.currentTarget.value = ""; void selectFile(selected); }} />
+        <label htmlFor={cameraInputId}><Icon name="camera" /><span><strong>카메라로 촬영</strong><small>후면 카메라 바로 열기</small></span></label>
+        <input id={cameraInputId} className="sr-only" type="file" accept="image/*" capture="environment" aria-label="카메라로 사진 촬영" onChange={(event) => { const selected = event.target.files?.item(0) ?? null; event.currentTarget.value = ""; void selectFile(selected); }} />
+      </div>
+      {photoInfo ? <p className="photo-optimization-result"><Icon name="check" />{photoInfo.optimized ? `${formatPhotoBytes(photoInfo.originalBytes)} → ${formatPhotoBytes(photoInfo.file.size)}로 최적화` : `${formatPhotoBytes(photoInfo.file.size)} · 추가 압축 없이 사용`}<span>{photoInfo.width} × {photoInfo.height}</span></p> : null}
       <label className="photo-caption-field"><span>사진 설명</span><input value={caption} maxLength={2_000} onChange={(event) => setCaption(event.target.value)} placeholder={SLOT_LABELS[slotId]} /></label>
       <div className="photo-privacy-note"><Icon name="sparkles" /><p><strong>개인정보를 한 번 더 확인해주세요.</strong><small>학생 얼굴, 차량번호, 연락처, 문서가 보이는 사진은 등록하지 않습니다.</small></p></div>
-      <GlassButton variant="primary" type="submit" disabled={saving || !file}>{saving ? "안전하게 변환 중…" : photo ? "새 사진으로 교체" : "현장 사진 등록"}</GlassButton>
+      <GlassButton variant="primary" type="submit" disabled={saving || optimizing || !file}>{saving ? savingLabel : photo ? "새 사진으로 교체" : "현장 사진 등록"}</GlassButton>
     </form>
   );
 }

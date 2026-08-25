@@ -18,11 +18,33 @@ test("delivery shell exposes role navigation and opens a real school detail shel
 
   const schoolCard = page.getByRole("button", { name: /대전온누리고등학교/ });
   await expect(schoolCard).toBeVisible();
+  await expect(schoolCard.getByLabel("공동 현장정보")).toContainText("검수 07:30–08:10");
+  await expect(schoolCard.getByLabel("공동 현장정보")).toContainText("대차 필요");
+  await expect(schoolCard.getByLabel("공동 현장정보")).toContainText("엘리베이터 있음");
   await schoolCard.click();
   await expect(page.getByRole("heading", { name: "대전온누리고등학교" })).toBeVisible();
   await expect(page.getByLabel("학교 빠른 작업")).toBeVisible();
   await page.getByRole("button", { name: "학교 목록" }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
+});
+
+test("mobile delivery navigation stays compact and yields detail space to the field brief", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, PHASE3_TEST_PINS.delivery);
+
+  const navigation = page.getByRole("navigation", { name: "주요 메뉴" });
+  await expect(navigation).toBeVisible();
+  const navigationBox = await navigation.boundingBox();
+  expect(navigationBox?.height).toBeLessThanOrEqual(72);
+  await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "row");
+  await page.screenshot({ path: "output/playwright/phase4-visuals/01-delivery-home-mobile.png", fullPage: true });
+
+  await page.getByRole("button", { name: /대전온누리고등학교/ }).click();
+  await expect(page.getByRole("region", { name: "현장 핵심 요약" })).toContainText("검수시간");
+  await expect(page.getByRole("region", { name: "현장 핵심 요약" })).toContainText("엘리베이터");
+  await expect(navigation).toBeHidden();
+  await expect(page.getByLabel("학교 빠른 작업")).toBeVisible();
+  await page.screenshot({ path: "output/playwright/phase4-visuals/02-school-detail-mobile.png", fullPage: true });
 });
 
 test("sales shell provides assigned schools, team scope, and accessible touch targets", async ({ page }) => {
