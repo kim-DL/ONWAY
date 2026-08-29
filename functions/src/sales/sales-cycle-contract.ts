@@ -10,6 +10,8 @@ const requestFields = {
   appVersion: z.string().trim().min(1).max(200),
 };
 
+export const MAX_ASSIGNMENTS_PER_CYCLE = 400;
+
 export const assignmentDraftSchema = z.object({
   schoolId: documentIdSchema,
   zoneId: documentIdSchema,
@@ -41,7 +43,7 @@ export const createSalesCycleInputSchema = z.object({
 
 export const createSalesAssignmentsInputSchema = z.object({
   cycleId: cycleIdSchema,
-  assignments: z.array(assignmentDraftSchema).min(1).max(50),
+  assignments: z.array(assignmentDraftSchema).min(1).max(MAX_ASSIGNMENTS_PER_CYCLE),
   ...requestFields,
 }).strict().superRefine((input, context) => {
   const schoolIds = input.assignments.map((assignment) => assignment.schoolId);
@@ -49,6 +51,16 @@ export const createSalesAssignmentsInputSchema = z.object({
     context.addIssue({ code: "custom", message: "A school can only be assigned once per request.", path: ["assignments"] });
   }
 });
+
+export const claimSalesAssignmentsInputSchema = z.object({
+  cycleId: cycleIdSchema,
+  zoneId: documentIdSchema,
+  schoolIds: z.array(documentIdSchema).min(1).max(MAX_ASSIGNMENTS_PER_CYCLE).refine(
+    (values) => new Set(values).size === values.length,
+    "Schools must be unique.",
+  ),
+  ...requestFields,
+}).strict();
 
 export const changeSalesAssignmentInputSchema = z.object({
   cycleId: cycleIdSchema,
@@ -75,4 +87,5 @@ export const changeSalesAssignmentInputSchema = z.object({
 export type AssignmentDraft = z.infer<typeof assignmentDraftSchema>;
 export type CreateSalesCycleInput = z.infer<typeof createSalesCycleInputSchema>;
 export type CreateSalesAssignmentsInput = z.infer<typeof createSalesAssignmentsInputSchema>;
+export type ClaimSalesAssignmentsInput = z.infer<typeof claimSalesAssignmentsInputSchema>;
 export type ChangeSalesAssignmentInput = z.infer<typeof changeSalesAssignmentInputSchema>;

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   changeSalesAssignmentInputSchema,
+  claimSalesAssignmentsInputSchema,
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
 } from "../src/sales/sales-cycle-contract.js";
@@ -57,6 +58,32 @@ describe("sales cycle and assignment contract", () => {
       primaryAssigneeId: "EMP-B",
       assigneeIds: ["EMP-A"],
       reason: "담당 조정",
+    }).success).toBe(false);
+  });
+
+  it("accepts production-size bulk assignment requests and rejects overflow", () => {
+    const request = { requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa5", appVersion: "bulk-assignment" };
+    const assignments = Array.from({ length: 400 }, (_, index) => ({
+      ...draft,
+      schoolId: `SCH-${String(index + 1).padStart(3, "0")}`,
+    }));
+    expect(createSalesAssignmentsInputSchema.safeParse({ ...request, cycleId: "2026-09", assignments }).success).toBe(true);
+    expect(createSalesAssignmentsInputSchema.safeParse({
+      ...request,
+      cycleId: "2026-09",
+      assignments: [...assignments, { ...draft, schoolId: "SCH-401" }],
+    }).success).toBe(false);
+    expect(claimSalesAssignmentsInputSchema.safeParse({
+      ...request,
+      cycleId: "2026-09",
+      zoneId: "A",
+      schoolIds: assignments.map((assignment) => assignment.schoolId),
+    }).success).toBe(true);
+    expect(claimSalesAssignmentsInputSchema.safeParse({
+      ...request,
+      cycleId: "2026-09",
+      zoneId: "A",
+      schoolIds: ["SCH-001", "SCH-001"],
     }).success).toBe(false);
   });
 });

@@ -31,6 +31,7 @@ export {
 } from "./photo/callables.js";
 export {
   changeSalesAssignment,
+  claimSalesAssignments,
   createSalesAssignments,
   createSalesCycle,
   recordSalesVisit,

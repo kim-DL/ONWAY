@@ -7,9 +7,11 @@ import { getAdminFirestore } from "../shared/firebase-admin.js";
 import type {
   AssignmentDraft,
   ChangeSalesAssignmentInput,
+  ClaimSalesAssignmentsInput,
   CreateSalesAssignmentsInput,
   CreateSalesCycleInput,
 } from "./sales-cycle-contract.js";
+import { MAX_ASSIGNMENTS_PER_CYCLE } from "./sales-cycle-contract.js";
 
 const timestampSchema = z.custom<Timestamp>((value) => value instanceof Timestamp);
 const cycleSchema = z.object({
@@ -39,19 +41,22 @@ const assignmentSchema = z.object({
   updatedAt: timestampSchema,
 }).strict();
 const requestLockSchema = z.object({
-  operation: z.enum(["createSalesCycle", "createSalesAssignments", "changeSalesAssignment"]),
+  operation: z.enum(["createSalesCycle", "createSalesAssignments", "claimSalesAssignments", "changeSalesAssignment"]),
   actorUid: z.string(),
   fingerprint: z.string().length(64),
   result: z.record(z.string(), z.unknown()),
 }).passthrough();
 
 export type SalesAdminActor = { uid: string; employeeId: string };
+export type SalesClaimActor = SalesAdminActor & { roleScopes: string[] };
 
 export class SalesRequestCollisionError extends Error {}
 export class SalesCycleNotFoundError extends Error {}
 export class SalesCycleAlreadyExistsError extends Error {}
 export class SalesAssignmentAlreadyExistsError extends Error {}
 export class SalesAssignmentNotFoundError extends Error {}
+export class SalesAssignmentClaimPermissionError extends Error {}
+export class SalesActiveCycleRequiredError extends Error {}
 export class SalesReferenceError extends Error {}
 export class SalesCycleClosedError extends Error {}
 export class SalesAssignmentRevisionConflictError extends Error {
@@ -69,7 +74,7 @@ function assignmentPath(cycleId: string, schoolId: string) {
 }
 
 function auditRecord(input: {
-  eventType: "SALES_CYCLE_CREATED" | "SALES_ASSIGNMENTS_CREATED" | "SALES_ASSIGNMENT_CHANGED";
+  eventType: "SALES_CYCLE_CREATED" | "SALES_ASSIGNMENTS_CREATED" | "SALES_ASSIGNMENTS_CLAIMED" | "SALES_ASSIGNMENT_CHANGED";
   actor: SalesAdminActor;
   cycleId: string;
   targetType: "salesCycle" | "salesAssignment";
@@ -158,10 +163,10 @@ export class SalesCycleService {
       if (sourceRef && (!sourceSnapshot || !sourceSnapshot.exists)) throw new SalesCycleNotFoundError();
 
       const sourceAssignments = sourceRef
-        ? await transaction.get(sourceRef.collection("assignments").limit(51))
+        ? await transaction.get(sourceRef.collection("assignments").limit(MAX_ASSIGNMENTS_PER_CYCLE + 1))
         : null;
-      if (sourceAssignments && sourceAssignments.size > 50) {
-        throw new SalesReferenceError("한 번에 복사할 수 있는 배정은 최대 50개입니다.");
+      if (sourceAssignments && sourceAssignments.size > MAX_ASSIGNMENTS_PER_CYCLE) {
+        throw new SalesReferenceError(`한 Cycle은 최대 ${MAX_ASSIGNMENTS_PER_CYCLE}개 학교까지 운영할 수 있습니다.`);
       }
 
       let previousCycleRef: DocumentReference | null = null;
@@ -238,15 +243,16 @@ export class SalesCycleService {
     const cycleRef = this.db.doc(`salesCycles/${input.cycleId}`);
     const inputFingerprint = fingerprint({ ...input, actorUid: actor.uid });
     const assignmentRefs = input.assignments.map((assignment) => this.db.doc(assignmentPath(input.cycleId, assignment.schoolId)));
+    const currentAssignmentsQuery = cycleRef.collection("assignments").limit(MAX_ASSIGNMENTS_PER_CYCLE + 1);
     const schoolRefs = input.assignments.map((assignment) => this.db.doc(`schools/${assignment.schoolId}`));
     const zoneRefs = [...new Set(input.assignments.map((assignment) => assignment.zoneId))].map((zoneId) => this.db.doc(`zones/${zoneId}`));
     const employeeRefs = [...new Set(input.assignments.flatMap((assignment) => assignment.assigneeIds))].map((employeeId) => this.db.doc(`employees/${employeeId}`));
 
     return this.db.runTransaction(async (transaction) => {
-      const [lockSnapshot, cycleSnapshot, assignmentSnapshots, schoolSnapshots, zoneSnapshots, employeeSnapshots] = await Promise.all([
+      const [lockSnapshot, cycleSnapshot, currentAssignments, schoolSnapshots, zoneSnapshots, employeeSnapshots] = await Promise.all([
         transaction.get(lockRef),
         transaction.get(cycleRef),
-        transaction.getAll(...assignmentRefs),
+        transaction.get(currentAssignmentsQuery),
         transaction.getAll(...schoolRefs),
         transaction.getAll(...zoneRefs),
         transaction.getAll(...employeeRefs),
@@ -259,7 +265,11 @@ export class SalesCycleService {
       if (!cycleSnapshot.exists) throw new SalesCycleNotFoundError();
       const cycle = cycleSchema.parse(cycleSnapshot.data());
       if (cycle.status === "closed") throw new SalesCycleClosedError();
-      if (assignmentSnapshots.some((snapshot) => snapshot.exists)) throw new SalesAssignmentAlreadyExistsError();
+      const currentIds = new Set(currentAssignments.docs.map((snapshot) => snapshot.id));
+      if (input.assignments.some((assignment) => currentIds.has(assignment.schoolId))) throw new SalesAssignmentAlreadyExistsError();
+      if (currentAssignments.size + input.assignments.length > MAX_ASSIGNMENTS_PER_CYCLE) {
+        throw new SalesReferenceError(`한 Cycle은 최대 ${MAX_ASSIGNMENTS_PER_CYCLE}개 학교까지 운영할 수 있습니다.`);
+      }
       if (schoolSnapshots.some((snapshot) => !snapshot.exists)) throw new SalesReferenceError("존재하지 않는 학교가 포함되어 있습니다.");
       if (zoneSnapshots.some((snapshot) => !snapshot.exists || snapshot.get("active") !== true)) throw new SalesReferenceError("활성 구역만 배정할 수 있습니다.");
       if (employeeSnapshots.some((snapshot) => !snapshot.exists || snapshot.get("status") !== "active" || !(snapshot.get("roleScopes") as unknown[] | undefined)?.includes("sales"))) {
@@ -288,6 +298,118 @@ export class SalesCycleService {
       transaction.create(this.db.doc(`auditLogs/${audit.logId}`), audit);
       transaction.create(lockRef, {
         operation: "createSalesAssignments",
+        actorUid: actor.uid,
+        fingerprint: inputFingerprint,
+        result,
+        createdAt: now,
+      });
+      return { ...result, replayed: false };
+    });
+  }
+
+  async claimAssignments(input: ClaimSalesAssignmentsInput, actor: SalesClaimActor) {
+    const lockRef = this.db.doc(`requestLocks/sales-assignment-claim-${input.requestId}`);
+    const cycleRef = this.db.doc(`salesCycles/${input.cycleId}`);
+    const settingsRef = this.db.doc("appSettings/public");
+    const zoneRef = this.db.doc(`zones/${input.zoneId}`);
+    const employeeRef = this.db.doc(`employees/${actor.employeeId}`);
+    const currentAssignmentsQuery = cycleRef.collection("assignments").limit(MAX_ASSIGNMENTS_PER_CYCLE + 1);
+    const assignmentRefs = input.schoolIds.map((schoolId) => this.db.doc(assignmentPath(input.cycleId, schoolId)));
+    const schoolRefs = input.schoolIds.map((schoolId) => this.db.doc(`schools/${schoolId}`));
+    const inputFingerprint = fingerprint({ ...input, actorUid: actor.uid, employeeId: actor.employeeId });
+
+    return this.db.runTransaction(async (transaction) => {
+      const [
+        lockSnapshot,
+        cycleSnapshot,
+        settingsSnapshot,
+        zoneSnapshot,
+        employeeSnapshot,
+        currentAssignments,
+        schoolSnapshots,
+      ] = await Promise.all([
+        transaction.get(lockRef),
+        transaction.get(cycleRef),
+        transaction.get(settingsRef),
+        transaction.get(zoneRef),
+        transaction.get(employeeRef),
+        transaction.get(currentAssignmentsQuery),
+        transaction.getAll(...schoolRefs),
+      ]);
+      if (lockSnapshot.exists) {
+        const lock = requestLockSchema.parse(lockSnapshot.data());
+        if (lock.actorUid !== actor.uid || lock.fingerprint !== inputFingerprint) throw new SalesRequestCollisionError();
+        return {
+          createdCount: z.number().int().parse(lock.result.createdCount),
+          zoneId: z.string().parse(lock.result.zoneId),
+          replayed: true,
+        };
+      }
+      if (!cycleSnapshot.exists) throw new SalesCycleNotFoundError();
+      const cycle = cycleSchema.parse(cycleSnapshot.data());
+      if (
+        !settingsSnapshot.exists
+        || settingsSnapshot.get("currentSalesCycleId") !== input.cycleId
+        || cycle.status !== "active"
+      ) {
+        throw new SalesActiveCycleRequiredError();
+      }
+      if (!zoneSnapshot.exists || zoneSnapshot.get("active") !== true) {
+        throw new SalesReferenceError("활성 구역만 선택할 수 있습니다.");
+      }
+      if (
+        !actor.roleScopes.includes("sales")
+        || !employeeSnapshot.exists
+        || employeeSnapshot.get("status") !== "active"
+        || !(employeeSnapshot.get("roleScopes") as unknown[] | undefined)?.includes("sales")
+      ) {
+        throw new SalesAssignmentClaimPermissionError();
+      }
+
+      const currentAssignmentsData = currentAssignments.docs.map((snapshot) => ({
+        id: snapshot.id,
+        assignment: assignmentSchema.parse(snapshot.data()),
+      }));
+      const ownsZone = currentAssignmentsData.some(({ assignment }) =>
+        assignment.zoneId === input.zoneId && assignment.assigneeIds.includes(actor.employeeId)
+      );
+      if (!ownsZone) throw new SalesAssignmentClaimPermissionError();
+      const currentIds = new Set(currentAssignmentsData.map(({ id }) => id));
+      if (input.schoolIds.some((schoolId) => currentIds.has(schoolId))) throw new SalesAssignmentAlreadyExistsError();
+      if (currentAssignments.size + input.schoolIds.length > MAX_ASSIGNMENTS_PER_CYCLE) {
+        throw new SalesReferenceError(`한 Cycle은 최대 ${MAX_ASSIGNMENTS_PER_CYCLE}개 학교까지 운영할 수 있습니다.`);
+      }
+      if (schoolSnapshots.some((snapshot) => !snapshot.exists)) {
+        throw new SalesReferenceError("존재하지 않는 학교가 포함되어 있습니다.");
+      }
+
+      const now = Timestamp.now();
+      const assignments = input.schoolIds.map((schoolId) => createAssignment(input.cycleId, {
+        schoolId,
+        zoneId: input.zoneId,
+        primaryAssigneeId: actor.employeeId,
+        assigneeIds: [actor.employeeId],
+      }, now));
+      for (const [index, assignment] of assignments.entries()) {
+        transaction.create(assignmentRefs[index]!, assignment);
+      }
+      const result = { createdCount: assignments.length, zoneId: input.zoneId };
+      const audit = auditRecord({
+        eventType: "SALES_ASSIGNMENTS_CLAIMED",
+        actor,
+        cycleId: input.cycleId,
+        targetType: "salesAssignment",
+        targetId: input.zoneId,
+        schoolId: null,
+        changedFields: assignments.map((assignment) => `assignment:${assignment.schoolId}`),
+        changeReason: `${actor.employeeId} 담당 구역 셀프 배정`,
+        requestId: input.requestId,
+        appVersion: input.appVersion,
+        createdAt: now,
+      });
+      transaction.create(this.db.doc(`auditLogs/${audit.logId}`), audit);
+      transaction.create(lockRef, {
+        operation: "claimSalesAssignments",
         actorUid: actor.uid,
         fingerprint: inputFingerprint,
         result,

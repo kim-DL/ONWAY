@@ -7,14 +7,17 @@ import { LoginRepository } from "../auth/login-repository.js";
 import { claimsMatchAuthz } from "../auth/login-service.js";
 import {
   changeSalesAssignmentInputSchema,
+  claimSalesAssignmentsInputSchema,
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
 } from "./sales-cycle-contract.js";
 import {
   SalesAssignmentAlreadyExistsError,
+  SalesAssignmentClaimPermissionError,
   SalesAssignmentNotFoundError,
   SalesAssignmentRevisionConflictError,
   SalesCycleAlreadyExistsError,
+  SalesActiveCycleRequiredError,
   SalesCycleClosedError,
   SalesCycleNotFoundError,
   SalesCycleService,
@@ -48,14 +51,14 @@ function isFunctionsEmulator() {
   return process.env.FUNCTIONS_EMULATOR === "true";
 }
 
-async function requireSalesRecorder(request: CallableRequest<unknown>) {
+async function requireSalesActor(request: CallableRequest<unknown>) {
   if (!request.auth) throw new HttpsError("unauthenticated", "인증이 필요합니다.");
   const authz = await new LoginRepository().getAuthz(request.auth.uid);
   if (!authz || !claimsMatchAuthz(request.auth.token, authz)) {
     throw new HttpsError("failed-precondition", "세션이 유효하지 않습니다.");
   }
   if (!authz.roleScopes.some((scope) => scope === "sales" || scope === "admin")) {
-    throw new HttpsError("permission-denied", "방문 기록을 저장할 권한이 없습니다.");
+    throw new HttpsError("permission-denied", "영업 기능을 사용할 권한이 없습니다.");
   }
   if (authz.roleScopes.includes("admin")) {
     const admin = await requireVerifiedAdmin(request);
@@ -72,6 +75,8 @@ function mapSalesError(error: unknown): HttpsError | null {
   if (error instanceof SalesRequestCollisionError) return new HttpsError("already-exists", "요청 식별자가 이미 사용되었습니다.");
   if (error instanceof SalesCycleAlreadyExistsError) return new HttpsError("already-exists", "이미 존재하는 월입니다.");
   if (error instanceof SalesAssignmentAlreadyExistsError) return new HttpsError("already-exists", "이미 배정된 학교가 포함되어 있습니다.");
+  if (error instanceof SalesAssignmentClaimPermissionError) return new HttpsError("permission-denied", "현재 담당 중인 구역의 학교만 가져올 수 있습니다.");
+  if (error instanceof SalesActiveCycleRequiredError) return new HttpsError("failed-precondition", "현재 운영 중인 월에만 학교를 가져올 수 있습니다.");
   if (error instanceof SalesCycleNotFoundError) return new HttpsError("not-found", "월별 영업 Cycle을 찾을 수 없습니다.");
   if (error instanceof SalesAssignmentNotFoundError) return new HttpsError("not-found", "학교 배정을 찾을 수 없습니다.");
   if (error instanceof SalesCycleClosedError) return new HttpsError("failed-precondition", "종료된 월의 배정은 변경할 수 없습니다.");
@@ -119,6 +124,26 @@ export const createSalesAssignments = onCall(callableOptions, async (request) =>
   }
 });
 
+export const claimSalesAssignments = onCall(callableOptions, async (request) => {
+  const parsed = claimSalesAssignmentsInputSchema.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "학교 선택 내용을 확인해주세요.");
+  const input = parsed.data;
+  const actor = await requireSalesActor(request);
+  try {
+    return await new SalesCycleService().claimAssignments(input, actor);
+  } catch (error) {
+    const mapped = mapSalesError(error);
+    if (mapped) throw mapped;
+    logger.error("Sales assignment claim failed.", {
+      cycleId: input.cycleId,
+      zoneId: input.zoneId,
+      requestId: input.requestId,
+      error,
+    });
+    throw new HttpsError("internal", "담당 학교를 가져오지 못했습니다.");
+  }
+});
+
 export const changeSalesAssignment = onCall(callableOptions, async (request) => {
   const parsed = changeSalesAssignmentInputSchema.safeParse(request.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "담당 변경 입력을 확인해주세요.");
@@ -138,7 +163,7 @@ export const recordSalesVisit = onCall(callableOptions, async (request) => {
   const parsed = recordSalesVisitInputSchema.safeParse(request.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "방문 기록 입력을 확인해주세요.");
   const input = parsed.data;
-  const actor = await requireSalesRecorder(request);
+  const actor = await requireSalesActor(request);
   try {
     return await new SalesVisitService().record(input, actor);
   } catch (error) {
@@ -182,7 +207,7 @@ export const updateSalesProfile = onCall(callableOptions, async (request) => {
   const parsed = updateSalesProfileInputSchema.safeParse(request.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "영업 협업 정보 입력을 확인해주세요.");
   const input = parsed.data;
-  const actor = await requireSalesRecorder(request);
+  const actor = await requireSalesActor(request);
   try {
     return await new SalesProfileService().update(input, actor);
   } catch (error) {

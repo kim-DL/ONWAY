@@ -7,6 +7,10 @@ import { getFirestore } from "firebase-admin/firestore";
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 
 const PROJECT_ID = "demo-onnuriway";
+const UI_CLAIM_SCHOOL_ID = "SCH-CLAIM-UI";
+const UI_CLAIM_SCHOOL_NAME = "대전미배정초등학교";
+
+test.setTimeout(90_000);
 
 test.beforeAll(async () => {
   if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -19,11 +23,63 @@ test.beforeAll(async () => {
   const batch = database.batch();
   for (const snapshot of rateLimits.docs) batch.delete(snapshot.ref);
   await batch.commit();
+
+  const schoolSnapshots = await database.collection("schools").limit(1).get();
+  const templateSchool = schoolSnapshots.docs[0];
+  if (!templateSchool) throw new Error("A school template is required for the assignment UI test.");
+  const templateData = templateSchool.data();
+  await database.doc(`schools/${UI_CLAIM_SCHOOL_ID}`).set({
+    ...templateData,
+    schoolId: UI_CLAIM_SCHOOL_ID,
+    name: UI_CLAIM_SCHOOL_NAME,
+    shortName: "미배정초",
+    source: { ...templateData.source, schoolCode: "G-CLAIM-UI" },
+  });
+  const catalogSnapshots = await database.collection("searchCatalogs").get();
+  const targetCatalog = catalogSnapshots.docs.find((snapshot) => snapshot.get("district") === templateData.district);
+  if (!targetCatalog) throw new Error("A district search catalog is required for the assignment UI test.");
+  const catalogItems = targetCatalog.get("items") as Record<string, unknown>[];
+  if (!catalogItems.some((item) => item.schoolId === UI_CLAIM_SCHOOL_ID)) {
+    await Promise.all([
+      targetCatalog.ref.update({
+        itemCount: catalogItems.length + 1,
+        items: [...catalogItems, {
+          schoolId: UI_CLAIM_SCHOOL_ID,
+          name: UI_CLAIM_SCHOOL_NAME,
+          shortName: "미배정초",
+          normalizedName: UI_CLAIM_SCHOOL_NAME,
+          initials: "ㄷㅈㅁㅂㅈㅊㄷㅎㄱ",
+          aliases: [],
+          schoolType: "elementary",
+          district: templateData.district,
+          addressSummary: "대전광역시 테스트구 온누리로 18",
+          operationalStatus: "active",
+          photoCount: 0,
+          fieldInfoAvailable: false,
+        }],
+      }),
+      database.doc("catalogMeta/current").update({
+        commonCatalogItemCount: catalogItems.length + 1
+          + catalogSnapshots.docs
+            .filter((snapshot) => snapshot.id !== targetCatalog.id)
+            .reduce((count, snapshot) => count + Number(snapshot.get("itemCount") ?? 0), 0),
+      }),
+    ]);
+  }
 });
 
 async function login(page: Page, pin: string) {
-  await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(pin);
+  const pinInput = page.getByLabel("직원 PIN");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    try {
+      await pinInput.waitFor({ state: "visible", timeout: 15_000 });
+      break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+    }
+  }
+  await pinInput.fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible();
   await expect(page.getByText("2026년 8월")).toBeVisible();
@@ -75,6 +131,36 @@ test("sales B and C receive distinct own-zone snapshots", async ({ browser }) =>
     await expect(page.locator(".assignment-card", { hasText: scenario.absent })).toHaveCount(0);
     await context.close();
   }
+});
+
+test("salesperson can search, preserve selection, and bulk-claim an unassigned school on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, PHASE3_TEST_PINS.salesA);
+  await page.getByRole("button", { name: "담당 학교 추가" }).click();
+  const dialog = page.getByRole("dialog", { name: "담당 학교 가져오기" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("searchbox", { name: "학교 검색" }).fill("미배정");
+  const schoolCheckbox = dialog.getByRole("checkbox", { name: new RegExp(UI_CLAIM_SCHOOL_NAME) });
+  await expect(schoolCheckbox).toBeAttached();
+  await schoolCheckbox.locator("xpath=ancestor::label").click();
+  await dialog.getByLabel("학교급").selectOption("elementary");
+  await expect(schoolCheckbox).toBeChecked();
+
+  const accessibility = await new AxeBuilder({ page }).include("[role=dialog]").analyze();
+  expect(accessibility.violations).toEqual([]);
+  const undersizedTargets = await dialog.locator("button:visible, input:not([type=checkbox]):visible, select:visible").evaluateAll((targets) =>
+    targets.flatMap((target) => {
+      const bounds = target.getBoundingClientRect();
+      return bounds.width < 44 || bounds.height < 44
+        ? [{ label: target.getAttribute("aria-label") ?? target.textContent?.trim(), width: bounds.width, height: bounds.height }]
+        : [];
+    }),
+  );
+  expect(undersizedTargets).toEqual([]);
+
+  await dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기" }).click();
+  await expect(page.getByText("1개 학교를 내 담당으로 가져왔습니다.")).toBeVisible();
+  await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toBeVisible({ timeout: 15_000 });
 });
 
 async function emulatorIdToken(uid: string) {
@@ -134,7 +220,7 @@ async function callFunction(name: string, idToken: string, data: unknown) {
   return { result: payload.data ?? payload.result, error: payload.error };
 }
 
-test("admin callables create and change assignments while sales users are denied", async () => {
+test("admin manages assignments while sales users can only claim into their own current zone", async () => {
   const [adminToken, salesToken] = await Promise.all([
     emulatorGoogleIdToken("uid-admin"),
     emulatorIdToken("uid-sales-a"),
@@ -148,6 +234,32 @@ test("admin callables create and change assignments while sales users are denied
     requestId: "86e03fe2-1663-4a24-b953-fbb22e65e9b1",
   });
   expect(blocked.error?.status).toBe("PERMISSION_DENIED");
+
+  const controlApp = getApps().find((candidate) => candidate.name === "phase9-e2e-control");
+  if (!controlApp) throw new Error("Phase 9 control app is missing.");
+  const database = getFirestore(controlApp);
+  await Promise.all([
+    database.doc("schools/SCH-CLAIM-E2E-A").set({ schoolId: "SCH-CLAIM-E2E-A", name: "셀프배정학교 A" }),
+    database.doc("schools/SCH-CLAIM-E2E-B").set({ schoolId: "SCH-CLAIM-E2E-B", name: "셀프배정학교 B" }),
+  ]);
+  const claimed = await callFunction("claimSalesAssignments", salesToken, {
+    ...base,
+    cycleId: "2026-08",
+    zoneId: "A",
+    schoolIds: ["SCH-CLAIM-E2E-A"],
+    requestId: "f65f95b7-1714-4cb0-8806-7e63740b05c2",
+  });
+  expect(claimed.result).toMatchObject({ createdCount: 1, zoneId: "A", replayed: false });
+
+  const salesBToken = await emulatorIdToken("uid-sales-b");
+  const foreignZone = await callFunction("claimSalesAssignments", salesBToken, {
+    ...base,
+    cycleId: "2026-08",
+    zoneId: "A",
+    schoolIds: ["SCH-CLAIM-E2E-B"],
+    requestId: "d9580ae2-0571-4a89-8df4-16ca147c5df7",
+  });
+  expect(foreignZone.error?.status).toBe("PERMISSION_DENIED");
 
   const cycle = await callFunction("createSalesCycle", adminToken, {
     ...base,

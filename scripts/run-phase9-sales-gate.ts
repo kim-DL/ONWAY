@@ -5,11 +5,14 @@ import { Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import {
   changeSalesAssignmentInputSchema,
+  claimSalesAssignmentsInputSchema,
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
 } from "../functions/src/sales/sales-cycle-contract.js";
 import {
+  SalesAssignmentClaimPermissionError,
   SalesAssignmentRevisionConflictError,
+  SalesActiveCycleRequiredError,
   SalesCycleService,
   SalesRequestCollisionError,
 } from "../functions/src/sales/sales-cycle-service.js";
@@ -38,7 +41,7 @@ for (const zoneId of ["A", "B", "C"]) {
 for (const employeeId of ["EMP-SALES-A", "EMP-SALES-B", "EMP-SALES-C"]) {
   await database.doc(`employees/${employeeId}`).set({ employeeId, status: "active", roleScopes: ["sales"] });
 }
-for (const schoolId of ["SCH-001", "SCH-002", "SCH-003"]) {
+for (const schoolId of ["SCH-001", "SCH-002", "SCH-003", "SCH-004", "SCH-005"]) {
   await database.doc(`schools/${schoolId}`).set({ schoolId, name: schoolId });
 }
 
@@ -81,6 +84,38 @@ try {
 }
 if (!collisionRejected) throw new Error("Request ID collision was not rejected.");
 
+const claimInput = claimSalesAssignmentsInputSchema.parse({
+  cycleId: "2026-08",
+  zoneId: "A",
+  schoolIds: ["SCH-004"],
+  requestId: randomUUID(),
+  appVersion: "phase9-gate",
+});
+const salesAActor = { uid: "uid-sales-a", employeeId: "EMP-SALES-A", roleScopes: ["sales"] };
+const claimed = await service.claimAssignments(claimInput, salesAActor);
+const replayedClaim = await service.claimAssignments(claimInput, salesAActor);
+if (claimed.createdCount !== 1 || claimed.zoneId !== "A" || claimed.replayed) {
+  throw new Error("Zone-scoped self assignment failed.");
+}
+if (!replayedClaim.replayed || replayedClaim.createdCount !== 1) {
+  throw new Error("Zone-scoped self assignment replay failed.");
+}
+
+let foreignZoneRejected = false;
+try {
+  await service.claimAssignments(claimSalesAssignmentsInputSchema.parse({
+    cycleId: "2026-08",
+    zoneId: "A",
+    schoolIds: ["SCH-005"],
+    requestId: randomUUID(),
+    appVersion: "phase9-gate",
+  }), { uid: "uid-sales-b", employeeId: "EMP-SALES-B", roleScopes: ["sales"] });
+} catch (error) {
+  if (error instanceof SalesAssignmentClaimPermissionError) foreignZoneRejected = true;
+  else throw error;
+}
+if (!foreignZoneRejected) throw new Error("A salesperson claimed a school into another employee's zone.");
+
 const changeInput = changeSalesAssignmentInputSchema.parse({
   cycleId: "2026-08",
   schoolId: "SCH-002",
@@ -111,7 +146,22 @@ const copiedCycle = await service.createCycle(createSalesCycleInputSchema.parse(
   requestId: randomUUID(),
   appVersion: "phase9-gate",
 }), actor);
-if (copiedCycle.status !== "draft" || copiedCycle.copiedAssignmentCount !== 3) throw new Error("Cycle copy failed.");
+if (copiedCycle.status !== "draft" || copiedCycle.copiedAssignmentCount !== 4) throw new Error("Cycle copy failed.");
+
+let draftClaimRejected = false;
+try {
+  await service.claimAssignments(claimSalesAssignmentsInputSchema.parse({
+    cycleId: "2026-09",
+    zoneId: "A",
+    schoolIds: ["SCH-005"],
+    requestId: randomUUID(),
+    appVersion: "phase9-gate",
+  }), salesAActor);
+} catch (error) {
+  if (error instanceof SalesActiveCycleRequiredError) draftClaimRejected = true;
+  else throw error;
+}
+if (!draftClaimRejected) throw new Error("A salesperson claimed a school into a draft cycle.");
 
 const [copiedAssignments, audits, settings] = await Promise.all([
   database.collection("salesCycles/2026-09/assignments").get(),
@@ -130,7 +180,7 @@ for (const document of copiedAssignments.docs) {
   }
 }
 if (settings.get("currentSalesCycleId") !== "2026-08") throw new Error("Draft copy changed the active cycle.");
-if (audits.size !== 4) throw new Error(`Expected four audit logs, received ${audits.size}.`);
+if (audits.size !== 5) throw new Error(`Expected five audit logs, received ${audits.size}.`);
 
 console.log(JSON.stringify({
   status: "phase9-sales-gate-passed",
@@ -142,5 +192,8 @@ console.log(JSON.stringify({
   conflictRevision,
   replayed: replayedAssignments.replayed,
   collisionRejected,
+  foreignZoneRejected,
+  draftClaimRejected,
+  claimedAssignmentCount: claimed.createdCount,
   auditCount: audits.size,
 }));

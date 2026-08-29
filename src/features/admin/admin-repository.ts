@@ -87,15 +87,15 @@ export const adminRepository = {
     return call("createSalesCycle", { ...input, ...mutationFields() });
   },
 
-  async createAssignment(input: { cycleId: string; schoolId: string; zoneId: string; primaryAssigneeId: string }) {
+  async createAssignments(input: { cycleId: string; schoolIds: string[]; zoneId: string; primaryAssigneeId: string }) {
     return call("createSalesAssignments", {
       cycleId: input.cycleId,
-      assignments: [{
-        schoolId: input.schoolId,
+      assignments: input.schoolIds.map((schoolId) => ({
+        schoolId,
         zoneId: input.zoneId,
         primaryAssigneeId: input.primaryAssigneeId,
         assigneeIds: [input.primaryAssigneeId],
-      }],
+      })),
       ...mutationFields(),
     });
   },

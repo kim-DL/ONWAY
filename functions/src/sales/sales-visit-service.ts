@@ -4,6 +4,7 @@ import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 
 import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { MAX_ASSIGNMENTS_PER_CYCLE } from "./sales-cycle-contract.js";
 import type { RecordSalesVisitInput } from "./sales-visit-contract.js";
 
 const timestampSchema = z.custom<Timestamp>((value) => value instanceof Timestamp);
@@ -200,7 +201,7 @@ export class SalesVisitService {
       const schoolRef = this.db.doc(`schools/${input.schoolId}`);
       const visitorRef = this.db.doc(`employees/${input.visitedBy}`);
       const visitRef = this.db.doc(`salesVisits/${input.requestId}`);
-      const assignmentsQuery = this.db.collection(`salesCycles/${input.cycleId}/assignments`).limit(51);
+      const assignmentsQuery = this.db.collection(`salesCycles/${input.cycleId}/assignments`).limit(MAX_ASSIGNMENTS_PER_CYCLE + 1);
       const employeeStatsQuery = this.db.collection(`salesCycles/${input.cycleId}/employeeStats`).limit(101);
       const productRefs = input.sample.items.map((item) => this.db.doc(`products/${item.productId}`));
       const tagRefs = input.activityTagIds.map((tagId) => this.db.doc(`activityTags/${tagId}`));
@@ -234,7 +235,9 @@ export class SalesVisitService {
       if (!assignmentSnapshot.exists) throw new SalesVisitAssignmentNotFoundError();
       if (!schoolSnapshot.exists) throw new SalesVisitReferenceError("학교를 찾을 수 없습니다.");
       if (visitSnapshot.exists) throw new SalesVisitRequestCollisionError();
-      if (assignmentSnapshots.size > 50) throw new SalesVisitReferenceError("월 배정은 최대 50개까지 집계할 수 있습니다.");
+      if (assignmentSnapshots.size > MAX_ASSIGNMENTS_PER_CYCLE) {
+        throw new SalesVisitReferenceError(`월 배정은 최대 ${MAX_ASSIGNMENTS_PER_CYCLE}개까지 집계할 수 있습니다.`);
+      }
       if (employeeStatsSnapshots.size > 100) throw new SalesVisitReferenceError("직원 통계 문서가 허용 범위를 초과했습니다.");
       if (!visitorSnapshot.exists || visitorSnapshot.get("status") !== "active" || !(visitorSnapshot.get("roleScopes") as unknown[] | undefined)?.includes("sales")) {
         throw new SalesVisitReferenceError("활성 영업 직원만 실제 방문자로 선택할 수 있습니다.");

@@ -13,6 +13,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
+import { SchoolAssignmentPicker } from "@/components/assignment/school-assignment-picker";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
 import { SalesExportWorkspace } from "@/features/export/sales-export-workspace";
@@ -138,6 +139,7 @@ const AUDIT_EVENT_LABELS: Record<string, string> = {
   PHOTO_RESTORED: "현장 사진 복원",
   SALES_ASSIGNMENT_CHANGED: "영업 배정 변경",
   SALES_ASSIGNMENTS_CREATED: "영업 배정 생성",
+  SALES_ASSIGNMENTS_CLAIMED: "담당자 학교 가져오기",
   SALES_CYCLE_CREATED: "영업 Cycle 생성",
   SALES_PROFILE_UPDATED: "영업 상태 변경",
   SALES_VISIT_RECORDED: "방문 기록 등록",
@@ -1270,7 +1272,6 @@ function CyclesPage({
   const [copyFrom, setCopyFrom] = useState(data.selectedCycleId ?? "");
   const [activate, setActivate] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [schoolId, setSchoolId] = useState("");
   const [zoneId, setZoneId] = useState(
     data.zones.find((zone) => zone.active)?.zoneId ?? "",
   );
@@ -1307,22 +1308,23 @@ function CyclesPage({
       setCreating(false);
     }
   };
-  const addAssignment = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!data.selectedCycleId || !schoolId || !zoneId || !assigneeId) return;
+  const addAssignments = async (schoolIds: string[]) => {
+    if (!data.selectedCycleId || schoolIds.length === 0 || !zoneId || !assigneeId) return false;
     setCreating(true);
     try {
-      await adminRepository.createAssignment({
+      await adminRepository.createAssignments({
         cycleId: data.selectedCycleId,
-        schoolId,
+        schoolIds,
         zoneId,
         primaryAssigneeId: assigneeId,
       });
       await onLoadCycle(data.selectedCycleId);
-      setSchoolId("");
-      showToast("학교 배정을 추가했습니다.");
+      showToast(`${schoolIds.length}개 학교를 한 번에 배정했습니다.`, "success");
+      return true;
     } catch (error) {
       showToast(adminErrorMessage(error));
+      await onLoadCycle(data.selectedCycleId);
+      return false;
     } finally {
       setCreating(false);
     }
@@ -1445,26 +1447,18 @@ function CyclesPage({
             ))}
           </select>
         </header>
-        <form
-          className="assignment-add"
-          onSubmit={(event) => void addAssignment(event)}
-        >
+        <div className="assignment-bulk-command">
+          <div className="assignment-bulk-command__heading">
+            <div>
+              <p>BULK ASSIGN</p>
+              <h3>미배정 학교를 한 번에 연결</h3>
+              <span>검색 결과 전체 선택과 선택 바구니로 300개 이상도 한 번에 처리합니다.</span>
+            </div>
+            <strong>{availableSchools.length}<small>곳 미배정</small></strong>
+          </div>
+          <div className="assignment-bulk-command__owners">
           <label>
-            <span>미배정 학교</span>
-            <select
-              value={schoolId}
-              onChange={(event) => setSchoolId(event.target.value)}
-            >
-              <option value="">학교 선택</option>
-              {availableSchools.map((school) => (
-                <option key={school.schoolId} value={school.schoolId}>
-                  {school.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>구역</span>
+            <span>배정 구역</span>
             <select
               value={zoneId}
               onChange={(event) => setZoneId(event.target.value)}
@@ -1491,15 +1485,22 @@ function CyclesPage({
               ))}
             </select>
           </label>
-          <GlassButton
-            variant="primary"
-            type="submit"
-            compact
-            disabled={!schoolId || !zoneId || !assigneeId || creating}
-          >
-            배정 추가
-          </GlassButton>
-        </form>
+          <p><Icon name="user" size={16} />관리자가 최초 구역을 연결하면 담당 직원도 같은 구역의 미배정 학교를 직접 가져올 수 있습니다.</p>
+          </div>
+          <SchoolAssignmentPicker
+            key={`${data.selectedCycleId ?? "none"}-${data.assignments.length}`}
+            candidates={availableSchools.map((school) => ({
+              schoolId: school.schoolId,
+              name: school.name,
+              district: school.district,
+              schoolType: school.schoolType,
+              address: school.roadAddress,
+            }))}
+            busy={creating}
+            actionLabel={(count) => `${count}곳 일괄 배정`}
+            onSubmit={addAssignments}
+          />
+        </div>
         <div className="admin-table-wrap">
           <table className="admin-table assignment-table">
             <thead>

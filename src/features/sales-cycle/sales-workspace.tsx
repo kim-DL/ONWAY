@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { SchoolAssignmentPicker } from "@/components/assignment/school-assignment-picker";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
@@ -10,9 +11,12 @@ import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { SmartChip } from "@/components/ui/smart-chip";
 import { SoftCard } from "@/components/ui/soft-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useToast } from "@/components/ui/toast";
 import type { MonthlyStatus, SalesAssignment, SalesCycle, SalesZone } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
+import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
+import { claimSalesAssignments, salesAssignmentErrorMessage } from "./sales-assignment-repository";
 import { useSalesWorkspace } from "./use-sales-workspace";
 
 const SCOPE_OPTIONS = [
@@ -122,6 +126,77 @@ function WorkspaceSkeleton() {
   );
 }
 
+function SalesClaimPicker({
+  session,
+  ownedZones,
+  assignedSchoolIds,
+  busy,
+  onSubmit,
+}: {
+  session: AuthenticatedSession;
+  ownedZones: SalesZone[];
+  assignedSchoolIds: Set<string>;
+  busy: boolean;
+  onSubmit: (zoneId: string, schoolIds: string[]) => Promise<boolean>;
+}) {
+  const catalog = useSchoolSearchCatalog(session, "sales");
+  const [zoneId, setZoneId] = useState(ownedZones[0]?.zoneId ?? "");
+  const catalogItems = catalog.status === "ready" ? catalog.catalog.items : null;
+  const candidates = useMemo(() => catalogItems
+    ? catalogItems
+      .filter((school) => school.operationalStatus === "active" && !assignedSchoolIds.has(school.schoolId))
+      .map((school) => ({
+        schoolId: school.schoolId,
+        name: school.name,
+        district: school.district,
+        schoolType: school.schoolType,
+        address: school.addressSummary,
+      }))
+    : [], [assignedSchoolIds, catalogItems]);
+
+  if (ownedZones.length === 0) {
+    return (
+      <div className="sales-claim-empty" role="status">
+        <span><Icon name="route" size={24} /></span>
+        <h3>먼저 담당 구역 연결이 필요해요.</h3>
+        <p>관리자가 이번 달 학교 한 곳을 담당 구역에 최초 배정하면, 이후 같은 구역의 학교는 직접 여러 곳씩 가져올 수 있습니다.</p>
+      </div>
+    );
+  }
+  if (catalog.status === "loading") {
+    return <div className="sales-claim-loading" role="status"><Icon name="refresh" /><span>전체 학교 목록을 준비하고 있어요.</span></div>;
+  }
+  if (catalog.status === "error") {
+    return (
+      <div className="sales-claim-empty" role="alert">
+        <span><Icon name="wifi-off" size={24} /></span>
+        <h3>학교 목록을 불러오지 못했어요.</h3>
+        <p>네트워크 연결을 확인한 뒤 다시 시도해주세요.</p>
+        <GlassButton compact onClick={catalog.retry}>다시 불러오기</GlassButton>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sales-claim-composer">
+      <label className="sales-claim-zone">
+        <span>가져올 담당 구역</span>
+        <select value={zoneId} onChange={(event) => setZoneId(event.target.value)}>
+          {ownedZones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.name}</option>)}
+        </select>
+        <small>서버가 {session.displayName}님의 현재 담당 구역인지 다시 확인합니다.</small>
+      </label>
+      <SchoolAssignmentPicker
+        candidates={candidates}
+        busy={busy}
+        actionLabel={(count) => `${count}곳 내 담당으로 가져오기`}
+        emptyTitle="현재 선택할 수 있는 미배정 학교가 없습니다."
+        onSubmit={(schoolIds) => onSubmit(zoneId, schoolIds)}
+      />
+    </div>
+  );
+}
+
 export function SalesWorkspace({
   session,
   onSelectSchool,
@@ -131,10 +206,13 @@ export function SalesWorkspace({
   onSelectSchool: (school: School) => void;
   onOpenSearch: () => void;
 }) {
+  const { showToast } = useToast();
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [zoneId, setZoneId] = useState<string>("all");
   const [cycleSheetOpen, setCycleSheetOpen] = useState(false);
+  const [claimSheetOpen, setClaimSheetOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const data = useSalesWorkspace(session, selectedCycleId);
   const workspace = data.workspace;
   const closeCycleSheet = useCallback(() => setCycleSheetOpen(false), []);
@@ -166,7 +244,20 @@ export function SalesWorkspace({
     const progress = scopeAssignments.length === 0 ? 0 : Math.round((completed / scopeAssignments.length) * 100);
     const availableZoneIds = new Set(scopeAssignments.map((assignment) => assignment.zoneId));
     const visibleZones = workspace.zones.filter((zone) => availableZoneIds.has(zone.zoneId));
-    return { visibleAssignments, employees, zones, totals: { assigned: scopeAssignments.length, completed, before, followUp, sample, progress }, visibleZones };
+    const ownedZoneIds = new Set(workspace.assignments
+      .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
+      .map((assignment) => assignment.zoneId));
+    const ownedZones = workspace.zones.filter((zone) => ownedZoneIds.has(zone.zoneId));
+    const assignedSchoolIds = new Set(workspace.assignments.map((assignment) => assignment.schoolId));
+    return {
+      visibleAssignments,
+      employees,
+      zones,
+      totals: { assigned: scopeAssignments.length, completed, before, followUp, sample, progress },
+      visibleZones,
+      ownedZones,
+      assignedSchoolIds,
+    };
   }, [scope, session.claims.employeeId, workspace, zoneId]);
 
   if (data.status === "loading" && !workspace) return <WorkspaceSkeleton />;
@@ -185,6 +276,26 @@ export function SalesWorkspace({
 
   const selectedCycleIsCurrent = workspace.selectedCycleId === workspace.currentCycleId;
   const scopeName = scope === "mine" ? "내 구역" : "팀 전체";
+  const claimAssignments = async (targetZoneId: string, schoolIds: string[]) => {
+    setClaiming(true);
+    try {
+      const result = await claimSalesAssignments({
+        cycleId: workspace.selectedCycleId,
+        zoneId: targetZoneId,
+        schoolIds,
+      });
+      showToast(`${result.createdCount}개 학교를 내 담당으로 가져왔습니다.`, "success");
+      setClaimSheetOpen(false);
+      data.retry();
+      return true;
+    } catch (error) {
+      showToast(salesAssignmentErrorMessage(error));
+      data.retry();
+      return false;
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   return (
     <section className="shell-page sales-cycle-page" aria-labelledby="sales-cycle-title">
@@ -231,6 +342,11 @@ export function SalesWorkspace({
           <span>{selectedCycleIsCurrent ? "현재 월 배정" : "과거 월 · 읽기 전용"} · {model.totals.assigned}곳</span>
         </div>
         <div className="sales-cycle-toolbar__actions">
+          {selectedCycleIsCurrent ? (
+            <GlassButton variant="primary" compact onClick={() => setClaimSheetOpen(true)}>
+              <Icon name="building" />담당 학교 추가
+            </GlassButton>
+          ) : null}
           <GlassButton compact onClick={onOpenSearch}><Icon name="search" />학교 찾기</GlassButton>
           <SegmentedControl
             className="sales-scope-control"
@@ -295,6 +411,23 @@ export function SalesWorkspace({
             </button>
           ))}
         </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={claimSheetOpen}
+        title="담당 학교 가져오기"
+        description="현재 담당 구역에 미배정 학교를 여러 곳 선택해 한 번에 연결합니다. 검색과 필터를 바꿔도 선택은 유지됩니다."
+        onClose={() => { if (!claiming) setClaimSheetOpen(false); }}
+      >
+        {claimSheetOpen ? (
+          <SalesClaimPicker
+            session={session}
+            ownedZones={model.ownedZones}
+            assignedSchoolIds={model.assignedSchoolIds}
+            busy={claiming}
+            onSubmit={claimAssignments}
+          />
+        ) : null}
       </BottomSheet>
     </section>
   );
