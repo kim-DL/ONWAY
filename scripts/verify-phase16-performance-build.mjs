@@ -56,7 +56,7 @@ const initialRawBytes = initial.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const initialGzipBytes = initial.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 
 const dynamicEntries = Object.entries(loadableManifest)
-  .filter(([key]) => key.includes("features\\"))
+  .filter(([key]) => /features[\\/]/u.test(key))
   .map(([boundary, value]) => ({ boundary, files: value.files }));
 const dynamicAssets = [...new Set(dynamicEntries.flatMap((entry) => entry.files))].map(sizeAsset);
 const largestJavascriptGzipBytes = Math.max(
