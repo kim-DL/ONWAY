@@ -6,6 +6,7 @@ import {
   claimSalesAssignmentsInputSchema,
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
+  releaseSalesAssignmentsInputSchema,
 } from "../src/sales/sales-cycle-contract.js";
 import { copyAssignment, createAssignment } from "../src/sales/sales-cycle-service.js";
 
@@ -85,5 +86,32 @@ describe("sales cycle and assignment contract", () => {
       zoneId: "A",
       schoolIds: ["SCH-001", "SCH-001"],
     }).success).toBe(false);
+    expect(releaseSalesAssignmentsInputSchema.safeParse({
+      ...request,
+      cycleId: "2026-09",
+      schoolIds: ["SCH-001", "SCH-002"],
+      reason: "담당 학교 정리",
+    }).success).toBe(true);
+    expect(releaseSalesAssignmentsInputSchema.safeParse({
+      ...request,
+      cycleId: "2026-09",
+      schoolIds: ["SCH-001", "SCH-001"],
+      reason: "담당 학교 정리",
+    }).success).toBe(false);
+  });
+
+  it("supports direct employee-school ownership without a zone", () => {
+    const request = { requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa5", appVersion: "direct-assignment" };
+    const parsed = createSalesAssignmentsInputSchema.parse({
+      ...request,
+      cycleId: "2026-09",
+      assignments: [{ schoolId: "SCH-001", primaryAssigneeId: "EMP-A", assigneeIds: ["EMP-A"] }],
+    });
+    expect(parsed.assignments[0]?.zoneId).toBeNull();
+    expect(claimSalesAssignmentsInputSchema.parse({
+      ...request,
+      cycleId: "2026-09",
+      schoolIds: ["SCH-002"],
+    }).zoneId).toBeNull();
   });
 });

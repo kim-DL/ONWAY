@@ -30,7 +30,7 @@ const schoolSchema = z.object({
   district: z.enum(["dong", "jung", "seo", "yuseong", "daedeok"]),
 }).passthrough();
 const assignmentSchema = z.object({
-  schoolId: z.string(), cycleId: z.string(), zoneId: z.string(), primaryAssigneeId: z.string(), assigneeIds: z.array(z.string()),
+  schoolId: z.string(), cycleId: z.string(), zoneId: z.string().nullable(), primaryAssigneeId: z.string(), assigneeIds: z.array(z.string()),
   monthlyStatus: z.enum(["before", "completed", "followUp", "revisit", "onHold"]),
   latestVisitedAt: timestampSchema.nullable(), brochureStatus: z.string(), sampleStatus: z.string(), updatedAt: timestampSchema,
 }).passthrough();
@@ -319,7 +319,7 @@ export class CsvExportService {
       const header = ["월", "학교명", "학교코드", "행정구", "학교급", "구역", "주 담당자", "공동 담당자", "방문 상태", "최근 방문일", "홍보지", "샘플", "관심도", "후속 여부", "후속일", "다음 행동", "커뮤니케이션 태그", "수정시각"];
       const rows = filtered.sort((a, b) => (schools.get(a.schoolId)?.name ?? a.schoolId).localeCompare(schools.get(b.schoolId)?.name ?? b.schoolId, "ko")).map((assignment) => {
         const school = schools.get(assignment.schoolId); const profile = profiles.get(assignment.schoolId);
-        return [assignment.cycleId, school?.name ?? assignment.schoolId, school?.source.schoolCode ?? "", school ? DISTRICT_LABELS[school.district] : "", school ? SCHOOL_TYPE_LABELS[school.schoolType] : "", zones.get(assignment.zoneId) ?? assignment.zoneId, employees.get(assignment.primaryAssigneeId) ?? assignment.primaryAssigneeId, assignment.assigneeIds.filter((id) => id !== assignment.primaryAssigneeId).map((id) => employees.get(id) ?? id).join(" · "), MONTHLY_STATUS_LABELS[assignment.monthlyStatus], seoulDate(assignment.latestVisitedAt), DELIVERY_LABELS[assignment.brochureStatus] ?? assignment.brochureStatus, DELIVERY_LABELS[assignment.sampleStatus] ?? assignment.sampleStatus, profile?.interestEvaluated ? profile.interestScore : "미평가", profile?.followUp.required ? "필요" : "없음", profile?.followUp.dueDate ?? "", profile?.nextAction.summary ?? "", profile?.communicationTagIds.map((id) => communicationTags.get(id) ?? id).join(" · ") ?? "", seoulDateTime(assignment.updatedAt)];
+        return [assignment.cycleId, school?.name ?? assignment.schoolId, school?.source.schoolCode ?? "", school ? DISTRICT_LABELS[school.district] : "", school ? SCHOOL_TYPE_LABELS[school.schoolType] : "", assignment.zoneId ? zones.get(assignment.zoneId) ?? assignment.zoneId : "", employees.get(assignment.primaryAssigneeId) ?? assignment.primaryAssigneeId, assignment.assigneeIds.filter((id) => id !== assignment.primaryAssigneeId).map((id) => employees.get(id) ?? id).join(" · "), MONTHLY_STATUS_LABELS[assignment.monthlyStatus], seoulDate(assignment.latestVisitedAt), DELIVERY_LABELS[assignment.brochureStatus] ?? assignment.brochureStatus, DELIVERY_LABELS[assignment.sampleStatus] ?? assignment.sampleStatus, profile?.interestEvaluated ? profile.interestScore : "미평가", profile?.followUp.required ? "필요" : "없음", profile?.followUp.dueDate ?? "", profile?.nextAction.summary ?? "", profile?.communicationTagIds.map((id) => communicationTags.get(id) ?? id).join(" · ") ?? "", seoulDateTime(assignment.updatedAt)];
       });
       return { rows: [header, ...rows], summary: selectionSummary(selection, names) };
     }

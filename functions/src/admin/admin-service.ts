@@ -661,7 +661,9 @@ export class AdminService {
       })),
       assignments: assignmentsSnapshot?.docs.map((document) => ({
         schoolId: document.id,
-        zoneId: String(document.get("zoneId")),
+        zoneId: typeof document.get("zoneId") === "string"
+          ? document.get("zoneId") as string
+          : null,
         primaryAssigneeId: String(document.get("primaryAssigneeId")),
         assigneeIds: Array.isArray(document.get("assigneeIds")) ? document.get("assigneeIds") as string[] : [],
         monthlyStatus: String(document.get("monthlyStatus")),

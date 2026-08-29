@@ -81,17 +81,17 @@ async function login(page: Page, pin: string) {
   }
   await pinInput.fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
-  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("2026년 8월")).toBeVisible();
 }
 
 test("sales A defaults to only their schools and can explicitly open the whole team", async ({ page }) => {
   await login(page, PHASE3_TEST_PINS.salesA);
 
-  await expect(page.getByRole("group", { name: "학교 범위" }).getByRole("button", { name: "내 구역" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "학교 범위" }).getByRole("button", { name: "내 학교" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".assignment-card")).toHaveCount(2);
-  await expect(page.getByRole("button", { name: /대전온누리고등학교, A구역, 담당 영업 A/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /대전새빛고등학교, A구역, 담당 영업 A/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /대전온누리고등학교, 서구, 담당 영업 A/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /대전새빛고등학교, 동구, 담당 영업 A/ })).toBeVisible();
   await expect(page.locator(".sales-cycle-progress")).toContainText("50");
 
   const accessibility = await new AxeBuilder({ page }).include(".sales-cycle-page").analyze();
@@ -110,12 +110,17 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   await expect(page.getByRole("heading", { name: /함께 이어가는.*팀의 흐름/ })).toBeVisible();
   await expect(page.locator(".assignment-card")).toHaveCount(5);
   await expect(page.getByText(/순위|저성과|실적 경쟁/)).toHaveCount(0);
-  await page.getByRole("button", { name: "C구역", exact: true }).click();
-  await expect(page.locator(".assignment-card")).toHaveCount(2);
-  await expect(page.getByRole("button", { name: /대전새봄초등학교, C구역, 담당 영업 C/ })).toBeVisible();
+  await page.getByRole("button", { name: "유성구", exact: true }).click();
+  await expect(page.locator(".assignment-card")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /대전새봄초등학교, 유성구, 담당 영업 C/ })).toBeVisible();
+
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "활동" }).click();
+  await expect(page.getByRole("heading", { name: /확인하고.*바로 움직이기/ })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: /함께 이어가는.*팀의 흐름/ })).toBeVisible();
 });
 
-test("sales B and C receive distinct own-zone snapshots", async ({ browser }) => {
+test("sales B and C receive distinct own-school snapshots", async ({ browser }) => {
   const cases = [
     { pin: PHASE3_TEST_PINS.salesB, schools: ["대전한밭중학교"], absent: "대전온누리고등학교" },
     { pin: PHASE3_TEST_PINS.salesC, schools: ["대전새봄초등학교", "대전푸른특수학교"], absent: "대전한밭중학교" },
@@ -136,9 +141,19 @@ test("sales B and C receive distinct own-zone snapshots", async ({ browser }) =>
 test("salesperson can search, preserve selection, and bulk-claim an unassigned school on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, PHASE3_TEST_PINS.salesA);
-  await page.getByRole("button", { name: "담당 학교 추가" }).click();
+  const navigationStyle = await page.locator(".workspace-navigation").evaluate((element) => ({
+    background: getComputedStyle(element).backgroundColor,
+    radius: getComputedStyle(element).borderRadius,
+  }));
+  expect(navigationStyle).toEqual({ background: "rgb(18, 59, 50)", radius: "0px" });
+
+  await page.getByRole("button", { name: "학교 추가" }).click();
   const dialog = page.getByRole("dialog", { name: "담당 학교 가져오기" });
   await expect(dialog).toBeVisible();
+  await page.goBack();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible();
+  await page.getByRole("button", { name: "학교 추가" }).click();
   await dialog.getByRole("searchbox", { name: "학교 검색" }).fill("미배정");
   const schoolCheckbox = dialog.getByRole("checkbox", { name: new RegExp(UI_CLAIM_SCHOOL_NAME) });
   await expect(schoolCheckbox).toBeAttached();
@@ -161,6 +176,14 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   await dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기" }).click();
   await expect(page.getByText("1개 학교를 내 담당으로 가져왔습니다.")).toBeVisible();
   await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "내 학교 정리" }).click();
+  await page.getByRole("checkbox", { name: `${UI_CLAIM_SCHOOL_NAME} 담당 학교에서 제외 선택` }).check();
+  await page.getByRole("button", { name: "내 담당에서 제외" }).click();
+  const releaseDialog = page.getByRole("dialog", { name: "1개 학교를 제외할까요?" });
+  await releaseDialog.getByRole("button", { name: "담당에서 제외" }).click();
+  await expect(page.getByText("1개 학교를 내 담당에서 제외했습니다.")).toBeVisible();
+  await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toHaveCount(0, { timeout: 15_000 });
 });
 
 async function emulatorIdToken(uid: string) {
@@ -220,7 +243,7 @@ async function callFunction(name: string, idToken: string, data: unknown) {
   return { result: payload.data ?? payload.result, error: payload.error };
 }
 
-test("admin manages assignments while sales users can only claim into their own current zone", async () => {
+test("admin manages monthly ownership while sales users can claim and release unassigned schools", async () => {
   const [adminToken, salesToken] = await Promise.all([
     emulatorGoogleIdToken("uid-admin"),
     emulatorIdToken("uid-sales-a"),
@@ -245,21 +268,37 @@ test("admin manages assignments while sales users can only claim into their own 
   const claimed = await callFunction("claimSalesAssignments", salesToken, {
     ...base,
     cycleId: "2026-08",
-    zoneId: "A",
     schoolIds: ["SCH-CLAIM-E2E-A"],
     requestId: "f65f95b7-1714-4cb0-8806-7e63740b05c2",
   });
-  expect(claimed.result).toMatchObject({ createdCount: 1, zoneId: "A", replayed: false });
+  expect(claimed.result).toMatchObject({ createdCount: 1, zoneId: null, replayed: false });
 
   const salesBToken = await emulatorIdToken("uid-sales-b");
-  const foreignZone = await callFunction("claimSalesAssignments", salesBToken, {
+  const salesBClaim = await callFunction("claimSalesAssignments", salesBToken, {
     ...base,
     cycleId: "2026-08",
-    zoneId: "A",
     schoolIds: ["SCH-CLAIM-E2E-B"],
     requestId: "d9580ae2-0571-4a89-8df4-16ca147c5df7",
   });
-  expect(foreignZone.error?.status).toBe("PERMISSION_DENIED");
+  expect(salesBClaim.result).toMatchObject({ createdCount: 1, zoneId: null, replayed: false });
+
+  const foreignRelease = await callFunction("releaseSalesAssignments", salesToken, {
+    ...base,
+    cycleId: "2026-08",
+    schoolIds: ["SCH-CLAIM-E2E-B"],
+    reason: "타 직원 담당 제외 시도",
+    requestId: "7d967ede-00ab-43d7-aa09-ffcc9968d33d",
+  });
+  expect(foreignRelease.error?.status).toBe("PERMISSION_DENIED");
+
+  const released = await callFunction("releaseSalesAssignments", salesBToken, {
+    ...base,
+    cycleId: "2026-08",
+    schoolIds: ["SCH-CLAIM-E2E-B"],
+    reason: "담당 학교 직접 정리",
+    requestId: "2b1c6d8b-e307-46ca-bcdc-dc0a38710752",
+  });
+  expect(released.result).toMatchObject({ removedCount: 1, replayed: false });
 
   const cycle = await callFunction("createSalesCycle", adminToken, {
     ...base,
@@ -276,7 +315,7 @@ test("admin manages assignments while sales users can only claim into their own 
     requestId: "94ba125b-f35c-4519-a437-e2598fc463d9",
     assignments: [{
       schoolId: "SCH-NEIS-G100000001",
-      zoneId: "A",
+      zoneId: null,
       primaryAssigneeId: "EMP-SALES-A",
       assigneeIds: ["EMP-SALES-A"],
     }],
@@ -288,7 +327,7 @@ test("admin manages assignments while sales users can only claim into their own 
     cycleId: "2026-10",
     schoolId: "SCH-NEIS-G100000001",
     expectedRevision: 1,
-    zoneId: "B",
+    zoneId: null,
     primaryAssigneeId: "EMP-SALES-B",
     assigneeIds: ["EMP-SALES-B", "EMP-SALES-A"],
     reason: "공동 담당 일정 조정",

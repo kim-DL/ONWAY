@@ -10,11 +10,14 @@ import {
   claimSalesAssignmentsInputSchema,
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
+  releaseSalesAssignmentsInputSchema,
 } from "./sales-cycle-contract.js";
 import {
   SalesAssignmentAlreadyExistsError,
   SalesAssignmentClaimPermissionError,
+  SalesAssignmentHasActivityError,
   SalesAssignmentNotFoundError,
+  SalesAssignmentReleasePermissionError,
   SalesAssignmentRevisionConflictError,
   SalesCycleAlreadyExistsError,
   SalesActiveCycleRequiredError,
@@ -75,7 +78,9 @@ function mapSalesError(error: unknown): HttpsError | null {
   if (error instanceof SalesRequestCollisionError) return new HttpsError("already-exists", "요청 식별자가 이미 사용되었습니다.");
   if (error instanceof SalesCycleAlreadyExistsError) return new HttpsError("already-exists", "이미 존재하는 월입니다.");
   if (error instanceof SalesAssignmentAlreadyExistsError) return new HttpsError("already-exists", "이미 배정된 학교가 포함되어 있습니다.");
-  if (error instanceof SalesAssignmentClaimPermissionError) return new HttpsError("permission-denied", "현재 담당 중인 구역의 학교만 가져올 수 있습니다.");
+  if (error instanceof SalesAssignmentClaimPermissionError) return new HttpsError("permission-denied", "담당 학교를 직접 선택할 권한이 없습니다.");
+  if (error instanceof SalesAssignmentReleasePermissionError) return new HttpsError("permission-denied", "자신이 단독 담당하는 학교만 제외할 수 있습니다.");
+  if (error instanceof SalesAssignmentHasActivityError) return new HttpsError("failed-precondition", "업무 기록이 있는 학교는 제외할 수 없습니다. 관리자에게 담당 변경을 요청해주세요.");
   if (error instanceof SalesActiveCycleRequiredError) return new HttpsError("failed-precondition", "현재 운영 중인 월에만 학교를 가져올 수 있습니다.");
   if (error instanceof SalesCycleNotFoundError) return new HttpsError("not-found", "월별 영업 Cycle을 찾을 수 없습니다.");
   if (error instanceof SalesAssignmentNotFoundError) return new HttpsError("not-found", "학교 배정을 찾을 수 없습니다.");
@@ -136,11 +141,29 @@ export const claimSalesAssignments = onCall(callableOptions, async (request) => 
     if (mapped) throw mapped;
     logger.error("Sales assignment claim failed.", {
       cycleId: input.cycleId,
-      zoneId: input.zoneId,
       requestId: input.requestId,
       error,
     });
     throw new HttpsError("internal", "담당 학교를 가져오지 못했습니다.");
+  }
+});
+
+export const releaseSalesAssignments = onCall(callableOptions, async (request) => {
+  const parsed = releaseSalesAssignmentsInputSchema.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "제외할 학교를 확인해주세요.");
+  const input = parsed.data;
+  const actor = await requireSalesActor(request);
+  try {
+    return await new SalesCycleService().releaseAssignments(input, actor);
+  } catch (error) {
+    const mapped = mapSalesError(error);
+    if (mapped) throw mapped;
+    logger.error("Sales assignment release failed.", {
+      cycleId: input.cycleId,
+      requestId: input.requestId,
+      error,
+    });
+    throw new HttpsError("internal", "담당 학교에서 제외하지 못했습니다.");
   }
 });
 

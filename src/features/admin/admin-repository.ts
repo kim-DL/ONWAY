@@ -87,12 +87,12 @@ export const adminRepository = {
     return call("createSalesCycle", { ...input, ...mutationFields() });
   },
 
-  async createAssignments(input: { cycleId: string; schoolIds: string[]; zoneId: string; primaryAssigneeId: string }) {
+  async createAssignments(input: { cycleId: string; schoolIds: string[]; primaryAssigneeId: string }) {
     return call("createSalesAssignments", {
       cycleId: input.cycleId,
       assignments: input.schoolIds.map((schoolId) => ({
         schoolId,
-        zoneId: input.zoneId,
+        zoneId: null,
         primaryAssigneeId: input.primaryAssigneeId,
         assigneeIds: [input.primaryAssigneeId],
       })),
@@ -104,7 +104,7 @@ export const adminRepository = {
     cycleId: string;
     schoolId: string;
     expectedRevision: number;
-    zoneId: string;
+    zoneId: string | null;
     primaryAssigneeId: string;
     reason: string;
   }) {
@@ -113,6 +113,10 @@ export const adminRepository = {
       assigneeIds: [input.primaryAssigneeId],
       ...mutationFields(),
     });
+  },
+
+  async releaseAssignments(input: { cycleId: string; schoolIds: string[]; reason: string }) {
+    return call("releaseSalesAssignments", { ...input, ...mutationFields() });
   },
 
   async previewNeis() {

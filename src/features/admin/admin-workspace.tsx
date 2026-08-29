@@ -54,7 +54,7 @@ const NAVIGATION: readonly {
     icon: "building",
   },
   { id: "employees", label: "직원 관리", hint: "PIN·권한·세션", icon: "user" },
-  { id: "cycles", label: "월별 구역", hint: "Cycle·배정", icon: "calendar" },
+  { id: "cycles", label: "학교 배정", hint: "월별 담당·복사", icon: "calendar" },
   { id: "sync", label: "데이터 동기화", hint: "NEIS·Kakao", icon: "refresh" },
   { id: "export", label: "CSV", hint: "안전한 내보내기", icon: "download" },
   { id: "audit", label: "감사 기록", hint: "변경 추적", icon: "clipboard" },
@@ -139,6 +139,7 @@ const AUDIT_EVENT_LABELS: Record<string, string> = {
   PHOTO_RESTORED: "현장 사진 복원",
   SALES_ASSIGNMENT_CHANGED: "영업 배정 변경",
   SALES_ASSIGNMENTS_CREATED: "영업 배정 생성",
+  SALES_ASSIGNMENTS_RELEASED: "영업 배정 제외",
   SALES_ASSIGNMENTS_CLAIMED: "담당자 학교 가져오기",
   SALES_CYCLE_CREATED: "영업 Cycle 생성",
   SALES_PROFILE_UPDATED: "영업 상태 변경",
@@ -156,7 +157,7 @@ const AUDIT_EVENT_LABELS: Record<string, string> = {
 const PAGE_HEADING_IDS: Record<string, string> = {
   "학교 관리": "schools-title",
   "직원 관리": "employees-title",
-  "월별 구역 배정": "cycles-title",
+  "월별 학교 배정": "cycles-title",
   "데이터 동기화": "sync-title",
   "감사 기록": "audit-title",
   설정: "admin-settings-title",
@@ -1147,23 +1148,23 @@ function AssignmentRow({
   assignment,
   school,
   employees,
-  zones,
   cycleId,
   onReload,
+  selected,
+  onSelect,
 }: {
   assignment: AdminAssignment;
   school: AdminSchool | undefined;
   employees: AdminEmployee[];
-  zones: AdminWorkspaceData["zones"];
   cycleId: string;
   onReload: () => Promise<void>;
+  selected: boolean;
+  onSelect: (schoolId: string, selected: boolean) => void;
 }) {
   const { showToast } = useToast();
-  const [zoneId, setZoneId] = useState(assignment.zoneId);
   const [assigneeId, setAssigneeId] = useState(assignment.primaryAssigneeId);
   const [saving, setSaving] = useState(false);
-  const dirty =
-    zoneId !== assignment.zoneId || assigneeId !== assignment.primaryAssigneeId;
+  const dirty = assigneeId !== assignment.primaryAssigneeId;
   const save = async () => {
     setSaving(true);
     try {
@@ -1171,9 +1172,9 @@ function AssignmentRow({
         cycleId,
         schoolId: assignment.schoolId,
         expectedRevision: assignment.revision,
-        zoneId,
+        zoneId: assignment.zoneId,
         primaryAssigneeId: assigneeId,
-        reason: "관리자 월별 구역 배정 변경",
+        reason: "관리자 월별 학교 담당 변경",
       });
       await onReload();
       showToast(`${school?.name ?? assignment.schoolId} 배정을 변경했습니다.`);
@@ -1186,25 +1187,20 @@ function AssignmentRow({
   return (
     <tr>
       <td>
-        <strong>{school?.name ?? assignment.schoolId}</strong>
-        <small>
-          {DISTRICT_LABELS[school?.district ?? ""] ?? school?.district}
-        </small>
-      </td>
-      <td>
-        <select
-          aria-label={`${school?.name ?? assignment.schoolId} 구역`}
-          value={zoneId}
-          onChange={(event) => setZoneId(event.target.value)}
-        >
-          {zones
-            .filter((zone) => zone.active)
-            .map((zone) => (
-              <option key={zone.zoneId} value={zone.zoneId}>
-                {zone.name}
-              </option>
-            ))}
-        </select>
+        <label className="assignment-table__school-select">
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={assignment.monthlyStatus !== "before"}
+            onChange={(event) => onSelect(assignment.schoolId, event.target.checked)}
+            aria-label={`${school?.name ?? assignment.schoolId} 배정 제외 선택`}
+          />
+          <span aria-hidden="true"><Icon name="check" size={13} /></span>
+          <span>
+            <strong>{school?.name ?? assignment.schoolId}</strong>
+            <small>{DISTRICT_LABELS[school?.district ?? ""] ?? school?.district}</small>
+          </span>
+        </label>
       </td>
       <td>
         <select
@@ -1272,9 +1268,7 @@ function CyclesPage({
   const [copyFrom, setCopyFrom] = useState(data.selectedCycleId ?? "");
   const [activate, setActivate] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [zoneId, setZoneId] = useState(
-    data.zones.find((zone) => zone.active)?.zoneId ?? "",
-  );
+  const [selectedAssignments, setSelectedAssignments] = useState<Set<string>>(() => new Set());
   const salesEmployees = data.employees.filter(
     (employee) =>
       employee.status === "active" && employee.roleScopes.includes("sales"),
@@ -1309,13 +1303,12 @@ function CyclesPage({
     }
   };
   const addAssignments = async (schoolIds: string[]) => {
-    if (!data.selectedCycleId || schoolIds.length === 0 || !zoneId || !assigneeId) return false;
+    if (!data.selectedCycleId || schoolIds.length === 0 || !assigneeId) return false;
     setCreating(true);
     try {
       await adminRepository.createAssignments({
         cycleId: data.selectedCycleId,
         schoolIds,
-        zoneId,
         primaryAssigneeId: assigneeId,
       });
       await onLoadCycle(data.selectedCycleId);
@@ -1329,6 +1322,34 @@ function CyclesPage({
       setCreating(false);
     }
   };
+  const removeAssignments = async () => {
+    if (!data.selectedCycleId || selectedAssignments.size === 0) return;
+    setCreating(true);
+    try {
+      const schoolIds = [...selectedAssignments];
+      await adminRepository.releaseAssignments({
+        cycleId: data.selectedCycleId,
+        schoolIds,
+        reason: "관리자 월별 미착수 학교 배정 정리",
+      });
+      setSelectedAssignments(new Set());
+      await onLoadCycle(data.selectedCycleId);
+      showToast(`${schoolIds.length}개 학교 배정을 제외했습니다.`, "success");
+    } catch (error) {
+      showToast(adminErrorMessage(error));
+      await onLoadCycle(data.selectedCycleId);
+    } finally {
+      setCreating(false);
+    }
+  };
+  const selectAssignment = (schoolId: string, selected: boolean) => {
+    setSelectedAssignments((current) => {
+      const next = new Set(current);
+      if (selected) next.add(schoolId);
+      else next.delete(schoolId);
+      return next;
+    });
+  };
 
   const activeCycleStatus = data.cycles.find(
     (cycle) => cycle.cycleId === data.selectedCycleId,
@@ -1338,8 +1359,8 @@ function CyclesPage({
     <section className="admin-page" aria-labelledby="cycles-title">
       <PageHeading
         kicker="MONTHLY SALES CYCLE"
-        title="월별 구역 배정"
-        description="월 단위 Cycle을 만들고 학교·구역·주 담당자를 명시적으로 배정합니다."
+        title="월별 학교 배정"
+        description="전월 담당 학교를 복사한 뒤 필요한 학교만 더하고 빼며 직원별 담당을 확정합니다."
       />
       <div className="cycle-command-grid">
         <article className="admin-panel">
@@ -1360,7 +1381,7 @@ function CyclesPage({
               />
             </label>
             <label>
-              <span>전월 배정 복사</span>
+              <span>기준 월 배정 복사</span>
               <select
                 value={copyFrom}
                 onChange={(event) => setCopyFrom(event.target.value)}
@@ -1412,17 +1433,11 @@ function CyclesPage({
             <small>개 학교</small>
           </strong>
           <div>
-            {data.zones
-              .filter((zone) => zone.active)
-              .map((zone) => (
-                <span key={zone.zoneId}>
+            {salesEmployees.map((employee) => (
+                <span key={employee.employeeId}>
                   <i />
-                  {zone.name}{" "}
-                  {
-                    data.assignments.filter(
-                      (assignment) => assignment.zoneId === zone.zoneId,
-                    ).length
-                  }
+                  {employee.displayName}{" "}
+                  {data.assignments.filter((assignment) => assignment.assigneeIds.includes(employee.employeeId)).length}
                 </span>
               ))}
           </div>
@@ -1456,24 +1471,9 @@ function CyclesPage({
             </div>
             <strong>{availableSchools.length}<small>곳 미배정</small></strong>
           </div>
-          <div className="assignment-bulk-command__owners">
+          <div className="assignment-bulk-command__owners assignment-bulk-command__owners--direct">
           <label>
-            <span>배정 구역</span>
-            <select
-              value={zoneId}
-              onChange={(event) => setZoneId(event.target.value)}
-            >
-              {data.zones
-                .filter((zone) => zone.active)
-                .map((zone) => (
-                  <option key={zone.zoneId} value={zone.zoneId}>
-                    {zone.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            <span>주 담당자</span>
+            <span>배정할 담당자</span>
             <select
               value={assigneeId}
               onChange={(event) => setAssigneeId(event.target.value)}
@@ -1485,7 +1485,7 @@ function CyclesPage({
               ))}
             </select>
           </label>
-          <p><Icon name="user" size={16} />관리자가 최초 구역을 연결하면 담당 직원도 같은 구역의 미배정 학교를 직접 가져올 수 있습니다.</p>
+          <p><Icon name="user" size={16} />학교를 먼저 여러 곳 고른 뒤 한 명의 담당자에게 한 번에 연결합니다. 직원도 미배정 학교를 직접 가져올 수 있습니다.</p>
           </div>
           <SchoolAssignmentPicker
             key={`${data.selectedCycleId ?? "none"}-${data.assignments.length}`}
@@ -1501,12 +1501,18 @@ function CyclesPage({
             onSubmit={addAssignments}
           />
         </div>
+        {selectedAssignments.size > 0 ? (
+          <div className="admin-assignment-batch" role="region" aria-label="선택한 학교 배정 작업">
+            <span><strong>{selectedAssignments.size}</strong>곳 선택</span>
+            <button type="button" onClick={() => setSelectedAssignments(new Set())}>선택 해제</button>
+            <button type="button" disabled={creating} onClick={() => void removeAssignments()}>{creating ? "확인 중…" : "미착수 배정 제외"}</button>
+          </div>
+        ) : null}
         <div className="admin-table-wrap">
           <table className="admin-table assignment-table">
             <thead>
               <tr>
                 <th>학교</th>
-                <th>구역</th>
                 <th>주 담당자</th>
                 <th>진행 상태</th>
                 <th>저장</th>
@@ -1519,9 +1525,10 @@ function CyclesPage({
                   assignment={assignment}
                   school={schools.get(assignment.schoolId)}
                   employees={data.employees}
-                  zones={data.zones}
                   cycleId={data.selectedCycleId ?? ""}
                   onReload={() => onLoadCycle(data.selectedCycleId)}
+                  selected={selectedAssignments.has(assignment.schoolId)}
+                  onSelect={selectAssignment}
                 />
               ))}
             </tbody>
@@ -1530,7 +1537,7 @@ function CyclesPage({
             <EmptyState
               icon="calendar"
               title="아직 배정이 없습니다."
-              description="위 입력란에서 학교, 구역, 담당자를 선택해 추가하세요."
+              description="위 입력란에서 담당자와 학교를 선택해 한 번에 추가하세요."
             />
           ) : null}
         </div>

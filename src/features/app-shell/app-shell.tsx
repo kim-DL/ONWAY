@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -52,9 +52,9 @@ function WorkspaceFeatureLoading({ label = "업무 화면을 준비하고 있습
   );
 }
 
-const SalesExportWorkspace = dynamic(
-  () => import("@/features/export/sales-export-workspace").then((module) => module.SalesExportWorkspace),
-  { loading: () => <WorkspaceFeatureLoading label="내보내기 화면을 준비하고 있습니다." /> },
+const SalesActivityWorkspace = dynamic(
+  () => import("@/features/sales-cycle/sales-activity-workspace").then((module) => module.SalesActivityWorkspace),
+  { loading: () => <WorkspaceFeatureLoading label="업무 목록을 준비하고 있습니다." /> },
 );
 
 const SchoolDetail = dynamic(
@@ -391,7 +391,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
           <div><span className="settings-list__icon"><Icon name={isOnline ? "refresh" : "wifi-off"} /></span><span><strong>네트워크</strong><small>{isOnline ? "최신 정보와 권한을 확인할 수 있습니다." : "저장된 학교 정보만 표시합니다."}</small></span><StatusBadge tone={isOnline ? "success" : "attention"}>{isOnline ? "온라인" : "오프라인"}</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="sparkles" /></span><span><strong>디자인 시스템</strong><small>Aurora · Soft Solid · Liquid Glass</small></span><StatusBadge>v1.0</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>기기 데이터</strong><small>로그아웃하면 비공개 로컬 상태를 정리합니다.</small></span><StatusBadge tone="info">이 기기</StatusBadge></div>
-          <div><span className="settings-list__icon"><Icon name="clipboard" /></span><span><strong>Pilot 기기 진단</strong><small>개인정보 없이 성능·캐시·연결 상태만 내보냅니다. {APP_METADATA.buildVersion}</small></span><button className="pwa-install-action" type="button" disabled={exportingDiagnostics} onClick={() => void exportDeviceDiagnostics()}>{exportingDiagnostics ? "준비 중…" : "진단 내보내기"}</button></div>
+          <div><span className="settings-list__icon"><Icon name="clipboard" /></span><span><strong>기기 진단</strong><small>개인정보 없이 성능·캐시·연결 상태만 내보냅니다. {APP_METADATA.buildVersion}</small></span><button className="pwa-install-action" type="button" disabled={exportingDiagnostics} onClick={() => void exportDeviceDiagnostics()}>{exportingDiagnostics ? "준비 중…" : "진단 내보내기"}</button></div>
         </SoftCard>
 
         <GlassButton className="settings-logout" variant="quiet" onClick={() => setConfirmingLogout(true)}>
@@ -417,7 +417,10 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
 }
 
 function AppShellContent({ session }: { session: AuthenticatedSession }) {
-  const availableModes = getAvailableModes(session.claims.roleScopes);
+  const availableModes = useMemo(
+    () => getAvailableModes(session.claims.roleScopes),
+    [session.claims.roleScopes],
+  );
   const storageKey = `onnuriway:private:v1:mode:${session.uid}`;
   const storedMode = useSyncExternalStore(
     subscribeToStoredMode,
@@ -438,17 +441,94 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
+  const historyReadyRef = useRef(false);
   const schoolData = useSchoolShellData(mode === "delivery" && view === "schools" && !selectedSchool);
+
+  const writeHistory = (
+    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean },
+    replace = false,
+  ) => {
+    const state = {
+      ...(typeof window.history.state === "object" && window.history.state ? window.history.state : {}),
+      onnuriwayShell: { version: 1, ...next },
+    };
+    if (replace) window.history.replaceState(state, "", window.location.href);
+    else window.history.pushState(state, "", window.location.href);
+  };
+
+  useEffect(() => {
+    if (!historyReadyRef.current) {
+      historyReadyRef.current = true;
+      writeHistory({ mode, view: "schools", school: null, searchOpen: false }, true);
+    }
+    const restore = (event: PopStateEvent) => {
+      const snapshot = event.state?.onnuriwayShell as {
+        version?: unknown;
+        mode?: unknown;
+        view?: unknown;
+        school?: unknown;
+        searchOpen?: unknown;
+      } | undefined;
+      if (!snapshot || snapshot.version !== 1) return;
+      const restoredMode = (snapshot.mode === "delivery" || snapshot.mode === "sales")
+        && availableModes.includes(snapshot.mode)
+        ? snapshot.mode
+        : availableModes[0] ?? "delivery";
+      const restoredView = snapshot.view === "schools" || snapshot.view === "activity" || snapshot.view === "settings"
+        ? normalizeView(restoredMode, snapshot.view)
+        : "schools";
+      const restoredSchool = snapshot.school
+        && typeof snapshot.school === "object"
+        && typeof (snapshot.school as { schoolId?: unknown }).schoolId === "string"
+        ? snapshot.school as School
+        : null;
+      setChosenMode(restoredMode);
+      setView(restoredView);
+      setSelectedSchool(restoredSchool);
+      const nextSearchOpen = snapshot.searchOpen === true && restoredSchool === null;
+      if (nextSearchOpen) setSearchMounted(true);
+      setSearchOpen(nextSearchOpen);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [availableModes, mode]);
 
   const openSearch = () => {
     setSearchMounted(true);
     setSearchOpen(true);
+    writeHistory({ mode, view, school: null, searchOpen: true });
+  };
+
+  const closeSearch = () => {
+    const snapshot = window.history.state?.onnuriwayShell as { searchOpen?: unknown } | undefined;
+    if (snapshot?.searchOpen === true) window.history.back();
+    else setSearchOpen(false);
+  };
+
+  const openSchool = (school: School) => {
+    setSearchOpen(false);
+    setSelectedSchool(school);
+    writeHistory({ mode, view, school, searchOpen: false });
+  };
+
+  const resolveSearchSchool = (school: School) => {
+    setSearchOpen(false);
+    setSelectedSchool(school);
+    writeHistory({ mode, view, school, searchOpen: false }, true);
+  };
+
+  const closeSchool = () => {
+    const snapshot = window.history.state?.onnuriwayShell as { school?: unknown } | undefined;
+    if (snapshot?.school) window.history.back();
+    else setSelectedSchool(null);
   };
 
   const changeMode = (nextMode: WorkMode) => {
     setChosenMode(nextMode);
     setView((current) => normalizeView(nextMode, current));
     setSelectedSchool(null);
+    const nextView = normalizeView(nextMode, view);
+    writeHistory({ mode: nextMode, view: nextView, school: null, searchOpen: false });
     try {
       localStorage.setItem(storageKey, nextMode);
     } catch {
@@ -457,21 +537,24 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   };
 
   const navigate = (nextView: ShellView) => {
+    if (nextView === view && !selectedSchool) return;
     setSelectedSchool(null);
     setView(nextView);
+    setSearchOpen(false);
+    writeHistory({ mode, view: nextView, school: null, searchOpen: false });
   };
 
   let content;
   if (selectedSchool) {
-    content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} onBack={() => setSelectedSchool(null)} />;
+    content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} onBack={closeSchool} />;
   } else if (view === "settings") {
     content = <SettingsPage session={session} />;
   } else if (view === "activity" && mode === "sales") {
-    content = <SalesExportWorkspace session={session} />;
+    content = <SalesActivityWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} />;
   } else if (mode === "sales") {
-    content = <SalesWorkspace session={session} onSelectSchool={setSelectedSchool} onOpenSearch={openSearch} />;
+    content = <SalesWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} />;
   } else {
-    content = <DeliveryHome session={session} schoolData={schoolData} onSelect={setSelectedSchool} onOpenSearch={openSearch} />;
+    content = <DeliveryHome session={session} schoolData={schoolData} onSelect={openSchool} onOpenSearch={openSearch} />;
   }
 
   return (
@@ -485,8 +568,8 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
           open={searchOpen}
           session={session}
           roleScope={mode}
-          onClose={() => setSearchOpen(false)}
-          onSchoolResolved={setSelectedSchool}
+          onClose={closeSearch}
+          onSchoolResolved={resolveSearchSchool}
         />
       ) : null}
     </main>

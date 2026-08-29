@@ -8,9 +8,10 @@ import {
   claimSalesAssignmentsInputSchema,
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
+  releaseSalesAssignmentsInputSchema,
 } from "../functions/src/sales/sales-cycle-contract.js";
 import {
-  SalesAssignmentClaimPermissionError,
+  SalesAssignmentReleasePermissionError,
   SalesAssignmentRevisionConflictError,
   SalesActiveCycleRequiredError,
   SalesCycleService,
@@ -86,7 +87,6 @@ if (!collisionRejected) throw new Error("Request ID collision was not rejected."
 
 const claimInput = claimSalesAssignmentsInputSchema.parse({
   cycleId: "2026-08",
-  zoneId: "A",
   schoolIds: ["SCH-004"],
   requestId: randomUUID(),
   appVersion: "phase9-gate",
@@ -94,27 +94,51 @@ const claimInput = claimSalesAssignmentsInputSchema.parse({
 const salesAActor = { uid: "uid-sales-a", employeeId: "EMP-SALES-A", roleScopes: ["sales"] };
 const claimed = await service.claimAssignments(claimInput, salesAActor);
 const replayedClaim = await service.claimAssignments(claimInput, salesAActor);
-if (claimed.createdCount !== 1 || claimed.zoneId !== "A" || claimed.replayed) {
-  throw new Error("Zone-scoped self assignment failed.");
+if (claimed.createdCount !== 1 || claimed.zoneId !== null || claimed.replayed) {
+  throw new Error("Direct self assignment failed.");
 }
 if (!replayedClaim.replayed || replayedClaim.createdCount !== 1) {
-  throw new Error("Zone-scoped self assignment replay failed.");
+  throw new Error("Direct self assignment replay failed.");
 }
 
-let foreignZoneRejected = false;
+const salesBActor = { uid: "uid-sales-b", employeeId: "EMP-SALES-B", roleScopes: ["sales"] };
+const salesBClaim = await service.claimAssignments(claimSalesAssignmentsInputSchema.parse({
+  cycleId: "2026-08",
+  schoolIds: ["SCH-005"],
+  requestId: randomUUID(),
+  appVersion: "phase9-gate",
+}), salesBActor);
+if (salesBClaim.createdCount !== 1 || salesBClaim.zoneId !== null) {
+  throw new Error("A salesperson could not select an unassigned school directly.");
+}
+
+let foreignReleaseRejected = false;
 try {
-  await service.claimAssignments(claimSalesAssignmentsInputSchema.parse({
+  await service.releaseAssignments(releaseSalesAssignmentsInputSchema.parse({
     cycleId: "2026-08",
-    zoneId: "A",
     schoolIds: ["SCH-005"],
+    reason: "타 직원 배정 제외 시도",
     requestId: randomUUID(),
     appVersion: "phase9-gate",
-  }), { uid: "uid-sales-b", employeeId: "EMP-SALES-B", roleScopes: ["sales"] });
+  }), salesAActor);
 } catch (error) {
-  if (error instanceof SalesAssignmentClaimPermissionError) foreignZoneRejected = true;
+  if (error instanceof SalesAssignmentReleasePermissionError) foreignReleaseRejected = true;
   else throw error;
 }
-if (!foreignZoneRejected) throw new Error("A salesperson claimed a school into another employee's zone.");
+if (!foreignReleaseRejected) throw new Error("A salesperson removed another employee's school.");
+
+const releaseInput = releaseSalesAssignmentsInputSchema.parse({
+  cycleId: "2026-08",
+  schoolIds: ["SCH-005"],
+  reason: "담당 학교 직접 정리",
+  requestId: randomUUID(),
+  appVersion: "phase9-gate",
+});
+const released = await service.releaseAssignments(releaseInput, salesBActor);
+const replayedRelease = await service.releaseAssignments(releaseInput, salesBActor);
+if (released.removedCount !== 1 || released.replayed || !replayedRelease.replayed) {
+  throw new Error("Direct assignment release or replay failed.");
+}
 
 const changeInput = changeSalesAssignmentInputSchema.parse({
   cycleId: "2026-08",
@@ -152,7 +176,6 @@ let draftClaimRejected = false;
 try {
   await service.claimAssignments(claimSalesAssignmentsInputSchema.parse({
     cycleId: "2026-09",
-    zoneId: "A",
     schoolIds: ["SCH-005"],
     requestId: randomUUID(),
     appVersion: "phase9-gate",
@@ -180,7 +203,7 @@ for (const document of copiedAssignments.docs) {
   }
 }
 if (settings.get("currentSalesCycleId") !== "2026-08") throw new Error("Draft copy changed the active cycle.");
-if (audits.size !== 5) throw new Error(`Expected five audit logs, received ${audits.size}.`);
+if (audits.size !== 7) throw new Error(`Expected seven audit logs, received ${audits.size}.`);
 
 console.log(JSON.stringify({
   status: "phase9-sales-gate-passed",
@@ -192,8 +215,9 @@ console.log(JSON.stringify({
   conflictRevision,
   replayed: replayedAssignments.replayed,
   collisionRejected,
-  foreignZoneRejected,
+  foreignReleaseRejected,
   draftClaimRejected,
   claimedAssignmentCount: claimed.createdCount,
+  releasedAssignmentCount: released.removedCount,
   auditCount: audits.size,
 }));

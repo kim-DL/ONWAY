@@ -14,7 +14,7 @@ export const MAX_ASSIGNMENTS_PER_CYCLE = 400;
 
 export const assignmentDraftSchema = z.object({
   schoolId: documentIdSchema,
-  zoneId: documentIdSchema,
+  zoneId: documentIdSchema.nullable().default(null),
   primaryAssigneeId: documentIdSchema,
   assigneeIds: z.array(documentIdSchema).min(1).max(10).refine(
     (values) => new Set(values).size === values.length,
@@ -54,7 +54,9 @@ export const createSalesAssignmentsInputSchema = z.object({
 
 export const claimSalesAssignmentsInputSchema = z.object({
   cycleId: cycleIdSchema,
-  zoneId: documentIdSchema,
+  // Kept as optional metadata for older clients. Ownership is school-based;
+  // a zone no longer grants or limits an employee's assignment authority.
+  zoneId: documentIdSchema.nullable().optional().default(null),
   schoolIds: z.array(documentIdSchema).min(1).max(MAX_ASSIGNMENTS_PER_CYCLE).refine(
     (values) => new Set(values).size === values.length,
     "Schools must be unique.",
@@ -62,11 +64,21 @@ export const claimSalesAssignmentsInputSchema = z.object({
   ...requestFields,
 }).strict();
 
+export const releaseSalesAssignmentsInputSchema = z.object({
+  cycleId: cycleIdSchema,
+  schoolIds: z.array(documentIdSchema).min(1).max(MAX_ASSIGNMENTS_PER_CYCLE).refine(
+    (values) => new Set(values).size === values.length,
+    "Schools must be unique.",
+  ),
+  reason: z.string().trim().min(2).max(200),
+  ...requestFields,
+}).strict();
+
 export const changeSalesAssignmentInputSchema = z.object({
   cycleId: cycleIdSchema,
   schoolId: documentIdSchema,
   expectedRevision: z.number().int().positive(),
-  zoneId: documentIdSchema,
+  zoneId: documentIdSchema.nullable(),
   primaryAssigneeId: documentIdSchema,
   assigneeIds: z.array(documentIdSchema).min(1).max(10).refine(
     (values) => new Set(values).size === values.length,
@@ -88,4 +100,5 @@ export type AssignmentDraft = z.infer<typeof assignmentDraftSchema>;
 export type CreateSalesCycleInput = z.infer<typeof createSalesCycleInputSchema>;
 export type CreateSalesAssignmentsInput = z.infer<typeof createSalesAssignmentsInputSchema>;
 export type ClaimSalesAssignmentsInput = z.infer<typeof claimSalesAssignmentsInputSchema>;
+export type ReleaseSalesAssignmentsInput = z.infer<typeof releaseSalesAssignmentsInputSchema>;
 export type ChangeSalesAssignmentInput = z.infer<typeof changeSalesAssignmentInputSchema>;

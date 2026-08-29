@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
 
 import { Icon } from "./icon";
 
@@ -15,7 +15,23 @@ interface BottomSheetProps {
 export function BottomSheet({ open, title, description, children, onClose }: BottomSheetProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const historyId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  const historyEntryRef = useRef(false);
+  const previousHistoryStateRef = useRef<unknown>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    if (historyEntryRef.current && window.history.state?.onnuriwaySheet === historyId) {
+      window.history.back();
+      return;
+    }
+    onCloseRef.current();
+  }, [historyId]);
 
   useEffect(() => {
     if (!open) return;
@@ -27,17 +43,37 @@ export function BottomSheet({ open, title, description, children, onClose }: Bot
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
 
+    previousHistoryStateRef.current = window.history.state;
+    window.history.pushState({
+      ...(typeof window.history.state === "object" && window.history.state ? window.history.state : {}),
+      onnuriwaySheet: historyId,
+    }, "", window.location.href);
+    historyEntryRef.current = true;
+
+    const closeFromHistory = (event: PopStateEvent) => {
+      if (historyEntryRef.current && event.state?.onnuriwaySheet !== historyId) {
+        historyEntryRef.current = false;
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener("popstate", closeFromHistory);
+
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", closeOnEscape);
 
     return () => {
+      window.removeEventListener("popstate", closeFromHistory);
       window.removeEventListener("keydown", closeOnEscape);
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
+      if (historyEntryRef.current && window.history.state?.onnuriwaySheet === historyId) {
+        window.history.replaceState(previousHistoryStateRef.current, "", window.location.href);
+        historyEntryRef.current = false;
+      }
     };
-  }, [onClose, open]);
+  }, [historyId, open, requestClose]);
 
   if (!open) return null;
 
@@ -45,7 +81,7 @@ export function BottomSheet({ open, title, description, children, onClose }: Bot
     <div
       className="bottom-sheet-layer"
       onMouseDown={(event) => {
-        if (event.currentTarget === event.target) onClose();
+        if (event.currentTarget === event.target) requestClose();
       }}
     >
       <section
@@ -56,7 +92,7 @@ export function BottomSheet({ open, title, description, children, onClose }: Bot
         aria-describedby={description ? descriptionId : undefined}
       >
         <span className="bottom-sheet__handle" aria-hidden="true" />
-        <button ref={closeRef} className="bottom-sheet__close" type="button" onClick={onClose} aria-label="닫기">
+        <button ref={closeRef} className="bottom-sheet__close" type="button" onClick={requestClose} aria-label="닫기">
           <Icon name="close" />
         </button>
         <header>

@@ -248,7 +248,7 @@ export const salesAssignmentSchema = z
   .object({
     schoolId: documentIdSchema,
     cycleId: cycleIdSchema,
-    zoneId: documentIdSchema,
+    zoneId: documentIdSchema.nullable(),
     primaryAssigneeId: documentIdSchema,
     assigneeIds: uniqueDocumentIdsSchema.min(1),
     monthlyStatus: monthlyStatusSchema,

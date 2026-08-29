@@ -31,7 +31,7 @@ const cycleSchema = z.object({
 const assignmentSchema = z.object({
   schoolId: z.string(),
   cycleId: z.string(),
-  zoneId: z.string(),
+  zoneId: z.string().nullable(),
   primaryAssigneeId: z.string(),
   assigneeIds: z.array(z.string()).min(1),
   monthlyStatus: monthlyStatusSchema,

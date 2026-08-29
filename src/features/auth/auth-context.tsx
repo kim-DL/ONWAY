@@ -21,7 +21,7 @@ import {
   signInWithCustomToken,
   signOut,
 } from "firebase/auth";
-import { doc, onSnapshot, type Unsubscribe } from "firebase/firestore";
+import { doc, getDocFromServer, onSnapshot, type Unsubscribe } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 import {
@@ -282,7 +282,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // blocked even when navigator.onLine is true. Probe a non-cached
         // endpoint first, restore only the last server-verified UID-bound
         // session offline, and perform token -> authz verification on recovery.
-        setState({ status: "resolving" });
+        setState((current) => current.status === "authenticated" && current.session.uid === user.uid
+          ? current
+          : { status: "resolving" });
         void probeNetworkReachability().then((reachable) => {
           if (!active || generation !== authGeneration) return;
           if (!reachable) {
@@ -357,10 +359,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { appVersion: string },
         { ok: boolean; employeeId: string; displayName: string }
       >(services.functions, "activateAdminSession");
-      await activateAdminSession({ appVersion: APP_METADATA.buildVersion });
-      // Keep the observer guard active until Firebase exposes the refreshed admin claims.
-      await credential.user.getIdToken(true);
+      const activation = await activateAdminSession({ appVersion: APP_METADATA.buildVersion });
+      // Establish the verified session directly after claim activation. Waiting
+      // only for a second observer event can leave popup logins on the splash
+      // screen because token refresh notifications may arrive while activation
+      // is still guarded.
+      const token = await credential.user.getIdTokenResult(true);
+      const firebaseClaim = token.claims.firebase as { sign_in_provider?: unknown } | undefined;
+      const parsedClaims = sessionClaimsSchema.safeParse({
+        ...token.claims,
+        signInProvider: firebaseClaim?.sign_in_provider,
+      });
+      if (!parsedClaims.success || !isVerifiedAdminSession(parsedClaims.data)) {
+        throw new Error("Activated admin claims are unavailable.");
+      }
+      const authzSnapshot = await getDocFromServer(doc(services.firestore, "authz", credential.user.uid));
+      const parsedAuthz = clientAuthzSchema.safeParse(authzSnapshot.data());
+      if (!authzSnapshot.exists() || !parsedAuthz.success || !authzMatchesSession(parsedAuthz.data, parsedClaims.data)) {
+        throw new Error("Activated admin authorization is unavailable.");
+      }
+      const session: AuthenticatedSession = {
+        uid: credential.user.uid,
+        displayName: activation.data.displayName || credential.user.displayName || "급식길 관리자",
+        claims: parsedClaims.data,
+      };
+      recordFirestoreReads("auth", 1);
+      writeVerifiedOfflineSession(session);
       adminActivationRef.current = false;
+      setState({ status: "authenticated", session });
+      // The refresh that delivered admin claims may have fired while the
+      // activation guard was active. Refresh once more after the screen is
+      // authenticated so the observer attaches its live authz revocation
+      // listener without returning the UI to the loading state.
+      void credential.user.getIdToken(true).catch(() => undefined);
     } catch (error) {
       adminActivationRef.current = false;
       await signOut(services.auth).catch(() => undefined);

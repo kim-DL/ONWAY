@@ -41,7 +41,7 @@ export const adminZoneSchema = z.object({
 
 export const adminAssignmentSchema = z.object({
   schoolId: z.string(),
-  zoneId: z.string(),
+  zoneId: z.string().nullable(),
   primaryAssigneeId: z.string(),
   assigneeIds: z.array(z.string()),
   monthlyStatus: z.string(),

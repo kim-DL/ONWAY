@@ -35,8 +35,9 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
   const navigation = page.getByRole("navigation", { name: "주요 메뉴" });
   await expect(navigation).toBeVisible();
   const navigationBox = await navigation.boundingBox();
-  expect(navigationBox?.height).toBeLessThanOrEqual(72);
-  await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "row");
+  expect(navigationBox?.height).toBeLessThanOrEqual(76);
+  await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "column");
+  await expect(navigation).toHaveCSS("border-radius", "0px");
   await page.screenshot({ path: "output/playwright/phase4-visuals/01-delivery-home-mobile.png", fullPage: true });
 
   await page.getByRole("button", { name: /대전온누리고등학교/ }).click();
@@ -52,7 +53,7 @@ test("sales shell provides assigned schools, team scope, and accessible touch ta
 
   await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "활동" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "내 구역" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "내 학교", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".assignment-card")).toHaveCount(2);
 
   const accessibilityScan = await new AxeBuilder({ page }).include(".workspace-shell").analyze();
@@ -71,5 +72,5 @@ test("sales shell provides assigned schools, team scope, and accessible touch ta
   await page.getByRole("button", { name: "전체 보기" }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(5);
   await page.getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: "활동", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /확인하고.*바로 움직이기/ })).toBeVisible();
 });
