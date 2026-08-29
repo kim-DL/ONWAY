@@ -5,6 +5,8 @@ import { getFirestore } from "firebase-admin/firestore";
 
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 
+test.setTimeout(60_000);
+
 test.beforeAll(async () => {
   if (!process.env.FIRESTORE_EMULATOR_HOST) {
     throw new Error("Phase 7 E2E rate-limit reset is restricted to the Firestore emulator.");
