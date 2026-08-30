@@ -70,8 +70,28 @@ export const updatePublicAppSettingsInputSchema = z.object({
   appVersion: appVersionSchema,
 }).strict();
 
+export const updateActivityTagsInputSchema = z.object({
+  tags: z.array(z.object({
+    tagId: documentIdSchema.nullable(),
+    label: z.string().trim().min(1).max(40),
+    active: z.boolean(),
+  }).strict()).min(1).max(20).superRefine((tags, context) => {
+    const ids = tags.flatMap((tag) => tag.tagId ? [tag.tagId] : []);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "Activity tag IDs must be unique." });
+    }
+    const labels = tags.map((tag) => tag.label.toLocaleLowerCase("ko-KR"));
+    if (new Set(labels).size !== labels.length) {
+      context.addIssue({ code: "custom", message: "Activity tag labels must be unique." });
+    }
+  }),
+  requestId: requestIdSchema,
+  appVersion: appVersionSchema,
+}).strict();
+
 export type CreateEmployeeInput = z.infer<typeof createEmployeeInputSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeInputSchema>;
 export type RotateEmployeePinInput = z.infer<typeof rotateEmployeePinInputSchema>;
 export type RevokeEmployeeSessionsInput = z.infer<typeof revokeEmployeeSessionsInputSchema>;
 export type UpdatePublicAppSettingsInput = z.infer<typeof updatePublicAppSettingsInputSchema>;
+export type UpdateActivityTagsInput = z.infer<typeof updateActivityTagsInputSchema>;

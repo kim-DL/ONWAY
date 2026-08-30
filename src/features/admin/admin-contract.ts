@@ -39,6 +39,14 @@ export const adminZoneSchema = z.object({
   active: z.boolean(),
 }).strict();
 
+export const adminActivityTagSchema = z.object({
+  tagId: z.string(),
+  label: z.string(),
+  active: z.boolean(),
+  displayOrder: z.number().int().nonnegative(),
+  updatedAt: z.string().datetime().nullable(),
+}).strict();
+
 export const adminAssignmentSchema = z.object({
   schoolId: z.string(),
   zoneId: z.string().nullable(),
@@ -108,6 +116,7 @@ export const adminWorkspaceSchema = z.object({
   schools: z.array(adminSchoolSchema),
   cycles: z.array(adminCycleSchema),
   zones: z.array(adminZoneSchema),
+  activityTags: z.array(adminActivityTagSchema),
   assignments: z.array(adminAssignmentSchema),
   settings: settingsSchema,
   syncRuns: z.array(syncRunSchema),
@@ -156,6 +165,7 @@ export type AdminEmployee = z.infer<typeof adminEmployeeSchema>;
 export type AdminSchool = z.infer<typeof adminSchoolSchema>;
 export type AdminCycle = z.infer<typeof adminCycleSchema>;
 export type AdminZone = z.infer<typeof adminZoneSchema>;
+export type AdminActivityTag = z.infer<typeof adminActivityTagSchema>;
 export type AdminAssignment = z.infer<typeof adminAssignmentSchema>;
 export type KakaoReview = z.infer<typeof kakaoReviewSchema>;
 export type AdminAudit = z.infer<typeof adminAuditSchema>;

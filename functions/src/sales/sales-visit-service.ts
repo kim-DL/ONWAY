@@ -76,7 +76,10 @@ const visitSchema = z.object({
   brochure: z.object({ status: deliveryStatusSchema }).strict(),
   sample: z.object({
     status: deliveryStatusSchema,
-    items: z.array(z.object({ productId: z.string(), quantity: z.number().int().positive() }).strict()),
+    items: z.array(z.union([
+      z.object({ productName: z.string().trim().min(1).max(120) }).strict(),
+      z.object({ productId: z.string(), quantity: z.number().int().positive() }).strict(),
+    ])),
   }).strict(),
   interest: z.object({ score: interestScoreSchema, explicitlySelected: z.literal(true) }).strict(),
   activityTagIds: z.array(z.string()),
@@ -203,7 +206,8 @@ export class SalesVisitService {
       const visitRef = this.db.doc(`salesVisits/${input.requestId}`);
       const assignmentsQuery = this.db.collection(`salesCycles/${input.cycleId}/assignments`).limit(MAX_ASSIGNMENTS_PER_CYCLE + 1);
       const employeeStatsQuery = this.db.collection(`salesCycles/${input.cycleId}/employeeStats`).limit(101);
-      const productRefs = input.sample.items.map((item) => this.db.doc(`products/${item.productId}`));
+      const legacyProductItems = input.sample.items.filter((item): item is Extract<typeof item, { productId: string }> => "productId" in item);
+      const productRefs = legacyProductItems.map((item) => this.db.doc(`products/${item.productId}`));
       const tagRefs = input.activityTagIds.map((tagId) => this.db.doc(`activityTags/${tagId}`));
       const [
         cycleSnapshot,
@@ -316,7 +320,7 @@ export class SalesVisitService {
       });
       const interestedProductIds = [...new Set([
         ...(currentProfile?.interestedProductIds ?? []),
-        ...input.sample.items.map((item) => item.productId),
+        ...legacyProductItems.map((item) => item.productId),
       ])];
       const nextProfile = profileSchema.parse({
         schoolId: input.schoolId,

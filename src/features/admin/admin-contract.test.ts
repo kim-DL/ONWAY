@@ -28,6 +28,7 @@ describe("Phase 15 admin client contracts", () => {
       schools: [],
       cycles: [],
       zones: [],
+      activityTags: [],
       assignments: [],
       settings: {
         minimumAppVersion: null,

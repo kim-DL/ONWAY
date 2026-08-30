@@ -13,6 +13,7 @@ import type {
   CreateEmployeeInput,
   RevokeEmployeeSessionsInput,
   RotateEmployeePinInput,
+  UpdateActivityTagsInput,
   UpdateEmployeeInput,
   UpdatePublicAppSettingsInput,
 } from "./admin-contract.js";
@@ -617,11 +618,12 @@ export class AdminService {
   }
 
   async workspace(cycleId: string | null) {
-    const [employeesSnapshot, schoolsSnapshot, cyclesSnapshot, zonesSnapshot, settingsSnapshot, syncSnapshot, reviewsSnapshot, auditsSnapshot] = await Promise.all([
+    const [employeesSnapshot, schoolsSnapshot, cyclesSnapshot, zonesSnapshot, activityTagsSnapshot, settingsSnapshot, syncSnapshot, reviewsSnapshot, auditsSnapshot] = await Promise.all([
       this.dependencies.db.collection("employees").limit(500).get(),
       this.dependencies.db.collection("schools").limit(1_000).get(),
       this.dependencies.db.collection("salesCycles").orderBy("cycleId", "desc").limit(36).get(),
       this.dependencies.db.collection("zones").orderBy("displayOrder").limit(100).get(),
+      this.dependencies.db.collection("activityTags").orderBy("displayOrder").limit(100).get(),
       this.dependencies.db.doc("appSettings/public").get(),
       this.dependencies.db.collection("neisSyncRuns").orderBy("startedAt", "desc").limit(12).get(),
       this.dependencies.db.collection("kakaoMatchReviews").limit(500).get(),
@@ -667,6 +669,13 @@ export class AdminService {
         zoneId: document.id,
         name: String(document.get("name")),
         active: document.get("active") === true,
+      })),
+      activityTags: activityTagsSnapshot.docs.map((document) => ({
+        tagId: document.id,
+        label: String(document.get("label") ?? document.id),
+        active: document.get("active") === true,
+        displayOrder: Number(document.get("displayOrder") ?? 0),
+        updatedAt: dateValue(document.get("updatedAt")),
       })),
       assignments: assignmentsSnapshot?.docs.map((document) => ({
         schoolId: document.id,
@@ -762,6 +771,56 @@ export class AdminService {
       minimumAppVersion: input.minimumAppVersion,
       maintenanceMode: input.maintenanceMode,
       updatedAt: now.toDate().toISOString(),
+    };
+  }
+
+  async updateActivityTags(input: UpdateActivityTagsInput, actor: VerifiedAdminActor) {
+    const now = Timestamp.fromDate(this.now());
+    const resolvedTags = input.tags.map((tag, index) => ({
+      ...tag,
+      tagId: tag.tagId ?? `ACT-${randomUUID()}`,
+      displayOrder: index + 1,
+    }));
+    const tagsAudit = audit({
+      eventType: "ACTIVITY_TAGS_UPDATED",
+      actor,
+      targetType: "activityTags",
+      targetId: null,
+      changedFields: resolvedTags.map((tag) => tag.tagId),
+      requestId: input.requestId,
+      appVersion: input.appVersion,
+      reason: `영업 활동 태그 ${resolvedTags.length}개 구성`,
+      createdAt: now,
+    });
+    await this.dependencies.db.runTransaction(async (transaction) => {
+      const existingSnapshot = await transaction.get(
+        this.dependencies.db.collection("activityTags").limit(100),
+      );
+      const existing = new Map(existingSnapshot.docs.map((document) => [document.id, document]));
+      for (const tag of resolvedTags) {
+        if (tag.tagId && input.tags.some((candidate) => candidate.tagId === tag.tagId) && !existing.has(tag.tagId)) {
+          throw new AdminNotFoundError("수정할 활동 태그를 찾을 수 없습니다. 최신 상태를 다시 불러와주세요.");
+        }
+        const previous = existing.get(tag.tagId);
+        transaction.set(this.dependencies.db.doc(`activityTags/${tag.tagId}`), {
+          tagId: tag.tagId,
+          label: tag.label,
+          active: tag.active,
+          displayOrder: tag.displayOrder,
+          createdAt: previous?.get("createdAt") instanceof Timestamp ? previous.get("createdAt") : now,
+          updatedAt: now,
+        });
+      }
+      transaction.create(this.dependencies.db.doc(tagsAudit.path), tagsAudit.data);
+    });
+    return {
+      tags: resolvedTags.map((tag) => ({
+        tagId: tag.tagId,
+        label: tag.label,
+        active: tag.active,
+        displayOrder: tag.displayOrder,
+        updatedAt: now.toDate().toISOString(),
+      })),
     };
   }
 }

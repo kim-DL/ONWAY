@@ -11,7 +11,7 @@ const request = {
   visitedAt: "2026-08-24T03:00:00.000Z",
   visitedBy: "EMP-SALES-A",
   brochureStatus: "delivered" as const,
-  sample: { status: "delivered" as const, items: [{ productId: "PROD-001", quantity: 2 }] },
+  sample: { status: "delivered" as const, items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
   interestScore: 60 as const,
   activityTagIds: ["ACT-SAMPLE"],
   summary: "샘플 사용 후 단가를 다시 안내하기로 함",
@@ -40,7 +40,7 @@ describe("sales visit contract", () => {
     }).success).toBe(false);
   });
 
-  it("rejects impossible dates, duplicate products, and unsupported scores", () => {
+  it("rejects impossible dates, duplicate product names, and unsupported scores", () => {
     expect(recordSalesVisitInputSchema.safeParse({
       ...request,
       followUp: { required: true, dueDate: "2026-02-31", summary: "연락" },
@@ -50,6 +50,13 @@ describe("sales visit contract", () => {
       sample: { status: "delivered", items: [request.sample.items[0], request.sample.items[0]] },
     }).success).toBe(false);
     expect(recordSalesVisitInputSchema.safeParse({ ...request, interestScore: 73 }).success).toBe(false);
+  });
+
+  it("keeps accepting legacy product and quantity payloads during the PWA update window", () => {
+    expect(recordSalesVisitInputSchema.safeParse({
+      ...request,
+      sample: { status: "delivered", items: [{ productId: "PROD-001", quantity: 2 }] },
+    }).success).toBe(true);
   });
 });
 

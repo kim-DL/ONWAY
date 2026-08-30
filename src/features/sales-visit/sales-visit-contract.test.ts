@@ -27,4 +27,22 @@ describe("sales visit client contract", () => {
       appVersion: "phase10-test",
     }).success).toBe(true);
   });
+
+  it("accepts a free-text sample product name without a quantity", () => {
+    expect(recordSalesVisitInputSchema.safeParse({
+      cycleId: "2026-08",
+      schoolId: "SCH-001",
+      expectedAssignmentRevision: 1,
+      visitedAt: "2026-08-24T05:30:00.000Z",
+      visitedBy: "EMP-SALES-A",
+      brochureStatus: "delivered",
+      sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
+      interestScore: 60,
+      activityTagIds: ["ACT-SAMPLE"],
+      summary: "샘플 전달 후 반응을 확인하기로 함",
+      followUp: { required: false, dueDate: null, summary: null },
+      requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa6",
+      appVersion: "phase10-test",
+    }).success).toBe(true);
+  });
 });

@@ -19,6 +19,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { SalesExportWorkspace } from "@/features/export/sales-export-workspace";
 import {
   type AdminAssignment,
+  type AdminActivityTag,
   type AdminAudit,
   type AdminEmployee,
   type AdminRole,
@@ -127,6 +128,7 @@ const KAKAO_STATUS_LABELS: Record<string, string> = {
 const AUDIT_EVENT_LABELS: Record<string, string> = {
   ADMIN_SESSION_ACTIVATED: "관리자 세션 승인",
   APP_SETTINGS_UPDATED: "앱 운영 설정 변경",
+  ACTIVITY_TAGS_UPDATED: "영업 활동 태그 변경",
   EMPLOYEE_CREATED: "직원 등록",
   EMPLOYEE_PIN_ROTATED: "직원 PIN 재발급",
   EMPLOYEE_SESSIONS_REVOKED: "직원 세션 종료",
@@ -169,6 +171,28 @@ const RISKY_CHANGE_TYPES = new Set([
   "TYPE_CHANGED",
   "MISSING",
 ]);
+
+const DEFAULT_ACTIVITY_TAG_LABELS = [
+  "첫 방문",
+  "담당자 상담",
+  "샘플 전달",
+  "견적 요청",
+  "재방문 약속",
+  "담당자 부재",
+] as const;
+
+type EditableActivityTag = Pick<AdminActivityTag, "tagId" | "label" | "active"> & {
+  clientId: string;
+};
+
+function editableActivityTags(tags: AdminActivityTag[]): EditableActivityTag[] {
+  return tags.map((tag) => ({
+    tagId: tag.tagId,
+    label: tag.label,
+    active: tag.active,
+    clientId: tag.tagId,
+  }));
+}
 
 function auditEventLabel(eventType: string) {
   return AUDIT_EVENT_LABELS[eventType] ?? eventType;
@@ -2305,6 +2329,8 @@ function SettingsPage({
   );
   const [maintenance, setMaintenance] = useState(data.settings.maintenanceMode);
   const [saving, setSaving] = useState(false);
+  const [activityTags, setActivityTags] = useState<EditableActivityTag[]>(() => editableActivityTags(data.activityTags));
+  const [savingTags, setSavingTags] = useState(false);
   const save = async () => {
     setSaving(true);
     try {
@@ -2318,6 +2344,51 @@ function SettingsPage({
       showToast(adminErrorMessage(error));
     } finally {
       setSaving(false);
+    }
+  };
+  const addActivityTag = (label = "") => {
+    setActivityTags((current) => current.length >= 20 ? current : [...current, {
+      tagId: "",
+      label,
+      active: true,
+      clientId: crypto.randomUUID(),
+    }]);
+  };
+  const applyDefaultActivityTags = () => {
+    setActivityTags(DEFAULT_ACTIVITY_TAG_LABELS.map((label) => ({
+      tagId: "",
+      label,
+      active: true,
+      clientId: crypto.randomUUID(),
+    })));
+  };
+  const saveActivityTags = async () => {
+    const cleaned = activityTags.map((tag) => ({ ...tag, label: tag.label.trim() }));
+    if (cleaned.length === 0 || cleaned.some((tag) => tag.label.length === 0)) {
+      showToast("활동 태그 이름을 한 글자 이상 입력해주세요.");
+      return;
+    }
+    const labels = cleaned.map((tag) => tag.label.toLocaleLowerCase("ko-KR"));
+    if (new Set(labels).size !== labels.length) {
+      showToast("같은 이름의 활동 태그는 한 번만 등록할 수 있습니다.");
+      return;
+    }
+    setSavingTags(true);
+    try {
+      const result = await adminRepository.updateActivityTags({
+        tags: cleaned.map((tag) => ({
+          tagId: tag.tagId || null,
+          label: tag.label,
+          active: tag.active,
+        })),
+      });
+      setActivityTags(editableActivityTags(result.tags));
+      await onReload();
+      showToast("영업 활동 태그를 반영했습니다.");
+    } catch (error) {
+      showToast(adminErrorMessage(error));
+    } finally {
+      setSavingTags(false);
     }
   };
   return (
@@ -2384,6 +2455,65 @@ function SettingsPage({
               onClick={() => void save()}
             >
               {saving ? "정책 반영 중…" : "운영 설정 저장"}
+            </GlassButton>
+          </div>
+        </article>
+        <article className="admin-panel activity-tag-admin">
+          <header>
+            <div>
+              <p>SALES ACTIVITY TAXONOMY</p>
+              <h2>영업 활동 태그</h2>
+            </div>
+            <StatusBadge tone={activityTags.some((tag) => tag.active) ? "success" : "attention"}>
+              활성 {activityTags.filter((tag) => tag.active).length}개
+            </StatusBadge>
+          </header>
+          <div className="activity-tag-admin__intro">
+            <span><Icon name="sparkles" size={18} /></span>
+            <p><strong>방문 결과를 빠르게 분류합니다.</strong>영업 직원은 방문 기록에서 여러 태그를 선택하고, 태그는 이력과 CSV에 함께 보존됩니다.</p>
+          </div>
+          {activityTags.length > 0 ? (
+            <div className="activity-tag-admin__list">
+              {activityTags.map((tag, index) => (
+                <div className="activity-tag-admin__row" data-active={tag.active} key={tag.clientId}>
+                  <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <label>
+                    <span className="sr-only">활동 태그 {index + 1} 이름</span>
+                    <input
+                      maxLength={40}
+                      value={tag.label}
+                      placeholder="활동 태그 이름"
+                      onChange={(event) => setActivityTags((current) => current.map((candidate) => candidate.clientId === tag.clientId ? { ...candidate, label: event.target.value } : candidate))}
+                    />
+                  </label>
+                  <label className="activity-tag-admin__toggle">
+                    <input
+                      type="checkbox"
+                      checked={tag.active}
+                      onChange={(event) => setActivityTags((current) => current.map((candidate) => candidate.clientId === tag.clientId ? { ...candidate, active: event.target.checked } : candidate))}
+                    />
+                    <span>{tag.active ? "사용" : "중지"}</span>
+                  </label>
+                  {!tag.tagId ? (
+                    <button type="button" aria-label={`${tag.label || `활동 태그 ${index + 1}`} 삭제`} onClick={() => setActivityTags((current) => current.filter((candidate) => candidate.clientId !== tag.clientId))}>
+                      <Icon name="trash" size={17} />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="activity-tag-admin__empty">
+              <Icon name="clipboard" size={24} />
+              <strong>아직 활동 태그가 없습니다.</strong>
+              <p>현장에서 바로 쓸 수 있는 기본 6개 태그로 시작할 수 있습니다.</p>
+              <GlassButton compact onClick={applyDefaultActivityTags}>기본 태그 구성</GlassButton>
+            </div>
+          )}
+          <div className="activity-tag-admin__actions">
+            <button type="button" disabled={activityTags.length >= 20} onClick={() => addActivityTag()}><Icon name="sparkles" size={17} />태그 추가</button>
+            <GlassButton variant="primary" disabled={savingTags || activityTags.length === 0} onClick={() => void saveActivityTags()}>
+              {savingTags ? "태그 반영 중…" : "활동 태그 저장"}
             </GlassButton>
           </div>
         </article>

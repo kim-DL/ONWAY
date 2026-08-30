@@ -60,7 +60,11 @@ function VisitTimelineItem({
         </div>
         {visit.sample.items.length > 0 ? (
           <ul className="visit-timeline-item__samples" aria-label="전달 샘플">
-            {visit.sample.items.map((item) => <li key={item.productId}>{productNames.get(item.productId) ?? "제품"} <strong>{item.quantity}개</strong></li>)}
+            {visit.sample.items.map((item, index) => (
+              "productName" in item
+                ? <li key={`${item.productName}-${index}`}>{item.productName}</li>
+                : <li key={item.productId}>{productNames.get(item.productId) ?? "제품"} <strong>{item.quantity}개</strong></li>
+            ))}
           </ul>
         ) : null}
         {visit.activityTagIds.length > 0 ? (

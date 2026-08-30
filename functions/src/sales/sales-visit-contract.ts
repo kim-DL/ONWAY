@@ -19,17 +19,28 @@ const interestScoreSchema = z.union([
 ]);
 const deliveryStatusSchema = z.enum(["delivered", "notDelivered"]);
 
-export const visitSampleItemInputSchema = z.object({
+const legacyVisitSampleItemInputSchema = z.object({
   productId: documentIdSchema,
   quantity: z.number().int().min(1).max(999),
 }).strict();
+
+const namedVisitSampleItemInputSchema = z.object({
+  productName: z.string().trim().min(1).max(120),
+}).strict();
+
+export const visitSampleItemInputSchema = z.union([
+  namedVisitSampleItemInputSchema,
+  legacyVisitSampleItemInputSchema,
+]);
 
 const visitSampleInputSchema = z.object({
   status: deliveryStatusSchema,
   items: z.array(visitSampleItemInputSchema).max(20),
 }).strict().superRefine((sample, context) => {
-  const productIds = sample.items.map((item) => item.productId);
-  if (new Set(productIds).size !== productIds.length) {
+  const itemKeys = sample.items.map((item) => "productName" in item
+    ? `name:${item.productName.toLocaleLowerCase("ko-KR")}`
+    : `id:${item.productId}`);
+  if (new Set(itemKeys).size !== itemKeys.length) {
     context.addIssue({ code: "custom", message: "Sample products must be unique.", path: ["items"] });
   }
   if (sample.status === "delivered" && sample.items.length === 0) {

@@ -44,7 +44,10 @@ const visitSchema = z.object({
   assignmentSnapshot: z.object({ zoneId: z.string().nullable(), primaryAssigneeId: z.string().nullable(), assigneeIds: z.array(z.string()) }).passthrough(),
   visitedAt: timestampSchema, visitedBy: z.string(), recordedBy: z.string(),
   brochure: z.object({ status: z.string() }).passthrough(),
-  sample: z.object({ status: z.string(), items: z.array(z.object({ productId: z.string(), quantity: z.number() }).passthrough()) }).passthrough(),
+  sample: z.object({ status: z.string(), items: z.array(z.union([
+    z.object({ productName: z.string() }).passthrough(),
+    z.object({ productId: z.string(), quantity: z.number() }).passthrough(),
+  ])) }).passthrough(),
   interest: z.object({ score: z.number() }).passthrough(), activityTagIds: z.array(z.string()), summary: z.string(),
   followUp: z.object({ required: z.boolean(), dueDate: z.string().nullable(), summary: z.string().nullable() }).passthrough(),
   deleted: z.boolean(), updatedAt: timestampSchema,
@@ -329,7 +332,7 @@ export class CsvExportService {
     const header = ["방문일", "월", "학교명", "학교코드", "행정구", "학교급", "구역", "당시 주 담당자", "실제 방문자", "기록자", "홍보지", "샘플", "샘플 내역", "관심도", "후속 여부", "후속일", "활동 태그", "방문 결과", "수정시각"];
     const rows = filtered.map((visit) => {
       const school = schools.get(visit.schoolId);
-      return [seoulDate(visit.visitedAt), visit.cycleId, school?.name ?? visit.schoolId, school?.source.schoolCode ?? "", school ? DISTRICT_LABELS[school.district] : "", school ? SCHOOL_TYPE_LABELS[school.schoolType] : "", visit.assignmentSnapshot.zoneId ? zones.get(visit.assignmentSnapshot.zoneId) ?? visit.assignmentSnapshot.zoneId : "", visit.assignmentSnapshot.primaryAssigneeId ? employees.get(visit.assignmentSnapshot.primaryAssigneeId) ?? visit.assignmentSnapshot.primaryAssigneeId : "", employees.get(visit.visitedBy) ?? visit.visitedBy, employees.get(visit.recordedBy) ?? visit.recordedBy, DELIVERY_LABELS[visit.brochure.status] ?? visit.brochure.status, DELIVERY_LABELS[visit.sample.status] ?? visit.sample.status, visit.sample.items.map((item) => `${products.get(item.productId) ?? item.productId} ${item.quantity}개`).join(" · "), visit.interest.score, visit.followUp.required ? "필요" : "없음", visit.followUp.dueDate ?? "", visit.activityTagIds.map((id) => activityTags.get(id) ?? id).join(" · "), visit.summary, seoulDateTime(visit.updatedAt)];
+      return [seoulDate(visit.visitedAt), visit.cycleId, school?.name ?? visit.schoolId, school?.source.schoolCode ?? "", school ? DISTRICT_LABELS[school.district] : "", school ? SCHOOL_TYPE_LABELS[school.schoolType] : "", visit.assignmentSnapshot.zoneId ? zones.get(visit.assignmentSnapshot.zoneId) ?? visit.assignmentSnapshot.zoneId : "", visit.assignmentSnapshot.primaryAssigneeId ? employees.get(visit.assignmentSnapshot.primaryAssigneeId) ?? visit.assignmentSnapshot.primaryAssigneeId : "", employees.get(visit.visitedBy) ?? visit.visitedBy, employees.get(visit.recordedBy) ?? visit.recordedBy, DELIVERY_LABELS[visit.brochure.status] ?? visit.brochure.status, DELIVERY_LABELS[visit.sample.status] ?? visit.sample.status, visit.sample.items.map((item) => "productName" in item ? item.productName : `${products.get(item.productId) ?? item.productId} ${item.quantity}개`).join(" · "), visit.interest.score, visit.followUp.required ? "필요" : "없음", visit.followUp.dueDate ?? "", visit.activityTagIds.map((id) => activityTags.get(id) ?? id).join(" · "), visit.summary, seoulDateTime(visit.updatedAt)];
     });
     return { rows: [header, ...rows], summary: selectionSummary(selection, names) };
   }

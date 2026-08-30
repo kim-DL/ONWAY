@@ -513,7 +513,6 @@ export function SchoolDetail({
         <SalesVisitSheet
           school={school}
           assignment={visitAssignment}
-          products={salesData.products.filter((product) => product.active)}
           activityTags={salesData.activityTags.filter((tag) => tag.active)}
           employees={salesData.employees}
           session={session}

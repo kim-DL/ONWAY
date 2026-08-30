@@ -14,6 +14,7 @@ import {
   revokeEmployeeSessionsInputSchema,
   rotateEmployeePinInputSchema,
   updateEmployeeInputSchema,
+  updateActivityTagsInputSchema,
   updatePublicAppSettingsInputSchema,
 } from "./admin-contract.js";
 import {
@@ -128,4 +129,11 @@ export const updatePublicAppSettings = onCall(options, async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", "앱 설정을 확인해주세요.");
   const actor = await requireVerifiedAdmin(request);
   return run("updatePublicAppSettings", () => service().updateSettings(parsed.data, actor));
+});
+
+export const updateActivityTags = onCall(options, async (request) => {
+  const parsed = updateActivityTagsInputSchema.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "활동 태그 구성을 확인해주세요.");
+  const actor = await requireVerifiedAdmin(request);
+  return run("updateActivityTags", () => service().updateActivityTags(parsed.data, actor));
 });

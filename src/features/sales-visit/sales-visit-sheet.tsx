@@ -6,7 +6,7 @@ import { FirebaseError } from "firebase/app";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import { SmartChip } from "@/components/ui/smart-chip";
-import type { Product, TagDefinition } from "@/domain/catalog";
+import type { TagDefinition } from "@/domain/catalog";
 import type { EmployeeDirectory } from "@/domain/identity";
 import type { InterestScore, SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
@@ -22,7 +22,6 @@ import {
 import { salesVisitRepository } from "./sales-visit-repository";
 
 type DeliveryChoice = "delivered" | "notDelivered" | null;
-type SampleRow = { rowId: string; productId: string; quantity: number };
 
 export type RecordedVisitSummary = {
   result: RecordSalesVisitResult;
@@ -68,7 +67,6 @@ function errorMessage(error: unknown) {
 export function SalesVisitSheet({
   school,
   assignment,
-  products,
   activityTags,
   employees,
   session,
@@ -77,7 +75,6 @@ export function SalesVisitSheet({
 }: {
   school: School;
   assignment: SalesAssignment;
-  products: Product[];
   activityTags: TagDefinition[];
   employees: EmployeeDirectory[];
   session: AuthenticatedSession;
@@ -88,7 +85,7 @@ export function SalesVisitSheet({
   const [visitedBy, setVisitedBy] = useState(session.claims.employeeId);
   const [brochureStatus, setBrochureStatus] = useState<DeliveryChoice>(null);
   const [sampleStatus, setSampleStatus] = useState<DeliveryChoice>(null);
-  const [sampleItems, setSampleItems] = useState<SampleRow[]>([]);
+  const [sampleProductName, setSampleProductName] = useState("");
   const [interestScore, setInterestScore] = useState<InterestScore | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [summary, setSummary] = useState("");
@@ -110,7 +107,7 @@ export function SalesVisitSheet({
 
   const chooseSampleStatus = (value: Exclude<DeliveryChoice, null>) => {
     setSampleStatus(value);
-    setSampleItems(value === "delivered" ? (current => current.length > 0 ? current : [{ rowId: crypto.randomUUID(), productId: "", quantity: 1 }]) : []);
+    if (value === "notDelivered") setSampleProductName("");
   };
   const clearFeedback = () => {
     if (errors.length > 0) setErrors([]);
@@ -123,8 +120,7 @@ export function SalesVisitSheet({
     if (!visitedBy) next.push("실제 방문자를 선택해주세요.");
     if (brochureStatus === null) next.push("홍보지 전달 여부를 선택해주세요.");
     if (sampleStatus === null) next.push("샘플 전달 여부를 선택해주세요.");
-    if (sampleStatus === "delivered" && (sampleItems.length === 0 || sampleItems.some((item) => !item.productId || item.quantity < 1))) next.push("전달한 샘플 제품과 수량을 입력해주세요.");
-    if (new Set(sampleItems.map((item) => item.productId)).size !== sampleItems.length) next.push("같은 샘플 제품은 한 번만 선택해주세요.");
+    if (sampleStatus === "delivered" && sampleProductName.trim().length === 0) next.push("전달한 샘플 제품명을 입력해주세요.");
     if (interestScore === null) next.push("제품 관심도를 선택해주세요. 미확인도 직접 선택할 수 있습니다.");
     if (summary.trim().length < 2) next.push("방문 결과를 한 줄 이상 입력해주세요.");
     if (followUpRequired && (!followUpDate || followUpSummary.trim().length < 2)) next.push("후속 날짜와 내용을 입력해주세요.");
@@ -151,7 +147,7 @@ export function SalesVisitSheet({
       sample: {
         status: sampleStatus,
         items: sampleStatus === "delivered"
-          ? sampleItems.map(({ productId, quantity }) => ({ productId, quantity }))
+          ? [{ productName: sampleProductName.trim() }]
           : [],
       },
       interestScore,
@@ -217,15 +213,20 @@ export function SalesVisitSheet({
 
         {sampleStatus === "delivered" ? (
           <section className="visit-sample-items" aria-labelledby="sample-items-title">
-            <div><h3 id="sample-items-title">전달 샘플</h3><span>제품별 수량을 남겨주세요.</span></div>
-            {sampleItems.map((item, index) => (
-              <div className="visit-sample-row" key={item.rowId}>
-                <label><span className="sr-only">샘플 제품 {index + 1}</span><select value={item.productId} onChange={(event) => setSampleItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, productId: event.target.value } : row))}><option value="">제품 선택</option>{products.map((product) => <option key={product.productId} value={product.productId}>{product.shortName ?? product.name}</option>)}</select></label>
-                <label><span className="sr-only">샘플 수량 {index + 1}</span><input type="number" inputMode="numeric" min={1} max={999} value={item.quantity} onChange={(event) => setSampleItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: Number(event.target.value) } : row))} /></label>
-                <button type="button" aria-label={`샘플 ${index + 1} 삭제`} onClick={() => setSampleItems((current) => current.filter((_, rowIndex) => rowIndex !== index))}><Icon name="trash" size={17} /></button>
-              </div>
-            ))}
-            {sampleItems.length < products.length ? <button className="visit-add-sample" type="button" onClick={() => setSampleItems((current) => [...current, { rowId: crypto.randomUUID(), productId: "", quantity: 1 }])}><Icon name="sparkles" size={16} />제품 추가</button> : null}
+            <div><h3 id="sample-items-title">전달 샘플</h3><span>현장에서 부르는 제품명을 그대로 남겨주세요.</span></div>
+            <label className="visit-sample-name">
+              <span>제품명 <em>필수</em></span>
+              <input
+                type="text"
+                autoComplete="off"
+                enterKeyHint="next"
+                maxLength={120}
+                value={sampleProductName}
+                placeholder="예: 우리쌀 떡볶이 순한맛"
+                onChange={(event) => setSampleProductName(event.target.value)}
+              />
+              <small>{sampleProductName.length}/120 · 수량은 기록하지 않습니다.</small>
+            </label>
           </section>
         ) : null}
 
@@ -233,7 +234,11 @@ export function SalesVisitSheet({
 
         <fieldset className="visit-activity-tags">
           <legend>활동 태그 <span>복수 선택</span></legend>
-          <div>{activityTags.map((tag) => <SmartChip key={tag.tagId} selected={selectedTagIds.includes(tag.tagId)} onClick={() => setSelectedTagIds((current) => current.includes(tag.tagId) ? current.filter((tagId) => tagId !== tag.tagId) : [...current, tag.tagId])}>{tag.label}</SmartChip>)}</div>
+          {activityTags.length > 0 ? (
+            <div>{activityTags.map((tag) => <SmartChip key={tag.tagId} selected={selectedTagIds.includes(tag.tagId)} onClick={() => setSelectedTagIds((current) => current.includes(tag.tagId) ? current.filter((tagId) => tagId !== tag.tagId) : [...current, tag.tagId])}>{tag.label}</SmartChip>)}</div>
+          ) : (
+            <p className="visit-activity-tags__empty"><Icon name="sparkles" size={17} />활동 태그 기준정보를 준비 중입니다. 방문 기록은 태그 없이도 저장할 수 있습니다.</p>
+          )}
         </fieldset>
 
         <label className="visit-summary-field">방문 결과 <em>필수</em><textarea maxLength={500} rows={3} value={summary} placeholder="예: 샘플 사용 후 단가를 다시 확인하기로 했습니다." onChange={(event) => setSummary(event.target.value)} /><span>{summary.length}/500</span></label>

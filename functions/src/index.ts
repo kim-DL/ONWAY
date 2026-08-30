@@ -19,6 +19,7 @@ export {
   revokeEmployeeSessions,
   rotateEmployeePin,
   updateEmployee,
+  updateActivityTags,
   updatePublicAppSettings,
 } from "./admin/callables.js";
 export { updateSchoolFieldProfile } from "./field/callables.js";

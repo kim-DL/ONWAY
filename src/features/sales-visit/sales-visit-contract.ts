@@ -20,8 +20,7 @@ export const recordSalesVisitInputSchema = z.object({
   sample: z.object({
     status: deliveryStatusSchema,
     items: z.array(z.object({
-      productId: documentIdSchema,
-      quantity: z.number().int().min(1).max(999),
+      productName: z.string().trim().min(1).max(120),
     }).strict()).max(20),
   }).strict(),
   interestScore: interestScoreSchema,
@@ -35,12 +34,12 @@ export const recordSalesVisitInputSchema = z.object({
   requestId: z.string().uuid(),
   appVersion: z.string().trim().min(1).max(200),
 }).strict().superRefine((input, context) => {
-  const productIds = input.sample.items.map((item) => item.productId);
-  if (new Set(productIds).size !== productIds.length) {
-    context.addIssue({ code: "custom", message: "샘플 제품은 중복 선택할 수 없습니다.", path: ["sample", "items"] });
+  const productNames = input.sample.items.map((item) => item.productName.toLocaleLowerCase("ko-KR"));
+  if (new Set(productNames).size !== productNames.length) {
+    context.addIssue({ code: "custom", message: "같은 샘플 제품명은 한 번만 입력해주세요.", path: ["sample", "items"] });
   }
   if (input.sample.status === "delivered" && input.sample.items.length === 0) {
-    context.addIssue({ code: "custom", message: "전달한 샘플 제품을 선택해주세요.", path: ["sample", "items"] });
+    context.addIssue({ code: "custom", message: "전달한 샘플 제품명을 입력해주세요.", path: ["sample", "items"] });
   }
   if (input.sample.status === "notDelivered" && input.sample.items.length > 0) {
     context.addIssue({ code: "custom", message: "미전달 샘플에는 제품을 남길 수 없습니다.", path: ["sample", "items"] });

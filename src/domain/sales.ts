@@ -106,12 +106,22 @@ const assignmentSnapshotSchema = z
     }
   });
 
-const sampleItemSchema = z
+const legacySampleItemSchema = z
   .object({
     productId: documentIdSchema,
     quantity: z.number().int().positive(),
   })
   .strict();
+
+const namedSampleItemSchema = z
+  .object({
+    productName: requiredTextSchema.max(120),
+  })
+  .strict();
+
+// Keep legacy product/quantity records readable while all new visits use the
+// field-friendly free-text product name format.
+const sampleItemSchema = z.union([namedSampleItemSchema, legacySampleItemSchema]);
 
 const sampleSchema = z
   .object({

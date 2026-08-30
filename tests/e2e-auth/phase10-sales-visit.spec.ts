@@ -47,8 +47,7 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
   await sheet.getByLabel(/실제 방문자/).selectOption("EMP-SALES-B");
   await sheet.getByRole("group", { name: /홍보지/ }).getByRole("radio", { name: "전달", exact: true }).click();
   await sheet.getByRole("group", { name: /샘플/ }).getByRole("radio", { name: "전달", exact: true }).click();
-  await sheet.getByLabel("샘플 제품 1").selectOption("PROD-002");
-  await sheet.getByLabel("샘플 수량 1").fill("2");
+  await sheet.getByLabel("제품명").fill("우리쌀 떡볶이 순한맛");
   await sheet.getByRole("radio", { name: /3단계, 관심 있음/ }).click();
   await sheet.getByRole("button", { name: "후속 필요", exact: true }).click();
   await sheet.getByRole("button", { name: "샘플 반응" }).click();
@@ -89,6 +88,7 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
     recordedBy: "EMP-SALES-A",
     interest: { score: 60, explicitlySelected: true },
     activityTagIds: ["ACT-FOLLOWUP", "ACT-SAMPLE"],
+    sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
   });
   expect(profile.data()).toMatchObject({ interestScore: 60, interestEvaluated: true, followUp: { required: true } });
   expect(assignment.data()).toMatchObject({ monthlyStatus: "followUp", brochureStatus: "delivered", sampleStatus: "delivered", revision: 2 });

@@ -9,6 +9,7 @@ import { APP_METADATA } from "@/lib/app-metadata";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
 import {
   adminAuditSchema,
+  type AdminActivityTag,
   adminEmployeeSchema,
   adminWorkspaceSchema,
   neisPreviewSchema,
@@ -147,5 +148,12 @@ export const adminRepository = {
 
   async updateSettings(input: { minimumAppVersion: string | null; maintenanceMode: boolean }) {
     return call("updatePublicAppSettings", { ...input, ...mutationFields() });
+  },
+
+  async updateActivityTags(input: { tags: { tagId: string | null; label: string; active: boolean }[] }) {
+    return call<typeof input & { requestId: string; appVersion: string }, { tags: AdminActivityTag[] }>(
+      "updateActivityTags",
+      { ...input, ...mutationFields() },
+    );
   },
 };

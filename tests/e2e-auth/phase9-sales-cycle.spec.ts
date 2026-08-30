@@ -251,6 +251,28 @@ test("admin manages monthly ownership while sales users can claim and release un
     emulatorIdToken("uid-sales-a"),
   ]);
   const base = { appVersion: "phase9-e2e" };
+  const blockedTags = await callFunction("updateActivityTags", salesToken, {
+    ...base,
+    tags: [{ tagId: "ACT-SAMPLE", label: "샘플 반응", active: true }],
+    requestId: "e6dd94b6-99c0-4b42-a6a2-d3ff6a428d61",
+  });
+  expect(blockedTags.error?.status).toBe("PERMISSION_DENIED");
+
+  const updatedTags = await callFunction("updateActivityTags", adminToken, {
+    ...base,
+    tags: [
+      { tagId: "ACT-FOLLOWUP", label: "후속 필요", active: true },
+      { tagId: "ACT-SAMPLE", label: "샘플 반응", active: true },
+      { tagId: null, label: "견적 요청", active: true },
+    ],
+    requestId: "2dfe21dc-d4df-43ca-bbeb-811da72a2179",
+  });
+  expect(updatedTags.result?.tags).toEqual(expect.arrayContaining([
+    expect.objectContaining({ tagId: "ACT-FOLLOWUP", label: "후속 필요", displayOrder: 1 }),
+    expect.objectContaining({ tagId: "ACT-SAMPLE", label: "샘플 반응", displayOrder: 2 }),
+    expect.objectContaining({ label: "견적 요청", displayOrder: 3 }),
+  ]));
+
   const blocked = await callFunction("createSalesCycle", salesToken, {
     ...base,
     cycleId: "2026-10",
