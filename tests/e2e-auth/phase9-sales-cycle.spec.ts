@@ -92,8 +92,9 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   await expect(page.locator(".assignment-card")).toHaveCount(2);
   await expect(page.getByRole("button", { name: /대전온누리고등학교, 서구, 담당 영업 A/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /대전새빛고등학교, 동구, 담당 영업 A/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "모두가 함께 쓰는 학교 정보" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /전체 학교 찾기/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모두가 함께 쓰는 학교 정보" })).toHaveCount(0);
+  await expect(page.locator(".school-card")).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: "담당 학교 작업" }).getByRole("button", { name: /학교 찾기/ })).toBeVisible();
   await expect(page.locator(".sales-cycle-progress")).toContainText("50");
 
   const accessibility = await new AxeBuilder({ page }).include(".sales-cycle-page").analyze();
@@ -147,7 +148,7 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
     background: getComputedStyle(element).backgroundColor,
     radius: getComputedStyle(element).borderRadius,
   }));
-  expect(navigationStyle).toEqual({ background: "rgb(18, 59, 50)", radius: "0px" });
+  expect(navigationStyle).toEqual({ background: "rgba(248, 250, 255, 0.88)", radius: "0px" });
 
   const schoolCommands = page.getByRole("toolbar", { name: "담당 학교 작업" });
   await expect(schoolCommands).toBeVisible();

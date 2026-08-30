@@ -30,8 +30,6 @@ import {
   type ShellView,
   type WorkMode,
 } from "./shell-policy";
-import { SchoolList } from "./school-list";
-import { useSchoolShellData } from "./use-school-shell-data";
 
 const MODE_OPTIONS = [
   { value: "delivery", label: "납품" },
@@ -170,13 +168,9 @@ function ShellNavigation({
 
 function DeliveryHome({
   session,
-  schoolData,
-  onSelect,
   onOpenSearch,
 }: {
   session: AuthenticatedSession;
-  schoolData: ReturnType<typeof useSchoolShellData>;
-  onSelect: (school: School) => void;
   onOpenSearch: () => void;
 }) {
   return (
@@ -195,10 +189,6 @@ function DeliveryHome({
           <span><Icon name="search" /><span><strong>학교 이름으로 찾기</strong><small>학교명 · 초성 · 주소</small></span></span>
           <Icon name="chevron-right" />
         </button>
-      </div>
-
-      <div className="delivery-school-list" aria-label="학교 목록">
-        <SchoolList {...schoolData} onRetry={schoolData.retry} onSelect={onSelect} />
       </div>
     </section>
   );
@@ -327,7 +317,6 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
-  const schoolData = useSchoolShellData(view === "schools" && !selectedSchool);
 
   const writeHistory = (
     next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean },
@@ -437,9 +426,9 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   } else if (view === "activity" && mode === "sales") {
     content = <SalesActivityWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} onOpenSchools={() => navigate("schools")} />;
   } else if (mode === "sales") {
-    content = <SalesWorkspace session={session} sharedSchoolData={schoolData} onSelectSchool={openSchool} onOpenSearch={openSearch} />;
+    content = <SalesWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} />;
   } else {
-    content = <DeliveryHome session={session} schoolData={schoolData} onSelect={openSchool} onOpenSearch={openSearch} />;
+    content = <DeliveryHome session={session} onOpenSearch={openSearch} />;
   }
 
   return (

@@ -15,15 +15,15 @@ test("delivery shell exposes role navigation and opens a real school detail shel
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
   await expect(page.getByText("READY TO GO", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "연결된 학교" })).toHaveCount(0);
+  await expect(page.locator(".school-card")).toHaveCount(0);
+  await expect(page.getByText("8곳", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "학교" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("button", { name: "활동" })).toHaveCount(0);
 
-  const schoolCard = page.getByRole("button", { name: /대전온누리고등학교/ });
-  await expect(schoolCard).toBeVisible();
-  await expect(schoolCard.getByLabel("공동 현장정보")).toContainText("검수 07:30–08:10");
-  await expect(schoolCard.getByLabel("공동 현장정보")).toContainText("대차 필요");
-  await expect(schoolCard.getByLabel("공동 현장정보")).toContainText("엘리베이터 있음");
-  await schoolCard.click();
+  await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
+  const search = page.getByRole("combobox", { name: "학교명 검색" });
+  await search.fill("온누리고");
+  await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
   await expect(page.getByRole("heading", { name: "대전온누리고등학교" })).toBeVisible();
   await expect(page.getByLabel("학교 빠른 작업")).toBeVisible();
   await page.getByRole("button", { name: "학교 목록" }).click();
@@ -40,10 +40,20 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
   expect(navigationBox?.height).toBeLessThanOrEqual(68);
   await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "column");
   await expect(navigation).toHaveCSS("border-radius", "0px");
-  expect(await navigation.getByRole("button", { name: "학교" }).evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe("none");
+  await expect(navigation).toHaveCSS("background-color", "rgba(248, 250, 255, 0.88)");
+  const activeIndicator = await navigation.getByRole("button", { name: "학교" }).evaluate((element) => ({
+    shadow: getComputedStyle(element).boxShadow,
+    indicatorOpacity: getComputedStyle(element, "::after").opacity,
+    indicatorWidth: Number.parseFloat(getComputedStyle(element, "::after").width),
+  }));
+  expect(activeIndicator.shadow).toBe("none");
+  expect(activeIndicator.indicatorOpacity).toBe("1");
+  expect(activeIndicator.indicatorWidth).toBeGreaterThanOrEqual(24);
   await page.screenshot({ path: "output/playwright/phase4-visuals/01-delivery-home-mobile.png", fullPage: true });
 
-  await page.getByRole("button", { name: /대전온누리고등학교/ }).click();
+  await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
+  await page.getByRole("combobox", { name: "학교명 검색" }).fill("온누리고");
+  await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
   await expect(page.getByRole("region", { name: "현장 핵심 요약" })).toContainText("검수시간");
   await expect(page.getByRole("region", { name: "현장 핵심 요약" })).toContainText("엘리베이터");
   await expect(navigation).toBeHidden();
@@ -58,6 +68,8 @@ test("sales shell provides assigned schools, team scope, and accessible touch ta
   await expect(page.getByRole("button", { name: "활동" })).toBeVisible();
   await expect(page.getByRole("button", { name: "내 학교", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".assignment-card")).toHaveCount(2);
+  await expect(page.locator(".assignment-card__rail")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "모두가 함께 쓰는 학교 정보" })).toHaveCount(0);
 
   const accessibilityScan = await new AxeBuilder({ page }).include(".workspace-shell").analyze();
   expect(accessibilityScan.violations).toEqual([]);

@@ -15,8 +15,6 @@ import { useToast } from "@/components/ui/toast";
 import type { MonthlyStatus, SalesAssignment, SalesCycle } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
-import { SchoolList } from "@/features/app-shell/school-list";
-import type { SchoolShellData } from "@/features/app-shell/use-school-shell-data";
 import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
 import {
   claimSalesAssignments,
@@ -98,7 +96,6 @@ function AssignmentCard({
   const latestVisit = formatVisitDate(assignment.latestVisitedAt);
   const content = (
     <>
-      <span className="assignment-card__rail" aria-hidden="true" />
       <span className="assignment-card__header">
         <span className="assignment-card__zone"><Icon name="location" size={16} />{DISTRICT_LABELS[school.district]}</span>
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
@@ -166,37 +163,6 @@ function WorkspaceSkeleton() {
   );
 }
 
-function SharedSchoolAssets({
-  data,
-  onSelectSchool,
-  onOpenSearch,
-}: {
-  data: SchoolShellData;
-  onSelectSchool: (school: School) => void;
-  onOpenSearch: () => void;
-}) {
-  return (
-    <section className="sales-shared-assets" aria-labelledby="sales-shared-assets-title">
-      <header>
-        <div>
-          <p className="shell-kicker">SHARED SCHOOL ASSETS</p>
-          <h2 id="sales-shared-assets-title">모두가 함께 쓰는 학교 정보</h2>
-          <span>검수시간·대차·엘리베이터·급식실 위치 등 현장에서 확인한 최신 정보를 공유합니다.</span>
-        </div>
-        <GlassButton compact onClick={onOpenSearch}><Icon name="search" size={18} />전체 학교 찾기</GlassButton>
-      </header>
-      <SchoolList
-        schools={data.schools}
-        profileBySchoolId={data.profileBySchoolId}
-        status={data.status}
-        onRetry={data.retry}
-        onSelect={onSelectSchool}
-        emptyMessage="학교 검색에서 전체 공동 학교 자산을 확인할 수 있습니다."
-      />
-    </section>
-  );
-}
-
 function SalesClaimPicker({
   session,
   assignedSchoolIds,
@@ -255,12 +221,10 @@ function SalesClaimPicker({
 
 export function SalesWorkspace({
   session,
-  sharedSchoolData,
   onSelectSchool,
   onOpenSearch,
 }: {
   session: AuthenticatedSession;
-  sharedSchoolData: SchoolShellData;
   onSelectSchool: (school: School) => void;
   onOpenSearch: () => void;
 }) {
@@ -343,12 +307,14 @@ export function SalesWorkspace({
             <p className="shell-kicker">MONTHLY ASSIGNMENT</p>
             <h1>{setupRequired ? "이번 달 담당 학교를 준비하고 있어요." : "담당 학교만 잠시 확인하지 못했어요."}</h1>
             <p>{setupRequired
-              ? "관리자가 이번 달 배정을 시작하면 내 학교와 업무 목록이 여기에 자동으로 연결됩니다. 아래 공동 학교 정보는 지금 바로 사용할 수 있습니다."
-              : "공동 학교 정보는 계속 사용할 수 있습니다. 연결을 확인한 뒤 배정 목록만 다시 불러오세요."}</p>
+              ? "관리자가 이번 달 배정을 시작하면 내 학교와 업무 목록이 여기에 자동으로 연결됩니다. 전체 학교는 검색에서 필요한 때 바로 찾을 수 있습니다."
+              : "전체 학교 검색은 계속 사용할 수 있습니다. 연결을 확인한 뒤 배정 목록만 다시 불러오세요."}</p>
           </div>
-          <GlassButton compact variant="primary" onClick={data.retry}>{setupRequired ? "배정 상태 확인" : "배정 목록 다시 불러오기"}</GlassButton>
+          <div className="sales-cycle-readiness__actions">
+            <GlassButton compact onClick={onOpenSearch}><Icon name="search" size={18} />학교 찾기</GlassButton>
+            <GlassButton compact variant="primary" onClick={data.retry}>{setupRequired ? "배정 상태 확인" : "배정 목록 다시 불러오기"}</GlassButton>
+          </div>
         </SoftCard>
-        <SharedSchoolAssets data={sharedSchoolData} onSelectSchool={onSelectSchool} onOpenSearch={onOpenSearch} />
       </section>
     );
   }
@@ -531,8 +497,6 @@ export function SalesWorkspace({
           <p>{scope === "mine" ? "학교 추가에서 미배정 학교를 직접 선택할 수 있습니다." : "다른 지역을 선택해보세요."}</p>
         </SoftCard>
       )}
-
-      <SharedSchoolAssets data={sharedSchoolData} onSelectSchool={onSelectSchool} onOpenSearch={onOpenSearch} />
 
       <BottomSheet
         open={cycleSheetOpen}
