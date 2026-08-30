@@ -68,7 +68,8 @@ export const recordSalesVisitInputSchema = z.object({
   cycleId: cycleIdSchema,
   schoolId: documentIdSchema,
   expectedAssignmentRevision: z.number().int().positive(),
-  visitedAt: z.string().datetime({ offset: true }),
+  visitedDate: dateOnlySchema.optional(),
+  visitedAt: z.string().datetime({ offset: true }).optional(),
   visitedBy: documentIdSchema,
   brochureStatus: deliveryStatusSchema,
   sample: visitSampleInputSchema,
@@ -81,6 +82,14 @@ export const recordSalesVisitInputSchema = z.object({
   followUp: visitFollowUpInputSchema,
   requestId: z.string().uuid(),
   appVersion: z.string().trim().min(1).max(200),
-}).strict();
+}).strict().superRefine((input, context) => {
+  if ((input.visitedDate ? 1 : 0) + (input.visitedAt ? 1 : 0) !== 1) {
+    context.addIssue({
+      code: "custom",
+      message: "Exactly one visit date representation is required.",
+      path: ["visitedDate"],
+    });
+  }
+});
 
 export type RecordSalesVisitInput = z.infer<typeof recordSalesVisitInputSchema>;

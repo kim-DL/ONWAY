@@ -149,6 +149,16 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   }));
   expect(navigationStyle).toEqual({ background: "rgb(18, 59, 50)", radius: "0px" });
 
+  const schoolCommands = page.getByRole("toolbar", { name: "담당 학교 작업" });
+  await expect(schoolCommands).toBeVisible();
+  const commandBoxes = await schoolCommands.getByRole("button").evaluateAll((buttons) => buttons.map((button) => {
+    const bounds = button.getBoundingClientRect();
+    return { top: Math.round(bounds.top), height: Math.round(bounds.height) };
+  }));
+  expect(commandBoxes).toHaveLength(3);
+  expect(Math.max(...commandBoxes.map(({ top }) => top)) - Math.min(...commandBoxes.map(({ top }) => top))).toBeLessThanOrEqual(2);
+  expect(commandBoxes.every(({ height }) => height >= 44 && height <= 68)).toBe(true);
+
   await page.getByRole("button", { name: "학교 추가" }).click();
   const dialog = page.getByRole("dialog", { name: "담당 학교 가져오기" });
   await expect(dialog).toBeVisible();

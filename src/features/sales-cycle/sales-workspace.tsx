@@ -456,24 +456,7 @@ export function SalesWorkspace({
           <h2>{scopeName} 학교</h2>
           <span>{selectedCycleIsCurrent ? "현재 월 배정" : "과거 월 · 읽기 전용"} · {model.totals.assigned}곳</span>
         </div>
-        <div className="sales-cycle-toolbar__actions">
-          {selectedCycleIsCurrent ? (
-            <>
-              {scope === "mine" ? (
-                <GlassButton
-                  compact
-                  variant={managing ? "primary" : "quiet"}
-                  onClick={() => managing ? leaveManageMode() : setManaging(true)}
-                >
-                  <Icon name={managing ? "check" : "settings"} />{managing ? "정리 마침" : "내 학교 정리"}
-                </GlassButton>
-              ) : null}
-              <GlassButton variant="primary" compact onClick={() => setClaimSheetOpen(true)}>
-                <Icon name="building" />학교 추가
-              </GlassButton>
-            </>
-          ) : null}
-          <GlassButton compact onClick={onOpenSearch}><Icon name="search" />학교 찾기</GlassButton>
+        <div className="sales-cycle-toolbar__controls">
           <SegmentedControl
             className="sales-scope-control"
             label="학교 범위"
@@ -481,6 +464,31 @@ export function SalesWorkspace({
             value={scope}
             onChange={(value) => { setScope(value); setDistrict("all"); leaveManageMode(); }}
           />
+          <div className="sales-school-commands" role="toolbar" aria-label="담당 학교 작업">
+            <button type="button" className="sales-school-command" onClick={onOpenSearch}>
+              <span><Icon name="search" /></span>
+              <span><strong>학교 찾기</strong><small>전체 학교 검색</small></span>
+            </button>
+            {selectedCycleIsCurrent ? (
+              <button type="button" className="sales-school-command sales-school-command--primary" onClick={() => setClaimSheetOpen(true)}>
+                <span><Icon name="building" /></span>
+                <span><strong>학교 추가</strong><small>내 담당으로 가져오기</small></span>
+              </button>
+            ) : null}
+            {selectedCycleIsCurrent && scope === "mine" ? (
+              <button
+                type="button"
+                className="sales-school-command"
+                data-active={managing}
+                aria-pressed={managing}
+                aria-label={managing ? "정리 마침" : "내 학교 정리"}
+                onClick={() => managing ? leaveManageMode() : setManaging(true)}
+              >
+                <span><Icon name={managing ? "check" : "settings"} /></span>
+                <span><strong>{managing ? "정리 마침" : "학교 정리"}</strong><small>{managing ? "목록으로 돌아가기" : "선택해서 제외하기"}</small></span>
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 

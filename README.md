@@ -239,9 +239,9 @@ npm run test:visit:emulator
 npm run test:e2e:phase10
 ```
 
-영업 학교 상세의 방문 기록 Bottom Sheet에서 방문일, 실제 방문자, 홍보지·샘플 전달, 자유 입력 샘플 제품명, 5단계 Heart 관심도와 명시적 ‘관심도 미확인’, 복수 활동 태그, 결과와 후속 일정을 입력한다. 수량이나 사전 제품 등록을 요구하지 않으며, 기존 제품·수량 기록은 이력과 CSV에서 계속 호환한다. 관리자는 설정에서 활동 태그를 추가·변경·중지할 수 있고 모든 변경은 감사 기록에 남는다. 기본 선택을 두지 않으며 입력 오류는 Draft를 보존한 채 요약으로 안내한다. 다른 직원의 배정은 팀 전체 보기에서 조회만 가능하다.
+영업 학교 상세의 방문 기록 Bottom Sheet에서 방문일, 실제 방문자, 홍보지·샘플 전달, 자유 입력 샘플 제품명, 5단계 Heart 관심도와 명시적 ‘관심도 미확인’, 복수 활동 태그, 결과와 후속 일정을 입력한다. 수량이나 사전 제품 등록을 요구하지 않으며, 기존 제품·수량 기록은 이력과 CSV에서 계속 호환한다. 관리자는 설정에서 활동 태그를 추가·변경·중지할 수 있고 모든 변경은 감사 기록에 남는다. 다음 달 배정은 월 시작 7일 전부터 사전 방문을 기록할 수 있고 후속일은 방문일 이후로 제한한다. 기본 선택을 두지 않으며 입력 오류는 Draft를 보존한 채 요약으로 안내한다. 다른 직원의 배정은 팀 전체 보기에서 조회만 가능하다.
 
-`recordSalesVisit`는 Client 직접 쓰기 없이 방문 원본, 학교 Sales Profile, 월 Assignment, 직원·팀 Stats, Audit와 Request Lock을 하나의 Transaction으로 기록한다. 실제 방문자 `visitedBy`, 인증된 기록 입력자 `recordedBy`와 Assignment 주 담당자를 분리하며 Expected Revision과 Payload 지문으로 동시 수정·재시도·더블 탭을 방어한다. 성공 후 상세 화면은 관심도·전달 상태·후속 행동을 즉시 반영하고 관련 Cache를 최신화한다.
+`recordSalesVisit`는 Client 직접 쓰기 없이 방문 원본, 학교 Sales Profile, 월 Assignment, 직원·팀 Stats, Audit와 Request Lock을 하나의 Transaction으로 기록한다. 방문 날짜만 Client에서 받고 실제 저장 시각은 서버가 결정해 휴대폰 시계 오차를 제거한다. 실제 방문자 `visitedBy`, 인증된 기록 입력자 `recordedBy`와 Assignment 주 담당자를 분리하며 Expected Revision과 Payload 지문으로 동시 수정·재시도·더블 탭을 방어한다. 성공 후 상세 화면은 관심도·전달 상태·후속 행동을 즉시 반영하고 관련 Cache를 최신화한다.
 
 ## Sales History & Collaboration
 

@@ -2,13 +2,13 @@ import { Timestamp } from "firebase-admin/firestore";
 import { describe, expect, it } from "vitest";
 
 import { recordSalesVisitInputSchema } from "../src/sales/sales-visit-contract.js";
-import { calculateCycleStats } from "../src/sales/sales-visit-service.js";
+import { calculateCycleStats, resolveServerVisitDate, visitDateWindowForCycle } from "../src/sales/sales-visit-service.js";
 
 const request = {
   cycleId: "2026-08",
   schoolId: "SCH-001",
   expectedAssignmentRevision: 1,
-  visitedAt: "2026-08-24T03:00:00.000Z",
+  visitedDate: "2026-08-24",
   visitedBy: "EMP-SALES-A",
   brochureStatus: "delivered" as const,
   sample: { status: "delivered" as const, items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
@@ -57,6 +57,34 @@ describe("sales visit contract", () => {
       ...request,
       sample: { status: "delivered", items: [{ productId: "PROD-001", quantity: 2 }] },
     }).success).toBe(true);
+  });
+
+  it("keeps accepting legacy timestamp payloads during the PWA update window", () => {
+    expect(recordSalesVisitInputSchema.safeParse({
+      ...request,
+      visitedDate: undefined,
+      visitedAt: "2026-08-24T03:00:00.000Z",
+    }).success).toBe(true);
+  });
+
+  it("rejects ambiguous or missing visit date representations", () => {
+    expect(recordSalesVisitInputSchema.safeParse({ ...request, visitedAt: "2026-08-24T03:00:00.000Z" }).success).toBe(false);
+    expect(recordSalesVisitInputSchema.safeParse({ ...request, visitedDate: undefined }).success).toBe(false);
+  });
+});
+
+describe("sales visit date policy", () => {
+  it("allows a visit during the seven-day crossover into the next cycle", () => {
+    expect(visitDateWindowForCycle("2026-09")).toEqual({ earliest: "2026-08-25", latest: "2026-09-30" });
+  });
+
+  it("uses server time for today's visit instead of trusting the device clock", () => {
+    const serverNow = new Date("2026-08-30T13:45:00.000Z");
+    expect(resolveServerVisitDate({ visitedDate: "2026-08-30" }, serverNow)).toEqual({
+      selectedDate: "2026-08-30",
+      serverToday: "2026-08-30",
+      timestamp: serverNow,
+    });
   });
 });
 

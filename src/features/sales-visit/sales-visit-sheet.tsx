@@ -15,8 +15,7 @@ import { APP_METADATA } from "@/lib/app-metadata";
 import { HeartInterestSelector } from "./heart-interest-selector";
 import {
   recordSalesVisitInputSchema,
-  todayInSeoul,
-  visitTimestampFromDate,
+  visitDateWindowForCycle,
   type RecordSalesVisitResult,
 } from "./sales-visit-contract";
 import { salesVisitRepository } from "./sales-visit-repository";
@@ -55,9 +54,15 @@ function BinaryChoice({
 
 function errorMessage(error: unknown) {
   if (error instanceof FirebaseError) {
+    const detail = error.message
+      .replace(/^Firebase:\s*/i, "")
+      .replace(/\s*\[\d{3}\]\s*$/u, "")
+      .trim();
     if (error.code === "functions/aborted") return "배정 정보가 변경되었습니다. 닫은 뒤 최신 정보를 확인해주세요.";
     if (error.code === "functions/permission-denied") return "이 학교의 방문 기록을 저장할 권한이 없습니다.";
-    if (error.code === "functions/failed-precondition") return error.message.replace(/^Firebase:\s*/i, "") || "방문일과 입력 내용을 확인해주세요.";
+    if (error.code === "functions/failed-precondition" || error.code === "functions/invalid-argument") {
+      return detail || "방문일과 입력 내용을 확인해주세요.";
+    }
   }
   return typeof navigator !== "undefined" && !navigator.onLine
     ? "인터넷 연결 후 다시 저장해주세요. 작성 내용은 그대로 유지됩니다."
@@ -81,7 +86,8 @@ export function SalesVisitSheet({
   onClose: () => void;
   onRecorded: (summary: RecordedVisitSummary) => void;
 }) {
-  const [visitedDate, setVisitedDate] = useState(() => todayInSeoul());
+  const visitDateWindow = visitDateWindowForCycle(assignment.cycleId);
+  const [visitedDate, setVisitedDate] = useState(() => visitDateWindow.initial);
   const [visitedBy, setVisitedBy] = useState(session.claims.employeeId);
   const [brochureStatus, setBrochureStatus] = useState<DeliveryChoice>(null);
   const [sampleStatus, setSampleStatus] = useState<DeliveryChoice>(null);
@@ -116,6 +122,7 @@ export function SalesVisitSheet({
 
   const validate = () => {
     const next: string[] = [];
+    if (!visitDateWindow.available) next.push(`${assignment.cycleId.replace("-", "년 ")}월 배정의 방문 기록 가능 기간이 아직 시작되지 않았습니다.`);
     if (!visitedDate) next.push("방문 날짜를 선택해주세요.");
     if (!visitedBy) next.push("실제 방문자를 선택해주세요.");
     if (brochureStatus === null) next.push("홍보지 전달 여부를 선택해주세요.");
@@ -141,7 +148,7 @@ export function SalesVisitSheet({
       cycleId: assignment.cycleId,
       schoolId: school.schoolId,
       expectedAssignmentRevision: assignment.revision,
-      visitedAt: visitTimestampFromDate(visitedDate),
+      visitedDate,
       visitedBy,
       brochureStatus,
       sample: {
@@ -201,7 +208,11 @@ export function SalesVisitSheet({
         noValidate
       >
         <div className="sales-visit-form__identity">
-          <label>방문일 <em>필수</em><input type="date" max={todayInSeoul()} value={visitedDate} onChange={(event) => setVisitedDate(event.target.value)} /></label>
+          <label>
+            방문일 <em>필수</em>
+            <input type="date" min={visitDateWindow.earliest} max={visitDateWindow.latest} value={visitedDate} onChange={(event) => setVisitedDate(event.target.value)} />
+            {visitDateWindow.isEarlyWindow ? <small className="visit-date-guidance">다음 달 배정은 시작 7일 전부터 사전 방문을 기록할 수 있어요.</small> : null}
+          </label>
           <label>실제 방문자 <em>필수</em><select value={visitedBy} onChange={(event) => setVisitedBy(event.target.value)}>{visitorOptions.map((employee) => <option key={employee.employeeId} value={employee.employeeId}>{employee.displayName}</option>)}</select></label>
           <p><Icon name="user" size={16} />기록 입력자는 {session.displayName}님으로 별도 저장됩니다.</p>
         </div>

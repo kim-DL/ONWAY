@@ -119,7 +119,12 @@ export class SalesVisitCycleError extends Error {}
 export class SalesVisitAssignmentNotFoundError extends Error {}
 export class SalesVisitPermissionError extends Error {}
 export class SalesVisitReferenceError extends Error {}
-export class SalesVisitChronologyError extends Error {}
+export type SalesVisitChronologyReason = "future" | "cycle-window" | "follow-up" | "before-latest";
+export class SalesVisitChronologyError extends Error {
+  constructor(readonly reason: SalesVisitChronologyReason) {
+    super(`Sales visit chronology is invalid: ${reason}.`);
+  }
+}
 export class SalesVisitAssignmentRevisionConflictError extends Error {
   constructor(readonly actualRevision: number) {
     super("Sales visit assignment revision conflict.");
@@ -140,14 +145,36 @@ function datePartsInSeoul(date: Date) {
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
-function cycleIdForSeoulDate(date: Date) {
-  const parts = datePartsInSeoul(date);
-  return `${parts.year}-${parts.month}`;
-}
-
 function dateOnlyForSeoulDate(date: Date) {
   const parts = datePartsInSeoul(date);
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function shiftDateOnly(dateOnly: string, days: number) {
+  const date = new Date(`${dateOnly}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function cycleEndDate(cycleId: string) {
+  const [yearText, monthText] = cycleId.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+export function visitDateWindowForCycle(cycleId: string) {
+  const cycleStart = `${cycleId}-01`;
+  return { earliest: shiftDateOnly(cycleStart, -7), latest: cycleEndDate(cycleId) };
+}
+
+export function resolveServerVisitDate(input: Pick<RecordSalesVisitInput, "visitedDate" | "visitedAt">, nowDate = new Date()) {
+  const selectedDate = input.visitedDate ?? dateOnlyForSeoulDate(new Date(input.visitedAt!));
+  const serverToday = dateOnlyForSeoulDate(nowDate);
+  const timestamp = selectedDate === serverToday
+    ? nowDate
+    : new Date(`${selectedDate}T12:00:00+09:00`);
+  return { selectedDate, serverToday, timestamp };
 }
 
 export function calculateCycleStats(assignments: Assignment[], updatedAt: Timestamp) {
@@ -261,21 +288,25 @@ export class SalesVisitService {
         throw new SalesVisitAssignmentRevisionConflictError(assignment.revision);
       }
 
-      const visitedDate = new Date(input.visitedAt);
       const nowDate = new Date();
-      if (Number.isNaN(visitedDate.getTime()) || visitedDate.getTime() > nowDate.getTime() + 5 * 60_000) {
-        throw new SalesVisitChronologyError();
+      const resolvedVisit = resolveServerVisitDate(input, nowDate);
+      const visitedDate = resolvedVisit.timestamp;
+      if (resolvedVisit.selectedDate > resolvedVisit.serverToday) {
+        throw new SalesVisitChronologyError("future");
       }
-      if (cycleIdForSeoulDate(visitedDate) !== input.cycleId) throw new SalesVisitChronologyError();
-      if (input.followUp.required && input.followUp.dueDate! < dateOnlyForSeoulDate(visitedDate)) {
-        throw new SalesVisitChronologyError();
+      const visitWindow = visitDateWindowForCycle(input.cycleId);
+      if (resolvedVisit.selectedDate < visitWindow.earliest || resolvedVisit.selectedDate > visitWindow.latest) {
+        throw new SalesVisitChronologyError("cycle-window");
+      }
+      if (input.followUp.required && input.followUp.dueDate! < resolvedVisit.selectedDate) {
+        throw new SalesVisitChronologyError("follow-up");
       }
 
       const currentProfile = profileSnapshot.exists ? profileSchema.parse(profileSnapshot.data()) : null;
       const latestDates = [assignment.latestVisitedAt, currentProfile?.latestVisit.visitedAt ?? null]
         .filter((value): value is Timestamp => value !== null);
-      if (latestDates.some((latest) => visitedDate.getTime() < latest.toMillis())) {
-        throw new SalesVisitChronologyError();
+      if (latestDates.some((latest) => resolvedVisit.selectedDate < dateOnlyForSeoulDate(latest.toDate()))) {
+        throw new SalesVisitChronologyError("before-latest");
       }
 
       const now = Timestamp.now();

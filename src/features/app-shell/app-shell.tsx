@@ -197,13 +197,9 @@ function DeliveryHome({
         </button>
       </div>
 
-      <div className="shell-section-heading">
-        <div><p>READY TO GO</p><h2>연결된 학교</h2></div>
-        <StatusBadge tone={schoolData.status === "ready" ? "success" : "neutral"}>
-          {schoolData.status === "ready" ? `${schoolData.schools.length}곳` : "동기화 중"}
-        </StatusBadge>
+      <div className="delivery-school-list" aria-label="학교 목록">
+        <SchoolList {...schoolData} onRetry={schoolData.retry} onSelect={onSelect} />
       </div>
-      <SchoolList {...schoolData} onRetry={schoolData.retry} onSelect={onSelect} />
     </section>
   );
 }

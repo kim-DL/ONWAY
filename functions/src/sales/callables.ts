@@ -206,7 +206,13 @@ export const recordSalesVisit = onCall(callableOptions, async (request) => {
       throw new HttpsError("failed-precondition", error.message);
     }
     if (error instanceof SalesVisitChronologyError) {
-      throw new HttpsError("failed-precondition", "방문일과 후속 날짜를 현재 월의 최신 기록 기준으로 확인해주세요.");
+      const message = {
+        future: "방문일은 오늘 이후로 선택할 수 없습니다.",
+        "cycle-window": "방문일은 배정 월 시작 7일 전부터 해당 월 말일까지 선택할 수 있습니다.",
+        "follow-up": "후속 방문일은 방문일과 같거나 이후여야 합니다.",
+        "before-latest": "기존 최신 방문일보다 앞선 날짜는 추가할 수 없습니다.",
+      }[error.reason];
+      throw new HttpsError("failed-precondition", message);
     }
     if (error instanceof SalesVisitAssignmentRevisionConflictError) {
       throw new HttpsError("aborted", "배정 정보가 변경되었습니다. 최신 정보를 확인해주세요.", {

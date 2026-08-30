@@ -14,7 +14,7 @@ export const recordSalesVisitInputSchema = z.object({
   cycleId: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   schoolId: documentIdSchema,
   expectedAssignmentRevision: z.number().int().positive(),
-  visitedAt: z.string().datetime({ offset: true }),
+  visitedDate: dateOnlySchema,
   visitedBy: documentIdSchema,
   brochureStatus: deliveryStatusSchema,
   sample: z.object({
@@ -78,6 +78,25 @@ export function todayInSeoul(now = new Date()) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-export function visitTimestampFromDate(dateOnly: string, now = new Date()) {
-  return dateOnly === todayInSeoul(now) ? now.toISOString() : new Date(`${dateOnly}T12:00:00+09:00`).toISOString();
+function shiftDateOnly(dateOnly: string, days: number) {
+  const date = new Date(`${dateOnly}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function visitDateWindowForCycle(cycleId: string, today = todayInSeoul()) {
+  const cycleStart = `${cycleId}-01`;
+  const [yearText, monthText] = cycleId.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const cycleEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  const earliest = shiftDateOnly(cycleStart, -7);
+  const latest = today < cycleEnd ? today : cycleEnd;
+  return {
+    earliest,
+    latest,
+    available: latest >= earliest,
+    initial: latest >= earliest ? latest : cycleStart,
+    isEarlyWindow: today < cycleStart && today >= earliest,
+  };
 }

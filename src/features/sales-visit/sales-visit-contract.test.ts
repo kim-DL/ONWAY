@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { recordSalesVisitInputSchema, todayInSeoul, visitTimestampFromDate } from "./sales-visit-contract";
+import { recordSalesVisitInputSchema, todayInSeoul, visitDateWindowForCycle } from "./sales-visit-contract";
 
 describe("sales visit client contract", () => {
-  it("keeps the current visit time and uses noon in Seoul for a past date", () => {
+  it("uses Seoul today and exposes the seven-day next-cycle recording window", () => {
     const now = new Date("2026-08-24T05:30:00.000Z");
     expect(todayInSeoul(now)).toBe("2026-08-24");
-    expect(visitTimestampFromDate("2026-08-24", now)).toBe(now.toISOString());
-    expect(visitTimestampFromDate("2026-08-20", now)).toBe("2026-08-20T03:00:00.000Z");
+    expect(visitDateWindowForCycle("2026-09", "2026-08-30")).toEqual({
+      earliest: "2026-08-25",
+      latest: "2026-08-30",
+      available: true,
+      initial: "2026-08-30",
+      isEarlyWindow: true,
+    });
+    expect(visitDateWindowForCycle("2026-09", "2026-08-20").available).toBe(false);
   });
 
   it("accepts an explicitly selected zero interest score", () => {
@@ -15,7 +21,7 @@ describe("sales visit client contract", () => {
       cycleId: "2026-08",
       schoolId: "SCH-001",
       expectedAssignmentRevision: 1,
-      visitedAt: "2026-08-24T05:30:00.000Z",
+      visitedDate: "2026-08-24",
       visitedBy: "EMP-SALES-A",
       brochureStatus: "notDelivered",
       sample: { status: "notDelivered", items: [] },
@@ -33,7 +39,7 @@ describe("sales visit client contract", () => {
       cycleId: "2026-08",
       schoolId: "SCH-001",
       expectedAssignmentRevision: 1,
-      visitedAt: "2026-08-24T05:30:00.000Z",
+      visitedDate: "2026-08-24",
       visitedBy: "EMP-SALES-A",
       brochureStatus: "delivered",
       sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }] },

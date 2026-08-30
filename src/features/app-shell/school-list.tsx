@@ -85,7 +85,7 @@ export function SchoolList({
     return (
       <SoftCard className="shell-empty-state">
         <span className="shell-empty-state__icon"><Icon name="building" /></span>
-        <h3>아직 연결된 학교가 없어요.</h3>
+        <h3>표시할 학교가 아직 없어요.</h3>
         <p>{emptyMessage}</p>
       </SoftCard>
     );
