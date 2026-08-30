@@ -29,6 +29,13 @@ import {
   type CachedSalesWorkspace,
 } from "./sales-workspace-cache";
 
+export class SalesWorkspaceSetupRequiredError extends Error {
+  constructor() {
+    super("An active sales cycle has not been prepared.");
+    this.name = "SalesWorkspaceSetupRequiredError";
+  }
+}
+
 export function createSalesSessionNamespace(session: AuthenticatedSession) {
   return `onnuriway:${session.claims.employeeId}:sales:${session.claims.sessionVersion}`;
 }
@@ -78,12 +85,15 @@ export async function loadSalesWorkspace(
     "sales",
     1 + cyclesSnapshot.size + zonesSnapshot.size + employeesSnapshot.size,
   );
-  if (!settingsSnapshot.exists()) throw new Error("Public app settings are missing.");
+  if (!settingsSnapshot.exists()) throw new SalesWorkspaceSetupRequiredError();
   const settings = settingsSnapshot.data();
   const cycles = cyclesSnapshot.docs.map((snapshot) => snapshot.data());
   const selectedCycleId = requestedCycleId ?? settings.currentSalesCycleId;
   const cycle = cycles.find((candidate) => candidate.cycleId === selectedCycleId);
-  if (!cycle) throw new Error("Selected sales cycle is unavailable.");
+  if (!cycle) {
+    if (cycles.length === 0 && requestedCycleId == null) throw new SalesWorkspaceSetupRequiredError();
+    throw new Error("Selected sales cycle is unavailable.");
+  }
 
   const assignmentsSnapshot = await getDocs(
     collection(services.firestore, "salesCycles", selectedCycleId, "assignments")

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import type { Auth } from "firebase-admin/auth";
 import {
-  FieldValue,
   Timestamp,
   type DocumentData,
   type Firestore,
@@ -293,7 +292,10 @@ export class AdminService {
       .orderBy("displayOrder", "desc")
       .limit(1)
       .get();
-    const displayOrder = (directorySnapshot.docs[0]?.get("displayOrder") as number | undefined ?? 0) + 1;
+    const previousDisplayOrder = Number(directorySnapshot.docs[0]?.get("displayOrder") ?? 0);
+    const displayOrder = (Number.isSafeInteger(previousDisplayOrder) && previousDisplayOrder >= 0
+      ? previousDisplayOrder
+      : 0) + 1;
 
     await this.dependencies.auth.createUser({
       uid,
@@ -442,7 +444,12 @@ export class AdminService {
 
     await this.dependencies.db.runTransaction(async (transaction) => {
       const credentialRef = this.dependencies.db.doc(`authCredentials/${employee.employeeId}`);
-      const credential = await transaction.get(credentialRef);
+      const directoryRef = this.dependencies.db.doc(`employeeDirectory/${employee.employeeId}`);
+      const [credential, directory] = await Promise.all([
+        transaction.get(credentialRef),
+        transaction.get(directoryRef),
+      ]);
+      const currentDisplayOrder = Number(directory.get("displayOrder") ?? 0);
       transaction.update(employeeRef, {
         displayName: input.displayName,
         roleScopes: input.roleScopes,
@@ -451,11 +458,13 @@ export class AdminService {
         sessionVersion: nextSessionVersion,
         updatedAt: now,
       });
-      transaction.set(this.dependencies.db.doc(`employeeDirectory/${employee.employeeId}`), {
+      transaction.set(directoryRef, {
         employeeId: employee.employeeId,
         displayName: input.displayName,
         active: input.status === "active",
-        displayOrder: FieldValue.increment(0),
+        displayOrder: Number.isSafeInteger(currentDisplayOrder) && currentDisplayOrder >= 0
+          ? currentDisplayOrder
+          : 0,
       }, { merge: true });
       transaction.update(authzRef, {
         active: input.status === "active",

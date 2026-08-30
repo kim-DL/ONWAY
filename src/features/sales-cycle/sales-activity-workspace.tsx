@@ -66,10 +66,12 @@ export function SalesActivityWorkspace({
   session,
   onSelectSchool,
   onOpenSearch,
+  onOpenSchools,
 }: {
   session: AuthenticatedSession;
   onSelectSchool: (school: School) => void;
   onOpenSearch: () => void;
+  onOpenSchools: () => void;
 }) {
   const [queue, setQueue] = useState<Queue>("next");
   const data = useSalesWorkspace(session);
@@ -96,13 +98,19 @@ export function SalesActivityWorkspace({
     return <section className="shell-page sales-activity-page" aria-label="업무 목록 불러오는 중"><div className="sales-activity-loading"><SkeletonCard /><SkeletonCard /></div></section>;
   }
   if (!model) {
+    const setupRequired = data.issue === "setup-required";
     return (
       <section className="shell-page sales-activity-page">
         <SoftCard className="sales-activity-error" role="alert">
-          <span><Icon name="wifi-off" size={26} /></span>
-          <h1>업무 목록을 확인하지 못했어요.</h1>
-          <p>학교 화면은 계속 사용할 수 있습니다. 연결을 확인한 뒤 이 목록만 다시 불러오세요.</p>
-          <GlassButton compact variant="primary" onClick={data.retry}>업무 목록 다시 불러오기</GlassButton>
+          <span><Icon name={setupRequired ? "calendar" : "wifi-off"} size={26} /></span>
+          <h1>{setupRequired ? "이번 달 업무를 준비하고 있어요." : "업무 목록만 잠시 확인하지 못했어요."}</h1>
+          <p>{setupRequired
+            ? "관리자가 이번 달 배정을 시작하면 방문 전·후속·완료 업무가 자동으로 만들어집니다. 학교 공동 자산은 지금 바로 확인할 수 있습니다."
+            : "학교 공동 자산은 계속 사용할 수 있습니다. 연결을 확인한 뒤 이 목록만 다시 불러오세요."}</p>
+          <div className="sales-activity-error__actions">
+            <GlassButton compact variant="primary" onClick={onOpenSchools}>학교 화면 열기</GlassButton>
+            <GlassButton compact onClick={data.retry}>{setupRequired ? "배정 상태 확인" : "업무 목록 다시 불러오기"}</GlassButton>
+          </div>
         </SoftCard>
       </section>
     );
@@ -149,6 +157,7 @@ export function SalesActivityWorkspace({
           <span><Icon name="check" size={24} /></span>
           <h3>{queueCopy.empty}</h3>
           <p>{queue === "next" ? "학교 화면에서 미배정 학교를 추가하거나 팀 전체 현황을 확인해보세요." : "다른 업무 상태를 선택해보세요."}</p>
+          {queue === "next" ? <GlassButton compact variant="primary" onClick={onOpenSchools}>담당 학교 추가</GlassButton> : null}
         </SoftCard>
       )}
     </section>

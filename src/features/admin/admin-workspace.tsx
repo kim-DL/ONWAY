@@ -189,9 +189,21 @@ function formatDate(value: string | null, includeTime = true) {
   }).format(new Date(value));
 }
 
-function nextCycleId() {
+function currentCycleId() {
   const now = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function cycleDisplayLabel(cycleId: string) {
+  const [year, month] = cycleId.split("-");
+  return `${year}년 ${Number(month)}월`;
+}
+
+function suggestedCycleId(cycles: readonly { cycleId: string }[]) {
+  const current = currentCycleId();
+  if (!cycles.some((cycle) => cycle.cycleId === current)) return current;
+  const [year, month] = current.split("-").map(Number);
+  const next = new Date(year!, month!, 1);
   return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
 }
 
@@ -1264,7 +1276,7 @@ function CyclesPage({
   onLoadCycle: (cycleId: string | null) => Promise<void>;
 }) {
   const { showToast } = useToast();
-  const [cycleId, setCycleId] = useState(nextCycleId());
+  const [cycleId, setCycleId] = useState(() => suggestedCycleId(data.cycles));
   const [copyFrom, setCopyFrom] = useState(data.selectedCycleId ?? "");
   const [activate, setActivate] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -1303,7 +1315,18 @@ function CyclesPage({
     }
   };
   const addAssignments = async (schoolIds: string[]) => {
-    if (!data.selectedCycleId || schoolIds.length === 0 || !assigneeId) return false;
+    if (!data.selectedCycleId) {
+      showToast("먼저 이번 달 배정을 시작해주세요.");
+      return false;
+    }
+    if (!assigneeId) {
+      showToast("배정할 영업 직원을 먼저 등록하거나 활성화해주세요.");
+      return false;
+    }
+    if (schoolIds.length === 0) {
+      showToast("배정할 학교를 한 곳 이상 선택해주세요.");
+      return false;
+    }
     setCreating(true);
     try {
       await adminRepository.createAssignments({
@@ -1454,6 +1477,7 @@ function CyclesPage({
             value={data.selectedCycleId ?? ""}
             onChange={(event) => void onLoadCycle(event.target.value || null)}
           >
+            {data.cycles.length === 0 ? <option value="">아직 시작된 월이 없습니다</option> : null}
             {data.cycles.map((cycle) => (
               <option key={cycle.cycleId} value={cycle.cycleId}>
                 {cycle.cycleId} ·{" "}
@@ -1471,35 +1495,64 @@ function CyclesPage({
             </div>
             <strong>{availableSchools.length}<small>곳 미배정</small></strong>
           </div>
-          <div className="assignment-bulk-command__owners assignment-bulk-command__owners--direct">
-          <label>
-            <span>배정할 담당자</span>
-            <select
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-            >
-              {salesEmployees.map((employee) => (
-                <option key={employee.employeeId} value={employee.employeeId}>
-                  {employee.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p><Icon name="user" size={16} />학교를 먼저 여러 곳 고른 뒤 한 명의 담당자에게 한 번에 연결합니다. 직원도 미배정 학교를 직접 가져올 수 있습니다.</p>
-          </div>
-          <SchoolAssignmentPicker
-            key={`${data.selectedCycleId ?? "none"}-${data.assignments.length}`}
-            candidates={availableSchools.map((school) => ({
-              schoolId: school.schoolId,
-              name: school.name,
-              district: school.district,
-              schoolType: school.schoolType,
-              address: school.roadAddress,
-            }))}
-            busy={creating}
-            actionLabel={(count) => `${count}곳 일괄 배정`}
-            onSubmit={addAssignments}
-          />
+          {!data.selectedCycleId ? (
+            <div className="assignment-readiness" role="status">
+              <span className="assignment-readiness__step">먼저 할 일</span>
+              <span className="assignment-readiness__icon"><Icon name="calendar" size={24} /></span>
+              <div>
+                <h3>{cycleDisplayLabel(cycleId)} 배정을 시작하세요.</h3>
+                <p>최초 월을 시작하면 운영 설정도 함께 안전하게 생성되고, 곧바로 담당자와 학교를 다중 선택할 수 있습니다.</p>
+              </div>
+              <GlassButton
+                variant="primary"
+                disabled={!/^\d{4}-\d{2}$/u.test(cycleId) || creating}
+                onClick={() => void createCycle()}
+              >
+                {creating ? "준비 중…" : `${cycleDisplayLabel(cycleId)} 배정 시작`}
+              </GlassButton>
+            </div>
+          ) : salesEmployees.length === 0 ? (
+            <div className="assignment-readiness" role="alert">
+              <span className="assignment-readiness__step">직원 필요</span>
+              <span className="assignment-readiness__icon"><Icon name="user" size={24} /></span>
+              <div>
+                <h3>활성 영업 직원을 먼저 등록해주세요.</h3>
+                <p>직원 관리에서 영업 권한을 가진 직원을 만든 뒤 이 화면으로 돌아오면 담당자 선택이 활성화됩니다.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="assignment-bulk-command__owners assignment-bulk-command__owners--direct">
+                <label>
+                  <span>배정할 담당자</span>
+                  <select
+                    value={assigneeId}
+                    onChange={(event) => setAssigneeId(event.target.value)}
+                  >
+                    {salesEmployees.map((employee) => (
+                      <option key={employee.employeeId} value={employee.employeeId}>
+                        {employee.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p><Icon name="user" size={16} />학교를 여러 곳 고른 뒤 한 명의 담당자에게 한 번에 연결합니다. 직원도 미배정 학교를 직접 가져올 수 있습니다.</p>
+              </div>
+              <SchoolAssignmentPicker
+                key={`${data.selectedCycleId}-${data.assignments.length}`}
+                candidates={availableSchools.map((school) => ({
+                  schoolId: school.schoolId,
+                  name: school.name,
+                  district: school.district,
+                  schoolType: school.schoolType,
+                  address: school.roadAddress,
+                }))}
+                busy={creating}
+                actionLabel={(count) => `${count}곳 · ${salesEmployees.find((employee) => employee.employeeId === assigneeId)?.displayName ?? "담당자"}에게 배정`}
+                onSubmit={addAssignments}
+              />
+            </>
+          )}
         </div>
         {selectedAssignments.size > 0 ? (
           <div className="admin-assignment-batch" role="region" aria-label="선택한 학교 배정 작업">

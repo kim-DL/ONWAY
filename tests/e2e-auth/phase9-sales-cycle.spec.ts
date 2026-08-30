@@ -92,6 +92,8 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   await expect(page.locator(".assignment-card")).toHaveCount(2);
   await expect(page.getByRole("button", { name: /대전온누리고등학교, 서구, 담당 영업 A/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /대전새빛고등학교, 동구, 담당 영업 A/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모두가 함께 쓰는 학교 정보" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /전체 학교 찾기/ })).toBeVisible();
   await expect(page.locator(".sales-cycle-progress")).toContainText("50");
 
   const accessibility = await new AxeBuilder({ page }).include(".sales-cycle-page").analyze();

@@ -112,8 +112,10 @@ test("section updates use the callable and stale revisions surface a recoverable
   await expect(concurrentPage.getByText("현장정보를 저장했습니다.")).toBeVisible();
   await concurrentPage.close();
 
-  await page.getByLabel("검수 시작").fill("07:35");
-  await page.getByRole("button", { name: "변경사항 저장" }).click();
+  const refreshedInspectionDialog = page.getByRole("dialog", { name: "검수시간 수정" });
+  await expect(refreshedInspectionDialog).toBeVisible({ timeout: 15_000 });
+  await refreshedInspectionDialog.getByLabel("검수 시작").fill("07:35");
+  await refreshedInspectionDialog.getByRole("button", { name: "변경사항 저장" }).click();
   await expect(page.getByText("다른 직원이 먼저 수정했습니다. 최신 정보를 불러왔습니다.")).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   await expect(page.getByText("현장정보 개정 2")).toBeVisible();

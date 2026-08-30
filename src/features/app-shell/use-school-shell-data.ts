@@ -10,7 +10,9 @@ type SchoolShellState =
   | { status: "ready"; schools: School[]; profileBySchoolId: Record<string, SchoolFieldProfile | null> }
   | { status: "error"; schools: School[]; profileBySchoolId: Record<string, SchoolFieldProfile | null> };
 
-export function useSchoolShellData(enabled = true) {
+export type SchoolShellData = SchoolShellState & { retry: () => void };
+
+export function useSchoolShellData(enabled = true): SchoolShellData {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<SchoolShellState>({ status: "loading", schools: [], profileBySchoolId: {} });
 

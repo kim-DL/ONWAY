@@ -136,6 +136,18 @@ function copyAssignment(cycleId: string, source: z.infer<typeof assignmentSchema
   }, now);
 }
 
+function createInitialPublicSettings(cycleId: string, now: Timestamp, commonCatalogVersion = 0) {
+  return {
+    minimumAppVersion: null,
+    currentSalesCycleId: cycleId,
+    commonCatalogVersion: Number.isSafeInteger(commonCatalogVersion) && commonCatalogVersion >= 0
+      ? commonCatalogVersion
+      : 0,
+    maintenanceMode: false,
+    updatedAt: now,
+  };
+}
+
 export class SalesCycleService {
   constructor(private readonly db: Firestore = getAdminFirestore()) {}
 
@@ -144,14 +156,16 @@ export class SalesCycleService {
     const cycleRef = this.db.doc(`salesCycles/${input.cycleId}`);
     const sourceRef = input.copiedFromCycleId ? this.db.doc(`salesCycles/${input.copiedFromCycleId}`) : null;
     const settingsRef = this.db.doc("appSettings/public");
+    const catalogMetaRef = this.db.doc("catalogMeta/current");
     const inputFingerprint = fingerprint({ ...input, actorUid: actor.uid });
 
     return this.db.runTransaction(async (transaction) => {
-      const [lockSnapshot, cycleSnapshot, sourceSnapshot, settingsSnapshot] = await Promise.all([
+      const [lockSnapshot, cycleSnapshot, sourceSnapshot, settingsSnapshot, catalogMetaSnapshot] = await Promise.all([
         transaction.get(lockRef),
         transaction.get(cycleRef),
         sourceRef ? transaction.get(sourceRef) : Promise.resolve(null),
         input.activate ? transaction.get(settingsRef) : Promise.resolve(null),
+        input.activate ? transaction.get(catalogMetaRef) : Promise.resolve(null),
       ]);
       if (lockSnapshot.exists) {
         const lock = requestLockSchema.parse(lockSnapshot.data());
@@ -211,8 +225,18 @@ export class SalesCycleService {
         transaction.create(this.db.doc(assignmentPath(input.cycleId, assignment.schoolId)), assignment);
       }
       if (input.activate) {
-        if (!settingsSnapshot?.exists) throw new SalesReferenceError("Public app settings are missing.");
-        transaction.update(settingsRef, { currentSalesCycleId: input.cycleId, updatedAt: now });
+        if (settingsSnapshot?.exists) {
+          transaction.update(settingsRef, { currentSalesCycleId: input.cycleId, updatedAt: now });
+        } else {
+          // A newly provisioned production project has no public settings yet.
+          // Creating the first active Cycle must also create the minimum safe
+          // public configuration so the system can bootstrap itself.
+          transaction.create(settingsRef, createInitialPublicSettings(
+            input.cycleId,
+            now,
+            Number(catalogMetaSnapshot?.get("commonCatalogVersion") ?? 0),
+          ));
+        }
         if (previousCycleRef && previousCycle?.status === "active") {
           transaction.update(previousCycleRef, { status: "closed", closedAt: now });
         }
@@ -608,4 +632,4 @@ export class SalesCycleService {
   }
 }
 
-export { createAssignment, copyAssignment };
+export { createAssignment, copyAssignment, createInitialPublicSettings };

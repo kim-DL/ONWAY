@@ -8,7 +8,11 @@ import {
   createSalesCycleInputSchema,
   releaseSalesAssignmentsInputSchema,
 } from "../src/sales/sales-cycle-contract.js";
-import { copyAssignment, createAssignment } from "../src/sales/sales-cycle-service.js";
+import {
+  copyAssignment,
+  createAssignment,
+  createInitialPublicSettings,
+} from "../src/sales/sales-cycle-service.js";
 
 const now = Timestamp.fromDate(new Date("2026-08-24T00:00:00.000Z"));
 const draft = {
@@ -113,5 +117,15 @@ describe("sales cycle and assignment contract", () => {
       cycleId: "2026-09",
       schoolIds: ["SCH-002"],
     }).zoneId).toBeNull();
+  });
+
+  it("creates a safe public foundation with the first active Cycle", () => {
+    expect(createInitialPublicSettings("2026-08", now, 4)).toEqual({
+      minimumAppVersion: null,
+      currentSalesCycleId: "2026-08",
+      commonCatalogVersion: 4,
+      maintenanceMode: false,
+      updatedAt: now,
+    });
   });
 });
