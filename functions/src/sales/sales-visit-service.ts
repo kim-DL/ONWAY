@@ -22,6 +22,7 @@ const cycleSchema = z.object({
   year: z.number().int(),
   month: z.number().int(),
   status: z.enum(["draft", "active", "closed"]),
+  promotedProductNames: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
   copiedFromCycleId: z.string().nullable(),
   createdAt: timestampSchema,
   createdBy: z.string(),

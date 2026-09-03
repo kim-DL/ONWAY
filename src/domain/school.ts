@@ -165,9 +165,29 @@ export const vehicleSchema = z
   })
   .strict();
 
+const nullablePhoneNumberSchema = z.string()
+  .trim()
+  .min(3)
+  .max(30)
+  .regex(/^[0-9+()\-.\s]+$/u, "Phone numbers may only contain digits and common separators.")
+  .nullable();
+
+export const schoolContactSchema = z
+  .object({
+    dietitianPhone: nullablePhoneNumberSchema,
+    cafeteriaPhone: nullablePhoneNumberSchema,
+  })
+  .strict();
+
+const EMPTY_SCHOOL_CONTACT = {
+  dietitianPhone: null,
+  cafeteriaPhone: null,
+} as const;
+
 export const schoolFieldProfileSchema = z
   .object({
     schoolId: documentIdSchema,
+    contacts: schoolContactSchema.default(EMPTY_SCHOOL_CONTACT),
     cafeteria: cafeteriaSchema,
     inspection: inspectionSchema,
     equipment: equipmentSchema,
@@ -185,6 +205,7 @@ export const schoolFieldProfileSchema = z
 
 export const schoolFieldProfilePatchSchema = z
   .object({
+    contacts: schoolContactSchema.optional(),
     cafeteria: cafeteriaSchema.optional(),
     inspection: inspectionSchema.optional(),
     equipment: equipmentSchema.optional(),

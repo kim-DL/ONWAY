@@ -29,6 +29,7 @@ export const adminSchoolSchema = z.object({
 export const adminCycleSchema = z.object({
   cycleId: z.string(),
   status: z.string(),
+  promotedProductNames: z.array(z.string()).max(12).default([]),
   copiedFromCycleId: z.string().nullable(),
   createdAt: z.string().datetime().nullable(),
 }).strict();

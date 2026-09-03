@@ -22,6 +22,7 @@ import {
   productConverter,
   publicAppSettingsConverter,
   salesAssignmentConverter,
+  salesCycleConverter,
   salesProfileConverter,
   schoolConverter,
   schoolFieldProfileConverter,
@@ -77,10 +78,11 @@ async function fetchSalesDetail(sessionNamespace: string, schoolId: string) {
   );
   if (!settingsSnapshot.exists()) throw new Error("Public app settings are missing.");
   const activeCycleId = settingsSnapshot.data().currentSalesCycleId;
-  const assignmentSnapshot = await getDoc(
-    doc(services.firestore, "salesCycles", activeCycleId, "assignments", schoolId).withConverter(salesAssignmentConverter),
-  );
-  recordFirestoreReads("sales", 1);
+  const [assignmentSnapshot, activeCycleSnapshot] = await Promise.all([
+    getDoc(doc(services.firestore, "salesCycles", activeCycleId, "assignments", schoolId).withConverter(salesAssignmentConverter)),
+    getDoc(doc(services.firestore, "salesCycles", activeCycleId).withConverter(salesCycleConverter)),
+  ]);
+  recordFirestoreReads("sales", 2);
   const assignment = assignmentSnapshot.exists() ? assignmentSnapshot.data() : null;
   const employeeDirectory = employeesSnapshot.docs.map((snapshot) => snapshot.data());
   const workspace = peekCachedSalesWorkspace(sessionNamespace, activeCycleId);
@@ -91,6 +93,7 @@ async function fetchSalesDetail(sessionNamespace: string, schoolId: string) {
   );
   return {
     activeCycleId,
+    promotedProductNames: activeCycleSnapshot.exists() ? activeCycleSnapshot.data().promotedProductNames : [],
     assignment,
     profile: profileSnapshot.exists() ? profileSnapshot.data() : null,
     products: productsSnapshot.docs.map((snapshot) => snapshot.data()),

@@ -88,6 +88,10 @@ export const adminRepository = {
     return call("createSalesCycle", { ...input, ...mutationFields() });
   },
 
+  async updateCycleProducts(input: { cycleId: string; productNames: string[] }) {
+    return call("updateSalesCyclePromotedProducts", { ...input, ...mutationFields() });
+  },
+
   async createAssignments(input: { cycleId: string; schoolIds: string[]; primaryAssigneeId: string }) {
     return call("createSalesAssignments", {
       cycleId: input.cycleId,

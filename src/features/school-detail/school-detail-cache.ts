@@ -24,6 +24,7 @@ export const cachedSchoolDetailSchema = z.object({
   photos: z.array(schoolPhotoSchema).max(3),
   salesData: z.object({
     activeCycleId: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    promotedProductNames: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
     assignment: salesAssignmentSchema.nullable(),
     profile: salesProfileSchema.nullable(),
     products: z.array(productSchema).max(100),

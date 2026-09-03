@@ -41,6 +41,16 @@ export const createSalesCycleInputSchema = z.object({
   }
 });
 
+export const updateSalesCycleProductsInputSchema = z.object({
+  cycleId: cycleIdSchema,
+  productNames: z.array(z.string().trim().min(1).max(120)).max(12)
+    .refine(
+      (names) => new Set(names.map((name) => name.toLocaleLowerCase("ko-KR"))).size === names.length,
+      "Product names must be unique.",
+    ),
+  ...requestFields,
+}).strict();
+
 export const createSalesAssignmentsInputSchema = z.object({
   cycleId: cycleIdSchema,
   assignments: z.array(assignmentDraftSchema).min(1).max(MAX_ASSIGNMENTS_PER_CYCLE),
@@ -98,6 +108,7 @@ export const changeSalesAssignmentInputSchema = z.object({
 
 export type AssignmentDraft = z.infer<typeof assignmentDraftSchema>;
 export type CreateSalesCycleInput = z.infer<typeof createSalesCycleInputSchema>;
+export type UpdateSalesCycleProductsInput = z.infer<typeof updateSalesCycleProductsInputSchema>;
 export type CreateSalesAssignmentsInput = z.infer<typeof createSalesAssignmentsInputSchema>;
 export type ClaimSalesAssignmentsInput = z.infer<typeof claimSalesAssignmentsInputSchema>;
 export type ReleaseSalesAssignmentsInput = z.infer<typeof releaseSalesAssignmentsInputSchema>;

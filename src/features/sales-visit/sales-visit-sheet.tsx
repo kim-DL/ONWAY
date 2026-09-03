@@ -72,12 +72,22 @@ function errorMessage(error: unknown) {
     : "방문 기록을 저장하지 못했습니다. 작성 내용을 확인한 뒤 다시 시도해주세요.";
 }
 
-function initialSampleProductName(visit: SalesVisit | null, products: Product[]) {
-  if (!visit) return "";
+function initialSampleProductNames(visit: SalesVisit | null, products: Product[]) {
+  if (!visit) return [];
   const namesById = new Map(products.map((product) => [product.productId, product.shortName ?? product.name]));
-  return visit.sample.items
-    .map((item) => "productName" in item ? item.productName : namesById.get(item.productId) ?? item.productId)
-    .join(", ");
+  return visit.sample.items.map((item) =>
+    "productName" in item ? item.productName : namesById.get(item.productId) ?? item.productId,
+  );
+}
+
+function uniqueProductNames(names: string[]) {
+  const seen = new Set<string>();
+  return names.filter((candidate) => {
+    const normalized = candidate.trim().toLocaleLowerCase("ko-KR");
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  }).map((name) => name.trim());
 }
 
 function visitorChoices(
@@ -112,6 +122,7 @@ export function SalesVisitSheet({
   assignment,
   activityTags,
   products,
+  promotedProductNames,
   employees,
   employeeDirectory,
   session,
@@ -124,6 +135,7 @@ export function SalesVisitSheet({
   assignment: SalesAssignment;
   activityTags: TagDefinition[];
   products: Product[];
+  promotedProductNames: string[];
   employees: EmployeeDirectory[];
   employeeDirectory: EmployeeDirectory[];
   session: AuthenticatedSession;
@@ -138,7 +150,12 @@ export function SalesVisitSheet({
   const [visitedBy, setVisitedBy] = useState(initialVisit?.visitedBy ?? session.claims.employeeId);
   const [brochureStatus, setBrochureStatus] = useState<DeliveryChoice>(initialVisit?.brochure.status ?? null);
   const [sampleStatus, setSampleStatus] = useState<DeliveryChoice>(initialVisit?.sample.status ?? null);
-  const [sampleProductName, setSampleProductName] = useState(() => initialSampleProductName(initialVisit, products));
+  const initialNames = initialSampleProductNames(initialVisit, products);
+  const initialCustomNames = initialNames.filter((name) => !promotedProductNames.includes(name));
+  const [selectedPromotedNames, setSelectedPromotedNames] = useState(() => initialNames.filter((name) => promotedProductNames.includes(name)));
+  const [customSampleNames, setCustomSampleNames] = useState(() => initialCustomNames.slice(1));
+  const [customSampleDraft, setCustomSampleDraft] = useState(() => initialCustomNames[0] ?? "");
+  const [customSampleOpen, setCustomSampleOpen] = useState(() => promotedProductNames.length === 0 || initialCustomNames.length > 0);
   const [interestScore, setInterestScore] = useState<InterestScore | null>(initialVisit?.interest.score ?? null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialVisit?.activityTagIds ?? []);
   const [summary, setSummary] = useState(initialVisit?.summary ?? "");
@@ -155,10 +172,30 @@ export function SalesVisitSheet({
     if (!savingRef.current) onClose();
   }, [onClose]);
   const visitorOptions = visitorChoices(employees, employeeDirectory, session, initialVisit);
+  const resolvedSampleNames = uniqueProductNames([
+    ...selectedPromotedNames,
+    ...customSampleNames,
+    ...(customSampleDraft.trim() ? [customSampleDraft] : []),
+  ]);
 
   const chooseSampleStatus = (value: Exclude<DeliveryChoice, null>) => {
     setSampleStatus(value);
-    if (value === "notDelivered") setSampleProductName("");
+    if (value === "notDelivered") {
+      setSelectedPromotedNames([]);
+      setCustomSampleNames([]);
+      setCustomSampleDraft("");
+    }
+  };
+  const togglePromotedProduct = (name: string) => {
+    setSelectedPromotedNames((current) => current.includes(name)
+      ? current.filter((candidate) => candidate !== name)
+      : [...current, name]);
+  };
+  const addCustomSample = () => {
+    const name = customSampleDraft.trim();
+    if (!name) return;
+    setCustomSampleNames((current) => uniqueProductNames([...current, name]));
+    setCustomSampleDraft("");
   };
   const clearFeedback = () => {
     if (errors.length > 0) setErrors([]);
@@ -172,7 +209,7 @@ export function SalesVisitSheet({
     if (!visitedBy) next.push("실제 방문자를 선택해주세요.");
     if (brochureStatus === null) next.push("홍보지 전달 여부를 선택해주세요.");
     if (sampleStatus === null) next.push("샘플 전달 여부를 선택해주세요.");
-    if (sampleStatus === "delivered" && sampleProductName.trim().length === 0) next.push("전달한 샘플 제품명을 입력해주세요.");
+    if (sampleStatus === "delivered" && resolvedSampleNames.length === 0) next.push("전달한 샘플 제품을 하나 이상 선택하거나 입력해주세요.");
     if (interestScore === null) next.push("제품 관심도를 선택해주세요. 미확인도 직접 선택할 수 있습니다.");
     if (summary.trim().length < 2) next.push("방문 결과를 한 줄 이상 입력해주세요.");
     if (followUpRequired && (!followUpDate || followUpSummary.trim().length < 2)) next.push("후속 날짜와 내용을 입력해주세요.");
@@ -199,7 +236,7 @@ export function SalesVisitSheet({
       sample: {
         status: sampleStatus,
         items: sampleStatus === "delivered"
-          ? [{ productName: sampleProductName.trim() }]
+          ? resolvedSampleNames.map((productName) => ({ productName }))
           : [],
       },
       interestScore,
@@ -283,20 +320,58 @@ export function SalesVisitSheet({
 
         {sampleStatus === "delivered" ? (
           <section className="visit-sample-items" aria-labelledby="sample-items-title">
-            <div><h3 id="sample-items-title">전달 샘플</h3><span>현장에서 부르는 제품명을 그대로 남겨주세요.</span></div>
-            <label className="visit-sample-name">
-              <span>제품명 <em>필수</em></span>
-              <input
-                type="text"
-                autoComplete="off"
-                enterKeyHint="next"
-                maxLength={120}
-                value={sampleProductName}
-                placeholder="예: 우리쌀 떡볶이 순한맛"
-                onChange={(event) => setSampleProductName(event.target.value)}
-              />
-              <small>{sampleProductName.length}/120 · 수량은 기록하지 않습니다.</small>
-            </label>
+            <div className="visit-sample-items__heading">
+              <div><h3 id="sample-items-title">전달 샘플</h3><span>제품을 탭해 빠르게 복수 선택하세요.</span></div>
+              <strong>{resolvedSampleNames.length}개 선택</strong>
+            </div>
+            {promotedProductNames.length > 0 ? (
+              <div className="visit-campaign-products" role="group" aria-label="이번 달 홍보 제품">
+                {promotedProductNames.map((name) => {
+                  const selected = selectedPromotedNames.includes(name);
+                  return (
+                    <button key={name} type="button" aria-pressed={selected} data-selected={selected} onClick={() => togglePromotedProduct(name)}>
+                      <span aria-hidden="true">{selected ? <Icon name="check" size={16} /> : null}</span>
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="visit-campaign-products__empty"><Icon name="sparkles" size={16} />이번 달 제품 목록을 준비 중입니다. 직접 입력은 바로 사용할 수 있어요.</p>
+            )}
+            <button className="visit-custom-product-toggle" type="button" aria-expanded={customSampleOpen} onClick={() => setCustomSampleOpen((current) => !current)}>
+              <Icon name="plus" size={17} />목록에 없는 제품 직접 입력
+            </button>
+            {customSampleOpen ? (
+              <div className="visit-custom-product">
+                <label>
+                  <span>제품명</span>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    enterKeyHint="done"
+                    maxLength={120}
+                    value={customSampleDraft}
+                    placeholder="현장에서 부르는 제품명"
+                    onChange={(event) => setCustomSampleDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addCustomSample();
+                      }
+                    }}
+                  />
+                </label>
+                <button type="button" disabled={!customSampleDraft.trim()} onClick={addCustomSample}>추가</button>
+              </div>
+            ) : null}
+            {customSampleNames.length > 0 ? (
+              <div className="visit-custom-product-list" aria-label="직접 입력한 제품">
+                {customSampleNames.map((name) => (
+                  <span key={name}>{name}<button type="button" aria-label={`${name} 삭제`} onClick={() => setCustomSampleNames((current) => current.filter((candidate) => candidate !== name))}><Icon name="close" size={13} /></button></span>
+                ))}
+              </div>
+            ) : null}
           </section>
         ) : null}
 

@@ -7,6 +7,7 @@ import {
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
   releaseSalesAssignmentsInputSchema,
+  updateSalesCycleProductsInputSchema,
 } from "../src/sales/sales-cycle-contract.js";
 import {
   copyAssignment,
@@ -101,6 +102,26 @@ describe("sales cycle and assignment contract", () => {
       cycleId: "2026-09",
       schoolIds: ["SCH-001", "SCH-001"],
       reason: "담당 학교 정리",
+    }).success).toBe(false);
+  });
+
+  it("accepts a concise monthly product shortlist and rejects ambiguous duplicates", () => {
+    const request = {
+      cycleId: "2026-09",
+      requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa5",
+      appVersion: "monthly-products",
+    };
+    expect(updateSalesCycleProductsInputSchema.parse({
+      ...request,
+      productNames: ["우리밀 핫도그", "사과 주스", "콩 단백 너겟", "현미 스낵", "저당 요거트"],
+    }).productNames).toHaveLength(5);
+    expect(updateSalesCycleProductsInputSchema.safeParse({
+      ...request,
+      productNames: ["사과 주스", "사과 주스"],
+    }).success).toBe(false);
+    expect(updateSalesCycleProductsInputSchema.safeParse({
+      ...request,
+      productNames: Array.from({ length: 13 }, (_, index) => `제품 ${index + 1}`),
     }).success).toBe(false);
   });
 

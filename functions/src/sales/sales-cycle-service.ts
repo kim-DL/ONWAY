@@ -11,6 +11,7 @@ import type {
   CreateSalesAssignmentsInput,
   CreateSalesCycleInput,
   ReleaseSalesAssignmentsInput,
+  UpdateSalesCycleProductsInput,
 } from "./sales-cycle-contract.js";
 import { MAX_ASSIGNMENTS_PER_CYCLE } from "./sales-cycle-contract.js";
 import { calculateCycleStats } from "./sales-visit-service.js";
@@ -21,6 +22,7 @@ const cycleSchema = z.object({
   year: z.number().int(),
   month: z.number().int(),
   status: z.enum(["draft", "active", "closed"]),
+  promotedProductNames: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
   copiedFromCycleId: z.string().nullable(),
   createdAt: timestampSchema,
   createdBy: z.string(),
@@ -43,7 +45,7 @@ const assignmentSchema = z.object({
   updatedAt: timestampSchema,
 }).strict();
 const requestLockSchema = z.object({
-  operation: z.enum(["createSalesCycle", "createSalesAssignments", "claimSalesAssignments", "releaseSalesAssignments", "changeSalesAssignment"]),
+  operation: z.enum(["createSalesCycle", "updateSalesCycleProducts", "createSalesAssignments", "claimSalesAssignments", "releaseSalesAssignments", "changeSalesAssignment"]),
   actorUid: z.string(),
   fingerprint: z.string().length(64),
   result: z.record(z.string(), z.unknown()),
@@ -78,7 +80,7 @@ function assignmentPath(cycleId: string, schoolId: string) {
 }
 
 function auditRecord(input: {
-  eventType: "SALES_CYCLE_CREATED" | "SALES_ASSIGNMENTS_CREATED" | "SALES_ASSIGNMENTS_CLAIMED" | "SALES_ASSIGNMENTS_RELEASED" | "SALES_ASSIGNMENT_CHANGED";
+  eventType: "SALES_CYCLE_CREATED" | "SALES_CYCLE_PRODUCTS_UPDATED" | "SALES_ASSIGNMENTS_CREATED" | "SALES_ASSIGNMENTS_CLAIMED" | "SALES_ASSIGNMENTS_RELEASED" | "SALES_ASSIGNMENT_CHANGED";
   actor: SalesAdminActor;
   cycleId: string;
   targetType: "salesCycle" | "salesAssignment";
@@ -200,11 +202,13 @@ export class SalesCycleService {
 
       const now = Timestamp.now();
       const [year, month] = input.cycleId.split("-").map(Number);
+      const sourceCycle = sourceSnapshot?.exists ? cycleSchema.parse(sourceSnapshot.data()) : null;
       const cycle = cycleSchema.parse({
         cycleId: input.cycleId,
         year,
         month,
         status: input.activate ? "active" : "draft",
+        promotedProductNames: sourceCycle?.promotedProductNames ?? [],
         copiedFromCycleId: input.copiedFromCycleId,
         createdAt: now,
         createdBy: actor.employeeId,
@@ -257,6 +261,58 @@ export class SalesCycleService {
       transaction.create(this.db.doc(`auditLogs/${audit.logId}`), audit);
       transaction.create(lockRef, {
         operation: "createSalesCycle",
+        actorUid: actor.uid,
+        fingerprint: inputFingerprint,
+        result,
+        createdAt: now,
+      });
+      return { ...result, replayed: false };
+    });
+  }
+
+  async updatePromotedProducts(input: UpdateSalesCycleProductsInput, actor: SalesAdminActor) {
+    const lockRef = this.db.doc(`requestLocks/sales-cycle-products-${input.requestId}`);
+    const cycleRef = this.db.doc(`salesCycles/${input.cycleId}`);
+    const inputFingerprint = fingerprint({ ...input, actorUid: actor.uid });
+
+    return this.db.runTransaction(async (transaction) => {
+      const [lockSnapshot, cycleSnapshot] = await Promise.all([
+        transaction.get(lockRef),
+        transaction.get(cycleRef),
+      ]);
+      if (lockSnapshot.exists) {
+        const lock = requestLockSchema.parse(lockSnapshot.data());
+        if (lock.actorUid !== actor.uid || lock.fingerprint !== inputFingerprint) throw new SalesRequestCollisionError();
+        return {
+          cycleId: z.string().parse(lock.result.cycleId),
+          productCount: z.number().int().nonnegative().parse(lock.result.productCount),
+          replayed: true,
+        };
+      }
+      if (!cycleSnapshot.exists) throw new SalesCycleNotFoundError();
+      const cycle = cycleSchema.parse(cycleSnapshot.data());
+      if (cycle.status === "closed") throw new SalesCycleClosedError();
+
+      const now = Timestamp.now();
+      const productNames = input.productNames.map((name) => name.trim());
+      const result = { cycleId: input.cycleId, productCount: productNames.length };
+      transaction.update(cycleRef, { promotedProductNames: productNames });
+      const audit = auditRecord({
+        eventType: "SALES_CYCLE_PRODUCTS_UPDATED",
+        actor,
+        cycleId: input.cycleId,
+        targetType: "salesCycle",
+        targetId: input.cycleId,
+        schoolId: null,
+        changedFields: ["promotedProductNames"],
+        changeReason: "월별 홍보 제품 목록 변경",
+        requestId: input.requestId,
+        appVersion: input.appVersion,
+        createdAt: now,
+      });
+      transaction.create(this.db.doc(`auditLogs/${audit.logId}`), audit);
+      transaction.create(lockRef, {
+        operation: "updateSalesCycleProducts",
         actorUid: actor.uid,
         fingerprint: inputFingerprint,
         result,

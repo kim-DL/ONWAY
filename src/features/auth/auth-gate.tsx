@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
+import { AppIconMark } from "@/components/ui/app-icon-mark";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import { useAuth } from "./auth-context";
 
@@ -27,7 +28,7 @@ const AppShell = dynamic(
 function Brand() {
   return (
     <div className="auth-brand" aria-label="급식길">
-      <span className="auth-brand__mark" aria-hidden="true">길</span>
+      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark /></span>
       <span><strong>급식길</strong><small>ONNURIWAY</small></span>
     </div>
   );

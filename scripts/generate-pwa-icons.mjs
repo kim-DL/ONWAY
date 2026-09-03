@@ -56,11 +56,11 @@ async function writeFavicon() {
 }
 
 await Promise.all([
-  writeIcon("icon-192.png", 192, 0),
-  writeIcon("icon-512.png", 512, 0),
-  writeIcon("icon-maskable-512.png", 512, 0.1),
-  writeIcon("apple-touch-icon.png", 180, 0.04),
+  writeIcon("onnuriway-icon-192-v2.png", 192, 0),
+  writeIcon("onnuriway-icon-512-v2.png", 512, 0),
+  writeIcon("onnuriway-icon-maskable-512-v2.png", 512, 0.1),
+  writeIcon("onnuriway-apple-touch-icon-v2.png", 180, 0.04),
   writeFavicon(),
 ]);
 
-console.log("Generated Phase 14 PWA icons in public/icons.");
+console.log("Generated refreshed Onnuriway PWA icons in public/icons.");

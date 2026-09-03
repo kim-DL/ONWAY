@@ -19,7 +19,7 @@ describe("Phase 14 PWA cache allowlist", () => {
     expect(isPublicAssetPath("/_next/static/chunks/app.js")).toBe(true);
     expect(isPublicAssetPath("/manifest.webmanifest")).toBe(true);
     expect(isPublicAssetPath("/favicon.ico")).toBe(true);
-    expect(isPublicAssetPath("/icons/icon-512.png")).toBe(true);
+    expect(isPublicAssetPath("/icons/onnuriway-icon-512-v2.png")).toBe(true);
     expect(isPublicAssetPath("/api/sales/export")).toBe(false);
     expect(isPublicAssetPath("/google.firestore.v1.Firestore/Listen/channel")).toBe(false);
   });

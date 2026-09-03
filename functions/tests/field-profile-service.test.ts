@@ -56,6 +56,24 @@ describe("school field profile mutation contract", () => {
     expect(next.updatedBy).toBe("EMP-B");
   });
 
+  it("stores school contact numbers without changing operational completeness", () => {
+    const profile = mergeFieldProfile(null, {
+      schoolId: "SCH-001",
+      employeeId: "EMP-SALES",
+      now,
+      patch: { contacts: { dietitianPhone: "010-1234-5678", cafeteriaPhone: "042-123-4567" } },
+    });
+    expect(profile.contacts).toEqual({ dietitianPhone: "010-1234-5678", cafeteriaPhone: "042-123-4567" });
+    expect(profile.completeness).toBe(0);
+    expect(updateFieldProfileInputSchema.safeParse({
+      schoolId: "SCH-001",
+      expectedRevision: 1,
+      requestId: "37d6694b-a0c0-40d7-b2e5-d92d1ae10a41",
+      appVersion: "school-contacts",
+      patch: { contacts: { dietitianPhone: "javascript:alert(1)", cafeteriaPhone: null } },
+    }).success).toBe(false);
+  });
+
   it("scores a complete operational profile at one hundred percent", () => {
     const completeness = calculateFieldProfileCompleteness({
       ...EMPTY_FIELD_PROFILE,

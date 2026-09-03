@@ -204,6 +204,12 @@ export const salesCycleSchema = z
     year: z.number().int().min(2000).max(9999),
     month: z.number().int().min(1).max(12),
     status: salesCycleStatusSchema,
+    promotedProductNames: z.array(requiredTextSchema.max(120)).max(12)
+      .refine(
+        (names) => new Set(names.map((name) => name.toLocaleLowerCase("ko-KR"))).size === names.length,
+        "Promoted product names must be unique.",
+      )
+      .default([]),
     copiedFromCycleId: cycleIdSchema.nullable(),
     createdAt: firestoreDateSchema,
     createdBy: documentIdSchema,

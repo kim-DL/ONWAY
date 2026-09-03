@@ -9,6 +9,14 @@ const timestampSchema = z.custom<Timestamp>((value) => value instanceof Timestam
 const requirementSchema = z.enum(["required", "notRequired", "unknown"]);
 const availabilitySchema = z.enum(["available", "unavailable", "unknown"]);
 const accessSchema = z.enum(["available", "limited", "unavailable", "unknown"]);
+const nullablePhoneNumberSchema = z.string().trim().min(3).max(30)
+  .regex(/^[0-9+()\-.\s]+$/u, "Phone numbers may only contain digits and common separators.")
+  .nullable();
+
+export const schoolContactSchema = z.object({
+  dietitianPhone: nullablePhoneNumberSchema,
+  cafeteriaPhone: nullablePhoneNumberSchema,
+}).strict();
 
 export const cafeteriaSchema = z.object({
   building: nullableShortTextSchema,
@@ -42,6 +50,7 @@ export const vehicleSchema = z.object({
 }).strict();
 
 export const fieldProfilePatchSchema = z.object({
+  contacts: schoolContactSchema.optional(),
   cafeteria: cafeteriaSchema.optional(),
   inspection: inspectionSchema.optional(),
   equipment: equipmentSchema.optional(),
@@ -59,6 +68,7 @@ export const updateFieldProfileInputSchema = z.object({
 
 export const fieldProfileSchema = z.object({
   schoolId: documentIdSchema,
+  contacts: schoolContactSchema.default({ dietitianPhone: null, cafeteriaPhone: null }),
   cafeteria: cafeteriaSchema,
   inspection: inspectionSchema,
   equipment: equipmentSchema,
@@ -78,6 +88,7 @@ export type FieldProfilePatch = z.infer<typeof fieldProfilePatchSchema>;
 export type UpdateFieldProfileInput = z.infer<typeof updateFieldProfileInputSchema>;
 
 export const EMPTY_FIELD_PROFILE = {
+  contacts: { dietitianPhone: null, cafeteriaPhone: null },
   cafeteria: {
     building: null,
     floor: null,

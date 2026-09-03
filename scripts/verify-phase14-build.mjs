@@ -6,7 +6,7 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase14",
+  "phase19",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",
@@ -34,10 +34,10 @@ if (serviceWorker.includes("'url':'/api/connectivity'")) {
 }
 
 const expectedIcons = new Map([
-  ["icon-192.png", [192, 192]],
-  ["icon-512.png", [512, 512]],
-  ["icon-maskable-512.png", [512, 512]],
-  ["apple-touch-icon.png", [180, 180]],
+  ["onnuriway-icon-192-v2.png", [192, 192]],
+  ["onnuriway-icon-512-v2.png", [512, 512]],
+  ["onnuriway-icon-maskable-512-v2.png", [512, 512]],
+  ["onnuriway-apple-touch-icon-v2.png", [180, 180]],
 ]);
 
 const favicon = await readFile(join(projectRoot, "public", "favicon.ico"));

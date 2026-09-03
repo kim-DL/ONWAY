@@ -83,6 +83,7 @@ export function mergeFieldProfile(
   };
   const merged = {
     ...base,
+    contacts: input.patch.contacts ?? base.contacts,
     cafeteria: input.patch.cafeteria ?? base.cafeteria,
     inspection: input.patch.inspection ?? base.inspection,
     equipment: input.patch.equipment ?? base.equipment,

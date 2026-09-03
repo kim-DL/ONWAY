@@ -11,6 +11,7 @@ import {
   createSalesAssignmentsInputSchema,
   createSalesCycleInputSchema,
   releaseSalesAssignmentsInputSchema,
+  updateSalesCycleProductsInputSchema,
 } from "./sales-cycle-contract.js";
 import {
   SalesAssignmentAlreadyExistsError,
@@ -129,6 +130,21 @@ export const createSalesAssignments = onCall(callableOptions, async (request) =>
     if (mapped) throw mapped;
     logger.error("Sales assignment creation failed.", { cycleId: input.cycleId, requestId: input.requestId, error });
     throw new HttpsError("internal", "학교 배정을 만들지 못했습니다.");
+  }
+});
+
+export const updateSalesCyclePromotedProducts = onCall(callableOptions, async (request) => {
+  const parsed = updateSalesCycleProductsInputSchema.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "홍보 제품 목록을 확인해주세요.");
+  const input = parsed.data;
+  const actor = await requireVerifiedAdmin(request);
+  try {
+    return await new SalesCycleService().updatePromotedProducts(input, actor);
+  } catch (error) {
+    const mapped = mapSalesError(error);
+    if (mapped) throw mapped;
+    logger.error("Sales cycle product update failed.", { cycleId: input.cycleId, requestId: input.requestId, error });
+    throw new HttpsError("internal", "홍보 제품 목록을 저장하지 못했습니다.");
   }
 });
 

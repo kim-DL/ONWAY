@@ -42,7 +42,7 @@ describe("sales visit client contract", () => {
       visitedDate: "2026-08-24",
       visitedBy: "EMP-SALES-A",
       brochureStatus: "delivered",
-      sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
+      sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }, { productName: "현미 스낵" }] },
       interestScore: 60,
       activityTagIds: ["ACT-SAMPLE"],
       summary: "샘플 전달 후 반응을 확인하기로 함",

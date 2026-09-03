@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
+import { AppIconMark } from "@/components/ui/app-icon-mark";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
@@ -144,6 +145,7 @@ const AUDIT_EVENT_LABELS: Record<string, string> = {
   SALES_ASSIGNMENTS_RELEASED: "영업 배정 제외",
   SALES_ASSIGNMENTS_CLAIMED: "담당자 학교 가져오기",
   SALES_CYCLE_CREATED: "영업 Cycle 생성",
+  SALES_CYCLE_PRODUCTS_UPDATED: "월별 홍보 제품 변경",
   SALES_PROFILE_UPDATED: "영업 상태 변경",
   SALES_VISIT_RECORDED: "방문 기록 등록",
   NEIS_SYNC_STARTED: "NEIS 동기화 시작",
@@ -1304,6 +1306,10 @@ function CyclesPage({
   const [copyFrom, setCopyFrom] = useState(data.selectedCycleId ?? "");
   const [activate, setActivate] = useState(true);
   const [creating, setCreating] = useState(false);
+  const selectedCycle = data.cycles.find((cycle) => cycle.cycleId === data.selectedCycleId) ?? null;
+  const [promotedProductNames, setPromotedProductNames] = useState<string[]>(selectedCycle?.promotedProductNames ?? []);
+  const [newProductName, setNewProductName] = useState("");
+  const [savingProducts, setSavingProducts] = useState(false);
   const [selectedAssignments, setSelectedAssignments] = useState<Set<string>>(() => new Set());
   const salesEmployees = data.employees.filter(
     (employee) =>
@@ -1321,6 +1327,45 @@ function CyclesPage({
   const schools = new Map(
     data.schools.map((school) => [school.schoolId, school]),
   );
+
+  const addPromotedProduct = () => {
+    const name = newProductName.trim();
+    if (!name) return;
+    if (promotedProductNames.length >= 12) {
+      showToast("홍보 제품은 월별 최대 12개까지 등록할 수 있습니다.");
+      return;
+    }
+    if (promotedProductNames.some((candidate) => candidate.localeCompare(name, "ko", { sensitivity: "accent" }) === 0)) {
+      showToast("이미 등록된 제품명입니다.");
+      return;
+    }
+    setPromotedProductNames((current) => [...current, name]);
+    setNewProductName("");
+  };
+
+  const savePromotedProducts = async () => {
+    if (!data.selectedCycleId) return;
+    const normalizedProductNames = promotedProductNames.map((name) => name.trim());
+    const uniqueNames = new Set(normalizedProductNames.map((name) => name.toLocaleLowerCase("ko-KR")));
+    if (uniqueNames.size !== normalizedProductNames.length) {
+      showToast("같은 제품명이 두 번 들어가 있습니다. 중복 항목을 정리해주세요.");
+      return;
+    }
+    setSavingProducts(true);
+    try {
+      await adminRepository.updateCycleProducts({
+        cycleId: data.selectedCycleId,
+        productNames: normalizedProductNames,
+      });
+      setPromotedProductNames(normalizedProductNames);
+      await onLoadCycle(data.selectedCycleId);
+      showToast(`${normalizedProductNames.length}개 홍보 제품을 이번 달 목록으로 저장했습니다.`, "success");
+    } catch (error) {
+      showToast(adminErrorMessage(error));
+    } finally {
+      setSavingProducts(false);
+    }
+  };
 
   const createCycle = async () => {
     setCreating(true);
@@ -1398,9 +1443,7 @@ function CyclesPage({
     });
   };
 
-  const activeCycleStatus = data.cycles.find(
-    (cycle) => cycle.cycleId === data.selectedCycleId,
-  )?.status;
+  const activeCycleStatus = selectedCycle?.status;
 
   return (
     <section className="admin-page" aria-labelledby="cycles-title">
@@ -1490,6 +1533,62 @@ function CyclesPage({
           </div>
         </article>
       </div>
+      <article className="admin-panel campaign-product-admin" aria-labelledby="campaign-products-title">
+        <header>
+          <div>
+            <p>MONTHLY PRODUCT SHORTLIST</p>
+            <h2 id="campaign-products-title">이번 달 홍보 제품</h2>
+          </div>
+          <StatusBadge tone={promotedProductNames.length >= 5 ? "success" : "neutral"}>
+            {promotedProductNames.length} / 12
+          </StatusBadge>
+        </header>
+        <p className="campaign-product-admin__description">
+          현장 직원은 방문 기록에서 이 목록을 탭해 여러 제품을 빠르게 선택하고, 목록에 없는 제품은 직접 입력할 수 있습니다.
+        </p>
+        <div className="campaign-product-admin__list" aria-live="polite">
+          {promotedProductNames.map((name, index) => (
+            <div key={`${name}-${index}`}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <input
+                aria-label={`${index + 1}번째 홍보 제품명`}
+                value={name}
+                maxLength={120}
+                onChange={(event) => setPromotedProductNames((current) => current.map((candidate, candidateIndex) => candidateIndex === index ? event.target.value : candidate))}
+              />
+              <button type="button" aria-label={`${name || `${index + 1}번째 제품`} 삭제`} onClick={() => setPromotedProductNames((current) => current.filter((_, candidateIndex) => candidateIndex !== index))}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          ))}
+          {promotedProductNames.length === 0 ? <p>아직 등록된 제품이 없습니다. 아래에서 이번 달 제품을 추가해주세요.</p> : null}
+        </div>
+        <div className="campaign-product-admin__add">
+          <label>
+            <span>제품 추가</span>
+            <input
+              value={newProductName}
+              maxLength={120}
+              placeholder="예: 우리밀 바삭 핫도그"
+              onChange={(event) => setNewProductName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addPromotedProduct();
+                }
+              }}
+            />
+          </label>
+          <GlassButton disabled={!newProductName.trim() || promotedProductNames.length >= 12} onClick={addPromotedProduct}>목록에 추가</GlassButton>
+          <GlassButton
+            variant="primary"
+            disabled={!data.selectedCycleId || savingProducts || promotedProductNames.some((name) => !name.trim())}
+            onClick={() => void savePromotedProducts()}
+          >
+            {savingProducts ? "저장 중…" : "이번 달 목록 저장"}
+          </GlassButton>
+        </div>
+      </article>
       <div className="admin-panel assignment-panel">
         <header>
           <div>
@@ -2642,7 +2741,11 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
     );
   else if (view === "cycles")
     content = (
-      <CyclesPage data={data} onLoadCycle={(cycleId) => load(cycleId, true)} />
+      <CyclesPage
+        key={`${data.selectedCycleId ?? "none"}:${JSON.stringify(data.cycles.find((cycle) => cycle.cycleId === data.selectedCycleId)?.promotedProductNames ?? [])}`}
+        data={data}
+        onLoadCycle={(cycleId) => load(cycleId, true)}
+      />
     );
   else if (view === "sync")
     content = <SyncPage data={data} onReload={reload} />;
@@ -2657,7 +2760,7 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <span>
-            <Icon name="route" />
+            <AppIconMark />
           </span>
           <div>
             <strong>급식길</strong>

@@ -662,6 +662,9 @@ export class AdminService {
       cycles: cyclesSnapshot.docs.map((document) => ({
         cycleId: document.id,
         status: String(document.get("status")),
+        promotedProductNames: Array.isArray(document.get("promotedProductNames"))
+          ? (document.get("promotedProductNames") as unknown[]).filter((value): value is string => typeof value === "string").slice(0, 12)
+          : [],
         copiedFromCycleId: document.get("copiedFromCycleId") as string | null,
         createdAt: dateValue(document.get("createdAt")),
       })),
