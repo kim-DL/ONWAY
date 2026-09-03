@@ -42,15 +42,17 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
   await expect(page.locator(".field-workspace")).toHaveCount(0);
   await expect(page.locator(".sales-history")).toBeVisible();
   await expect(page.locator(".sales-collaboration")).toBeVisible();
-  const sectionOrder = await page.locator(".sales-school-brief, .sales-history, .school-photo-gallery, .sales-collaboration, .sales-shared-brief")
+  const sectionOrder = await page.locator(".sales-school-brief, .sales-history, .school-photo-gallery, .sales-collaboration, .sales-contact-brief")
     .evaluateAll((sections) => sections.map((section) => section.classList[0]));
   expect(sectionOrder).toEqual([
     "sales-school-brief",
     "sales-history",
     "school-photo-gallery",
     "sales-collaboration",
-    "sales-shared-brief",
+    "sales-contact-brief",
   ]);
+  await expect(page.getByText("미팅 위치", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("팀 공유 메모", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "방문 기록 시작" }).click();
   const sheet = page.locator(".bottom-sheet", { hasText: "방문 기록" });
   await expect(sheet).toBeVisible();

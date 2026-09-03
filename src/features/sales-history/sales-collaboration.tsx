@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FirebaseError } from "firebase/app";
 import { FunctionsError } from "firebase/functions";
 
@@ -12,6 +12,24 @@ import type { SalesAssignment, SalesProfile } from "@/domain/sales";
 import { APP_METADATA } from "@/lib/app-metadata";
 import { salesHistoryRepository } from "./sales-history-repository";
 import type { UpdateSalesProfileResult } from "./sales-history-contract";
+
+const DEFAULT_COMMUNICATION_TAGS = [
+  { tagId: "COMM-TEXT", label: "문자 연락 선호", active: true },
+  { tagId: "COMM-CALL", label: "전화 연락 선호", active: true },
+  { tagId: "COMM-DETAIL", label: "상세 자료 선호", active: true },
+  { tagId: "COMM-BEFORE-VISIT", label: "방문 전 연락 필요", active: true },
+  { tagId: "COMM-SAMPLE-REQUEST", label: "샘플 사전 요청", active: true },
+  { tagId: "COMM-REGULAR-MATERIAL", label: "정기 자료 요청", active: true },
+] as const;
+
+function communicationTagOptions(tags: TagDefinition[]) {
+  const options = tags.map(({ tagId, label, active }) => ({ tagId, label, active }));
+  const knownIds = new Set(options.map((tag) => tag.tagId));
+  for (const tag of DEFAULT_COMMUNICATION_TAGS) {
+    if (!knownIds.has(tag.tagId)) options.push({ ...tag });
+  }
+  return options;
+}
 
 function profileError(error: unknown) {
   if (error instanceof FirebaseError) {
@@ -57,8 +75,9 @@ export function SalesCollaboration({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const requestIdRef = useRef(crypto.randomUUID());
-  const tagLabels = new Map(communicationTags.map((tag) => [tag.tagId, tag.label]));
-  const activeTags = communicationTags.filter((tag) => tag.active);
+  const availableTags = useMemo(() => communicationTagOptions(communicationTags), [communicationTags]);
+  const tagLabels = useMemo(() => new Map(availableTags.map((tag) => [tag.tagId, tag.label])), [availableTags]);
+  const activeTags = useMemo(() => availableTags.filter((tag) => tag.active), [availableTags]);
 
   const openEditor = () => {
     const activeIds = new Set(activeTags.map((tag) => tag.tagId));
@@ -135,9 +154,16 @@ export function SalesCollaboration({
       >
         <div className="communication-editor">
           <div className="communication-editor__note"><Icon name="sparkles" /><span><strong>학교에 지속되는 참고정보</strong>월별 활동 태그와 분리되어 다음 Cycle에도 유지됩니다.</span></div>
-          <fieldset>
+          <fieldset aria-describedby="communication-tag-help">
             <legend>업무 참고 태그 <span>복수 선택</span></legend>
-            <div>{activeTags.map((tag) => <SmartChip key={tag.tagId} selected={draftTagIds.includes(tag.tagId)} onClick={() => toggleTag(tag.tagId)}>{tag.label}</SmartChip>)}</div>
+            <div className="communication-editor__tag-grid">
+              {activeTags.map((tag) => (
+                <SmartChip key={tag.tagId} selected={draftTagIds.includes(tag.tagId)} onClick={() => toggleTag(tag.tagId)}>
+                  <span aria-hidden="true"><Icon name="check" size={14} /></span>{tag.label}
+                </SmartChip>
+              ))}
+            </div>
+            <small id="communication-tag-help">해당 학교에서 반복되는 연락 방식만 골라주세요.</small>
           </fieldset>
           {saveError ? <p className="communication-editor__error" role="alert">{saveError}</p> : null}
           <div className="communication-editor__actions"><button type="button" disabled={saving} onClick={() => setEditorOpen(false)}>취소</button><button type="button" disabled={saving} onClick={() => void save()}>{saving ? "안전하게 저장 중…" : "업무 참고 저장"}</button></div>

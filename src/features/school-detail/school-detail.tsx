@@ -348,55 +348,38 @@ function SalesSchoolBrief({
   );
 }
 
-function SalesSharedFieldBrief({
-  school,
+function SalesContactBrief({
   profile,
   canEdit,
   onEdit,
 }: {
-  school: School;
   profile: SchoolFieldProfile | null;
   canEdit: boolean;
   onEdit: (section: EditorSection) => void;
 }) {
-  const address = school.address.road ?? school.address.jibun ?? "주소 확인 필요";
-  const meetingPoint = profile
-    ? [profile.cafeteria.building, profile.cafeteria.floor, profile.cafeteria.locationDescription].filter(Boolean).join(" · ")
-    : "아직 공유된 방문 위치가 없습니다.";
+  const contacts = [
+    { label: "영양사 선생님", phone: profile?.contacts.dietitianPhone ?? null },
+    { label: "급식실", phone: profile?.contacts.cafeteriaPhone ?? null },
+  ];
   return (
-    <section className="sales-shared-brief" aria-labelledby="sales-shared-brief-title">
-      <header>
-        <div><p>SHARED FIELD BRIEF</p><h2 id="sales-shared-brief-title">대화에 필요한 학교 정보만.</h2></div>
-        <span><Icon name="check" size={15} />영업 전용 요약</span>
-      </header>
-      <div className="sales-shared-brief__grid">
-        <article className="sales-shared-brief__contacts">
-          <span><Icon name="phone" size={17} />바로 전화</span>
-          <div className="sales-contact-list">
-            <div>
-              <span><strong>영양사 선생님</strong><small>{profile?.contacts.dietitianPhone ?? "전화번호 미등록"}</small></span>
-              {profile?.contacts.dietitianPhone ? <a href={phoneHref(profile.contacts.dietitianPhone)} aria-label={`영양사 선생님 ${profile.contacts.dietitianPhone} 전화`}><Icon name="phone" size={16} />전화</a> : null}
-            </div>
-            <div>
-              <span><strong>급식실</strong><small>{profile?.contacts.cafeteriaPhone ?? "전화번호 미등록"}</small></span>
-              {profile?.contacts.cafeteriaPhone ? <a href={phoneHref(profile.contacts.cafeteriaPhone)} aria-label={`급식실 ${profile.contacts.cafeteriaPhone} 전화`}><Icon name="phone" size={16} />전화</a> : null}
-            </div>
+    <section className="sales-contact-brief" aria-labelledby="sales-contact-brief-title">
+      <div className="sales-contact-brief__heading">
+        <span aria-hidden="true"><Icon name="phone" size={18} /></span>
+        <div><p>QUICK CONTACT</p><h2 id="sales-contact-brief-title">학교 연락처</h2></div>
+        {canEdit ? <button type="button" onClick={() => onEdit("contacts")}>연락처 수정</button> : null}
+      </div>
+      <div className="sales-contact-brief__list">
+        {contacts.map((contact) => contact.phone ? (
+          <a key={contact.label} href={phoneHref(contact.phone)} aria-label={`${contact.label} ${contact.phone} 전화`}>
+            <span><strong>{contact.label}</strong><small>{contact.phone}</small></span>
+            <b><Icon name="phone" size={15} />전화</b>
+          </a>
+        ) : (
+          <div key={contact.label}>
+            <span><strong>{contact.label}</strong><small>전화번호 미등록</small></span>
+            <em>미등록</em>
           </div>
-          <small>{address}</small>
-          {canEdit ? <button type="button" onClick={() => onEdit("contacts")}>연락처 수정</button> : null}
-        </article>
-        <article>
-          <span><Icon name="location" size={17} />미팅 위치</span>
-          <strong>{meetingPoint || "급식실 위치 확인 필요"}</strong>
-          <small>{profile?.cafeteria.entranceDescription ?? "방문 출입구 정보 없음"}</small>
-          {canEdit ? <button type="button" onClick={() => onEdit("cafeteria")}>위치 수정</button> : null}
-        </article>
-        <article className="sales-shared-brief__note">
-          <span><Icon name="clipboard" size={17} />팀 공유 메모</span>
-          <strong>{profile?.fieldNotes ?? "아직 공유된 메모가 없습니다."}</strong>
-          <small>다음 담당자에게 이어지는 공동 참고 정보입니다.</small>
-          {canEdit ? <button type="button" onClick={() => onEdit("fieldNotes")}>메모 수정</button> : null}
-        </article>
+        ))}
       </div>
     </section>
   );
@@ -587,7 +570,7 @@ export function SchoolDetail({
         />
       ) : null}
 
-      {mode === "sales" && detailState.status === "ready" ? <SalesSharedFieldBrief school={school} profile={profile} canEdit={canEdit} onEdit={setEditor} /> : null}
+      {mode === "sales" && detailState.status === "ready" ? <SalesContactBrief profile={profile} canEdit={canEdit} onEdit={setEditor} /> : null}
 
       {mode === "delivery" ? <SoftCard className="detail-information">
         <div className="detail-card-heading"><div><p className="shell-kicker">SCHOOL INFO</p><h2>학교 기본 정보</h2></div><StatusBadge>{SCHOOL_TYPE_LABELS[school.schoolType]}</StatusBadge></div>

@@ -6,6 +6,15 @@ import { z } from "zod";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import type { UpdateSalesProfileInput } from "./sales-profile-contract.js";
 
+const DEFAULT_COMMUNICATION_TAGS = new Map<string, { label: string; displayOrder: number }>([
+  ["COMM-TEXT", { label: "문자 연락 선호", displayOrder: 1 }],
+  ["COMM-CALL", { label: "전화 연락 선호", displayOrder: 2 }],
+  ["COMM-DETAIL", { label: "상세 자료 선호", displayOrder: 3 }],
+  ["COMM-BEFORE-VISIT", { label: "방문 전 연락 필요", displayOrder: 4 }],
+  ["COMM-SAMPLE-REQUEST", { label: "샘플 사전 요청", displayOrder: 5 }],
+  ["COMM-REGULAR-MATERIAL", { label: "정기 자료 요청", displayOrder: 6 }],
+]);
+
 const timestampSchema = z.custom<Timestamp>((value) => value instanceof Timestamp);
 const profileSchema = z.object({
   schoolId: z.string(),
@@ -121,7 +130,17 @@ export class SalesProfileService {
       }
       if (!schoolSnapshot.exists) throw new SalesProfileReferenceError("학교를 찾을 수 없습니다.");
       if (!assignmentSnapshot.exists) throw new SalesProfileAssignmentNotFoundError();
-      if (tagSnapshots.some((snapshot) => !snapshot.exists || snapshot.get("active") !== true)) {
+      const missingDefaultTags = tagSnapshots.flatMap((snapshot, index) => {
+        if (snapshot.exists) return [];
+        const tagId = input.communicationTagIds[index];
+        const definition = tagId ? DEFAULT_COMMUNICATION_TAGS.get(tagId) : undefined;
+        return tagId && definition ? [{ tagId, definition }] : [];
+      });
+      if (tagSnapshots.some((snapshot, index) => {
+        if (snapshot.exists) return snapshot.get("active") !== true;
+        const tagId = input.communicationTagIds[index];
+        return !tagId || !DEFAULT_COMMUNICATION_TAGS.has(tagId);
+      })) {
         throw new SalesProfileReferenceError("활성 커뮤니케이션 태그만 선택할 수 있습니다.");
       }
 
@@ -160,6 +179,16 @@ export class SalesProfileService {
       });
       const auditId = randomUUID();
 
+      for (const { tagId, definition } of missingDefaultTags) {
+        transaction.create(this.db.doc(`communicationTags/${tagId}`), {
+          tagId,
+          label: definition.label,
+          active: true,
+          displayOrder: definition.displayOrder,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
       transaction.set(profileRef, nextProfile);
       transaction.create(this.db.doc(`auditLogs/${auditId}`), {
         logId: auditId,

@@ -104,6 +104,16 @@ try {
 }
 if (!otherAssigneeRejected) throw new Error("A different sales employee changed the school profile.");
 
+const fallbackTagResult = await service.update({
+  ...input,
+  expectedSalesRevision: 2,
+  communicationTagIds: ["COMM-CALL"],
+  requestId: randomUUID(),
+}, salesA);
+if (fallbackTagResult.salesRevision !== 3) {
+  throw new Error("A default communication tag was not saved with the next profile revision.");
+}
+
 const historyBase = database.collection("salesVisits")
   .where("schoolId", "==", schoolId)
   .where("deleted", "==", false)
@@ -122,19 +132,23 @@ if (visitIds.length !== 8 || new Set(visitIds).size !== 8 || visitIds[0] !== ori
   throw new Error("History cursor ordering skipped or duplicated visits.");
 }
 
-const [profile, immutableVisitAfter, audits] = await Promise.all([
+const [profile, immutableVisitAfter, audits, fallbackTag] = await Promise.all([
   database.doc(`salesProfiles/${schoolId}`).get(),
   database.doc(`salesVisits/${originalVisit.visitId}`).get(),
   database.collection("auditLogs").where("eventType", "==", "SALES_PROFILE_UPDATED").get(),
+  database.doc("communicationTags/COMM-CALL").get(),
 ]);
 if (
-  profile.get("salesRevision") !== 2
+  profile.get("salesRevision") !== 3
   || profile.get("nextAction.summary") !== "자료 전달 후 연락"
   || profile.get("followUp.summary") !== "상세 자료 전달"
   || profile.get("latestVisit.visitId") !== originalVisit.visitId
   || profile.get("interestScore") !== 80
 ) {
   throw new Error("The persistent school profile lost visit or next-action context.");
+}
+if (!fallbackTag.exists || fallbackTag.get("label") !== "전화 연락 선호" || fallbackTag.get("active") !== true) {
+  throw new Error("The default communication tag did not self-provision safely.");
 }
 if (
   immutableVisitAfter.get("summary") !== immutableVisitBefore.get("summary")
@@ -143,7 +157,7 @@ if (
 ) {
   throw new Error("Updating communication tags mutated an immutable visit event.");
 }
-if (audits.size !== 1) throw new Error(`Expected one profile audit, received ${audits.size}.`);
+if (audits.size !== 2) throw new Error(`Expected two profile audits, received ${audits.size}.`);
 
 console.log(JSON.stringify({
   status: "phase11-sales-history-gate-passed",
@@ -157,6 +171,7 @@ console.log(JSON.stringify({
   staleProfileRevision,
   staleAssignmentRevision,
   otherAssigneeRejected,
+  fallbackTagProvisioned: true,
   immutableVisitPreserved: true,
   auditCount: audits.size,
 }));
