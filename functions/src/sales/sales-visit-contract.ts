@@ -92,4 +92,27 @@ export const recordSalesVisitInputSchema = z.object({
   }
 });
 
+export const updateSalesVisitInputSchema = z.object({
+  visitId: documentIdSchema,
+  cycleId: cycleIdSchema,
+  schoolId: documentIdSchema,
+  expectedVisitRevision: z.number().int().positive(),
+  expectedAssignmentRevision: z.number().int().positive(),
+  expectedSalesRevision: z.number().int().positive(),
+  visitedDate: dateOnlySchema,
+  visitedBy: documentIdSchema,
+  brochureStatus: deliveryStatusSchema,
+  sample: visitSampleInputSchema,
+  interestScore: interestScoreSchema,
+  activityTagIds: z.array(documentIdSchema).max(20).refine(
+    (values) => new Set(values).size === values.length,
+    "Activity tags must be unique.",
+  ),
+  summary: z.string().trim().min(2).max(500),
+  followUp: visitFollowUpInputSchema,
+  requestId: z.string().uuid(),
+  appVersion: z.string().trim().min(1).max(200),
+}).strict();
+
 export type RecordSalesVisitInput = z.infer<typeof recordSalesVisitInputSchema>;
+export type UpdateSalesVisitInput = z.infer<typeof updateSalesVisitInputSchema>;

@@ -6,15 +6,17 @@ import { FirebaseError } from "firebase/app";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import { SmartChip } from "@/components/ui/smart-chip";
-import type { TagDefinition } from "@/domain/catalog";
+import type { Product, TagDefinition } from "@/domain/catalog";
 import type { EmployeeDirectory } from "@/domain/identity";
-import type { InterestScore, SalesAssignment } from "@/domain/sales";
+import type { InterestScore, SalesAssignment, SalesVisit } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { APP_METADATA } from "@/lib/app-metadata";
 import { HeartInterestSelector } from "./heart-interest-selector";
 import {
   recordSalesVisitInputSchema,
+  todayInSeoul,
+  updateSalesVisitInputSchema,
   visitDateWindowForCycle,
   type RecordSalesVisitResult,
 } from "./sales-visit-contract";
@@ -30,6 +32,7 @@ export type RecordedVisitSummary = {
   visitedBy: string;
   summary: string;
   followUp: { required: boolean; dueDate: string | null; summary: string | null };
+  operation: "created" | "updated";
 };
 
 function BinaryChoice({
@@ -69,35 +72,79 @@ function errorMessage(error: unknown) {
     : "방문 기록을 저장하지 못했습니다. 작성 내용을 확인한 뒤 다시 시도해주세요.";
 }
 
+function initialSampleProductName(visit: SalesVisit | null, products: Product[]) {
+  if (!visit) return "";
+  const namesById = new Map(products.map((product) => [product.productId, product.shortName ?? product.name]));
+  return visit.sample.items
+    .map((item) => "productName" in item ? item.productName : namesById.get(item.productId) ?? item.productId)
+    .join(", ");
+}
+
+function visitorChoices(
+  employees: EmployeeDirectory[],
+  directory: EmployeeDirectory[],
+  session: AuthenticatedSession,
+  initialVisit: SalesVisit | null,
+) {
+  const choices = new Map(employees.map((employee) => [employee.employeeId, employee]));
+  if (!choices.has(session.claims.employeeId)) {
+    choices.set(session.claims.employeeId, {
+      employeeId: session.claims.employeeId,
+      displayName: session.displayName,
+      active: true,
+      displayOrder: Number.MAX_SAFE_INTEGER - 1,
+    });
+  }
+  if (initialVisit && !choices.has(initialVisit.visitedBy)) {
+    const savedVisitor = directory.find((employee) => employee.employeeId === initialVisit.visitedBy);
+    choices.set(initialVisit.visitedBy, savedVisitor ?? {
+      employeeId: initialVisit.visitedBy,
+      displayName: "기존 방문자",
+      active: true,
+      displayOrder: Number.MAX_SAFE_INTEGER,
+    });
+  }
+  return [...choices.values()];
+}
+
 export function SalesVisitSheet({
   school,
   assignment,
   activityTags,
+  products,
   employees,
+  employeeDirectory,
   session,
+  initialVisit = null,
+  expectedSalesRevision,
   onClose,
   onRecorded,
 }: {
   school: School;
   assignment: SalesAssignment;
   activityTags: TagDefinition[];
+  products: Product[];
   employees: EmployeeDirectory[];
+  employeeDirectory: EmployeeDirectory[];
   session: AuthenticatedSession;
+  initialVisit?: SalesVisit | null;
+  expectedSalesRevision: number;
   onClose: () => void;
   onRecorded: (summary: RecordedVisitSummary) => void;
 }) {
   const visitDateWindow = visitDateWindowForCycle(assignment.cycleId);
-  const [visitedDate, setVisitedDate] = useState(() => visitDateWindow.initial);
-  const [visitedBy, setVisitedBy] = useState(session.claims.employeeId);
-  const [brochureStatus, setBrochureStatus] = useState<DeliveryChoice>(null);
-  const [sampleStatus, setSampleStatus] = useState<DeliveryChoice>(null);
-  const [sampleProductName, setSampleProductName] = useState("");
-  const [interestScore, setInterestScore] = useState<InterestScore | null>(null);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-  const [summary, setSummary] = useState("");
-  const [followUpRequired, setFollowUpRequired] = useState(false);
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [followUpSummary, setFollowUpSummary] = useState("");
+  const editing = initialVisit !== null;
+  const [visitedDate, setVisitedDate] = useState(() => initialVisit ? todayInSeoul(initialVisit.visitedAt) : visitDateWindow.initial);
+  const [visitedBy, setVisitedBy] = useState(initialVisit?.visitedBy ?? session.claims.employeeId);
+  const [brochureStatus, setBrochureStatus] = useState<DeliveryChoice>(initialVisit?.brochure.status ?? null);
+  const [sampleStatus, setSampleStatus] = useState<DeliveryChoice>(initialVisit?.sample.status ?? null);
+  const [sampleProductName, setSampleProductName] = useState(() => initialSampleProductName(initialVisit, products));
+  const [interestScore, setInterestScore] = useState<InterestScore | null>(initialVisit?.interest.score ?? null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialVisit?.activityTagIds ?? []);
+  const [summary, setSummary] = useState(initialVisit?.summary ?? "");
+  const [followUpRequired, setFollowUpRequired] = useState(initialVisit?.followUp.required ?? false);
+  const [followUpDate, setFollowUpDate] = useState(initialVisit?.followUp.dueDate ?? "");
+  const [followUpSummary, setFollowUpSummary] = useState(initialVisit?.followUp.summary ?? "");
   const [errors, setErrors] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -107,9 +154,7 @@ export function SalesVisitSheet({
   const handleClose = useCallback(() => {
     if (!savingRef.current) onClose();
   }, [onClose]);
-  const visitorOptions = employees.some((employee) => employee.employeeId === session.claims.employeeId)
-    ? employees
-    : [{ employeeId: session.claims.employeeId, displayName: session.displayName }, ...employees];
+  const visitorOptions = visitorChoices(employees, employeeDirectory, session, initialVisit);
 
   const chooseSampleStatus = (value: Exclude<DeliveryChoice, null>) => {
     setSampleStatus(value);
@@ -144,7 +189,7 @@ export function SalesVisitSheet({
     event.preventDefault();
     setSaveError(null);
     if (!validate() || brochureStatus === null || sampleStatus === null || interestScore === null) return;
-    const parsed = recordSalesVisitInputSchema.safeParse({
+    const content = {
       cycleId: assignment.cycleId,
       schoolId: school.schoolId,
       expectedAssignmentRevision: assignment.revision,
@@ -165,7 +210,15 @@ export function SalesVisitSheet({
         : { required: false, dueDate: null, summary: null },
       requestId,
       appVersion: APP_METADATA.buildVersion,
-    });
+    };
+    const parsed = editing && initialVisit
+      ? updateSalesVisitInputSchema.safeParse({
+          ...content,
+          visitId: initialVisit.visitId,
+          expectedVisitRevision: initialVisit.revision,
+          expectedSalesRevision,
+        })
+      : recordSalesVisitInputSchema.safeParse(content);
     if (!parsed.success) {
       setErrors(["입력한 날짜와 방문 내용을 다시 확인해주세요."]);
       return;
@@ -173,7 +226,9 @@ export function SalesVisitSheet({
     savingRef.current = true;
     setSaving(true);
     try {
-      const result = await salesVisitRepository.record(parsed.data, session);
+      const result = editing
+        ? await salesVisitRepository.update(updateSalesVisitInputSchema.parse(parsed.data), session)
+        : await salesVisitRepository.record(recordSalesVisitInputSchema.parse(parsed.data), session);
       onRecorded({
         result,
         interestScore,
@@ -182,6 +237,7 @@ export function SalesVisitSheet({
         visitedBy,
         summary: summary.trim(),
         followUp: parsed.data.followUp,
+        operation: editing ? "updated" : "created",
       });
     } catch (error) {
       setSaveError(errorMessage(error));
@@ -194,8 +250,10 @@ export function SalesVisitSheet({
   return (
     <BottomSheet
       open
-      title="방문 기록"
-      description={`${school.name} · 담당자와 실제 방문자를 구분해 이번 달 활동을 기록합니다.`}
+      title={editing ? "방문 기록 수정" : "방문 기록"}
+      description={editing
+        ? `${school.name} · 가장 최근 기록의 저장된 내용을 불러왔습니다.`
+        : `${school.name} · 방문일은 오늘로 준비하고 이번 달 활동을 기록합니다.`}
       onClose={handleClose}
     >
       <form
@@ -207,6 +265,7 @@ export function SalesVisitSheet({
         onSubmit={(event) => void submit(event)}
         noValidate
       >
+        {editing ? <div className="visit-editing-note"><Icon name="clock" size={17} /><span><strong>저장된 최신 기록을 수정합니다.</strong><small>기존 값을 유지한 채 필요한 부분만 바꿀 수 있어요.</small></span></div> : null}
         <div className="sales-visit-form__identity">
           <label>
             방문일 <em>필수</em>
@@ -264,7 +323,7 @@ export function SalesVisitSheet({
 
         <div className="sales-visit-form__submit">
           <p><Icon name="check" size={16} />한 번의 저장으로 방문·학교 상태·통계가 함께 반영됩니다.</p>
-          <button type="submit" disabled={saving}>{saving ? "안전하게 저장 중…" : "방문 기록 저장"}</button>
+          <button type="submit" disabled={saving}>{saving ? "안전하게 저장 중…" : editing ? "수정 내용 저장" : "방문 기록 저장"}</button>
         </div>
       </form>
     </BottomSheet>

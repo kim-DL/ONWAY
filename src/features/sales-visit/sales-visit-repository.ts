@@ -11,7 +11,9 @@ import { getFirebaseClientServices } from "@/lib/firebase/client";
 import {
   recordSalesVisitInputSchema,
   recordSalesVisitResultSchema,
+  updateSalesVisitInputSchema,
   type RecordSalesVisitInput,
+  type UpdateSalesVisitInput,
 } from "./sales-visit-contract";
 
 export class SalesVisitRepository {
@@ -20,6 +22,17 @@ export class SalesVisitRepository {
     if (!services) throw new Error("Firebase is not configured.");
     const payload = recordSalesVisitInputSchema.parse(input);
     const callable = httpsCallable<RecordSalesVisitInput, unknown>(services.functions, "recordSalesVisit");
+    const response = await callable(payload);
+    const result = recordSalesVisitResultSchema.parse(response.data);
+    await invalidateCachedSalesWorkspace(createSalesSessionNamespace(session), input.cycleId).catch(() => undefined);
+    return result;
+  }
+
+  async update(input: UpdateSalesVisitInput, session: AuthenticatedSession) {
+    const services = getFirebaseClientServices();
+    if (!services) throw new Error("Firebase is not configured.");
+    const payload = updateSalesVisitInputSchema.parse(input);
+    const callable = httpsCallable<UpdateSalesVisitInput, unknown>(services.functions, "updateSalesVisit");
     const response = await callable(payload);
     const result = recordSalesVisitResultSchema.parse(response.data);
     await invalidateCachedSalesWorkspace(createSalesSessionNamespace(session), input.cycleId).catch(() => undefined);

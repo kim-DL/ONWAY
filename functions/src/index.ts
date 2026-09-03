@@ -37,6 +37,7 @@ export {
   createSalesCycle,
   recordSalesVisit,
   releaseSalesAssignments,
+  updateSalesVisit,
   updateSalesProfile,
 } from "./sales/callables.js";
 export {

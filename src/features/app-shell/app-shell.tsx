@@ -30,6 +30,7 @@ import {
   type ShellView,
   type WorkMode,
 } from "./shell-policy";
+import { DeliveryRecentSchools } from "./delivery-recent-schools";
 
 const MODE_OPTIONS = [
   { value: "delivery", label: "납품" },
@@ -169,9 +170,11 @@ function ShellNavigation({
 function DeliveryHome({
   session,
   onOpenSearch,
+  onSelectSchool,
 }: {
   session: AuthenticatedSession;
   onOpenSearch: () => void;
+  onSelectSchool: (school: School) => void;
 }) {
   return (
     <section className="shell-page shell-home" aria-labelledby="delivery-home-title">
@@ -190,6 +193,7 @@ function DeliveryHome({
           <Icon name="chevron-right" />
         </button>
       </div>
+      <DeliveryRecentSchools session={session} onSelectSchool={onSelectSchool} onOpenSearch={onOpenSearch} />
     </section>
   );
 }
@@ -428,7 +432,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   } else if (mode === "sales") {
     content = <SalesWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} />;
   } else {
-    content = <DeliveryHome session={session} onOpenSearch={openSearch} />;
+    content = <DeliveryHome session={session} onOpenSearch={openSearch} onSelectSchool={openSchool} />;
   }
 
   return (

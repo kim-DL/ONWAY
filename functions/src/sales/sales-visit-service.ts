@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { MAX_ASSIGNMENTS_PER_CYCLE } from "./sales-cycle-contract.js";
-import type { RecordSalesVisitInput } from "./sales-visit-contract.js";
+import type { RecordSalesVisitInput, UpdateSalesVisitInput } from "./sales-visit-contract.js";
 
 const timestampSchema = z.custom<Timestamp>((value) => value instanceof Timestamp);
 const monthlyStatusSchema = z.enum(["before", "completed", "followUp", "revisit", "onHold"]);
@@ -106,6 +106,12 @@ const requestLockSchema = z.object({
   fingerprint: z.string().length(64),
   result: resultSchema,
 }).passthrough();
+const updateRequestLockSchema = z.object({
+  operation: z.literal("updateSalesVisit"),
+  actorUid: z.string(),
+  fingerprint: z.string().length(64),
+  result: resultSchema,
+}).passthrough();
 
 export type SalesVisitActor = {
   uid: string;
@@ -130,6 +136,17 @@ export class SalesVisitAssignmentRevisionConflictError extends Error {
     super("Sales visit assignment revision conflict.");
   }
 }
+export class SalesVisitRevisionConflictError extends Error {
+  constructor(readonly actualRevision: number) {
+    super("Sales visit revision conflict.");
+  }
+}
+export class SalesVisitProfileRevisionConflictError extends Error {
+  constructor(readonly actualRevision: number) {
+    super("Sales profile revision conflict.");
+  }
+}
+export class SalesVisitNotLatestError extends Error {}
 
 function fingerprint(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -410,6 +427,210 @@ export class SalesVisitService {
       });
       transaction.create(lockRef, {
         operation: "recordSalesVisit",
+        actorUid: actor.uid,
+        fingerprint: inputFingerprint,
+        result,
+        createdAt: now,
+      });
+      return { ...result, replayed: false };
+    });
+  }
+
+  async update(input: UpdateSalesVisitInput, actor: SalesVisitActor) {
+    const lockRef = this.db.doc(`requestLocks/sales-visit-update-${input.requestId}`);
+    const inputFingerprint = fingerprint({ ...input, actorUid: actor.uid });
+
+    return this.db.runTransaction(async (transaction) => {
+      const lockSnapshot = await transaction.get(lockRef);
+      if (lockSnapshot.exists) {
+        const lock = updateRequestLockSchema.parse(lockSnapshot.data());
+        if (lock.actorUid !== actor.uid || lock.fingerprint !== inputFingerprint) {
+          throw new SalesVisitRequestCollisionError();
+        }
+        return { ...lock.result, replayed: true };
+      }
+
+      const cycleRef = this.db.doc(`salesCycles/${input.cycleId}`);
+      const assignmentRef = this.db.doc(`salesCycles/${input.cycleId}/assignments/${input.schoolId}`);
+      const profileRef = this.db.doc(`salesProfiles/${input.schoolId}`);
+      const visitorRef = this.db.doc(`employees/${input.visitedBy}`);
+      const visitRef = this.db.doc(`salesVisits/${input.visitId}`);
+      const assignmentsQuery = this.db.collection(`salesCycles/${input.cycleId}/assignments`).limit(MAX_ASSIGNMENTS_PER_CYCLE + 1);
+      const employeeStatsQuery = this.db.collection(`salesCycles/${input.cycleId}/employeeStats`).limit(101);
+      const recentVisitsQuery = this.db.collection("salesVisits")
+        .where("schoolId", "==", input.schoolId)
+        .where("deleted", "==", false)
+        .orderBy("visitedAt", "desc")
+        .limit(2);
+      const legacyProductItems = input.sample.items.filter((item): item is Extract<typeof item, { productId: string }> => "productId" in item);
+      const productRefs = legacyProductItems.map((item) => this.db.doc(`products/${item.productId}`));
+      const tagRefs = input.activityTagIds.map((tagId) => this.db.doc(`activityTags/${tagId}`));
+      const [
+        cycleSnapshot,
+        assignmentSnapshot,
+        profileSnapshot,
+        visitorSnapshot,
+        visitSnapshot,
+        assignmentSnapshots,
+        employeeStatsSnapshots,
+        recentVisitSnapshots,
+        productSnapshots,
+        tagSnapshots,
+      ] = await Promise.all([
+        transaction.get(cycleRef),
+        transaction.get(assignmentRef),
+        transaction.get(profileRef),
+        transaction.get(visitorRef),
+        transaction.get(visitRef),
+        transaction.get(assignmentsQuery),
+        transaction.get(employeeStatsQuery),
+        transaction.get(recentVisitsQuery),
+        productRefs.length > 0 ? transaction.getAll(...productRefs) : Promise.resolve([]),
+        tagRefs.length > 0 ? transaction.getAll(...tagRefs) : Promise.resolve([]),
+      ]);
+
+      if (!cycleSnapshot.exists || cycleSchema.parse(cycleSnapshot.data()).status !== "active") {
+        throw new SalesVisitCycleError();
+      }
+      if (!assignmentSnapshot.exists) throw new SalesVisitAssignmentNotFoundError();
+      if (!profileSnapshot.exists || !visitSnapshot.exists) throw new SalesVisitReferenceError("수정할 방문 기록을 찾을 수 없습니다.");
+      if (assignmentSnapshots.size > MAX_ASSIGNMENTS_PER_CYCLE) {
+        throw new SalesVisitReferenceError(`월 배정은 최대 ${MAX_ASSIGNMENTS_PER_CYCLE}개까지 집계할 수 있습니다.`);
+      }
+      if (employeeStatsSnapshots.size > 100) throw new SalesVisitReferenceError("직원 통계 문서가 허용 범위를 초과했습니다.");
+      if (!visitorSnapshot.exists || visitorSnapshot.get("status") !== "active" || !(visitorSnapshot.get("roleScopes") as unknown[] | undefined)?.includes("sales")) {
+        throw new SalesVisitReferenceError("활성 영업 직원만 실제 방문자로 선택할 수 있습니다.");
+      }
+      if (productSnapshots.some((snapshot) => !snapshot.exists || snapshot.get("active") !== true)) {
+        throw new SalesVisitReferenceError("활성 제품만 샘플로 기록할 수 있습니다.");
+      }
+      if (tagSnapshots.some((snapshot) => !snapshot.exists || snapshot.get("active") !== true)) {
+        throw new SalesVisitReferenceError("활성 활동 태그만 기록할 수 있습니다.");
+      }
+
+      const assignment = assignmentSchema.parse(assignmentSnapshot.data());
+      const currentProfile = profileSchema.parse(profileSnapshot.data());
+      const currentVisit = visitSchema.parse(visitSnapshot.data());
+      if (!actor.roleScopes.includes("admin") && !assignment.assigneeIds.includes(actor.employeeId)) {
+        throw new SalesVisitPermissionError();
+      }
+      if (assignment.revision !== input.expectedAssignmentRevision) {
+        throw new SalesVisitAssignmentRevisionConflictError(assignment.revision);
+      }
+      if (currentProfile.salesRevision !== input.expectedSalesRevision) {
+        throw new SalesVisitProfileRevisionConflictError(currentProfile.salesRevision);
+      }
+      if (currentVisit.revision !== input.expectedVisitRevision) {
+        throw new SalesVisitRevisionConflictError(currentVisit.revision);
+      }
+      if (currentVisit.schoolId !== input.schoolId || currentVisit.cycleId !== input.cycleId) {
+        throw new SalesVisitReferenceError("방문 기록과 학교 배정이 일치하지 않습니다.");
+      }
+      if (assignment.latestVisitId !== input.visitId || currentProfile.latestVisit.visitId !== input.visitId) {
+        throw new SalesVisitNotLatestError();
+      }
+
+      const nowDate = new Date();
+      const resolvedVisit = resolveServerVisitDate({ visitedDate: input.visitedDate }, nowDate);
+      if (resolvedVisit.selectedDate > resolvedVisit.serverToday) throw new SalesVisitChronologyError("future");
+      const visitWindow = visitDateWindowForCycle(input.cycleId);
+      if (resolvedVisit.selectedDate < visitWindow.earliest || resolvedVisit.selectedDate > visitWindow.latest) {
+        throw new SalesVisitChronologyError("cycle-window");
+      }
+      if (input.followUp.required && input.followUp.dueDate! < resolvedVisit.selectedDate) {
+        throw new SalesVisitChronologyError("follow-up");
+      }
+      const previousLatest = recentVisitSnapshots.docs
+        .filter((snapshot) => snapshot.id !== input.visitId)
+        .map((snapshot) => visitSchema.parse(snapshot.data()).visitedAt)
+        .sort((left, right) => right.toMillis() - left.toMillis())[0] ?? null;
+      if (previousLatest && resolvedVisit.selectedDate < dateOnlyForSeoulDate(previousLatest.toDate())) {
+        throw new SalesVisitChronologyError("before-latest");
+      }
+
+      const now = Timestamp.now();
+      const visitedAt = Timestamp.fromDate(resolvedVisit.timestamp);
+      const monthlyStatus = input.followUp.required ? "followUp" as const : "completed" as const;
+      const nextVisit = visitSchema.parse({
+        ...currentVisit,
+        visitedAt,
+        visitedBy: input.visitedBy,
+        brochure: { status: input.brochureStatus },
+        sample: input.sample,
+        interest: { score: input.interestScore, explicitlySelected: true },
+        activityTagIds: input.activityTagIds,
+        summary: input.summary,
+        followUp: input.followUp,
+        revision: currentVisit.revision + 1,
+        updatedAt: now,
+      });
+      const nextAssignment = assignmentSchema.parse({
+        ...assignment,
+        monthlyStatus,
+        latestVisitedAt: visitedAt,
+        brochureStatus: input.brochureStatus,
+        sampleStatus: input.sample.status,
+        revision: assignment.revision + 1,
+        updatedAt: now,
+      });
+      const nextProfile = profileSchema.parse({
+        ...currentProfile,
+        interestScore: input.interestScore,
+        interestEvaluated: true,
+        interestedProductIds: [...new Set([
+          ...currentProfile.interestedProductIds,
+          ...legacyProductItems.map((item) => item.productId),
+        ])],
+        latestVisit: { visitId: input.visitId, visitedAt, visitedBy: input.visitedBy },
+        followUp: input.followUp,
+        nextAction: {
+          dueDate: input.followUp.required ? input.followUp.dueDate : null,
+          summary: input.followUp.required ? input.followUp.summary : null,
+        },
+        salesRevision: currentProfile.salesRevision + 1,
+        updatedAt: now,
+        updatedBy: actor.employeeId,
+      });
+      const allAssignments = assignmentSnapshots.docs.map((snapshot) =>
+        snapshot.id === input.schoolId ? nextAssignment : assignmentSchema.parse(snapshot.data())
+      );
+      const stats = calculateCycleStats(allAssignments, now);
+      const result = resultSchema.parse({
+        visitId: input.visitId,
+        assignmentRevision: nextAssignment.revision,
+        salesRevision: nextProfile.salesRevision,
+        monthlyStatus,
+        visitedAt: resolvedVisit.timestamp.toISOString(),
+      });
+      const auditId = randomUUID();
+
+      transaction.set(visitRef, nextVisit);
+      transaction.set(profileRef, nextProfile);
+      transaction.set(assignmentRef, nextAssignment);
+      transaction.set(this.db.doc(`salesCycles/${input.cycleId}/stats/team`), stats.team);
+      for (const [employeeId, employeeStats] of stats.employees) {
+        transaction.set(this.db.doc(`salesCycles/${input.cycleId}/employeeStats/${employeeId}`), employeeStats);
+      }
+      for (const snapshot of employeeStatsSnapshots.docs) {
+        if (!stats.employees.has(snapshot.id)) transaction.delete(snapshot.ref);
+      }
+      transaction.create(this.db.doc(`auditLogs/${auditId}`), {
+        logId: auditId,
+        eventType: "SALES_VISIT_UPDATED",
+        actorUid: actor.uid,
+        actorEmployeeId: actor.employeeId,
+        targetType: "salesVisit",
+        targetId: input.visitId,
+        schoolId: input.schoolId,
+        cycleId: input.cycleId,
+        changedFields: ["visit", "salesProfile", "assignmentSummary", "employeeStats", "teamStats"],
+        changeReason: "최신 방문 기록 수정",
+        requestId: input.requestId,
+        appVersion: input.appVersion,
+        createdAt: now,
+      });
+      transaction.create(lockRef, {
+        operation: "updateSalesVisit",
         actorUid: actor.uid,
         fingerprint: inputFingerprint,
         result,

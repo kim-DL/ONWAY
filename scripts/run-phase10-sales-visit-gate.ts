@@ -3,11 +3,12 @@ import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-import { recordSalesVisitInputSchema } from "../functions/src/sales/sales-visit-contract.js";
+import { recordSalesVisitInputSchema, updateSalesVisitInputSchema } from "../functions/src/sales/sales-visit-contract.js";
 import {
   SalesVisitAssignmentRevisionConflictError,
   SalesVisitPermissionError,
   SalesVisitRequestCollisionError,
+  SalesVisitRevisionConflictError,
   SalesVisitService,
 } from "../functions/src/sales/sales-visit-service.js";
 import { buildPhase1SeedDocuments, createPhase1Seed } from "../src/seed/phase1.js";
@@ -83,7 +84,45 @@ try {
 }
 if (!otherZoneRejected) throw new Error("A non-assignee recorded another employee's visit.");
 
-const [visits, visit, profile, assignment, teamStats, employeeStats, audits] = await Promise.all([
+const updateInput = updateSalesVisitInputSchema.parse({
+  visitId: result.visitId,
+  cycleId: input.cycleId,
+  schoolId: input.schoolId,
+  expectedVisitRevision: 1,
+  expectedAssignmentRevision: result.assignmentRevision,
+  expectedSalesRevision: result.salesRevision,
+  visitedDate: "2026-08-25",
+  visitedBy: "EMP-SALES-B",
+  brochureStatus: "delivered",
+  sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
+  interestScore: 80,
+  activityTagIds: ["ACT-SAMPLE"],
+  summary: "저장된 샘플 반응과 관심도를 보완함",
+  followUp: { required: false, dueDate: null, summary: null },
+  requestId: randomUUID(),
+  appVersion: "phase10-update-gate",
+});
+const updated = await service.update(updateInput, actor);
+const updateReplay = await service.update(updateInput, actor);
+if (updated.replayed || !updateReplay.replayed || updated.visitId !== result.visitId) {
+  throw new Error("Visit update idempotency failed.");
+}
+
+let staleVisitRevision: number | null = null;
+try {
+  await service.update({
+    ...updateInput,
+    expectedAssignmentRevision: updated.assignmentRevision,
+    expectedSalesRevision: updated.salesRevision,
+    requestId: randomUUID(),
+  }, actor);
+} catch (error) {
+  if (error instanceof SalesVisitRevisionConflictError) staleVisitRevision = error.actualRevision;
+  else throw error;
+}
+if (staleVisitRevision !== 2) throw new Error("A stale visit edit was not rejected.");
+
+const [visits, visit, profile, assignment, teamStats, employeeStats, audits, updateAudits] = await Promise.all([
   database.collection("salesVisits").where("schoolId", "==", targetSchoolId).get(),
   database.doc(`salesVisits/${result.visitId}`).get(),
   database.doc(`salesProfiles/${targetSchoolId}`).get(),
@@ -91,23 +130,28 @@ const [visits, visit, profile, assignment, teamStats, employeeStats, audits] = a
   database.doc("salesCycles/2026-08/stats/team").get(),
   database.doc("salesCycles/2026-08/employeeStats/EMP-SALES-A").get(),
   database.collection("auditLogs").where("eventType", "==", "SALES_VISIT_RECORDED").get(),
+  database.collection("auditLogs").where("eventType", "==", "SALES_VISIT_UPDATED").get(),
 ]);
 if (visits.size !== 1 || !visit.exists || visit.get("recordedBy") !== "EMP-SALES-A" || visit.get("visitedBy") !== "EMP-SALES-B") {
   throw new Error("Visit event or actor separation is incorrect.");
 }
-if (profile.get("interestScore") !== 60 || profile.get("followUp.required") !== true || profile.get("salesRevision") !== 1) {
+const updatedSample = visit.get("sample") as { items?: Array<{ productName?: string }> } | undefined;
+if (visit.get("revision") !== 2 || visit.get("summary") !== updateInput.summary || updatedSample?.items?.[0]?.productName !== "우리쌀 떡볶이 순한맛") {
+  throw new Error("The existing visit was not updated in place.");
+}
+if (profile.get("interestScore") !== 80 || profile.get("followUp.required") !== false || profile.get("salesRevision") !== 2) {
   throw new Error("Sales profile was not updated consistently.");
 }
-if (assignment.get("monthlyStatus") !== "followUp" || assignment.get("revision") !== 2 || assignment.get("latestVisitId") !== result.visitId) {
+if (assignment.get("monthlyStatus") !== "completed" || assignment.get("revision") !== 3 || assignment.get("latestVisitId") !== result.visitId) {
   throw new Error("Assignment summary was not updated consistently.");
 }
-if (teamStats.get("totalSchoolCount") !== 5 || teamStats.get("followUpCount") !== 1 || teamStats.get("beforeCount") !== 2) {
+if (teamStats.get("totalSchoolCount") !== 5 || teamStats.get("followUpCount") !== 0 || teamStats.get("beforeCount") !== 2) {
   throw new Error("Team stats were not recomputed correctly.");
 }
-if (employeeStats.get("assignedSchoolCount") !== 2 || employeeStats.get("followUpCount") !== 1) {
+if (employeeStats.get("assignedSchoolCount") !== 2 || employeeStats.get("followUpCount") !== 0) {
   throw new Error("Employee stats were not recomputed correctly.");
 }
-if (audits.size !== 1) throw new Error(`Expected one visit audit, received ${audits.size}.`);
+if (audits.size !== 1 || updateAudits.size !== 1) throw new Error(`Expected one create and update audit, received ${audits.size}/${updateAudits.size}.`);
 
 console.log(JSON.stringify({
   status: "phase10-sales-visit-gate-passed",
@@ -118,9 +162,12 @@ console.log(JSON.stringify({
   visitedBy: visit.get("visitedBy"),
   recordedBy: visit.get("recordedBy"),
   replayed: replayed.replayed,
+  updateReplayed: updateReplay.replayed,
   collisionRejected,
   conflictRevision,
+  staleVisitRevision,
   otherZoneRejected,
   visitCount: visits.size,
   auditCount: audits.size,
+  updateAuditCount: updateAudits.size,
 }));

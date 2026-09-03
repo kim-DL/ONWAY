@@ -34,6 +34,10 @@ const recentSchoolRecordSchema = z.object({
 
 export type CachedCommonCatalog = z.infer<typeof cachedCommonCatalogSchema>;
 type RecentSchoolRecord = z.infer<typeof recentSchoolRecordSchema>;
+export type RecentSchoolEntry = {
+  item: SchoolSearchItem;
+  viewedAt: number;
+};
 
 interface SearchCatalogDatabase extends DBSchema {
   catalogs: {
@@ -103,10 +107,10 @@ export async function writeCachedCatalog(value: CachedCommonCatalog) {
   await transaction.done;
 }
 
-export async function readRecentSchools(
+export async function readRecentSchoolEntries(
   catalogNamespace: string,
   validItems: readonly SchoolSearchItem[],
-): Promise<SchoolSearchItem[]> {
+): Promise<RecentSchoolEntry[]> {
   const database = await getDatabase();
   const validItemsById = new Map(validItems.map((item) => [item.schoolId, item]));
   const records = await database.getAllFromIndex("recentSchools", "by-catalog", catalogNamespace);
@@ -118,8 +122,14 @@ export async function readRecentSchools(
       return currentItem ? [{ item: currentItem, viewedAt: parsed.data.viewedAt }] : [];
     })
     .sort((left, right) => right.viewedAt - left.viewedAt)
-    .slice(0, MAX_RECENT_SCHOOLS)
-    .map(({ item }) => item);
+    .slice(0, MAX_RECENT_SCHOOLS);
+}
+
+export async function readRecentSchools(
+  catalogNamespace: string,
+  validItems: readonly SchoolSearchItem[],
+): Promise<SchoolSearchItem[]> {
+  return (await readRecentSchoolEntries(catalogNamespace, validItems)).map(({ item }) => item);
 }
 
 export async function recordRecentSchool(input: {

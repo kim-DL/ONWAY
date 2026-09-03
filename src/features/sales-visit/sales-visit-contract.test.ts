@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { recordSalesVisitInputSchema, todayInSeoul, visitDateWindowForCycle } from "./sales-visit-contract";
+import { recordSalesVisitInputSchema, todayInSeoul, updateSalesVisitInputSchema, visitDateWindowForCycle } from "./sales-visit-contract";
 
 describe("sales visit client contract", () => {
   it("uses Seoul today and exposes the seven-day next-cycle recording window", () => {
@@ -50,5 +50,29 @@ describe("sales visit client contract", () => {
       requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa6",
       appVersion: "phase10-test",
     }).success).toBe(true);
+  });
+
+  it("requires every concurrency revision when editing the latest saved visit", () => {
+    const editableVisit = {
+      visitId: "VISIT-001",
+      cycleId: "2026-08",
+      schoolId: "SCH-001",
+      expectedVisitRevision: 2,
+      expectedAssignmentRevision: 3,
+      expectedSalesRevision: 2,
+      visitedDate: "2026-08-24",
+      visitedBy: "EMP-SALES-A",
+      brochureStatus: "delivered",
+      sample: { status: "delivered", items: [{ productName: "현미 스낵" }] },
+      interestScore: 80,
+      activityTagIds: ["ACT-SAMPLE"],
+      summary: "저장된 대화 내용을 보완했습니다.",
+      followUp: { required: false, dueDate: null, summary: null },
+      requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa7",
+      appVersion: "phase10-test",
+    };
+    expect(updateSalesVisitInputSchema.safeParse(editableVisit).success).toBe(true);
+    expect(updateSalesVisitInputSchema.safeParse({ ...editableVisit, expectedVisitRevision: undefined }).success).toBe(false);
+    expect(updateSalesVisitInputSchema.safeParse({ ...editableVisit, expectedSalesRevision: 0 }).success).toBe(false);
   });
 });

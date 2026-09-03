@@ -21,6 +21,7 @@ test.beforeAll(async () => {
 });
 
 async function login(page: Page, pin: string) {
+  await page.clock.setFixedTime(new Date("2026-08-24T05:30:00.000Z"));
   await page.goto("/");
   await page.getByLabel("직원 PIN").fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
@@ -34,10 +35,22 @@ async function openOwnSchool(page: Page, schoolName: string) {
 }
 
 test("sales A records a complete visit with sample, hearts, tags, another visitor, and follow-up", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await login(page, PHASE3_TEST_PINS.salesA);
   await openOwnSchool(page, "대전새빛고등학교");
   await expect(page.getByText("아직 평가 전")).toBeVisible();
-
+  await expect(page.locator(".field-workspace")).toHaveCount(0);
+  await expect(page.locator(".sales-history")).toBeVisible();
+  await expect(page.locator(".sales-collaboration")).toBeVisible();
+  const sectionOrder = await page.locator(".sales-school-brief, .sales-history, .school-photo-gallery, .sales-collaboration, .sales-shared-brief")
+    .evaluateAll((sections) => sections.map((section) => section.classList[0]));
+  expect(sectionOrder).toEqual([
+    "sales-school-brief",
+    "sales-history",
+    "school-photo-gallery",
+    "sales-collaboration",
+    "sales-shared-brief",
+  ]);
   await page.getByRole("button", { name: "방문 기록 시작" }).click();
   const sheet = page.locator(".bottom-sheet", { hasText: "방문 기록" });
   await expect(sheet).toBeVisible();
@@ -76,11 +89,27 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
   await expect(schoolBrief.getByText("가격 자료 전달 후 반응 확인", { exact: true })).toBeVisible();
   await expect(schoolBrief.getByText("후속 필요", { exact: true })).toBeVisible();
 
-  const [visits, profile, assignment, teamStats] = await Promise.all([
+  const timeline = page.locator(".sales-history");
+  await timeline.getByRole("button", { name: "수정" }).click();
+  const editSheet = page.locator(".bottom-sheet", { hasText: "방문 기록 수정" });
+  await expect(editSheet).toBeVisible();
+  await expect(editSheet.getByLabel(/방문일/)).toHaveValue("2026-08-24");
+  await expect(editSheet.getByLabel(/실제 방문자/)).toHaveValue("EMP-SALES-B");
+  await expect(editSheet.getByLabel("제품명")).toHaveValue("우리쌀 떡볶이 순한맛");
+  await expect(editSheet.getByRole("button", { name: "샘플 반응" })).toHaveAttribute("aria-pressed", "true");
+  await expect(editSheet.getByLabel(/방문 결과/)).toHaveValue("샘플 사용 뒤 가격 자료를 다시 전달하기로 했습니다.");
+  await expect(editSheet.getByLabel(/후속 날짜/)).toHaveValue("2026-08-30");
+  await editSheet.getByLabel(/방문 결과/).fill("샘플 반응이 좋아 가격 자료를 우선 전달하기로 했습니다.");
+  await editSheet.getByRole("button", { name: "수정 내용 저장" }).click();
+  await expect(page.getByText("최신 방문 기록을 수정했습니다.")).toBeVisible();
+  await expect(editSheet).toHaveCount(0);
+
+  const [visits, profile, assignment, teamStats, updateAudits] = await Promise.all([
     database.collection("salesVisits").where("schoolId", "==", FOLLOW_UP_SCHOOL_ID).get(),
     database.doc(`salesProfiles/${FOLLOW_UP_SCHOOL_ID}`).get(),
     database.doc(`salesCycles/2026-08/assignments/${FOLLOW_UP_SCHOOL_ID}`).get(),
     database.doc("salesCycles/2026-08/stats/team").get(),
+    database.collection("auditLogs").where("eventType", "==", "SALES_VISIT_UPDATED").get(),
   ]);
   expect(visits.size).toBe(1);
   expect(visits.docs[0]?.data()).toMatchObject({
@@ -89,10 +118,13 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
     interest: { score: 60, explicitlySelected: true },
     activityTagIds: ["ACT-FOLLOWUP", "ACT-SAMPLE"],
     sample: { status: "delivered", items: [{ productName: "우리쌀 떡볶이 순한맛" }] },
+    revision: 2,
+    summary: "샘플 반응이 좋아 가격 자료를 우선 전달하기로 했습니다.",
   });
-  expect(profile.data()).toMatchObject({ interestScore: 60, interestEvaluated: true, followUp: { required: true } });
-  expect(assignment.data()).toMatchObject({ monthlyStatus: "followUp", brochureStatus: "delivered", sampleStatus: "delivered", revision: 2 });
+  expect(profile.data()).toMatchObject({ interestScore: 60, interestEvaluated: true, followUp: { required: true }, salesRevision: 2 });
+  expect(assignment.data()).toMatchObject({ monthlyStatus: "followUp", brochureStatus: "delivered", sampleStatus: "delivered", revision: 3 });
   expect(teamStats.data()).toMatchObject({ totalSchoolCount: 5, followUpCount: 1 });
+  expect(updateAudits.size).toBe(1);
 });
 
 test("sales B must explicitly choose zero interest and no delivery defaults are preselected", async ({ page }) => {
@@ -100,6 +132,7 @@ test("sales B must explicitly choose zero interest and no delivery defaults are 
   await openOwnSchool(page, "대전한밭중학교");
   await page.getByRole("button", { name: "방문 기록 시작" }).click();
   const sheet = page.locator(".bottom-sheet", { hasText: "방문 기록" });
+  await expect(sheet.getByLabel(/방문일/)).toHaveValue("2026-08-24");
   await expect(sheet.getByRole("group", { name: /홍보지/ }).getByRole("radio", { checked: true })).toHaveCount(0);
   await expect(sheet.getByRole("group", { name: /샘플/ }).getByRole("radio", { checked: true })).toHaveCount(0);
   await expect(sheet.getByRole("radiogroup", { name: "제품 관심도" }).getByRole("radio", { checked: true })).toHaveCount(0);

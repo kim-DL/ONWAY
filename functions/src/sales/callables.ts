@@ -38,15 +38,18 @@ import {
   SalesProfileRevisionConflictError,
   SalesProfileService,
 } from "./sales-profile-service.js";
-import { recordSalesVisitInputSchema } from "./sales-visit-contract.js";
+import { recordSalesVisitInputSchema, updateSalesVisitInputSchema } from "./sales-visit-contract.js";
 import {
   SalesVisitAssignmentNotFoundError,
   SalesVisitAssignmentRevisionConflictError,
   SalesVisitChronologyError,
   SalesVisitCycleError,
   SalesVisitPermissionError,
+  SalesVisitProfileRevisionConflictError,
   SalesVisitReferenceError,
   SalesVisitRequestCollisionError,
+  SalesVisitRevisionConflictError,
+  SalesVisitNotLatestError,
   SalesVisitService,
 } from "./sales-visit-service.js";
 
@@ -229,6 +232,72 @@ export const recordSalesVisit = onCall(callableOptions, async (request) => {
       error,
     });
     throw new HttpsError("internal", "방문 기록을 저장하지 못했습니다.");
+  }
+});
+
+export const updateSalesVisit = onCall(callableOptions, async (request) => {
+  const parsed = updateSalesVisitInputSchema.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "수정할 방문 기록 입력을 확인해주세요.");
+  const input = parsed.data;
+  const actor = await requireSalesActor(request);
+  try {
+    return await new SalesVisitService().update(input, actor);
+  } catch (error) {
+    if (error instanceof SalesVisitRequestCollisionError) {
+      throw new HttpsError("already-exists", "요청 식별자가 이미 사용되었습니다.");
+    }
+    if (error instanceof SalesVisitCycleError) {
+      throw new HttpsError("failed-precondition", "현재 진행 중인 월의 최신 방문 기록만 수정할 수 있습니다.");
+    }
+    if (error instanceof SalesVisitAssignmentNotFoundError) {
+      throw new HttpsError("not-found", "이번 달 학교 배정을 찾을 수 없습니다.");
+    }
+    if (error instanceof SalesVisitPermissionError) {
+      throw new HttpsError("permission-denied", "자신의 담당 학교 방문 기록만 수정할 수 있습니다.");
+    }
+    if (error instanceof SalesVisitNotLatestError) {
+      throw new HttpsError("failed-precondition", "가장 최근 방문 기록만 수정할 수 있습니다.");
+    }
+    if (error instanceof SalesVisitReferenceError) {
+      throw new HttpsError("failed-precondition", error.message);
+    }
+    if (error instanceof SalesVisitChronologyError) {
+      const message = {
+        future: "방문일은 오늘 이후로 선택할 수 없습니다.",
+        "cycle-window": "방문일은 배정 월 시작 7일 전부터 해당 월 말일까지 선택할 수 있습니다.",
+        "follow-up": "후속 방문일은 방문일과 같거나 이후여야 합니다.",
+        "before-latest": "이전 방문 기록보다 앞선 날짜로 수정할 수 없습니다.",
+      }[error.reason];
+      throw new HttpsError("failed-precondition", message);
+    }
+    if (error instanceof SalesVisitAssignmentRevisionConflictError) {
+      throw new HttpsError("aborted", "학교 담당 정보가 변경되었습니다. 최신 정보를 확인해주세요.", {
+        conflictType: "assignment",
+        actualRevision: error.actualRevision,
+      });
+    }
+    if (error instanceof SalesVisitProfileRevisionConflictError) {
+      throw new HttpsError("aborted", "영업 협업 정보가 변경되었습니다. 최신 정보를 확인해주세요.", {
+        conflictType: "salesProfile",
+        actualRevision: error.actualRevision,
+      });
+    }
+    if (error instanceof SalesVisitRevisionConflictError) {
+      throw new HttpsError("aborted", "다른 직원이 방문 기록을 먼저 수정했습니다.", {
+        conflictType: "salesVisit",
+        actualRevision: error.actualRevision,
+      });
+    }
+    if (error instanceof z.ZodError) {
+      throw new HttpsError("failed-precondition", "저장된 영업 방문 계약이 올바르지 않습니다.");
+    }
+    logger.error("Sales visit update failed.", {
+      visitId: input.visitId,
+      schoolId: input.schoolId,
+      requestId: input.requestId,
+      error,
+    });
+    throw new HttpsError("internal", "방문 기록을 수정하지 못했습니다.");
   }
 });
 

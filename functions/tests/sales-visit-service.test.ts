@@ -1,7 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { describe, expect, it } from "vitest";
 
-import { recordSalesVisitInputSchema } from "../src/sales/sales-visit-contract.js";
+import { recordSalesVisitInputSchema, updateSalesVisitInputSchema } from "../src/sales/sales-visit-contract.js";
 import { calculateCycleStats, resolveServerVisitDate, visitDateWindowForCycle } from "../src/sales/sales-visit-service.js";
 
 const request = {
@@ -65,6 +65,18 @@ describe("sales visit contract", () => {
       visitedDate: undefined,
       visitedAt: "2026-08-24T03:00:00.000Z",
     }).success).toBe(true);
+  });
+
+  it("accepts a revision-guarded update and rejects incomplete edit state", () => {
+    const updateRequest = {
+      ...request,
+      visitId: "VISIT-001",
+      expectedVisitRevision: 1,
+      expectedSalesRevision: 1,
+    };
+    expect(updateSalesVisitInputSchema.safeParse(updateRequest).success).toBe(true);
+    expect(updateSalesVisitInputSchema.safeParse({ ...updateRequest, expectedAssignmentRevision: 0 }).success).toBe(false);
+    expect(updateSalesVisitInputSchema.safeParse({ ...updateRequest, visitedAt: "2026-08-24T03:00:00.000Z" }).success).toBe(false);
   });
 
   it("rejects ambiguous or missing visit date representations", () => {

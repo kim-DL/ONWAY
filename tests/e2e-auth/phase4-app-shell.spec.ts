@@ -17,6 +17,8 @@ test("delivery shell exposes role navigation and opens a real school detail shel
   await expect(page.getByRole("heading", { name: "연결된 학교" })).toHaveCount(0);
   await expect(page.locator(".school-card")).toHaveCount(0);
   await expect(page.getByText("8곳", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "최근 본 학교" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /첫 학교를 열어보세요/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "학교" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("button", { name: "활동" })).toHaveCount(0);
 
@@ -28,6 +30,7 @@ test("delivery shell exposes role navigation and opens a real school detail shel
   await expect(page.getByLabel("학교 빠른 작업")).toBeVisible();
   await page.getByRole("button", { name: "학교 목록" }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "대전온누리고등학교 다시 열기" })).toBeVisible();
 });
 
 test("mobile delivery navigation stays compact and yields detail space to the field brief", async ({ page }) => {
@@ -40,7 +43,7 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
   expect(navigationBox?.height).toBeLessThanOrEqual(68);
   await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "column");
   await expect(navigation).toHaveCSS("border-radius", "0px");
-  await expect(navigation).toHaveCSS("background-color", "rgba(248, 250, 255, 0.88)");
+  await expect(navigation).toHaveCSS("background-color", "rgba(250, 250, 247, 0.92)");
   const activeIndicator = await navigation.getByRole("button", { name: "학교" }).evaluate((element) => ({
     shadow: getComputedStyle(element).boxShadow,
     indicatorOpacity: getComputedStyle(element, "::after").opacity,

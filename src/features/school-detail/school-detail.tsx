@@ -17,6 +17,7 @@ import type {
   SchoolFieldProfile,
   SchoolFieldProfilePatch,
 } from "@/domain/school";
+import type { SalesVisit } from "@/domain/sales";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import type { WorkMode } from "@/features/app-shell/shell-policy";
 import {
@@ -332,6 +333,50 @@ function SalesSchoolBrief({
   );
 }
 
+function SalesSharedFieldBrief({
+  school,
+  profile,
+  canEdit,
+  onEdit,
+}: {
+  school: School;
+  profile: SchoolFieldProfile | null;
+  canEdit: boolean;
+  onEdit: (section: EditorSection) => void;
+}) {
+  const address = school.address.road ?? school.address.jibun ?? "주소 확인 필요";
+  const meetingPoint = profile
+    ? [profile.cafeteria.building, profile.cafeteria.floor, profile.cafeteria.locationDescription].filter(Boolean).join(" · ")
+    : "아직 공유된 방문 위치가 없습니다.";
+  return (
+    <section className="sales-shared-brief" aria-labelledby="sales-shared-brief-title">
+      <header>
+        <div><p>SHARED FIELD BRIEF</p><h2 id="sales-shared-brief-title">대화에 필요한 학교 정보만.</h2></div>
+        <span><Icon name="check" size={15} />영업 전용 요약</span>
+      </header>
+      <div className="sales-shared-brief__grid">
+        <article>
+          <span><Icon name="phone" size={17} />학교 연락</span>
+          <strong>{school.phone ?? "대표 전화 확인 필요"}</strong>
+          <small>{address}</small>
+        </article>
+        <article>
+          <span><Icon name="location" size={17} />미팅 위치</span>
+          <strong>{meetingPoint || "급식실 위치 확인 필요"}</strong>
+          <small>{profile?.cafeteria.entranceDescription ?? "방문 출입구 정보 없음"}</small>
+          {canEdit ? <button type="button" onClick={() => onEdit("cafeteria")}>위치 수정</button> : null}
+        </article>
+        <article className="sales-shared-brief__note">
+          <span><Icon name="clipboard" size={17} />팀 공유 메모</span>
+          <strong>{profile?.fieldNotes ?? "아직 공유된 메모가 없습니다."}</strong>
+          <small>다음 담당자에게 이어지는 공동 참고 정보입니다.</small>
+          {canEdit ? <button type="button" onClick={() => onEdit("fieldNotes")}>메모 수정</button> : null}
+        </article>
+      </div>
+    </section>
+  );
+}
+
 export function SchoolDetail({
   school: initialSchool,
   session,
@@ -349,6 +394,8 @@ export function SchoolDetail({
   const [editor, setEditor] = useState<EditorSection | null>(null);
   const [visitSheetOpen, setVisitSheetOpen] = useState(false);
   const [recordedVisit, setRecordedVisit] = useState<RecordedVisitSummary | null>(null);
+  const [editingVisit, setEditingVisit] = useState<SalesVisit | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const detail = detailState.status === "ready" ? detailState.detail : null;
   const school = detail?.school ?? initialSchool;
@@ -386,14 +433,35 @@ export function SchoolDetail({
       setSaving(false);
     }
   };
-  const closeVisitSheet = useCallback(() => setVisitSheetOpen(false), []);
+  const openNewVisit = useCallback(() => {
+    setEditingVisit(null);
+    setVisitSheetOpen(true);
+  }, []);
+  const openVisitEditor = useCallback((visit: SalesVisit) => {
+    setEditingVisit(visit);
+    setVisitSheetOpen(true);
+  }, []);
+  const closeVisitSheet = useCallback(() => {
+    setVisitSheetOpen(false);
+    setEditingVisit(null);
+  }, []);
   const handleVisitRecorded = useCallback((summary: RecordedVisitSummary) => {
     setRecordedVisit(summary);
     setVisitSheetOpen(false);
+    setEditingVisit(null);
+    setHistoryRefreshKey(`${summary.result.visitId}:${crypto.randomUUID()}`);
     refreshDetail();
-    showToast(summary.followUp.required ? "방문과 후속 일정을 함께 저장했습니다." : "방문 기록을 저장했습니다.", "success");
+    showToast(
+      summary.operation === "updated"
+        ? "최신 방문 기록을 수정했습니다."
+        : summary.followUp.required
+          ? "방문과 후속 일정을 함께 저장했습니다."
+          : "방문 기록을 저장했습니다.",
+      "success",
+    );
   }, [refreshDetail, showToast]);
   const handleSalesProfileUpdated = useCallback(() => {
+    setRecordedVisit(null);
     refreshDetail();
     showToast("커뮤니케이션 참고를 저장했습니다.", "success");
   }, [refreshDetail, showToast]);
@@ -421,12 +489,12 @@ export function SchoolDetail({
         <div className="detail-hero__mark"><Icon name="building" size={30} /></div>
         <div>
           <div className="detail-hero__status">
-            <StatusBadge tone={profile && !profile.reviewRequired ? "success" : "attention"}>{profile ? `현장정보 ${profile.completeness}%` : "현장정보 미등록"}</StatusBadge>
+            {mode === "delivery" ? <StatusBadge tone={profile && !profile.reviewRequired ? "success" : "attention"}>{profile ? `현장정보 ${profile.completeness}%` : "현장정보 미등록"}</StatusBadge> : <StatusBadge tone="info">영업 학교</StatusBadge>}
             {detailState.status === "ready" && detailState.refreshing ? <StatusBadge>최신 정보 확인 중</StatusBadge> : null}
           </div>
           <h1 id="school-detail-title">{school.name}</h1>
           <p><Icon name="location" size={17} />{address ?? "주소 정보 확인 필요"}</p>
-          <small>{DISTRICT_LABELS[school.district]} · {SCHOOL_TYPE_LABELS[school.schoolType]} · 현장정보 개정 {profile?.revision ?? 0}</small>
+          <small>{DISTRICT_LABELS[school.district]} · {SCHOOL_TYPE_LABELS[school.schoolType]} · {mode === "delivery" ? `현장정보 개정 ${profile?.revision ?? 0}` : "팀 영업 정보"}</small>
         </div>
       </div>
 
@@ -435,10 +503,24 @@ export function SchoolDetail({
       ) : null}
 
       {mode === "sales" && salesData ? (
-        <SalesSchoolBrief salesData={salesData} recorded={recordedVisit} canRecord={canRecordVisit} onRecord={() => setVisitSheetOpen(true)} />
+        <SalesSchoolBrief salesData={salesData} recorded={recordedVisit} canRecord={canRecordVisit} onRecord={openNewVisit} />
       ) : null}
 
-      <section className="field-workspace" aria-labelledby="field-workspace-title">
+      {mode === "sales" && salesData ? (
+        <SalesHistoryTimeline
+          key={`history-${school.schoolId}`}
+          schoolId={school.schoolId}
+          employees={salesData.employeeDirectory}
+          activityTags={salesData.activityTags}
+          products={salesData.products}
+          refreshKey={historyRefreshKey}
+          teamReadOnly={!canRecordVisit}
+          latestVisitId={recordedVisit?.result.visitId ?? salesData.assignment?.latestVisitId ?? null}
+          onEditVisit={openVisitEditor}
+        />
+      ) : null}
+
+      {mode === "delivery" ? <section className="field-workspace" aria-labelledby="field-workspace-title">
         <div className="field-workspace__heading"><div><p>{mode === "delivery" ? "DELIVERY FIELD BRIEF" : "SHARED FIELD BRIEF"}</p><h2 id="field-workspace-title">도착 전에, 필요한 것만.</h2></div><div className="field-workspace__actions">{profile ? <StatusBadge tone={profile.reviewRequired ? "attention" : "success"}>{profile.reviewRequired ? "보완 필요" : "현장 준비 완료"}</StatusBadge> : null}{profile && canEdit ? <button type="button" onClick={() => setEditor("all")}><Icon name="clipboard" size={16} />전체 편집</button> : null}</div></div>
 
         {detailState.status === "loading" ? <div className="field-loading"><SkeletonCard /><SkeletonCard /></div> : null}
@@ -449,7 +531,7 @@ export function SchoolDetail({
           <SoftCard className="field-empty-state"><span><Icon name="sparkles" /></span><h2>아직 현장정보가 없습니다.</h2><p>검수시간, 대차, 엘리베이터, 급식실 동선과 하역 위치를 한 번에 남겨 공동자산으로 만드세요.</p>{canEdit ? <GlassButton variant="primary" onClick={() => setEditor("all")}>전체 현장정보 등록</GlassButton> : null}</SoftCard>
         ) : null}
         {profile ? <FieldInfoContent profile={profile} onEdit={setEditor} canEdit={canEdit} /> : null}
-      </section>
+      </section> : null}
 
       {detailState.status === "ready" ? (
         <SchoolPhotoGallery
@@ -479,22 +561,12 @@ export function SchoolDetail({
         />
       ) : null}
 
-      {mode === "sales" && salesData ? (
-        <SalesHistoryTimeline
-          key={`history-${school.schoolId}`}
-          schoolId={school.schoolId}
-          employees={salesData.employeeDirectory}
-          activityTags={salesData.activityTags}
-          products={salesData.products}
-          refreshKey={recordedVisit?.result.visitId ?? null}
-          teamReadOnly={!canRecordVisit}
-        />
-      ) : null}
+      {mode === "sales" && detailState.status === "ready" ? <SalesSharedFieldBrief school={school} profile={profile} canEdit={canEdit} onEdit={setEditor} /> : null}
 
-      <SoftCard className="detail-information">
+      {mode === "delivery" ? <SoftCard className="detail-information">
         <div className="detail-card-heading"><div><p className="shell-kicker">SCHOOL INFO</p><h2>학교 기본 정보</h2></div><StatusBadge>{SCHOOL_TYPE_LABELS[school.schoolType]}</StatusBadge></div>
         <dl><div><dt>지역</dt><dd>대전광역시 {DISTRICT_LABELS[school.district]}</dd></div><div><dt>대표 전화</dt><dd>{school.phone ?? "확인 필요"}</dd></div><div><dt>학교 코드</dt><dd>{school.source.schoolCode}</dd></div><div><dt>기본 정보</dt><dd>개정 {school.schoolBaseRevision}</dd></div></dl>
-      </SoftCard>
+      </SoftCard> : null}
 
       <FloatingContextBar label="학교 빠른 작업">
         <a href={directionsUrl} target="_blank" rel="noreferrer"><Icon name="route" /><span>길안내</span></a>
@@ -502,7 +574,7 @@ export function SchoolDetail({
           school.phone ? <a href={`tel:${school.phone}`}><Icon name="phone" /><span>전화</span></a> : <button type="button" onClick={() => showToast("확인된 학교 전화번호가 없습니다.")}><Icon name="phone" /><span>전화 확인</span></button>
         ) : <button type="button" onClick={() => document.getElementById("school-photo-summary")?.scrollIntoView({ behavior: "smooth" })}><Icon name="building" /><span>사진</span></button>}
         {mode === "sales" ? (
-          canRecordVisit ? <button className="visit-record-action" type="button" onClick={() => setVisitSheetOpen(true)}><Icon name="clipboard" /><span>방문기록</span></button> : <button type="button" disabled><Icon name="clipboard" /><span>조회 전용</span></button>
+          canRecordVisit ? <button className="visit-record-action" type="button" onClick={openNewVisit}><Icon name="clipboard" /><span>방문기록</span></button> : <button type="button" disabled><Icon name="clipboard" /><span>조회 전용</span></button>
         ) : canEdit ? <button type="button" onClick={() => setEditor("all")}><Icon name="clipboard" /><span>정보 수정</span></button> : null}
       </FloatingContextBar>
 
@@ -514,8 +586,12 @@ export function SchoolDetail({
           school={school}
           assignment={visitAssignment}
           activityTags={salesData.activityTags.filter((tag) => tag.active)}
+          products={salesData.products}
           employees={salesData.employees}
+          employeeDirectory={salesData.employeeDirectory}
           session={session}
+          initialVisit={editingVisit}
+          expectedSalesRevision={recordedVisit?.result.salesRevision ?? salesData.profile?.salesRevision ?? 0}
           onClose={closeVisitSheet}
           onRecorded={handleVisitRecorded}
         />

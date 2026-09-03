@@ -24,12 +24,16 @@ function VisitTimelineItem({
   activityLabels,
   productNames,
   teamReadOnly,
+  editable,
+  onEdit,
 }: {
   visit: SalesVisit;
   employeeNames: Map<string, string>;
   activityLabels: Map<string, string>;
   productNames: Map<string, string>;
   teamReadOnly: boolean;
+  editable: boolean;
+  onEdit: () => void;
 }) {
   const visitor = employeeNames.get(visit.visitedBy) ?? visit.visitedBy;
   const recorder = employeeNames.get(visit.recordedBy) ?? visit.recordedBy;
@@ -44,7 +48,10 @@ function VisitTimelineItem({
             <time dateTime={visit.visitedAt.toISOString()}>{DATE_FORMATTER.format(visit.visitedAt)}</time>
             <span>{visit.cycleId.replace("-", "년 ")}월</span>
           </div>
-          <small>{teamReadOnly ? "팀 기록 · 읽기 전용" : "원본 기록"}</small>
+          <div className="visit-timeline-item__actions">
+            <small>{teamReadOnly ? "팀 기록 · 읽기 전용" : editable ? "최신 기록" : "원본 기록"}</small>
+            {editable ? <button type="button" onClick={onEdit}><Icon name="clipboard" size={14} />수정</button> : null}
+          </div>
         </header>
         <div className="visit-timeline-item__people">
           <span><Icon name="user" size={15} />담당 <strong>{assignee}</strong></span>
@@ -91,6 +98,8 @@ export function SalesHistoryTimeline({
   products,
   refreshKey,
   teamReadOnly,
+  latestVisitId,
+  onEditVisit,
 }: {
   schoolId: string;
   employees: EmployeeDirectory[];
@@ -98,6 +107,8 @@ export function SalesHistoryTimeline({
   products: Product[];
   refreshKey: string | null;
   teamReadOnly: boolean;
+  latestVisitId: string | null;
+  onEditVisit: (visit: SalesVisit) => void;
 }) {
   const history = useSalesHistory(schoolId, refreshKey);
   const [expanded, setExpanded] = useState(false);
@@ -129,7 +140,7 @@ export function SalesHistoryTimeline({
   return (
     <section className="sales-history" aria-labelledby="sales-history-title">
       <div className="sales-history__heading">
-        <div><p>VISIT ARCHIVE · IMMUTABLE NOTES</p><h2 id="sales-history-title">이전 대화가, 다음 방문의 맥락이 됩니다.</h2></div>
+        <div><p>VISIT ARCHIVE · VERSIONED NOTES</p><h2 id="sales-history-title">이전 대화가, 다음 방문의 맥락이 됩니다.</h2></div>
         <span><Icon name="clock" size={16} />최근 기록부터</span>
       </div>
       {history.status === "loading" ? <div className="sales-history__loading" aria-label="방문 기록 불러오는 중"><SkeletonCard /><SkeletonCard /></div> : null}
@@ -150,6 +161,8 @@ export function SalesHistoryTimeline({
                 activityLabels={activityLabels}
                 productNames={productNames}
                 teamReadOnly={teamReadOnly}
+                editable={!teamReadOnly && visit.visitId === latestVisitId}
+                onEdit={() => onEditVisit(visit)}
               />
             ))}
           </div>
