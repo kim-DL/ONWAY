@@ -44,9 +44,15 @@ function BinaryChoice({
   value: DeliveryChoice;
   onChange: (value: Exclude<DeliveryChoice, null>) => void;
 }) {
+  const statusLabel = value === "delivered"
+    ? "전달 완료"
+    : value === "notDelivered"
+      ? "미전달"
+      : "선택 필요";
+
   return (
-    <fieldset className="visit-binary-choice">
-      <legend>{label} <em>필수</em></legend>
+    <fieldset className="visit-binary-choice" data-value={value ?? "unset"}>
+      <legend>{label} <em>필수</em><span>{statusLabel}</span></legend>
       <div role="radiogroup" aria-label={`${label} 전달 여부`}>
         <button type="button" role="radio" aria-checked={value === "delivered"} data-selected={value === "delivered"} onClick={() => onChange("delivered")}><Icon name="check" />전달</button>
         <button type="button" role="radio" aria-checked={value === "notDelivered"} data-selected={value === "notDelivered"} onClick={() => onChange("notDelivered")}><Icon name="close" />미전달</button>

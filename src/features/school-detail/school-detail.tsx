@@ -389,12 +389,10 @@ export function SchoolDetail({
   school: initialSchool,
   session,
   mode,
-  onBack,
 }: {
   school: School;
   session: AuthenticatedSession;
   mode: WorkMode;
-  onBack: () => void;
 }) {
   const { showToast } = useToast();
   const detailState = useSchoolDetail(initialSchool, session, mode);
@@ -489,11 +487,6 @@ export function SchoolDetail({
 
   return (
     <section className="shell-page school-detail" aria-labelledby="school-detail-title">
-      <header className="detail-sticky-header">
-        <button className="detail-back" type="button" onClick={onBack}><Icon name="arrow-left" />학교 목록</button>
-        <a href={directionsUrl} target="_blank" rel="noreferrer"><Icon name="route" />길안내</a>
-      </header>
-
       <div className="detail-hero">
         <div className="detail-hero__mark"><Icon name="building" size={30} /></div>
         <div>

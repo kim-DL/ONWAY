@@ -108,15 +108,21 @@ function ShellHeader({
   mode,
   availableModes,
   onModeChange,
+  onDetailBack,
 }: {
   session: AuthenticatedSession;
   mode: WorkMode;
   availableModes: readonly WorkMode[];
   onModeChange: (mode: WorkMode) => void;
+  onDetailBack?: (() => void) | undefined;
 }) {
   return (
     <header className="workspace-header">
-      <AppBrand />
+      {onDetailBack ? (
+        <button className="workspace-header__back" type="button" onClick={onDetailBack}>
+          <Icon name="arrow-left" /><span>학교 목록</span>
+        </button>
+      ) : <AppBrand />}
       <div className="workspace-header__controls">
         {availableModes.length > 1 ? (
           <SegmentedControl
@@ -425,7 +431,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 
   let content;
   if (selectedSchool) {
-    content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} onBack={closeSchool} />;
+    content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} />;
   } else if (view === "settings") {
     content = <SettingsPage session={session} />;
   } else if (view === "activity" && mode === "sales") {
@@ -439,7 +445,13 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   return (
     <main className="workspace-shell" data-mode={mode} data-detail={selectedSchool ? "true" : "false"}>
       <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
-      <ShellHeader session={session} mode={mode} availableModes={availableModes} onModeChange={changeMode} />
+      <ShellHeader
+        session={session}
+        mode={mode}
+        availableModes={availableModes}
+        onModeChange={changeMode}
+        onDetailBack={selectedSchool ? closeSchool : undefined}
+      />
       <ShellNavigation mode={mode} view={view} onNavigate={navigate} />
       <div className="workspace-content">{content}</div>
       {searchMounted ? (
