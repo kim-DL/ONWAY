@@ -129,7 +129,6 @@ export function SalesActivityWorkspace({
           <p className="shell-kicker">SALES · ACTION DESK</p>
           <span>{model.cycleId} · {session.displayName}님의 실행 목록</span>
           <h1 id="sales-activity-title">확인하고,<br /><em>바로 움직이기.</em></h1>
-          <p>담당 학교의 다음 행동만 모았습니다. 학교를 열면 방문 기록과 공동 현장 정보를 바로 이어서 작성할 수 있습니다.</p>
         </div>
         <div className="sales-activity-score" aria-label={`전체 ${model.total}곳 중 완료 ${model.counts.completed}곳`}>
           <span>이번 달 완료</span>
@@ -146,7 +145,7 @@ export function SalesActivityWorkspace({
       </div>
 
       <div className="sales-activity-heading">
-        <div><p>{queue.toUpperCase()}</p><h2>{queueCopy.title}</h2></div>
+        <div><h2>{queueCopy.title}</h2></div>
         <span>{model.visible.length}곳</span>
       </div>
 

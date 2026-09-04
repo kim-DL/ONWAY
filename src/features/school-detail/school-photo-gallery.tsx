@@ -356,7 +356,7 @@ export function SchoolPhotoGallery({
 
   return (
     <section id="school-photo-summary" className="school-photo-gallery" aria-labelledby="detail-photo-title">
-      <div className="school-photo-gallery__heading"><div><p>FIELD PHOTO · {activePhotos.length}/3</p><h2 id="detail-photo-title">도착 전에 보는 현장</h2><small>접근로부터 하역 위치까지, 사진 3장으로 이어집니다.</small></div><StatusBadge tone={activePhotos.length === 3 ? "success" : "attention"}>{activePhotos.length === 3 ? "사진 준비 완료" : `${3 - activePhotos.length}개 슬롯 비어 있음`}</StatusBadge></div>
+      <div className="school-photo-gallery__heading"><div><h2 id="detail-photo-title">도착 전에 보는 현장</h2></div><StatusBadge tone={activePhotos.length === 3 ? "success" : "attention"}>{activePhotos.length === 3 ? "사진 준비 완료" : `${3 - activePhotos.length}개 슬롯 비어 있음`}</StatusBadge></div>
       <div className="photo-gallery-grid">
         {PHOTO_SLOT_IDS.map((slotId, slotIndex) => {
           const photo = photoBySlot.get(slotId) ?? null;
@@ -365,14 +365,13 @@ export function SchoolPhotoGallery({
           return (
             <article className="photo-card" data-primary={slotIndex === 0} data-empty={!photo} key={slotId}>
               {photo ? <PhotoImage photo={photo} sessionNamespace={sessionNamespace} variant={isPriorityPhoto ? "preview" : "thumbnail"} enabled={isPriorityPhoto || secondaryPhotosEnabled} onReady={isPriorityPhoto ? enableSecondaryPhotos : undefined} onOpen={() => setViewerIndex(photoIndex)} /> : <button className="photo-card__empty" type="button" disabled={!canEdit} onClick={() => setEditorSlot(slotId)}><Icon name="camera" /><strong>{SLOT_LABELS[slotId]}</strong><small>{canEdit ? "첫 사진 추가" : "등록된 사진이 없습니다."}</small></button>}
-              <div className="photo-card__meta"><span>{slotId} · {SLOT_LABELS[slotId]}</span><strong>{photo?.caption ?? "아직 등록되지 않았어요."}</strong>{photo ? <small>사진 개정 {photo.photoRevision}</small> : null}</div>
+              <div className="photo-card__meta"><span>{slotId} · {SLOT_LABELS[slotId]}</span><strong>{photo?.caption ?? "아직 등록되지 않았어요."}</strong></div>
               {canEdit && photo ? <div className="photo-card__actions"><button type="button" onClick={() => setEditorSlot(slotId)}><Icon name="upload" size={16} />교체</button><button type="button" disabled={workingSlot === slotId} onClick={() => void deletePhoto(photo)}><Icon name="trash" size={16} />삭제</button></div> : null}
             </article>
           );
         })}
       </div>
-      <p className="school-photo-gallery__policy"><Icon name="sparkles" />Preview를 먼저 표시하고, 확대할 때만 Original을 불러옵니다. 사진은 서버에서 EXIF를 제거한 WebP로 변환됩니다.</p>
-      {editorSlot ? <BottomSheet open title={`${SLOT_LABELS[editorSlot]} 사진 ${photoBySlot.has(editorSlot) ? "교체" : "추가"}`} description="새 버전으로 안전하게 저장하며, 이전 파일을 덮어쓰지 않습니다." onClose={() => setEditorSlot(null)}><PhotoUploader key={`${editorSlot}:${photoBySlot.get(editorSlot)?.photoRevision ?? 0}`} schoolId={schoolId} slotId={editorSlot} photo={photoBySlot.get(editorSlot) ?? null} onDone={() => { setEditorSlot(null); onRefresh(); }} /></BottomSheet> : null}
+      {editorSlot ? <BottomSheet open title={`${SLOT_LABELS[editorSlot]} 사진 ${photoBySlot.has(editorSlot) ? "교체" : "추가"}`} onClose={() => setEditorSlot(null)}><PhotoUploader key={`${editorSlot}:${photoBySlot.get(editorSlot)?.photoRevision ?? 0}`} schoolId={schoolId} slotId={editorSlot} photo={photoBySlot.get(editorSlot) ?? null} onDone={() => { setEditorSlot(null); onRefresh(); }} /></BottomSheet> : null}
       {viewerIndex !== null ? <PhotoViewer photos={activePhotos} initialIndex={viewerIndex} sessionNamespace={sessionNamespace} onClose={() => setViewerIndex(null)} /> : null}
     </section>
   );

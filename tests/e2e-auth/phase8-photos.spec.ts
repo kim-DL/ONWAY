@@ -124,7 +124,7 @@ test("mobile uploader replaces a version, then soft delete can be undone", async
   await uploader.getByLabel("사진 설명").fill("새로 확인한 정문 접근로");
   await uploader.getByRole("button", { name: "새 사진으로 교체" }).click();
   await expect(page.getByText("새 버전의 사진으로 교체했습니다.")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".photo-card").first()).toContainText("사진 개정 2", { timeout: 15_000 });
+  await expect(page.locator(".photo-card").first()).toContainText("새로 확인한 정문 접근로", { timeout: 15_000 });
 
   const app = getApps().find((candidate) => candidate.name === "phase8-e2e-control");
   if (!app) throw new Error("Phase 8 control app is missing.");

@@ -140,7 +140,7 @@ export function SalesHistoryTimeline({
   return (
     <section className="sales-history" aria-labelledby="sales-history-title">
       <div className="sales-history__heading">
-        <div><p>VISIT ARCHIVE · VERSIONED NOTES</p><h2 id="sales-history-title">이전 대화가, 다음 방문의 맥락이 됩니다.</h2></div>
+        <div><h2 id="sales-history-title">이전 대화가, 다음 방문의 맥락이 됩니다.</h2></div>
         <span><Icon name="clock" size={16} />최근 기록부터</span>
       </div>
       {history.status === "loading" ? <div className="sales-history__loading" aria-label="방문 기록 불러오는 중"><SkeletonCard /><SkeletonCard /></div> : null}
@@ -148,7 +148,7 @@ export function SalesHistoryTimeline({
         <div className="sales-history__empty" role="alert"><Icon name="clock" /><strong>방문 기록을 불러오지 못했어요.</strong><p>연결을 확인한 뒤 다시 시도해주세요.</p><button type="button" onClick={history.refresh}>다시 불러오기</button></div>
       ) : null}
       {history.status === "ready" && history.visits.length === 0 ? (
-        <div className="sales-history__empty"><Icon name="clipboard" /><strong>아직 남겨진 방문 기록이 없습니다.</strong><p>첫 방문을 저장하면 이곳에 팀의 대화가 시간순으로 이어집니다.</p></div>
+        <div className="sales-history__empty"><Icon name="clipboard" /><strong>아직 남겨진 방문 기록이 없습니다.</strong></div>
       ) : null}
       {history.status === "ready" && history.visits.length > 0 ? (
         <>
@@ -167,7 +167,6 @@ export function SalesHistoryTimeline({
             ))}
           </div>
           <div className="sales-history__footer">
-            <p><Icon name="sparkles" size={15} />학교 진입 시 최근 3건만 읽고, 요청할 때 이전 기록을 추가합니다.</p>
             {!expanded && history.hasMore ? <button type="button" onClick={() => void expandHistory()}>전체 기록 보기<Icon name="chevron-right" size={16} /></button> : null}
             {expanded && history.hasMore ? <button type="button" disabled={history.loadingMore} onClick={() => void loadMore()}>{history.loadingMore ? "이전 기록 불러오는 중…" : "이전 기록 더 보기"}</button> : null}
             {expanded && !history.hasMore ? <small>마지막 기록까지 모두 확인했습니다.</small> : null}

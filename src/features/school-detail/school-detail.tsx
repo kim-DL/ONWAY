@@ -341,7 +341,7 @@ function SalesSchoolBrief({
         </div>
       </div>
       <div className="sales-school-brief__footer">
-        <span><Icon name="calendar" size={16} />{salesData.activeCycleId.replace("-", "년 ")}월 · {assignment ? `배정 개정 ${recorded?.result.assignmentRevision ?? assignment.revision}` : "팀 조회 전용"}</span>
+        <span><Icon name="calendar" size={16} />{salesData.activeCycleId.replace("-", "년 ")}월</span>
         {canRecord ? <button type="button" onClick={onRecord}><Icon name="clipboard" />방문 기록 시작<Icon name="chevron-right" /></button> : <small>다른 직원의 배정은 조회만 가능합니다.</small>}
       </div>
     </section>
@@ -496,7 +496,7 @@ export function SchoolDetail({
           </div>
           <h1 id="school-detail-title">{school.name}</h1>
           <p><Icon name="location" size={17} />{address ?? "주소 정보 확인 필요"}</p>
-          <small>{DISTRICT_LABELS[school.district]} · {SCHOOL_TYPE_LABELS[school.schoolType]} · {mode === "delivery" ? `현장정보 개정 ${profile?.revision ?? 0}` : "팀 영업 정보"}</small>
+          <small>{DISTRICT_LABELS[school.district]} · {SCHOOL_TYPE_LABELS[school.schoolType]}</small>
         </div>
       </div>
 
@@ -567,7 +567,7 @@ export function SchoolDetail({
 
       {mode === "delivery" ? <SoftCard className="detail-information">
         <div className="detail-card-heading"><div><p className="shell-kicker">SCHOOL INFO</p><h2>학교 기본 정보</h2></div><StatusBadge>{SCHOOL_TYPE_LABELS[school.schoolType]}</StatusBadge></div>
-        <dl><div><dt>지역</dt><dd>대전광역시 {DISTRICT_LABELS[school.district]}</dd></div><div><dt>대표 전화</dt><dd>{school.phone ?? "확인 필요"}</dd></div><div><dt>학교 코드</dt><dd>{school.source.schoolCode}</dd></div><div><dt>기본 정보</dt><dd>개정 {school.schoolBaseRevision}</dd></div></dl>
+        <dl><div><dt>지역</dt><dd>대전광역시 {DISTRICT_LABELS[school.district]}</dd></div><div><dt>대표 전화</dt><dd>{school.phone ?? "확인 필요"}</dd></div><div><dt>학교 코드</dt><dd>{school.source.schoolCode}</dd></div></dl>
       </SoftCard> : null}
 
       <FloatingContextBar label="학교 빠른 작업">
@@ -580,7 +580,7 @@ export function SchoolDetail({
         ) : canEdit ? <button type="button" onClick={() => setEditor("all")}><Icon name="clipboard" /><span>정보 수정</span></button> : null}
       </FloatingContextBar>
 
-      <BottomSheet open={editor !== null} title={editor ? EDITOR_TITLES[editor] : "현장정보 수정"} description="현재 개정을 기준으로 안전하게 저장하며, 다른 직원의 수정과 충돌하면 최신 정보를 다시 불러옵니다." onClose={() => { if (!saving) setEditor(null); }}>
+      <BottomSheet open={editor !== null} title={editor ? EDITOR_TITLES[editor] : "현장정보 수정"} onClose={() => { if (!saving) setEditor(null); }}>
         {editor ? <FieldProfileEditor key={`${editor}-${profile?.revision ?? 0}`} section={editor} profile={profile} saving={saving} onSave={saveFieldProfile} /> : null}
       </BottomSheet>
       {visitSheetOpen && salesData && visitAssignment ? (

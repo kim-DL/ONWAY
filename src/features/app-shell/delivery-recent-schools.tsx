@@ -111,7 +111,6 @@ export function DeliveryRecentSchools({
     <section className="delivery-recents" aria-labelledby="delivery-recents-title">
       <header>
         <div>
-          <p>RECENT TRAIL</p>
           <h2 id="delivery-recents-title">최근 본 학교</h2>
         </div>
         <button type="button" onClick={onOpenSearch}>새 학교 찾기<Icon name="chevron-right" size={16} /></button>
@@ -144,11 +143,10 @@ export function DeliveryRecentSchools({
       ) : (
         <button className="delivery-recents__empty" type="button" onClick={onOpenSearch}>
           <span><Icon name="route" /></span>
-          <span><strong>첫 학교를 열어보세요.</strong><small>최근 본 학교 3곳만 이 기기에 남겨 빠르게 다시 찾습니다.</small></span>
+          <span><strong>첫 학교를 열어보세요.</strong></span>
           <Icon name="chevron-right" />
         </button>
       )}
-      <p className="delivery-recents__privacy"><Icon name="check" size={14} />이 목록은 현재 로그인과 이 기기에만 보관됩니다.</p>
     </section>
   );
 }

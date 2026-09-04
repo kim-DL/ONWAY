@@ -204,10 +204,6 @@ function SalesClaimPicker({
 
   return (
     <div className="sales-claim-composer">
-      <div className="sales-claim-policy">
-        <span><Icon name="check" size={18} /></span>
-        <p><strong>미배정 학교만 안전하게 가져옵니다.</strong><small>다른 직원이 먼저 선택한 학교는 서버에서 중복 배정을 막고 목록을 갱신합니다.</small></p>
-      </div>
       <SchoolAssignmentPicker
         candidates={candidates}
         busy={busy}
@@ -418,7 +414,6 @@ export function SalesWorkspace({
 
       <div className="sales-cycle-toolbar">
         <div>
-          <p className="shell-kicker">ASSIGNED SCHOOLS</p>
           <h2>{scopeName} 학교</h2>
           <span>{selectedCycleIsCurrent ? "현재 월 배정" : "과거 월 · 읽기 전용"} · {model.totals.assigned}곳</span>
         </div>
@@ -527,7 +522,6 @@ export function SalesWorkspace({
       <BottomSheet
         open={claimSheetOpen}
         title="담당 학교 가져오기"
-        description="이번 달 미배정 학교를 여러 곳 선택해 내 담당으로 연결합니다. 검색과 필터를 바꿔도 선택은 유지됩니다."
         onClose={() => { if (!claiming) setClaimSheetOpen(false); }}
       >
         {claimSheetOpen ? (

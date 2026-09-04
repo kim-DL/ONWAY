@@ -109,9 +109,7 @@ function PinLogin() {
 
       <section className="login-panel" aria-labelledby="pin-title">
         <div className="login-card">
-          <p className="login-card__step">직원 로그인 · 01</p>
           <h2 id="pin-title">6자리 PIN을<br />입력해주세요.</h2>
-          <p className="login-card__description">최초 한 번 로그인하면 이 기기에서 로그인 상태가 유지됩니다.</p>
 
           <form onSubmit={submit} className="pin-form">
             <label htmlFor="employee-pin">직원 PIN</label>
@@ -137,8 +135,8 @@ function PinLogin() {
                 aria-invalid={Boolean(error)}
               />
             </div>
-            <p id="pin-help" className="pin-help">숫자 6자리 · 입력값은 기기에 저장되지 않습니다.</p>
-            <p id="pin-error" className="pin-error" role="alert" aria-live="assertive">{error ?? "\u00a0"}</p>
+            <p id="pin-help" className="sr-only">숫자 6자리 PIN</p>
+            {error ? <p id="pin-error" className="pin-error" role="alert" aria-live="assertive">{error}</p> : null}
             <button type="submit" disabled={pin.length !== 6 || submitting}>
               <span>{submitting ? "확인 중" : "급식길 시작하기"}</span>
               <span aria-hidden="true">→</span>
@@ -154,7 +152,6 @@ function PinLogin() {
             <span className="google-mark" aria-hidden="true">G</span>
             {adminSubmitting ? "관리자 확인 중…" : "Google로 관리자 로그인"}
           </button>
-          <p className="admin-login-help">서버 허용목록에 등록된 관리자 계정만 접근할 수 있습니다.</p>
         </div>
         <p className="login-support">PIN을 잊으셨나요? 운영 관리자에게 문의해주세요.</p>
       </section>

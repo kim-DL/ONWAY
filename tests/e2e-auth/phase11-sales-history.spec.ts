@@ -129,7 +129,7 @@ test("sales A updates persistent communication tags without mutating visit event
   await login(page, PHASE3_TEST_PINS.salesA);
   await page.locator(".assignment-card", { hasText: SCHOOL_NAME }).click();
   await expect(page.getByRole("heading", { name: SCHOOL_NAME })).toBeVisible();
-  await expect(page.getByText("다음 달에도 유지됩니다.")).toBeVisible();
+  await expect(page.getByText("2026.08.27")).toBeVisible();
 
   await page.getByRole("button", { name: "업무 참고 편집" }).click();
   const editor = page.locator(".bottom-sheet", { hasText: "커뮤니케이션 참고" });

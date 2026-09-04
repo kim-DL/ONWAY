@@ -261,7 +261,6 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
       <div className="shell-page-heading">
         <p className="shell-kicker">ACCOUNT · DEVICE</p>
         <h1 id="settings-title">설정</h1>
-        <p>현재 계정과 이 기기의 앱 정보를 확인합니다.</p>
       </div>
 
       <div className="settings-grid">
@@ -275,7 +274,6 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
           <div><span className="settings-list__icon"><Icon name="check" /></span><span><strong>세션 보호</strong><small>권한 변경을 실시간으로 확인합니다.</small></span><StatusBadge tone="success">안전하게 연결됨</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="download" /></span><span><strong>기기 앱</strong><small>{installState === "installed" ? "홈 화면에서 독립 실행됩니다." : "설치하면 오프라인에서도 빠르게 시작합니다."}</small></span>{installState === "available" ? <button className="pwa-install-action" type="button" onClick={() => void install()}>앱 설치</button> : <StatusBadge tone={installState === "installed" ? "success" : "neutral"}>{installState === "installed" ? "설치됨" : "브라우저에서 사용 중"}</StatusBadge>}</div>
           <div><span className="settings-list__icon"><Icon name={isOnline ? "refresh" : "wifi-off"} /></span><span><strong>네트워크</strong><small>{isOnline ? "최신 정보와 권한을 확인할 수 있습니다." : "저장된 학교 정보만 표시합니다."}</small></span><StatusBadge tone={isOnline ? "success" : "attention"}>{isOnline ? "온라인" : "오프라인"}</StatusBadge></div>
-          <div><span className="settings-list__icon"><Icon name="sparkles" /></span><span><strong>디자인 시스템</strong><small>Aurora · Soft Solid · Liquid Glass</small></span><StatusBadge>v1.0</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>기기 데이터</strong><small>로그아웃하면 비공개 로컬 상태를 정리합니다.</small></span><StatusBadge tone="info">이 기기</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="clipboard" /></span><span><strong>기기 진단</strong><small>개인정보 없이 성능·캐시·연결 상태만 내보냅니다. {APP_METADATA.buildVersion}</small></span><button className="pwa-install-action" type="button" disabled={exportingDiagnostics} onClick={() => void exportDeviceDiagnostics()}>{exportingDiagnostics ? "준비 중…" : "진단 내보내기"}</button></div>
         </SoftCard>

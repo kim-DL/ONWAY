@@ -2053,7 +2053,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .school-search-result__name { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .school-search-result__name strong { font-size: 1rem; letter-spacing: -0.035em; }
 .school-search-result__name small { padding: 0.22rem 0.42rem; border-radius: 999px; color: var(--shell-accent-deep); background: var(--shell-accent-soft); font-size: 0.58rem; font-weight: 780; }
-.school-search-result__meta { overflow: hidden; color: var(--shell-ink-soft); font-size: 0.66rem; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.school-search-result__meta { overflow: hidden; color: #5f6b82; font-size: 0.66rem; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .school-search-result__signals { display: flex; gap: 0.35rem; }
 .school-search-result__signals span { padding: 0.24rem 0.42rem; border-radius: 7px; color: #4f5a6d; background: #f0f2f5; font-size: 0.58rem; font-weight: 720; }
 .school-search-result__signals span[data-active="true"] { color: #136c5e; background: #e4f4ef; }
@@ -4251,4 +4251,202 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 @keyframes progress-reveal {
   from { transform: scaleX(0); }
+}
+
+/* Production density pass · concise copy, faster scanning, preserved touch targets */
+.login-card h2 + .pin-form { margin-top: 1.6rem; }
+.pin-form > button { margin-top: .85rem; }
+.pin-error { min-height: 0; margin: .6rem 0 0; }
+.admin-login-separator { margin: .9rem 0 .7rem; }
+.login-support { margin-top: 1rem; }
+
+.shell-page {
+  padding-top: clamp(.75rem, 1.5vw, 1.35rem);
+  padding-right: clamp(1rem, 3vw, 3rem);
+  padding-left: clamp(1rem, 3vw, 3rem);
+}
+.shell-hero {
+  gap: clamp(1.25rem, 3.5vw, 3rem);
+  padding: .75rem 0 clamp(1.4rem, 3vw, 2.3rem);
+}
+.shell-greeting { margin-bottom: .7rem; }
+.shell-hero h1 { font-size: clamp(2.8rem, 5vw, 4.9rem); }
+.school-search-trigger { min-height: 4.35rem; border-radius: 19px; }
+
+.delivery-recents {
+  margin: 0 0 1.35rem;
+  padding: .85rem 1rem;
+  border-radius: 22px 22px 22px 8px;
+}
+.delivery-recents > header { padding: 0 0 .45rem; }
+.delivery-recents__list > button { min-height: 4.25rem; padding-block: .5rem; }
+.delivery-recents__empty { min-height: 4.65rem; padding: .7rem; }
+
+.sales-cycle-hero {
+  gap: clamp(1.15rem, 3vw, 2.6rem);
+  margin: .15rem 0 1.1rem;
+  padding: clamp(1.15rem, 2.5vw, 2rem);
+  border-radius: 28px 28px 28px 10px;
+}
+.sales-cycle-hero__greeting { margin-bottom: .55rem; }
+.sales-cycle-hero h1 { font-size: clamp(2.45rem, 4vw, 4rem); }
+.cycle-selector { min-height: 3.25rem; margin-top: 1rem; }
+.sales-cycle-overview { padding: .45rem; border-radius: 21px; }
+.sales-cycle-progress { padding: .7rem .75rem .65rem; }
+.sales-cycle-progress > span strong { font-size: clamp(2.2rem, 4vw, 3.25rem); }
+.sales-cycle-progress > div { margin-top: .5rem; }
+.sales-cycle-metrics > div { padding: .6rem .65rem; border-radius: 14px; }
+.sales-cycle-toolbar { margin-bottom: .7rem; }
+.sales-cycle-toolbar__controls { gap: .4rem; }
+.sales-school-command { min-height: 3.15rem; }
+.sales-zone-chips { margin-bottom: .7rem; }
+.assignment-grid { gap: .65rem; }
+.assignment-card {
+  min-height: 15rem;
+  padding: .85rem .9rem .75rem;
+  border-radius: 19px;
+  contain-intrinsic-size: auto 15rem;
+}
+.assignment-card__school { margin: .75rem 0 .65rem; }
+.assignment-card__owner { padding: .55rem .6rem; border-radius: 13px; }
+.assignment-card__signals { margin-top: .55rem; }
+.assignment-card__footer { padding-top: .6rem; }
+.sales-cycle-empty,
+.sales-cycle-error { min-height: 11rem; padding: 1.25rem; }
+
+.sales-activity-hero {
+  min-height: 13.5rem;
+  gap: 1.25rem;
+  padding: clamp(1.15rem, 2.8vw, 2rem);
+  border-radius: 26px 26px 26px 9px;
+}
+.sales-activity-hero h1 { margin: .45rem 0 0; font-size: clamp(2.65rem, 4.8vw, 4.35rem); }
+.sales-activity-score { padding: .85rem; }
+.sales-activity-score > strong { font-size: 2.5rem; }
+.sales-activity-actions { min-height: 4.4rem; }
+.sales-activity-heading { padding: .2rem 0 .65rem; }
+.sales-task-row { min-height: 4.8rem; padding-block: .6rem; }
+.sales-activity-empty,
+.sales-activity-error { min-height: 11rem; padding: 1.25rem; }
+
+.shell-page-heading { padding: 1rem 0 1.6rem; }
+.shell-page-heading h1 { font-size: clamp(2.7rem, 4.8vw, 4.25rem); }
+.settings-grid { gap: .7rem; }
+.settings-list { padding-block: .35rem; }
+.settings-list > div { min-height: 4.35rem; }
+
+.detail-hero {
+  gap: .9rem;
+  padding-bottom: clamp(1rem, 2vw, 1.6rem);
+}
+.detail-hero__mark { width: 3.65rem; border-radius: 18px 18px 18px 7px; }
+.detail-hero h1 { margin-top: .5rem; font-size: clamp(2.25rem, 4.6vw, 4.15rem); }
+.detail-hero p { margin-top: .65rem; }
+.field-workspace { margin-bottom: .7rem; padding: clamp(.9rem, 2vw, 1.45rem); border-radius: 25px; }
+.field-workspace__heading { margin-bottom: .9rem; }
+.school-photo-gallery { margin-top: .7rem; padding: clamp(.85rem, 2vw, 1.35rem); border-radius: 25px; }
+.school-photo-gallery__heading { padding: 0 0 .75rem; }
+.sales-history { margin-top: .7rem; padding: .9rem; border-radius: 21px 21px 21px 7px; }
+.sales-history__heading { padding-bottom: .7rem; }
+.sales-history__empty { min-height: 7rem; padding: 1rem; }
+.sales-history__footer { justify-content: flex-end; padding: .6rem 0 0; }
+.workspace-shell[data-mode="sales"] .sales-collaboration { margin-top: .7rem; }
+.workspace-shell[data-mode="sales"] .sales-collaboration__heading { padding: .7rem .8rem .6rem; }
+.workspace-shell[data-mode="sales"] .sales-collaboration__grid { padding: .6rem .8rem .8rem; }
+.sales-contact-brief { margin-top: .7rem; }
+
+.admin-content { padding: clamp(1rem, 2vw, 2rem); }
+.admin-page-heading { min-height: 5rem; margin-bottom: .9rem; }
+.admin-metric-grid { gap: .6rem; margin-bottom: .6rem; }
+.admin-metric-grid button { min-height: 8.25rem; padding: .8rem; }
+.admin-overview-grid { gap: .6rem; }
+.admin-panel > header { min-height: 4.1rem; padding: .8rem 1rem; }
+
+@media (max-width: 760px) {
+  .login-story { min-height: 11.5rem; padding: 1.15rem; }
+  .login-story__copy { padding: 1.2rem 0 0; }
+  .login-story h1 { font-size: 2.45rem; }
+  .login-panel {
+    min-height: calc(100dvh - 11.5rem);
+    padding: 1.55rem 1rem max(1.5rem, env(safe-area-inset-bottom));
+  }
+  .login-card h2 { font-size: 2.05rem; }
+  .login-card h2 + .pin-form { margin-top: 1.25rem; }
+  .pin-field { min-height: 4.4rem; }
+  .login-support { margin-top: .8rem; }
+
+  .workspace-shell .shell-page {
+    padding-top: .45rem;
+    padding-right: .75rem;
+    padding-left: .75rem;
+  }
+  .workspace-shell .shell-hero { gap: .8rem; padding: .35rem 0 1rem; }
+  .workspace-shell .shell-hero h1 { font-size: clamp(2.4rem, 10.5vw, 3.2rem); }
+  .school-search-trigger { min-height: 4rem; padding: .65rem .8rem; }
+  .delivery-recents { margin-bottom: .8rem; padding: .7rem; }
+  .delivery-recents > header { align-items: center; padding-bottom: .35rem; }
+  .delivery-recents > header button { margin-top: 0; }
+  .delivery-recents__list > button { min-height: 4rem; }
+
+  .sales-cycle-hero {
+    grid-template-columns: 1fr;
+    gap: .8rem;
+    margin-bottom: .8rem;
+    padding: .9rem;
+    border-radius: 22px 22px 22px 8px;
+  }
+  .sales-cycle-hero h1 { font-size: clamp(2.25rem, 10vw, 3rem); }
+  .cycle-selector { width: 100%; min-width: 0; min-height: 3rem; margin-top: .7rem; }
+  .sales-cycle-progress { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .35rem .7rem; }
+  .sales-cycle-progress > div { margin-top: 0; }
+  .sales-cycle-progress p { grid-column: 1 / -1; margin-top: .15rem; }
+  .sales-cycle-progress > span strong { font-size: 2rem; }
+  .sales-cycle-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sales-cycle-metrics > div { padding: .5rem; }
+  .sales-cycle-metrics strong { font-size: 1.3rem; }
+  .sales-cycle-toolbar { gap: .6rem; margin-bottom: .55rem; }
+  .sales-cycle-toolbar h2 { font-size: 1.45rem; }
+  .sales-cycle-toolbar__controls { gap: .35rem; }
+  .sales-school-commands { gap: .35rem; }
+  .sales-school-command { min-height: 3rem; }
+  .assignment-grid { gap: .55rem; }
+  .assignment-card { min-height: auto; contain-intrinsic-size: auto 13rem; }
+
+  .sales-activity-hero {
+    min-height: auto;
+    gap: .7rem;
+    padding: .9rem;
+    border-radius: 22px 22px 22px 8px;
+  }
+  .sales-activity-hero h1 { font-size: clamp(2.35rem, 10.5vw, 3.2rem); }
+  .sales-activity-score { padding: .7rem; }
+  .sales-activity-score > strong { font-size: 2rem; }
+  .sales-activity-actions { gap: .55rem; padding: .65rem 0; }
+  .sales-activity-heading { padding-bottom: .55rem; }
+  .sales-task-row { min-height: 4.6rem; }
+
+  .shell-page-heading { padding: .55rem 0 1rem; }
+  .shell-page-heading h1 { font-size: 2.5rem; }
+  .detail-hero { gap: .7rem; padding-bottom: .9rem; }
+  .workspace-shell .detail-hero__mark { width: 3rem; }
+  .workspace-shell .detail-hero h1 { font-size: clamp(1.8rem, 7.8vw, 2.3rem); }
+  .detail-hero p { margin-top: .45rem; }
+  .field-workspace,
+  .school-photo-gallery,
+  .workspace-shell[data-mode="sales"] .sales-school-brief,
+  .sales-history,
+  .workspace-shell[data-mode="sales"] .sales-collaboration,
+  .sales-contact-brief { margin-top: .55rem; margin-inline: 0; }
+  .school-photo-gallery__heading { display: flex; align-items: center; }
+  .school-photo-gallery__heading .status-badge { justify-self: auto; }
+
+  .admin-page-heading { margin-bottom: .7rem; }
+  .admin-metric-grid button { min-height: 7.5rem; }
+}
+
+@media (max-width: 480px) {
+  .sales-school-commands { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sales-school-command { min-width: 0; justify-content: center; padding-inline: .4rem; }
+  .sales-school-command > span:last-child small { display: none; }
+  .sales-school-command strong { font-size: .67rem; }
 }

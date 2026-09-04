@@ -129,19 +129,18 @@ export function SalesCollaboration({
   return (
     <section className="sales-collaboration" aria-labelledby="sales-collaboration-title">
       <div className="sales-collaboration__heading">
-        <div><p>TEAM HANDOFF · SCHOOL MEMORY</p><h2 id="sales-collaboration-title">다음 사람이 바로 이어갈 수 있게.</h2></div>
+        <div><h2 id="sales-collaboration-title">다음 사람이 바로 이어갈 수 있게.</h2></div>
         {canEdit ? <button type="button" onClick={openEditor}><Icon name="sparkles" size={16} />업무 참고 편집</button> : <small>담당 직원만 편집</small>}
       </div>
       <div className="sales-collaboration__grid">
         <div className="sales-next-action" data-active={Boolean(currentNextAction)}>
           <span><Icon name="calendar" size={17} />다음 행동</span>
           <strong>{currentNextAction?.summary ?? "예정된 후속 활동 없음"}</strong>
-          <small>{currentNextAction ? `${displayDueDate(currentNextAction.dueDate) ? `${displayDueDate(currentNextAction.dueDate)} · ` : ""}다음 달에도 유지됩니다.` : "방문 기록에서 후속 일정을 남길 수 있습니다."}</small>
+          {currentNextAction ? <small>{displayDueDate(currentNextAction.dueDate)}</small> : null}
         </div>
         <div className="communication-reference">
           <span><Icon name="user" size={17} />커뮤니케이션 참고</span>
           {savedTagIds.length > 0 ? <div>{savedTagIds.map((tagId) => <em key={tagId}>{tagLabels.get(tagId) ?? "비활성 참고 태그"}</em>)}</div> : <strong>아직 등록된 업무 참고가 없습니다.</strong>}
-          <small>방문 활동 태그와 달리 월이 바뀌어도 학교에 유지됩니다.</small>
         </div>
       </div>
       {!canEdit ? <p className="sales-collaboration__readonly"><Icon name="check" size={15} />팀 기록은 읽을 수 있지만 다른 담당자의 학교 참고정보는 변경할 수 없습니다.</p> : null}
@@ -149,12 +148,11 @@ export function SalesCollaboration({
       <BottomSheet
         open={editorOpen}
         title="커뮤니케이션 참고"
-        description="사람에 대한 평가가 아니라, 다음 대화를 돕는 업무 방식만 선택해주세요."
+        description="업무에 필요한 참고만 선택해주세요."
         onClose={() => { if (!saving) setEditorOpen(false); }}
       >
         <div className="communication-editor">
-          <div className="communication-editor__note"><Icon name="sparkles" /><span><strong>학교에 지속되는 참고정보</strong>월별 활동 태그와 분리되어 다음 Cycle에도 유지됩니다.</span></div>
-          <fieldset aria-describedby="communication-tag-help">
+          <fieldset>
             <legend>업무 참고 태그 <span>복수 선택</span></legend>
             <div className="communication-editor__tag-grid">
               {activeTags.map((tag) => (
@@ -163,7 +161,6 @@ export function SalesCollaboration({
                 </SmartChip>
               ))}
             </div>
-            <small id="communication-tag-help">해당 학교에서 반복되는 연락 방식만 골라주세요.</small>
           </fieldset>
           {saveError ? <p className="communication-editor__error" role="alert">{saveError}</p> : null}
           <div className="communication-editor__actions"><button type="button" disabled={saving} onClick={() => setEditorOpen(false)}>취소</button><button type="button" disabled={saving} onClick={() => void save()}>{saving ? "안전하게 저장 중…" : "업무 참고 저장"}</button></div>

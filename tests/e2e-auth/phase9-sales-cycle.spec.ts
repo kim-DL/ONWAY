@@ -148,7 +148,7 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
     background: getComputedStyle(element).backgroundColor,
     radius: getComputedStyle(element).borderRadius,
   }));
-  expect(navigationStyle).toEqual({ background: "rgba(248, 250, 255, 0.88)", radius: "0px" });
+  expect(navigationStyle).toEqual({ background: "rgba(255, 255, 255, 0.9)", radius: "0px" });
 
   const schoolCommands = page.getByRole("toolbar", { name: "담당 학교 작업" });
   await expect(schoolCommands).toBeVisible();
