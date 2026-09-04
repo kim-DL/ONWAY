@@ -156,7 +156,7 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
     const bounds = button.getBoundingClientRect();
     return { top: Math.round(bounds.top), height: Math.round(bounds.height) };
   }));
-  expect(commandBoxes).toHaveLength(3);
+  expect(commandBoxes).toHaveLength(4);
   expect(Math.max(...commandBoxes.map(({ top }) => top)) - Math.min(...commandBoxes.map(({ top }) => top))).toBeLessThanOrEqual(2);
   expect(commandBoxes.every(({ height }) => height >= 44 && height <= 68)).toBe(true);
 
@@ -197,6 +197,39 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   await releaseDialog.getByRole("button", { name: "담당에서 제외" }).click();
   await expect(page.getByText("1개 학교를 내 담당에서 제외했습니다.")).toBeVisible();
   await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toHaveCount(0, { timeout: 15_000 });
+});
+
+test("salesperson creates an accessible route and applies its order on mobile", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, PHASE3_TEST_PINS.salesA);
+
+  await page.getByRole("button", { name: /방문 동선/ }).click();
+  const dialog = page.getByRole("dialog", { name: "방문 동선 만들기" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("checkbox", { name: /대전온누리고등학교/ })).toBeChecked();
+  await expect(dialog.getByRole("checkbox", { name: /대전새빛고등학교/ })).toBeChecked();
+  await dialog.getByRole("button", { name: /가까운 순서 계산/ }).click();
+  await expect(dialog.getByText("추천 순서")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.locator(".sales-route-order > li")).toHaveCount(2);
+  if (process.env.CAPTURE_ROUTE_UI === "true") {
+    await page.screenshot({ path: testInfo.outputPath("sales-route-planner.png"), fullPage: true });
+  }
+
+  const accessibility = await new AxeBuilder({ page }).include("[role=dialog]").analyze();
+  expect(accessibility.violations).toEqual([]);
+  const undersizedTargets = await dialog.locator("button:visible, a:visible").evaluateAll((targets) =>
+    targets.flatMap((target) => {
+      const bounds = target.getBoundingClientRect();
+      return bounds.width < 44 || bounds.height < 44
+        ? [{ label: target.getAttribute("aria-label") ?? target.textContent?.trim(), width: bounds.width, height: bounds.height }]
+        : [];
+    }),
+  );
+  expect(undersizedTargets).toEqual([]);
+
+  await dialog.getByRole("button", { name: "이 순서로 보기" }).click();
+  await expect(page.getByRole("region", { name: "적용 중인 방문 동선" })).toBeVisible();
+  await expect(page.locator(".assignment-card").first()).toHaveAccessibleName(/^동선 1번째/);
 });
 
 async function emulatorIdToken(uid: string) {
@@ -262,6 +295,22 @@ test("admin manages monthly ownership while sales users can claim and release un
     emulatorIdToken("uid-sales-a"),
   ]);
   const base = { appVersion: "phase9-e2e" };
+  const route = await callFunction("optimizeSalesRoute", salesToken, {
+    cycleId: "2026-08",
+    schoolIds: ["SCH-NEIS-G100000001", "SCH-NEIS-G100000004"],
+    startSchoolId: "SCH-NEIS-G100000001",
+  });
+  expect(route.result).toMatchObject({
+    calculationMode: "distanceEstimate",
+    orderedSchoolIds: ["SCH-NEIS-G100000001", "SCH-NEIS-G100000004"],
+  });
+
+  const foreignRoute = await callFunction("optimizeSalesRoute", salesToken, {
+    cycleId: "2026-08",
+    schoolIds: ["SCH-NEIS-G100000001", "SCH-NEIS-G100000002"],
+    startSchoolId: "SCH-NEIS-G100000001",
+  });
+  expect(foreignRoute.error?.status).toBe("PERMISSION_DENIED");
   const blockedTags = await callFunction("updateActivityTags", salesToken, {
     ...base,
     tags: [{ tagId: "ACT-SAMPLE", label: "샘플 반응", active: true }],

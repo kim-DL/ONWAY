@@ -35,6 +35,7 @@ export {
   claimSalesAssignments,
   createSalesAssignments,
   createSalesCycle,
+  optimizeSalesRoute,
   recordSalesVisit,
   releaseSalesAssignments,
   updateSalesVisit,

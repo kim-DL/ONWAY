@@ -1,4 +1,5 @@
 import { logger } from "firebase-functions";
+import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 
@@ -39,6 +40,15 @@ import {
   SalesProfileRevisionConflictError,
   SalesProfileService,
 } from "./sales-profile-service.js";
+import { KakaoRouteClient } from "./kakao-route-client.js";
+import { optimizeSalesRouteInputSchema } from "./sales-route-contract.js";
+import {
+  SalesRouteCycleError,
+  SalesRouteLocationError,
+  SalesRoutePermissionError,
+  SalesRouteSchoolError,
+  SalesRouteService,
+} from "./sales-route-service.js";
 import { recordSalesVisitInputSchema, updateSalesVisitInputSchema } from "./sales-visit-contract.js";
 import {
   SalesVisitAssignmentNotFoundError,
@@ -57,6 +67,8 @@ import {
 function isFunctionsEmulator() {
   return process.env.FUNCTIONS_EMULATOR === "true";
 }
+
+const kakaoRestApiKey = defineSecret("KAKAO_REST_API_KEY");
 
 async function requireSalesActor(request: CallableRequest<unknown>) {
   if (!request.auth) throw new HttpsError("unauthenticated", "인증이 필요합니다.");
@@ -102,6 +114,54 @@ const callableOptions = {
   maxInstances: 10,
   region: "asia-northeast3" as const,
 };
+
+const routeCallableOptions = {
+  ...callableOptions,
+  memory: "512MiB" as const,
+  timeoutSeconds: 60,
+  secrets: isFunctionsEmulator() ? [] : [kakaoRestApiKey],
+};
+
+export const optimizeSalesRoute = onCall(routeCallableOptions, async (request) => {
+  const parsed = optimizeSalesRouteInputSchema.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "방문할 학교와 첫 학교를 확인해주세요.");
+  const input = parsed.data;
+  const actor = await requireSalesActor(request);
+  const restApiKey = isFunctionsEmulator() ? "" : kakaoRestApiKey.value().trim();
+  const service = new SalesRouteService(
+    undefined,
+    restApiKey ? new KakaoRouteClient(restApiKey) : undefined,
+  );
+  try {
+    return await service.optimize(input, actor);
+  } catch (error) {
+    if (error instanceof SalesRouteCycleError) {
+      throw new HttpsError("failed-precondition", "현재 운영 중인 월의 담당 학교만 동선을 만들 수 있습니다.");
+    }
+    if (error instanceof SalesRoutePermissionError) {
+      throw new HttpsError("permission-denied", "자신의 담당 학교만 방문 동선에 포함할 수 있습니다.");
+    }
+    if (error instanceof SalesRouteSchoolError) {
+      throw new HttpsError("not-found", "학교 배정 정보가 변경되었습니다. 목록을 새로 확인해주세요.");
+    }
+    if (error instanceof SalesRouteLocationError) {
+      throw new HttpsError("failed-precondition", "위치가 확정되지 않은 학교가 포함되어 있습니다.", {
+        reason: "unverified-location",
+        schoolIds: error.schoolIds,
+      });
+    }
+    if (error instanceof z.ZodError) {
+      throw new HttpsError("failed-precondition", "저장된 학교 위치 정보가 올바르지 않습니다.");
+    }
+    logger.error("Sales route optimization failed.", {
+      cycleId: input.cycleId,
+      schoolCount: input.schoolIds.length,
+      actor: actor.employeeId,
+      error,
+    });
+    throw new HttpsError("internal", "방문 동선을 계산하지 못했습니다.");
+  }
+});
 
 export const createSalesCycle = onCall(callableOptions, async (request) => {
   const parsed = createSalesCycleInputSchema.safeParse(request.data);

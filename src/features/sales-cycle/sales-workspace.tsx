@@ -17,12 +17,16 @@ import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
+import { SalesRoutePlanner, hasTrustedRouteLocation } from "@/features/sales-route/sales-route-planner";
+import type { ActiveSalesRoute } from "@/features/sales-route/sales-route-contract";
+import { readActiveSalesRoute, readLatestActiveSalesRoute, writeActiveSalesRoute } from "@/features/sales-route/sales-route-storage";
 import {
   claimSalesAssignments,
   releaseSalesAssignments,
   salesAssignmentErrorMessage,
   salesAssignmentReleaseErrorMessage,
 } from "./sales-assignment-repository";
+import { createSalesSessionNamespace } from "./sales-workspace-repository";
 import { useSalesWorkspace } from "./use-sales-workspace";
 
 const SCOPE_OPTIONS = [
@@ -83,6 +87,7 @@ function AssignmentCard({
   selected = false,
   releasable = false,
   onToggle,
+  routePosition,
 }: {
   assignment: SalesAssignment;
   school: School;
@@ -92,6 +97,7 @@ function AssignmentCard({
   selected?: boolean;
   releasable?: boolean;
   onToggle?: (schoolId: string, selected: boolean) => void;
+  routePosition?: number | undefined;
 }) {
   const status = STATUS_META[assignment.monthlyStatus];
   const latestVisit = formatVisitDate(assignment.latestVisitedAt);
@@ -99,7 +105,10 @@ function AssignmentCard({
     <>
       <span className="assignment-card__header">
         <span className="assignment-card__zone"><Icon name="location" size={16} />{DISTRICT_LABELS[school.district]}</span>
-        <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+        <span className="assignment-card__header-meta">
+          {routePosition ? <span className="assignment-card__route-order">{routePosition}번째</span> : null}
+          <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+        </span>
       </span>
       <span className="assignment-card__school">
         <strong>{school.name}</strong>
@@ -148,7 +157,7 @@ function AssignmentCard({
       data-status={assignment.monthlyStatus}
       type="button"
       onClick={() => onSelect(school)}
-      aria-label={`${school.name}, ${DISTRICT_LABELS[school.district]}, 담당 ${primaryName}, ${status.label}`}
+      aria-label={`${routePosition ? `동선 ${routePosition}번째, ` : ""}${school.name}, ${DISTRICT_LABELS[school.district]}, 담당 ${primaryName}, ${status.label}`}
     >
       {content}
     </button>
@@ -228,6 +237,7 @@ export function SalesWorkspace({
   const { showToast } = useToast();
   const greeting = useTimeGreeting();
   const scopeStorageKey = `onnuriway:private:v1:sales-scope:${session.uid}`;
+  const sessionNamespace = createSalesSessionNamespace(session);
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
   const [scope, setScope] = useState<"mine" | "all">(() => {
     try {
@@ -244,6 +254,8 @@ export function SalesWorkspace({
   const [selectedReleaseIds, setSelectedReleaseIds] = useState<Set<string>>(() => new Set());
   const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [routeSheetOpen, setRouteSheetOpen] = useState(false);
+  const [activeRoute, setActiveRoute] = useState<ActiveSalesRoute | null>(() => readLatestActiveSalesRoute(sessionNamespace));
   const data = useSalesWorkspace(session, selectedCycleId);
   const workspace = data.workspace;
   const closeCycleSheet = useCallback(() => setCycleSheetOpen(false), []);
@@ -260,6 +272,20 @@ export function SalesWorkspace({
     if (!workspace) return null;
     const schools = new Map(workspace.schools.map((school) => [school.schoolId, school]));
     const employees = new Map(workspace.employees.map((employee) => [employee.employeeId, employee.displayName]));
+    const schoolById = new Map(workspace.schools.map((school) => [school.schoolId, school]));
+    const ownedIds = new Set(workspace.assignments
+      .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
+      .map((assignment) => assignment.schoolId));
+    const usableActiveRoute = activeRoute?.result.cycleId === workspace.selectedCycleId
+      && activeRoute.orderedSchoolIds.every((schoolId) => {
+        const school = schoolById.get(schoolId);
+        return ownedIds.has(schoolId) && school ? hasTrustedRouteLocation(school) : false;
+      })
+      ? activeRoute
+      : null;
+    const routeRank = usableActiveRoute
+      ? new Map(usableActiveRoute.orderedSchoolIds.map((schoolId, index) => [schoolId, index]))
+      : null;
     const scopeAssignments = workspace.assignments.filter((assignment) =>
       scope === "all" || assignment.assigneeIds.includes(session.claims.employeeId)
     );
@@ -270,6 +296,11 @@ export function SalesWorkspace({
       })
       .filter(({ school }) => district === "all" || school.district === district)
       .sort((left, right) => {
+        if (scope === "mine" && routeRank) {
+          const routeDifference = (routeRank.get(left.school.schoolId) ?? Number.MAX_SAFE_INTEGER)
+            - (routeRank.get(right.school.schoolId) ?? Number.MAX_SAFE_INTEGER);
+          if (routeDifference !== 0) return routeDifference;
+        }
         const districtDifference = left.school.district.localeCompare(right.school.district, "ko");
         if (districtDifference !== 0) return districtDifference;
         const employeeDifference = left.assignment.primaryAssigneeId.localeCompare(right.assignment.primaryAssigneeId, "ko");
@@ -285,14 +316,24 @@ export function SalesWorkspace({
       return school ? [school.district] : [];
     }))];
     const assignedSchoolIds = new Set(workspace.assignments.map((assignment) => assignment.schoolId));
+    const ownRouteCandidates = workspace.assignments
+      .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
+      .flatMap((assignment) => {
+        const school = schools.get(assignment.schoolId);
+        return school ? [{ assignment, school }] : [];
+      })
+      .sort((left, right) => left.school.name.localeCompare(right.school.name, "ko"));
     return {
       visibleAssignments,
       employees,
       totals: { assigned: scopeAssignments.length, completed, before, followUp, sample, progress },
       availableDistricts,
       assignedSchoolIds,
+      ownRouteCandidates,
+      routeRank,
+      activeRoute: usableActiveRoute,
     };
-  }, [district, scope, session.claims.employeeId, workspace]);
+  }, [activeRoute, district, scope, session.claims.employeeId, workspace]);
 
   if (data.status === "loading" && !workspace) return <WorkspaceSkeleton />;
   if (data.status === "error" || !workspace || !model) {
@@ -432,6 +473,17 @@ export function SalesWorkspace({
               <span><Icon name="search" /></span>
               <span><strong>학교 찾기</strong><small>전체 학교 검색</small></span>
             </button>
+            {selectedCycleIsCurrent && scope === "mine" ? (
+              <button
+                type="button"
+                className="sales-school-command"
+                data-route-active={model.activeRoute ? "true" : "false"}
+                onClick={() => setRouteSheetOpen(true)}
+              >
+                <span><Icon name="route" /></span>
+                <span><strong>방문 동선</strong><small>{model.activeRoute ? "저장된 순서 보기" : "가까운 순서 만들기"}</small></span>
+              </button>
+            ) : null}
             {selectedCycleIsCurrent ? (
               <button type="button" className="sales-school-command sales-school-command--primary" onClick={() => setClaimSheetOpen(true)}>
                 <span><Icon name="building" /></span>
@@ -454,6 +506,25 @@ export function SalesWorkspace({
           </div>
         </div>
       </div>
+
+      {scope === "mine" && model.activeRoute ? (
+        <div className="sales-route-active" role="region" aria-label="적용 중인 방문 동선">
+          <span className="sales-route-active__mark"><Icon name="route" size={20} /></span>
+          <div>
+            <strong>{model.activeRoute.orderedSchoolIds.length}곳 방문 순서</strong>
+            <span>{Math.max(1, Math.round(model.activeRoute.result.totalDurationSeconds / 60))}분 · {(model.activeRoute.result.totalDistanceMeters / 1_000).toFixed(1)}km 예상</span>
+          </div>
+          <button type="button" onClick={() => setRouteSheetOpen(true)}>계획 보기</button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveRoute(null);
+              writeActiveSalesRoute(sessionNamespace, workspace.selectedCycleId, null);
+              showToast("방문 순서를 해제했습니다.", "success");
+            }}
+          >순서 해제</button>
+        </div>
+      ) : null}
 
       {model.availableDistricts.length > 1 ? (
         <div className="sales-zone-chips" aria-label="행정구 필터">
@@ -484,6 +555,7 @@ export function SalesWorkspace({
                 && assignment.sampleStatus === "unknown"
               }
               onToggle={toggleRelease}
+              routePosition={scope === "mine" ? (model.routeRank?.get(assignment.schoolId) ?? -1) + 1 || undefined : undefined}
             />
           ))}
         </div>
@@ -509,6 +581,7 @@ export function SalesWorkspace({
               data-selected={cycle.cycleId === workspace.selectedCycleId}
               onClick={() => {
                 setSelectedCycleId(cycle.cycleId);
+                setActiveRoute(readActiveSalesRoute(sessionNamespace, cycle.cycleId));
                 setDistrict("all");
                 leaveManageMode();
                 setCycleSheetOpen(false);
@@ -543,6 +616,30 @@ export function SalesWorkspace({
           <button type="button" onClick={() => setReleaseConfirmOpen(true)}>내 담당에서 제외</button>
         </div>
       ) : null}
+
+      <BottomSheet
+        open={routeSheetOpen}
+        title={model.activeRoute ? "오늘의 방문 동선" : "방문 동선 만들기"}
+        description="첫 학교를 기준으로 이동이 가까운 순서를 계산합니다."
+        onClose={() => setRouteSheetOpen(false)}
+      >
+        {routeSheetOpen ? (
+          <SalesRoutePlanner
+            cycleId={workspace.selectedCycleId}
+            candidates={model.ownRouteCandidates}
+            initialRoute={model.activeRoute}
+            onApply={(route) => {
+              setActiveRoute(route);
+              writeActiveSalesRoute(sessionNamespace, workspace.selectedCycleId, route);
+              setDistrict("all");
+              setScope("mine");
+              leaveManageMode();
+              setRouteSheetOpen(false);
+              showToast("추천 방문 순서를 학교 목록에 적용했습니다.", "success");
+            }}
+          />
+        ) : null}
+      </BottomSheet>
 
       <BottomSheet
         open={releaseConfirmOpen}
