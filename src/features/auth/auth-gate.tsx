@@ -57,37 +57,46 @@ function PinIndicator({ length }: { length: number }) {
   );
 }
 
-function PinLogin() {
+function PinLogin({ initialError = null }: { initialError?: string | null }) {
   const { login, loginWithGoogle } = useAuth();
   const [pin, setPin] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [adminSubmitting, setAdminSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submissionLockRef = useRef(false);
+
+  useEffect(() => {
+    // Focus only after React has removed the pending input's disabled state.
+    if (error && !submitting && !adminSubmitting) inputRef.current?.focus();
+  }, [adminSubmitting, error, submitting]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (pin.length !== 6 || submitting) return;
+    if (pin.length !== 6 || submitting || adminSubmitting || submissionLockRef.current) return;
 
+    submissionLockRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
       await login(pin);
     } catch (caught) {
+      submissionLockRef.current = false;
       setPin("");
       setError(caught instanceof Error ? caught.message : "PIN을 확인해주세요.");
       setSubmitting(false);
-      inputRef.current?.focus();
     }
   };
 
   const submitAdmin = async () => {
-    if (adminSubmitting || submitting) return;
+    if (adminSubmitting || submitting || submissionLockRef.current) return;
+    submissionLockRef.current = true;
     setAdminSubmitting(true);
     setError(null);
     try {
       await loginWithGoogle();
     } catch (caught) {
+      submissionLockRef.current = false;
       setError(caught instanceof Error ? caught.message : "관리자 로그인을 완료하지 못했습니다.");
       setAdminSubmitting(false);
     }
@@ -126,6 +135,7 @@ function PinLogin() {
                 autoComplete="off"
                 autoFocus
                 data-1p-ignore
+                disabled={submitting || adminSubmitting}
                 value={pin}
                 onChange={(event) => {
                   setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
@@ -137,7 +147,7 @@ function PinLogin() {
             </div>
             <p id="pin-help" className="sr-only">숫자 6자리 PIN</p>
             {error ? <p id="pin-error" className="pin-error" role="alert" aria-live="assertive">{error}</p> : null}
-            <button type="submit" disabled={pin.length !== 6 || submitting}>
+            <button type="submit" disabled={pin.length !== 6 || submitting || adminSubmitting}>
               <span>{submitting ? "확인 중" : "급식길 시작하기"}</span>
               <span aria-hidden="true">→</span>
             </button>
@@ -199,6 +209,6 @@ export function AuthGate() {
   if (state.status === "resolving") return <AuthSplash />;
   if (state.status === "unconfigured") return <Unconfigured />;
   if (state.status === "invalid") return <InvalidSession message={state.message} />;
-  if (state.status === "unauthenticated") return <PinLogin />;
+  if (state.status === "unauthenticated") return <PinLogin initialError={state.message ?? null} />;
   return <AppShell session={state.session} />;
 }

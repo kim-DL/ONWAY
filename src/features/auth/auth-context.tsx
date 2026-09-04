@@ -32,6 +32,7 @@ import {
   type SessionClaims,
 } from "@/domain/auth";
 import {
+  ensureFirebaseAppCheckReady,
   getFirebaseClientServices,
   type FirebaseClientServices,
 } from "@/lib/firebase/client";
@@ -43,6 +44,7 @@ import {
 } from "@/features/pwa/network-status";
 import { readVerifiedOfflineSession, writeVerifiedOfflineSession } from "./offline-session";
 import { clearPrivateClientState } from "./private-client-state";
+import { classifyPinLoginError, type PinLoginStage } from "./pin-login-error";
 
 export type AuthenticatedSession = {
   uid: string;
@@ -53,7 +55,7 @@ export type AuthenticatedSession = {
 export type AuthState =
   | { status: "resolving" }
   | { status: "unconfigured" }
-  | { status: "unauthenticated" }
+  | { status: "unauthenticated"; message?: string }
   | { status: "invalid"; message: string }
   | { status: "authenticated"; session: AuthenticatedSession };
 
@@ -75,16 +77,6 @@ function useIsClient() {
     () => true,
     () => false,
   );
-}
-
-function loginMessage(error: unknown) {
-  if (
-    error instanceof FirebaseError &&
-    error.code === "functions/resource-exhausted"
-  ) {
-    return "잠시 후 다시 시도해주세요.";
-  }
-  return "PIN을 확인해주세요.";
 }
 
 function adminLoginMessage(error: unknown) {
@@ -338,14 +330,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { customToken: string }
       >(services.functions, "employeeLogin");
 
+      let stage: PinLoginStage = "app-check";
       try {
+        await ensureFirebaseAppCheckReady();
+        stage = "credentials";
         const response = await employeeLogin({ pin, appVersion: APP_METADATA.buildVersion });
+        stage = "persistence";
         await setPersistence(services.auth, browserLocalPersistence);
-        setState({ status: "resolving" });
+        stage = "token-exchange";
+        // Keep the form mounted while exchanging the custom token so its local
+        // error and retry controls survive a rejected exchange. The auth observer
+        // enters resolving only when Firebase actually publishes a signed-in user.
         await signInWithCustomToken(services.auth, response.data.customToken);
       } catch (error) {
-        setState({ status: "unauthenticated" });
-        throw new Error(loginMessage(error));
+        const message = classifyPinLoginError(error, stage).message;
+        setState({ status: "unauthenticated", message });
+        throw new Error(message);
       }
     },
     [services],
@@ -400,8 +400,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       adminActivationRef.current = false;
       await signOut(services.auth).catch(() => undefined);
-      setState({ status: "unauthenticated" });
-      throw new Error(adminLoginMessage(error));
+      const message = adminLoginMessage(error);
+      setState({ status: "unauthenticated", message });
+      throw new Error(message);
     }
   }, [services]);
 

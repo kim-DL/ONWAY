@@ -1,9 +1,11 @@
 import "client-only";
 
-import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { FirebaseError, getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import {
+  getToken,
   initializeAppCheck,
   ReCaptchaEnterpriseProvider,
+  type AppCheck,
 } from "firebase/app-check";
 import {
   connectAuthEmulator,
@@ -33,6 +35,7 @@ export interface FirebaseClientServices {
 
 const emulatorMarker = Symbol.for("onnuriway.firebase-emulators-connected");
 let services: FirebaseClientServices | null | undefined;
+let appCheck: AppCheck | undefined;
 
 export function getFirebaseClientServices(): FirebaseClientServices | null {
   if (services !== undefined) {
@@ -56,11 +59,11 @@ export function getFirebaseClientServices(): FirebaseClientServices | null {
   const appAlreadyExists = getApps().length > 0;
   const app = appAlreadyExists ? getApp() : initializeApp(config);
   if (
-    !appAlreadyExists &&
     !usesEmulators &&
     appCheckSiteKey
   ) {
-    initializeAppCheck(app, {
+    // The SDK reuses the instance for identical options, including after HMR.
+    appCheck = initializeAppCheck(app, {
       provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
       isTokenAutoRefreshEnabled: true,
     });
@@ -78,6 +81,29 @@ export function getFirebaseClientServices(): FirebaseClientServices | null {
 
   connectLocalEmulators(services);
   return services;
+}
+
+/** Validate this app before sending a PIN; never expose or persist its token ourselves. */
+export async function ensureFirebaseAppCheckReady(): Promise<void> {
+  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") return;
+  if (!getFirebaseClientServices() || !appCheck) {
+    throw new FirebaseError("appCheck/unconfigured", "App verification is unavailable.");
+  }
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      // Reuse the SDK cache/in-flight request instead of forcing a new assessment.
+      getToken(appCheck, false),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new FirebaseError(
+          "appCheck/deadline-exceeded", "App verification timed out.",
+        )), 12_000);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 function connectLocalEmulators(firebase: FirebaseClientServices): void {

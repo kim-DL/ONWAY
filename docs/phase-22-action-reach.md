@@ -48,7 +48,23 @@ Five picker regressions cover actionable error forwarding, generic fallback, ret
 - Browser failure responses are deliberately injected for deterministic recovery tests. Field persistence and route calculation also exercise real emulator handlers; no test writes to production school data.
 - This change unifies the operational bottom sheets. School search, photo viewing and the administrator's separate dialog layouts were reviewed but are not replaced wholesale by this component.
 - No database schema, security rules or production assignments are changed.
-- Deployment is preview-only at the user's request. The project's existing preview configuration uses the production Firebase project; viewing the preview does not change the live UI, but a user saving there will change real data. Automated write verification uses emulators only.
+- The initial review used a preview deployment. On 2026-09-05 the user changed the release decision to direct production deployment after verification; further preview review is not required. Automated write verification still uses emulators only.
+
+## Production follow-up — login diagnostics and control feedback
+
+- Read-only inspection confirmed six preview login requests returned HTTP 401 before PIN handling: App Check was missing, while the preceding preflight requests returned 204. The preview hostname was not registered for the production reCAPTCHA Enterprise key; `onnuriway.vercel.app` is registered. App Check enforcement and domain restrictions remain unchanged.
+- PIN submission now verifies App Check first, using the SDK cache rather than forcing new assessments. A stalled check is bounded to 12 seconds. Failed verification never sends a PIN to the login callable.
+- PIN mismatch, rate limiting, connection failure, storage failure and custom-token exchange failure have separate safe messages. SDK messages and credentials are not exposed. PIN mismatch and disabled-account responses remain indistinguishable.
+- The login form stays mounted during token exchange; failed administrator sign-in retains its message across the loading screen. Synchronous submission locking prevents overlapping PIN and Google sign-in.
+- Shared controls retain the existing layout and Toss-blue palette, with stronger keyboard focus, distinguishable disabled/busy feedback, forced-color support and stationary controls when reduced motion is requested.
+- `scripts/audit-preview-login-readonly.mjs` provides bounded domain/log diagnostics and rejects `--apply`. Its output is limited to status, timestamps, hostnames and verification enums; it never prints PINs, tokens, request bodies or raw log messages.
+- Production configuration was read without modification: all required Firebase public values and the App Check key are present; emulator mode is off and no public debug token is configured. Production must be rebuilt using production environment variables, not promoted from the preview build.
+
+Authentication browser checks run with `ONNURIWAY_E2E_UX_SUITE=auth npm run test:e2e:ux`. They cover persisted sign-in, logout, rejection/rate limiting, revoked access, accessibility, service failure and failed token-exchange recovery. App Check provider failures are unit tested; emulator tests do not prove real-browser attestation or staff PIN login on production.
+
+Follow-up verification: **274 unit tests passed, 3 NEIS cases skipped**; **7 authentication browser cases passed**; **10 mobile-action/browser regressions passed**; **10 standalone shared-control browser cases passed**. Full typecheck and lint passed. The production-built emulator login page was also visually inspected using an independent browser: no blank screen, framework overlay or browser errors were observed.
+
+Technical reference: [Firebase App Check for web](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider), [cached App Check token API](https://firebase.google.com/docs/reference/js/app-check#gettoken).
 
 ## References
 

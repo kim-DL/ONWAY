@@ -39,7 +39,9 @@ try {
   const result = spawnSync(
     process.execPath,
     [playwrightCli, "test", ...(process.env.ONNURIWAY_E2E_UX === "true"
-      ? process.env.ONNURIWAY_E2E_UX_SUITE === "visits"
+      ? process.env.ONNURIWAY_E2E_UX_SUITE === "auth"
+        ? ["tests/e2e-auth/phase3-auth.spec.ts", "tests/e2e-auth/phase22-login-recovery.spec.ts"]
+        : process.env.ONNURIWAY_E2E_UX_SUITE === "visits"
         ? ["tests/e2e-auth/phase10-sales-visit.spec.ts"]
         : process.env.ONNURIWAY_E2E_UX_SUITE === "sales"
           ? ["tests/e2e-auth/phase9-sales-cycle.spec.ts"]

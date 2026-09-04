@@ -5731,3 +5731,29 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
 @media (prefers-reduced-motion: reduce) {
   .bottom-sheet-layer > .bottom-sheet { animation: none; }
 }
+
+/* Shared control feedback: visible focus, honest disabled states, no forced motion. */
+:is(.glass-button, .smart-chip):focus-visible,
+:is(.workspace-shell, .admin-shell) :is(.glass-button, .smart-chip):focus-visible {
+  outline: 3px solid var(--toss-blue-deep, #1b64da);
+  outline-offset: 3px;
+}
+.glass-button:disabled { cursor: not-allowed; }
+.smart-chip:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+[aria-busy="true"] :is(.glass-button, .smart-chip):disabled { cursor: progress; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .smart-chip { transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 120ms ease; }
+  .smart-chip:active:not(:disabled) { transform: translateY(1px); }
+}
+@media (hover: hover) {
+  .smart-chip:hover:not(:disabled) { border-color: var(--toss-blue-deep, #1b64da); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.glass-button, .smart-chip) { transition: none !important; }
+  :is(.glass-button, .smart-chip):is(:hover, :active) { transform: none !important; }
+}
+@media (forced-colors: active) {
+  :is(.glass-button, .smart-chip):focus-visible,
+  :is(.workspace-shell, .admin-shell) :is(.glass-button, .smart-chip):focus-visible { outline-color: Highlight; }
+}
