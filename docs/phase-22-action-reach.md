@@ -64,6 +64,13 @@ Authentication browser checks run with `ONNURIWAY_E2E_UX_SUITE=auth npm run test
 
 Follow-up verification: **274 unit tests passed, 3 NEIS cases skipped**; **7 authentication browser cases passed**; **10 mobile-action/browser regressions passed**; **10 standalone shared-control browser cases passed**. Full typecheck and lint passed. The production-built emulator login page was also visually inspected using an independent browser: no blank screen, framework overlay or browser errors were observed.
 
+### Release outcome (2026-09-05)
+
+- Production build and PWA artifact verification passed. Code commit `47ec187` was deployed to `https://onnuriway.vercel.app` as `dpl_9QjH1LtVtAamTWa7SgUSQAyTLbaS`; Vercel reports production/READY and the production alias points to this deployment.
+- The single review deployment `dpl_7PdmUjYnvt1fuLTH88vYz4xJ9Zgg` was removed at the user's request. Its source commit remains available; previous production deployments were retained.
+- Live-browser verification used an existing signed-in session, not guessed credentials: the sales home restored successfully, the PWA update action reloaded into the same session, and the school-assignment dialog loaded the available schools with its 48px action visible. The dialog was closed without saving or changing assignments. No browser errors were observed.
+- A fresh staff-PIN login and physical-device keyboard/system-Back checks remain user/device verification items; existing-session restoration and emulator sign-in tests are not a substitute for those checks.
+
 Technical reference: [Firebase App Check for web](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider), [cached App Check token API](https://firebase.google.com/docs/reference/js/app-check#gettoken).
 
 ## References
