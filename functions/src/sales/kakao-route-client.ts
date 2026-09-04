@@ -34,6 +34,7 @@ export class KakaoRouteClient implements RoadMatrixClient {
 
   async loadFrom(origin: SalesRouteNode, destinations: readonly SalesRouteNode[]) {
     if (destinations.length === 0) return new Map<string, SalesRouteMetric>();
+    const destinationByKey = new Map(destinations.map((destination, index) => [String(index), destination]));
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6_000);
     try {
@@ -65,7 +66,9 @@ export class KakaoRouteClient implements RoadMatrixClient {
 
       const metrics = new Map<string, SalesRouteMetric>();
       for (const route of parsed.data.routes) {
-        const destination = destinations[Number(route.key)];
+        // Keys are opaque echoes of the values we sent. Numeric coercion can
+        // incorrectly turn an empty/whitespace provider key into destination 0.
+        const destination = destinationByKey.get(route.key);
         if (!destination || route.result_code !== 0 || !route.summary) continue;
         metrics.set(destination.schoolId, {
           fromSchoolId: origin.schoolId,

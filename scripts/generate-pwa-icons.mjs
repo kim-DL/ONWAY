@@ -27,15 +27,13 @@ const brandMark = await sharp(sourceLogoPath)
 await writeFile(join(brandDirectory, "onnuri-food-logo.png"), brandMark);
 
 function iconBackground(size) {
-  const inset = Math.max(2, Math.round(size * 0.018));
-  const radius = Math.round(size * 0.22);
   return Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <defs>
         <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ffffff"/>
-          <stop offset="0.54" stop-color="#f5faff"/>
-          <stop offset="1" stop-color="#eff9f0"/>
+          <stop offset="0" stop-color="#f4faff"/>
+          <stop offset="0.54" stop-color="#e8f4ff"/>
+          <stop offset="1" stop-color="#edf9f2"/>
         </linearGradient>
         <radialGradient id="blue" cx="0" cy="0" r="1">
           <stop offset="0" stop-color="#22b8f2" stop-opacity=".22"/>
@@ -49,10 +47,22 @@ function iconBackground(size) {
       <rect width="${size}" height="${size}" fill="url(#surface)"/>
       <circle cx="0" cy="0" r="${Math.round(size * 0.86)}" fill="url(#blue)"/>
       <circle cx="${size}" cy="${size}" r="${Math.round(size * 0.9)}" fill="url(#green)"/>
-      <rect x="${inset}" y="${inset}" width="${size - inset * 2}" height="${size - inset * 2}" rx="${radius}" fill="none" stroke="#ffffff" stroke-opacity=".72" stroke-width="${Math.max(1, Math.round(size * 0.009))}"/>
     </svg>
   `);
 }
+
+// The wave is unusually wide: a padded square inside another padded square made
+// Android launchers shrink it twice. Fit the actual artwork, not its empty corners,
+// to the maskable 40%-radius safe circle. Keep a small antialiasing margin.
+const { data: logoPixels, info: logoInfo } = await sharp(brandMark).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+let logoRadius = 0;
+for (let y = 0; y < logoInfo.height; y += 1) {
+  for (let x = 0; x < logoInfo.width; x += 1) {
+    if (logoPixels[(y * logoInfo.width + x) * 4 + 3] === 0) continue;
+    logoRadius = Math.max(logoRadius, Math.hypot(x + .5 - logoInfo.width / 2, y + .5 - logoInfo.height / 2));
+  }
+}
+const maskableLogoScale = Math.min(.8, .395 * logoInfo.width / logoRadius);
 
 async function iconBuffer(size, logoScale) {
   const logo = await sharp(brandMark)
@@ -74,7 +84,7 @@ async function writeIcon(filename, size, logoScale) {
 }
 
 async function writeFavicon() {
-  const png = await iconBuffer(32, 0.9);
+  const png = await iconBuffer(32, 0.96);
   const icoHeader = Buffer.alloc(22);
   icoHeader.writeUInt16LE(0, 0);
   icoHeader.writeUInt16LE(1, 2);
@@ -89,12 +99,12 @@ async function writeFavicon() {
 }
 
 await Promise.all([
-  writeIcon("onnuriway-company-icon-192-v3.png", 192, 0.84),
-  writeIcon("onnuriway-company-icon-512-v3.png", 512, 0.84),
-  writeIcon("onnuriway-company-icon-maskable-512-v3.png", 512, 0.66),
-  writeIcon("onnuriway-company-apple-touch-icon-v3.png", 180, 0.8),
-  iconBuffer(64, 0.86).then((buffer) => writeFile(browserIconPath, buffer)),
+  writeIcon("onnuriway-company-icon-192-v4.png", 192, 0.96),
+  writeIcon("onnuriway-company-icon-512-v4.png", 512, 0.96),
+  writeIcon("onnuriway-company-icon-maskable-512-v4.png", 512, maskableLogoScale),
+  writeIcon("onnuriway-company-apple-touch-icon-v4.png", 180, 0.96),
+  iconBuffer(64, 0.96).then((buffer) => writeFile(browserIconPath, buffer)),
   writeFavicon(),
 ]);
 
-console.log("Generated Onnuri General Foods brand assets and PWA icon v3 set.");
+console.log(`Generated company PWA icon v4 set (standard 96%, maskable ${(maskableLogoScale * 100).toFixed(1)}%).`);

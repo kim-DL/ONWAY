@@ -19,7 +19,7 @@ describe("Phase 14 PWA cache allowlist", () => {
     expect(isPublicAssetPath("/_next/static/chunks/app.js")).toBe(true);
     expect(isPublicAssetPath("/manifest.webmanifest")).toBe(true);
     expect(isPublicAssetPath("/favicon.ico")).toBe(true);
-    expect(isPublicAssetPath("/icons/onnuriway-company-icon-512-v3.png")).toBe(true);
+    expect(isPublicAssetPath("/icons/onnuriway-company-icon-512-v4.png")).toBe(true);
     expect(isPublicAssetPath("/brand/onnuri-food-logo.png")).toBe(true);
     expect(isPublicAssetPath("/api/sales/export")).toBe(false);
     expect(isPublicAssetPath("/google.firestore.v1.Firestore/Listen/channel")).toBe(false);

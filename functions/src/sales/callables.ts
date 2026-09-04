@@ -155,10 +155,19 @@ export const optimizeSalesRoute = onCall(routeCallableOptions, async (request) =
     }
     if (error instanceof SalesRouteLocationError) {
       const providerUnavailable = error.reason === "provider-unavailable";
-      throw new HttpsError("failed-precondition", providerUnavailable
-        ? "학교 위치 자동 확인 서비스를 사용할 수 없습니다. 관리자에게 알려주세요."
-        : "일부 학교 위치를 자동 확인하지 못했습니다. 관리자의 Kakao 위치 검토가 필요합니다.", {
-        reason: providerUnavailable ? "location-provider-unavailable" : "location-review-required",
+      const checkPending = error.reason === "check-pending";
+      logger.warn("Sales route location checks incomplete.", {
+        cycleId: input.cycleId,
+        schoolCount: input.schoolIds.length,
+        unresolvedSchoolIds: error.schoolIds,
+        reason: error.reason,
+      });
+      throw new HttpsError("failed-precondition", checkPending
+        ? "학교 위치를 일부 확인했어요. 다시 시도하면 남은 학교를 이어서 확인합니다."
+        : providerUnavailable
+          ? "학교 위치 확인 서비스에 잠시 연결하지 못했어요. 잠시 후 다시 시도해주세요."
+          : "일부 학교의 지도 위치를 확정하지 못했어요. 해당 학교의 위치 검토가 필요합니다.", {
+        reason: checkPending ? "location-check-pending" : providerUnavailable ? "location-provider-unavailable" : "location-review-required",
         schoolIds: error.schoolIds,
       });
     }

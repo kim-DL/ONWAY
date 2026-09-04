@@ -1,4 +1,4 @@
-export const PWA_CACHE_VERSION = "phase20";
+export const PWA_CACHE_VERSION = "phase21";
 
 export const PWA_CACHE_NAMES = {
   appShell: `app-shell-${PWA_CACHE_VERSION}`,
@@ -9,10 +9,10 @@ export const PWA_CACHE_NAMES = {
 const PUBLIC_ASSET_PATHS = new Set([
   "/favicon.ico",
   "/manifest.webmanifest",
-  "/icons/onnuriway-company-icon-192-v3.png",
-  "/icons/onnuriway-company-icon-512-v3.png",
-  "/icons/onnuriway-company-icon-maskable-512-v3.png",
-  "/icons/onnuriway-company-apple-touch-icon-v3.png",
+  "/icons/onnuriway-company-icon-192-v4.png",
+  "/icons/onnuriway-company-icon-512-v4.png",
+  "/icons/onnuriway-company-icon-maskable-512-v4.png",
+  "/icons/onnuriway-company-apple-touch-icon-v4.png",
   "/brand/onnuri-food-logo.png",
 ]);
 

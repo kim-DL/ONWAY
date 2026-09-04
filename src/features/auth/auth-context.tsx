@@ -156,7 +156,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const observeAuth = () => {
+      // Persistence can settle after cleanup (including Strict Mode replay).
+      // Never install a listener that the disposed effect cannot unsubscribe.
+      if (!active) return;
       authUnsubscribe = onIdTokenChanged(services.auth, (user) => {
+        if (!active) return;
         const generation = ++authGeneration;
         authzUnsubscribe?.();
         authzUnsubscribe = undefined;
@@ -233,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   authzUnsubscribe = onSnapshot(
                     doc(services.firestore, "authz", user.uid),
                     (snapshot) => {
+                      if (!active || generation !== authGeneration) return;
                       // Authorization is confirmed only by a server snapshot. A
                       // previously cached missing/stale document must never sign a
                       // freshly authenticated user out before Firestore reconnects.

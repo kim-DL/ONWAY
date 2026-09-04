@@ -143,6 +143,43 @@ describe("Kakao school matcher", () => {
     expect(decision).toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
   });
 
+  it.each([
+    ["온누리초등학교(급속) 전기차충전소", "교통,수송 > 자동차 > 전기차 충전소"],
+    ["온누리초등학교(대전) 전기차충전소", "교통,수송 > 자동차 > 전기차 충전소"],
+    ["온누리초등학교 전기차충전소", "교통,수송 > 자동차 > 전기차 충전소"],
+    ["온누리초등학교 매점", "가정,생활 > 슈퍼마켓"],
+    ["온누리초등학교 정문", "교통,수송 > 입출구"],
+    ["대전온누리초등학교 체육관", "스포츠,레저 > 스포츠시설 > 체육관"],
+  ])("recognizes same-address campus facilities with local school names: %s", (name, categoryName) => {
+    expect(decideKakaoSchoolMatch({
+      school, addressResult,
+      candidates: [candidate({ candidateId: "facility", placeId: "facility", name, categoryName }), candidate()],
+    })).toMatchObject({ status: "autoMatched", candidate: { name: school.name, score: 100 } });
+  });
+
+  it.each([
+    ["온누리초등학교(이전) 전기차충전소", "교통,수송 > 자동차 > 전기차 충전소"],
+    ["온누리초등학교 제2캠퍼스 체육관", "스포츠,레저 > 스포츠시설 > 체육관"],
+    ["온누리초등학교 매점", "교육,학문 > 학교 > 초등학교"],
+    ["온누리초등학교앞 매점", "가정,생활 > 슈퍼마켓"],
+    ["다른초등학교 체육관", "스포츠,레저 > 스포츠시설 > 체육관"],
+  ])("does not hide uncertain aliases or mismatched facility categories: %s", (name, categoryName) => {
+    expect(decideKakaoSchoolMatch({
+      school, addressResult,
+      candidates: [candidate(), candidate({ candidateId: "other", placeId: "other", name, categoryName })],
+    })).toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
+  it("keeps a distant facility with a falsely matching road address for review", () => {
+    expect(decideKakaoSchoolMatch({
+      school, addressResult: { ...addressResult, latitude: 36.353, longitude: 127.38 },
+      candidates: [candidate(), candidate({
+        candidateId: "distant", placeId: "distant", name: `${school.name} 체육관`,
+        categoryName: "스포츠,레저 > 스포츠시설 > 체육관", latitude: 36.356,
+      })],
+    })).toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
   it("does not substitute a school office when the school itself is missing", () => {
     const decision = decideKakaoSchoolMatch({
       school,

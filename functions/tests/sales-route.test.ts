@@ -39,6 +39,24 @@ function roadMatrix(): SalesRouteMatrix {
 }
 
 describe("sales route contract and optimizer", () => {
+  it.each([2, 9, 16, 20])("retains every one of %i schools exactly once with the chosen start", (count) => {
+    const schools = Array.from({ length: count }, (_, index) => ({
+      schoolId: `S-${index}`, name: `학교 ${index}`, latitude: 36.3 + index * 0.004, longitude: 127.4 + index * 0.002,
+    }));
+    const schoolIds = schools.map(school => school.schoolId);
+    const startSchoolId = schoolIds.at(-1)!;
+    expect(optimizeSalesRouteInputSchema.safeParse({ cycleId: "2026-09", schoolIds, startSchoolId }).success).toBe(true);
+    const result = optimizeSalesRouteOrder(schools, startSchoolId, createEstimatedRouteMatrix(schools));
+    expect(result[0]).toBe(startSchoolId);
+    expect(result).toHaveLength(count);
+    expect(new Set(result)).toEqual(new Set(schoolIds));
+  });
+
+  it("rejects more than twenty schools rather than silently truncating them", () => {
+    expect(optimizeSalesRouteInputSchema.safeParse({
+      cycleId: "2026-09", schoolIds: Array.from({ length: 21 }, (_, index) => String(index)), startSchoolId: "0",
+    }).success).toBe(false);
+  });
   it("requires two unique schools and keeps the selected first school fixed", () => {
     expect(optimizeSalesRouteInputSchema.safeParse({
       cycleId: "2026-09",
@@ -66,6 +84,24 @@ describe("sales route contract and optimizer", () => {
 });
 
 describe("Kakao route client", () => {
+  it("does not assign malformed or unknown provider keys to another school", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ routes: ["", " ", "00", "0.0", "1e0", "-1", "99"].map(key => ({
+      result_code: 0, key, summary: { distance: 1, duration: 1 },
+    })) }), { status: 200 }));
+    const client = new KakaoRouteClient("test-key", fetcher as typeof fetch);
+    expect(await client.loadFrom(nodes[0]!, nodes.slice(1))).toEqual(new Map());
+  });
+
+  it("retains available road legs when other destinations have no driving route", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ routes: [
+      { result_code: 0, key: "0", summary: { distance: 1000, duration: 120 } },
+      { result_code: 104, key: "1" },
+    ] }), { status: 200 }));
+    const metrics = await new KakaoRouteClient("test-key", fetcher as typeof fetch).loadFrom(nodes[0]!, nodes.slice(1));
+    expect(metrics.size).toBe(1);
+    expect(metrics.get("B")).toMatchObject({ source: "road", durationSeconds: 120 });
+    expect(metrics.has("C")).toBe(false);
+  });
   it("maps successful destination summaries back to school IDs", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({
       trans_id: "route-test",
@@ -93,4 +129,3 @@ describe("Kakao route client", () => {
     });
   });
 });
-

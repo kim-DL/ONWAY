@@ -32,9 +32,10 @@ const schoolSchema = z.object({
 }).passthrough();
 
 export type SalesRouteActor = { uid: string; employeeId: string };
+export type SalesRouteLocationFailureReason = "review-required" | "provider-unavailable" | "check-pending";
 export type SalesRouteLocationResolution =
   | { ok: true; latitude: number; longitude: number }
-  | { ok: false; reason: "review-required" | "provider-unavailable" };
+  | { ok: false; reason: SalesRouteLocationFailureReason };
 export interface SalesRouteLocationResolver {
   resolve(schoolId: string, actor: SalesRouteActor): Promise<SalesRouteLocationResolution>;
 }
@@ -45,7 +46,7 @@ export class SalesRouteSchoolError extends Error {}
 export class SalesRouteLocationError extends Error {
   constructor(
     readonly schoolIds: string[],
-    readonly reason: "review-required" | "provider-unavailable" = "review-required",
+    readonly reason: SalesRouteLocationFailureReason = "review-required",
   ) {
     super("Some schools do not have trusted coordinates.");
   }
@@ -58,12 +59,23 @@ export type RouteSchool = z.infer<typeof schoolSchema>;
 const LOCATION_SCHEDULING_BUDGET_MS = 12_000;
 const ROAD_SCHEDULING_BUDGET_MS = 18_000;
 
+function validRouteCoordinate(latitude: number | null, longitude: number | null) {
+  // This catalog is restricted to Daejeon. Reject old placeholders and corrupt
+  // provider values even when their persisted match status says "confirmed".
+  return latitude !== null && longitude !== null
+    && Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= 36 && latitude <= 36.7
+    && longitude >= 127.1 && longitude <= 127.7;
+}
+
 function trustedNode(school: RouteSchool): SalesRouteNode | null {
   if (
     school.operationalStatus !== "active"
+    || school.possibleRelocation === true
     || !["confirmed", "autoMatched"].includes(school.location.matchStatus)
     || school.location.latitude === null
     || school.location.longitude === null
+    || !validRouteCoordinate(school.location.latitude, school.location.longitude)
   ) return null;
   return {
     schoolId: school.schoolId,
@@ -81,6 +93,7 @@ export async function resolveRouteNodes(
   const nodes: Array<SalesRouteNode | null> = schools.map(trustedNode);
   const schedulingDeadline = Date.now() + LOCATION_SCHEDULING_BUDGET_MS;
   let providerUnavailable = false;
+  let checkPending = false;
   let nextIndex = 0;
 
   const worker = async () => {
@@ -94,21 +107,25 @@ export async function resolveRouteNodes(
       if (school.operationalStatus !== "active" || !hasOfficialAddress || !resolver) {
         continue;
       }
-      if (providerUnavailable || Date.now() >= schedulingDeadline) {
-        providerUnavailable = true;
+      if (providerUnavailable) return;
+      if (Date.now() >= schedulingDeadline) {
+        // Successfully checked schools are already persisted by the resolver.
+        // A retry can continue with the remaining schools; this is not an outage.
+        checkPending = true;
         return;
       }
       try {
         const resolution = await resolver.resolve(school.schoolId, actor);
-        if (resolution.ok) {
+        if (resolution.ok && validRouteCoordinate(resolution.latitude, resolution.longitude)) {
           nodes[index] = {
             schoolId: school.schoolId,
             name: school.name,
             latitude: resolution.latitude,
             longitude: resolution.longitude,
           };
-        } else {
+        } else if (!resolution.ok) {
           providerUnavailable ||= resolution.reason === "provider-unavailable";
+          checkPending ||= resolution.reason === "check-pending";
         }
       } catch {
         providerUnavailable = true;
@@ -122,7 +139,7 @@ export async function resolveRouteNodes(
   if (unresolvedSchoolIds.length > 0) {
     throw new SalesRouteLocationError(
       unresolvedSchoolIds,
-      providerUnavailable ? "provider-unavailable" : "review-required",
+      providerUnavailable ? "provider-unavailable" : checkPending ? "check-pending" : "review-required",
     );
   }
   return nodes as SalesRouteNode[];

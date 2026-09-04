@@ -30,7 +30,8 @@ try {
   await waitForServer();
   const result = spawnSync(
     process.execPath,
-    [playwrightCli, "test", "tests/e2e-auth/phase9-sales-cycle.spec.ts", "--config", "playwright.phase3.config.ts"],
+    [playwrightCli, "test", "tests/e2e-auth/phase9-sales-cycle.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts", "--config", "playwright.phase3.config.ts",
+      ...(process.env.ONNURIWAY_E2E_GREP ? ["--grep", process.env.ONNURIWAY_E2E_GREP] : [])],
     { cwd: process.cwd(), env: process.env, stdio: "inherit" },
   );
   if (result.error) console.error(result.error.message);

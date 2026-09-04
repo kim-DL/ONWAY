@@ -232,6 +232,119 @@ test("salesperson creates an accessible route and applies its order on mobile", 
   await expect(page.locator(".assignment-card").first()).toHaveAccessibleName(/^동선 1번째/);
 });
 
+test("sixteen-school route preserves failed selections and explicitly recovers with a new first school", async ({ page }) => {
+  const app = getApps().find((candidate) => candidate.name === "phase9-e2e-control")!;
+  const database = getFirestore(app);
+  const templateId = "SCH-NEIS-G100000001";
+  const school = (await database.doc(`schools/${templateId}`).get()).data()!;
+  const assignment = (await database.doc(`salesCycles/2026-08/assignments/${templateId}`).get()).data()!;
+  const extraIds = Array.from({ length: 14 }, (_, index) => `SCH-ROUTE-RECOVERY-${index + 1}`);
+  const batch = database.batch();
+  for (const [index, schoolId] of extraIds.entries()) {
+    batch.set(database.doc(`schools/${schoolId}`), {
+      ...school, schoolId, name: `동선검증${index + 1}초등학교`,
+      source: { ...school.source, schoolCode: schoolId },
+    });
+    batch.set(database.doc(`salesCycles/2026-08/assignments/${schoolId}`), { ...assignment, schoolId, monthlyStatus: "before" });
+  }
+  await batch.commit();
+  let releaseRequest: (() => void) | undefined;
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, PHASE3_TEST_PINS.salesA);
+    await page.getByRole("button", { name: /방문 동선/ }).click();
+    const dialog = page.getByRole("dialog", { name: "방문 동선 만들기" });
+    await dialog.getByRole("button", { name: "선택 가능한 학교 전체" }).click();
+    await dialog.locator(".sales-route-candidates > li", { hasText: "동선검증1초등학교" }).getByRole("radio").locator("xpath=ancestor::label").click();
+    const requests: { schoolIds: string[]; startSchoolId: string }[] = [];
+    const secondRequestGate = new Promise<void>((resolve) => { releaseRequest = resolve; });
+    await page.route("**/optimizeSalesRoute", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      requests.push(route.request().postDataJSON().data);
+      if (requests.length === 1) {
+        return route.fulfill({
+          status: 400, contentType: "application/json",
+          body: JSON.stringify({ error: { status: "FAILED_PRECONDITION", message: "400 raw server detail", details: { reason: "location-review-required", schoolIds: extraIds.slice(0, 2) } } }),
+        });
+      }
+      await secondRequestGate;
+      return route.continue();
+    });
+
+    await dialog.getByRole("button", { name: /가까운 순서 계산/ }).click();
+    const recovery = dialog.getByLabel("동선 계산 안내", { exact: true });
+    await expect(recovery).toBeVisible();
+    await expect(recovery.getByRole("list", { name: "위치 확인이 남은 학교" })).toContainText("동선검증1초등학교");
+    await expect(recovery.getByRole("list", { name: "위치 확인이 남은 학교" })).toContainText("동선검증2초등학교");
+    await expect(recovery).not.toContainText("400");
+    await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(16);
+    await expect(dialog.locator(".sales-route-candidates > li", { hasText: "동선검증1초등학교" }).getByRole("radio")).toBeChecked();
+    const remainder = recovery.getByRole("button", { name: "위 2곳 빼고 14곳 계산" });
+    await expect(remainder).toBeDisabled();
+    await recovery.getByRole("combobox", { name: "나머지 동선의 첫 학교" }).selectOption(templateId);
+    await expect(remainder).toBeEnabled();
+    const accessibility = await new AxeBuilder({ page }).include("[role=dialog]").analyze();
+    expect(accessibility.violations).toEqual([]);
+    await remainder.click();
+    await expect(dialog.getByRole("button", { name: /계산 중/ })).toBeDisabled();
+    await expect(dialog.locator(".sales-route-candidates input:enabled")).toHaveCount(0);
+    await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(14);
+    await expect.poll(() => requests.length).toBe(2);
+    expect(requests[0]).toMatchObject({ startSchoolId: extraIds[0], schoolIds: expect.arrayContaining(extraIds) });
+    expect(requests[0]!.schoolIds).toHaveLength(16);
+    expect(requests[1]!.schoolIds).toHaveLength(14);
+    for (const excludedId of extraIds.slice(0, 2)) expect(requests[1]!.schoolIds).not.toContain(excludedId);
+    expect(requests[1]!.startSchoolId).toBe(templateId);
+    releaseRequest!();
+    await expect(dialog.locator(".sales-route-order > li")).toHaveCount(14, { timeout: 15_000 });
+    await expect(dialog.locator(".sales-route-order > li").first()).toContainText("대전온누리고등학교");
+    expect((await database.doc(`salesCycles/2026-08/assignments/${extraIds[0]}`).get()).exists).toBe(true);
+  } finally {
+    releaseRequest?.();
+    const cleanup = database.batch();
+    for (const schoolId of extraIds) {
+      cleanup.delete(database.doc(`salesCycles/2026-08/assignments/${schoolId}`));
+      cleanup.delete(database.doc(`schools/${schoolId}`));
+    }
+    await cleanup.commit();
+  }
+});
+
+test("route outages and pending checks keep selection, while changed selections clear obsolete errors", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, PHASE3_TEST_PINS.salesA);
+  await page.getByRole("button", { name: /방문 동선/ }).click();
+  const dialog = page.getByRole("dialog", { name: "방문 동선 만들기" });
+  let attempts = 0;
+  await page.route("**/optimizeSalesRoute", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const input = route.request().postDataJSON().data;
+    attempts += 1;
+    return route.fulfill({
+      status: 400, contentType: "application/json",
+      body: JSON.stringify({ error: { status: "FAILED_PRECONDITION", message: "HTTP 400", details: {
+        reason: attempts === 1 ? "location-provider-unavailable" : attempts === 2 ? "location-check-pending" : "location-review-required",
+        schoolIds: input.schoolIds,
+      } } }),
+    });
+  });
+  await dialog.getByRole("button", { name: /가까운 순서 계산/ }).click();
+  const recovery = dialog.getByLabel("동선 계산 안내", { exact: true });
+  await expect(recovery).toContainText("서비스가 잠시 응답하지 않아요");
+  await expect(recovery.getByRole("button", { name: /빼고/ })).toHaveCount(0);
+  await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(2);
+  await recovery.getByRole("button", { name: "선택 그대로 다시 계산" }).click();
+  await expect(recovery).toContainText("위치 확인에 시간이 더 필요해요");
+  await expect(recovery.getByRole("button", { name: /빼고/ })).toHaveCount(0);
+  await recovery.getByRole("button", { name: "위치 확인 이어서 계산" }).click();
+  await expect(recovery).toContainText("확인된 학교가 2곳 미만이에요");
+  await expect(recovery.getByRole("button", { name: /빼고/ })).toHaveCount(0);
+  await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(2);
+  const otherFirstSchool = dialog.locator(".sales-route-candidate__start input:not(:checked)").first();
+  await otherFirstSchool.locator("xpath=ancestor::label").click();
+  await expect(recovery).toHaveCount(0);
+});
+
 async function emulatorIdToken(uid: string) {
   const app = getApps().find((candidate) => candidate.name === "phase9-e2e-control");
   if (!app) throw new Error("Phase 9 control app is missing.");

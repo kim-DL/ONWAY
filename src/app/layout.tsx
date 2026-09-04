@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    apple: [{ url: "/icons/onnuriway-company-apple-touch-icon-v3.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/icons/onnuriway-company-apple-touch-icon-v4.png", sizes: "180x180", type: "image/png" }],
   },
   robots: {
     index: false,

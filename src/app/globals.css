@@ -758,6 +758,20 @@ button { -webkit-tap-highlight-color: transparent; }
 .sales-route-empty strong { color: var(--toss-ink); font-size: .78rem; }
 .sales-route-empty span { font-size: .64rem; }
 .sales-route-error { margin: 0; padding: .7rem; border-radius: 10px; color: #9c2f3f; background: #fff0f2; font-size: .67rem; font-weight: 750; }
+.sales-route-recovery { display: grid; gap: .45rem; padding: .75rem; border: 1px solid var(--toss-grey-200); border-radius: 12px; background: #fff; color: var(--toss-grey-700); font-size: .65rem; line-height: 1.5; }
+.sales-route-recovery strong { color: var(--toss-ink); font-size: .75rem; }
+.sales-route-recovery p { margin: .15rem 0 0; }
+.sales-route-recovery ul { display: flex; flex-wrap: wrap; gap: .3rem; max-height: 6rem; overflow-y: auto; margin: 0; padding: .1rem; list-style: none; }
+.sales-route-recovery li { padding: .2rem .4rem; border-radius: 5px; color: var(--toss-grey-700); background: var(--toss-grey-50); font-weight: 750; }
+.sales-route-recovery__start { display: grid; gap: .35rem; }
+.sales-route-recovery__start select { width: 100%; min-height: 44px; padding: .45rem; border: 1px solid var(--toss-grey-300); border-radius: 8px; color: var(--toss-ink); background: #fff; font: inherit; font-size: max(16px, .67rem); }
+.sales-route-recovery__actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.sales-route-recovery__actions button { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; flex: 1 1 auto; min-height: 44px; padding: .45rem .65rem; border: 1px solid var(--toss-grey-200); border-radius: 8px; color: var(--toss-blue-deep); background: var(--toss-blue-weak); font: inherit; font-weight: 800; cursor: pointer; }
+.sales-route-recovery__actions button:last-child:not(:first-child) { color: var(--toss-grey-700); background: #fff; }
+.sales-route-recovery__actions button:disabled { opacity: .5; cursor: not-allowed; }
+.sales-route-recovery:focus-visible,
+.sales-route-recovery button:focus-visible,
+.sales-route-recovery select:focus-visible { outline: 3px solid rgba(49, 130, 246, .4); outline-offset: 3px; }
 .sales-route-planner__footer { display: flex; align-items: center; justify-content: space-between; gap: .65rem; padding-top: .15rem; }
 .sales-route-planner__footer > span { color: var(--toss-grey-600); font-size: .61rem; }
 .sales-route-planner__footer .glass-button { min-width: 11rem; justify-content: center; }
@@ -4348,6 +4362,72 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 /* Onnuri General Foods identity · exact company mark with purposeful motion */
+.workspace-header .app-brand--signature {
+  flex-shrink: 0;
+  gap: .65rem;
+}
+.workspace-header .app-brand--signature .app-brand__mark {
+  width: 76px;
+  height: 36px;
+  aspect-ratio: auto;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.workspace-header .app-brand--signature .app-brand__mark::after { content: none; }
+.workspace-header .app-brand--signature .app-brand__wordmark {
+  display: grid;
+  gap: .12rem;
+  white-space: nowrap;
+}
+.workspace-header .app-brand--signature .app-brand__wordmark strong {
+  color: #191f28;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 760;
+  letter-spacing: -.045em;
+}
+.workspace-header .app-brand--signature .app-brand__wordmark small {
+  display: block;
+  color: #525d6b;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.workspace-shell .workspace-header .mode-control button { font-size: 13px; }
+.workspace-shell .workspace-header .mode-control button[aria-pressed="false"] { color: #525d6b; }
+@media (max-width: 760px) {
+  .workspace-header:has(.app-brand--signature) { gap: .5rem; }
+  .workspace-header .app-brand--signature {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+  }
+  .workspace-header .app-brand--signature .app-brand__mark { width: 80px; height: 30px; }
+  .workspace-header .app-brand--signature .app-brand__wordmark strong { font-size: 13px; }
+  .workspace-header .app-brand--signature .app-brand__wordmark small { display: none; }
+  .workspace-header:has(.app-brand--signature) .workspace-header__controls { flex-shrink: 0; }
+}
+@media (max-width: 359px) {
+  .workspace-header:has(.app-brand--signature) { padding-inline: .75rem; }
+  .workspace-header:has(.app-brand--signature) .workspace-header__controls { gap: .35rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-header .app-brand--signature .app-brand__mark {
+    animation: company-wave-arrive 700ms cubic-bezier(.18, .82, .24, 1) backwards;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .workspace-header .app-brand--signature .app-brand__mark { transition: transform 240ms ease; }
+  .workspace-header .app-brand--signature:hover .app-brand__mark { transform: translateY(-2px); }
+}
+@keyframes company-wave-arrive {
+  from { opacity: 0; transform: translateX(-8px) scale(.92); }
+  65% { opacity: 1; transform: translateX(1px) scale(1.02); }
+}
+
 .workspace-shell .app-brand__mark,
 .auth-brand__mark,
 .admin-brand > span {

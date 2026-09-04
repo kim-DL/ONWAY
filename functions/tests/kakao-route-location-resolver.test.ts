@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { KakaoRouteLocationResolver } from "../src/sales/kakao-route-location-resolver.js";
+import { KakaoMatchConflictError } from "../src/sync/kakao-match-service.js";
 
 const actor = { uid: "uid-sales", employeeId: "EMP-SALES" };
 const candidate = {
@@ -22,6 +23,26 @@ const candidate = {
 };
 
 describe("Kakao route location resolver", () => {
+  it("returns a retryable state after a conflict without fresh trusted coordinates", async () => {
+    const match = vi.fn(async () => { throw new KakaoMatchConflictError(); });
+    const readTrustedLocation = vi.fn(async () => null);
+    const resolver = new KakaoRouteLocationResolver({ match, readTrustedLocation });
+
+    await expect(resolver.resolve("SCHOOL-1", actor)).resolves.toEqual({ ok: false, reason: "check-pending" });
+    expect(match).toHaveBeenCalledTimes(1);
+    expect(readTrustedLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not hide unrelated matcher errors behind conflict recovery", async () => {
+    const error = new Error("Database unavailable");
+    const match = vi.fn(async () => { throw error; });
+    const readTrustedLocation = vi.fn(async () => null);
+    const resolver = new KakaoRouteLocationResolver({ match, readTrustedLocation });
+
+    await expect(resolver.resolve("SCHOOL-1", actor)).rejects.toBe(error);
+    expect(readTrustedLocation).not.toHaveBeenCalled();
+  });
+
   it("returns a trusted auto-matched coordinate", async () => {
     const match = vi.fn(async () => ({
       schoolId: "SCHOOL-1",

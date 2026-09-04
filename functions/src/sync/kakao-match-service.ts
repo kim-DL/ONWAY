@@ -117,6 +117,21 @@ export class KakaoMatchService {
     this.now = dependencies.now ?? (() => new Date());
   }
 
+  async readTrustedLocation(schoolId: string) {
+    const snapshot = await this.dependencies.db.doc(`schools/${schoolId}`).get();
+    if (!snapshot.exists) return null;
+    const school = asStoredSchool(snapshot.data()!, snapshot.id);
+    const { latitude, longitude, matchStatus } = school.location;
+    if (
+      school.operationalStatus !== "active" || school.possibleRelocation
+      || (matchStatus !== "autoMatched" && matchStatus !== "confirmed")
+      || latitude === null || longitude === null
+      || !Number.isFinite(latitude) || !Number.isFinite(longitude)
+      || latitude < 36 || latitude > 36.7 || longitude < 127.1 || longitude > 127.7
+    ) return null;
+    return { latitude, longitude };
+  }
+
   private async persistDecision(input: {
     requestId: string;
     school: StoredSchool;
@@ -151,7 +166,9 @@ export class KakaoMatchService {
               candidate,
             ) <= 100
             : false;
-          if (samePlace || close) {
+          // A Kakao place ID can survive a campus relocation. Identity alone
+          // must not clear the warning while retaining a distant old coordinate.
+          if (close) {
             status = "confirmed";
             reason = samePlace ? "CONFIRMED_PLACE_UNCHANGED" : "CONFIRMED_LOCATION_NEARBY";
             possibleRelocation = false;
@@ -250,6 +267,7 @@ export class KakaoMatchService {
       });
     }
 
+    let decision: KakaoMatchDecision;
     try {
       const addressResult = await this.dependencies.client.searchAddress(
         schoolAddressQuery(officialAddress, school.name),
@@ -258,20 +276,13 @@ export class KakaoMatchService {
         query: `${school.name} 대전`,
         origin: addressResult,
       });
-      return this.persistDecision({
-        requestId: input.requestId,
-        school,
-        decision: decideKakaoSchoolMatch({ school, addressResult, candidates }),
-        actor,
-      });
+      decision = decideKakaoSchoolMatch({ school, addressResult, candidates });
     } catch {
-      return this.persistDecision({
-        requestId: input.requestId,
-        school,
-        decision: { status: "failed", candidate: null, candidates: [], reason: "KAKAO_API_FAILURE" },
-        actor,
-      });
+      decision = { status: "failed", candidate: null, candidates: [], reason: "KAKAO_API_FAILURE" };
     }
+    // Persistence errors are not provider failures. In particular, a concurrent
+    // school update must not trigger another write using the same stale revision.
+    return this.persistDecision({ requestId: input.requestId, school, decision, actor });
   }
 
   async confirm(input: ConfirmKakaoMatchInput, actor: SyncActor) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
@@ -13,7 +13,8 @@ import {
   type SalesRouteResult,
 } from "./sales-route-contract";
 import { canPlanRouteForSchool, hasTrustedRouteLocation } from "./sales-route-location";
-import { optimizeSalesRoute, salesRouteErrorMessage } from "./sales-route-repository";
+import { optimizeSalesRoute } from "./sales-route-repository";
+import { parseSalesRouteFailure, routeLocationRecovery, routeRequestKey, type SalesRouteFailure } from "./sales-route-recovery";
 
 const MAX_ROUTE_SCHOOLS = 20;
 
@@ -93,9 +94,25 @@ export function SalesRoutePlanner({
   const [orderedSchoolIds, setOrderedSchoolIds] = useState<string[]>(() => initialRoute?.orderedSchoolIds ?? []);
   const [manuallyAdjusted, setManuallyAdjusted] = useState(initialRoute?.manuallyAdjusted ?? false);
   const [busy, setBusy] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [failure, setFailure] = useState<SalesRouteFailure | null>(null);
+  const [recoveryStartId, setRecoveryStartId] = useState("");
+  const busyRef = useRef(false);
+  const mountedRef = useRef(false);
+  const failureRef = useRef<HTMLDivElement>(null);
+  const selectionKey = routeRequestKey({ cycleId, schoolIds: [...selectedIds], startSchoolId });
+  const currentSelectionKey = useRef(selectionKey);
+  const recovery = routeLocationRecovery(failure, [...selectedIds], startSchoolId);
+  const schoolById = new Map(candidates.map(({ school }) => [school.schoolId, school]));
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  useEffect(() => { currentSelectionKey.current = selectionKey; }, [selectionKey]);
+  useEffect(() => { if (failure) failureRef.current?.focus(); }, [failure]);
   const eligibleCount = candidates.filter(({ school }) => canPlanRouteForSchool(school)).length;
-  const unavailableCount = candidates.length - eligibleCount;
+  const inactiveCount = candidates.filter(({ school }) => school.operationalStatus !== "active").length;
+  const missingAddressCount = candidates.filter(({ school }) => school.operationalStatus === "active" && !canPlanRouteForSchool(school)).length;
   const pendingLocationCount = candidates.filter(({ school }) => (
     canPlanRouteForSchool(school) && !hasTrustedRouteLocation(school)
   )).length;
@@ -111,9 +128,11 @@ export function SalesRoutePlanner({
   }, [orderedSchoolIds, result]);
 
   const toggleSchool = (schoolId: string, selected: boolean) => {
+    if (busyRef.current) return;
     setResult(null);
     setOrderedSchoolIds([]);
-    setErrorMessage(null);
+    setFailure(null);
+    setRecoveryStartId("");
     const next = new Set(selectedIds);
     if (selected && next.size < MAX_ROUTE_SCHOOLS) next.add(schoolId);
     if (!selected) next.delete(schoolId);
@@ -122,14 +141,17 @@ export function SalesRoutePlanner({
   };
 
   const selectSuggested = () => {
+    if (busyRef.current) return;
     setSelectedIds(new Set(defaults));
     setStartSchoolId(defaults[0] ?? "");
     setResult(null);
     setOrderedSchoolIds([]);
-    setErrorMessage(null);
+    setFailure(null);
+    setRecoveryStartId("");
   };
 
   const selectAll = () => {
+    if (busyRef.current) return;
     const ids = candidates
       .filter(({ school }) => canPlanRouteForSchool(school))
       .slice(0, MAX_ROUTE_SCHOOLS)
@@ -138,26 +160,44 @@ export function SalesRoutePlanner({
     setStartSchoolId(ids[0] ?? "");
     setResult(null);
     setOrderedSchoolIds([]);
-    setErrorMessage(null);
+    setFailure(null);
+    setRecoveryStartId("");
   };
 
-  const calculate = async () => {
-    if (busy || selectedCount < 2 || !selectedIds.has(startSchoolId)) return;
+  const calculate = async (schoolIds = [...selectedIds], firstSchoolId = startSchoolId) => {
+    if (busyRef.current || schoolIds.length < 2 || !schoolIds.includes(firstSchoolId)) return;
+    busyRef.current = true;
+    // Only the explicit recovery action may change the requested set. A normal
+    // failure keeps both the original selection and the chosen first school.
+    const requestSelectionKey = routeRequestKey({ cycleId, schoolIds, startSchoolId: firstSchoolId });
+    currentSelectionKey.current = requestSelectionKey;
+    setSelectedIds(new Set(schoolIds));
+    setStartSchoolId(firstSchoolId);
     setBusy(true);
-    setErrorMessage(null);
+    setFailure(null);
     try {
       const nextResult = await optimizeSalesRoute({
         cycleId,
-        schoolIds: [...selectedIds],
-        startSchoolId,
+        schoolIds,
+        startSchoolId: firstSchoolId,
       });
+      if (!mountedRef.current || currentSelectionKey.current !== requestSelectionKey) return;
+      setSelectedIds(new Set(schoolIds));
+      setStartSchoolId(firstSchoolId);
       setResult(nextResult);
       setOrderedSchoolIds(nextResult.orderedSchoolIds);
       setManuallyAdjusted(false);
     } catch (error) {
-      setErrorMessage(salesRouteErrorMessage(error));
+      if (!mountedRef.current || currentSelectionKey.current !== requestSelectionKey) return;
+      const nextFailure = parseSalesRouteFailure(error);
+      const requestedFailureIds = nextFailure.schoolIds.filter((id) => schoolIds.includes(id));
+      setFailure(nextFailure.kind === "review" && requestedFailureIds.length === 0
+        ? parseSalesRouteFailure(null)
+        : { ...nextFailure, schoolIds: requestedFailureIds });
+      setRecoveryStartId("");
     } finally {
-      setBusy(false);
+      busyRef.current = false;
+      if (mountedRef.current) setBusy(false);
     }
   };
 
@@ -210,7 +250,7 @@ export function SalesRoutePlanner({
         </ol>
 
         <div className="sales-route-planner__footer">
-          <button type="button" className="sales-route-text-action" onClick={() => { setResult(null); setOrderedSchoolIds([]); setErrorMessage(null); }}>학교 다시 선택</button>
+          <button type="button" className="sales-route-text-action" onClick={() => { setResult(null); setOrderedSchoolIds([]); setFailure(null); }}>학교 다시 선택</button>
           <GlassButton
             variant="primary"
             onClick={() => onApply({
@@ -243,11 +283,45 @@ export function SalesRoutePlanner({
       </div>
       <div className="sales-route-planner__quick" aria-label="빠른 선택">
         <button type="button" disabled={busy} onClick={selectSuggested}>미완료 학교</button>
-        <button type="button" disabled={busy} onClick={selectAll}>선택 가능한 학교 전체</button>
-        <span>{selectedCount}/{Math.min(eligibleCount, MAX_ROUTE_SCHOOLS)}</span>
+        <button type="button" disabled={busy} onClick={selectAll}>{eligibleCount > MAX_ROUTE_SCHOOLS ? "전체 (최대 20곳)" : "선택 가능한 학교 전체"}</button>
+        <span>{selectedCount}/{eligibleCount}</span>
       </div>
       {pendingLocationCount > 0 ? <p className="sales-route-location-note"><Icon name="sparkles" size={16} />{pendingLocationCount}곳은 계산할 때 공식 주소로 위치를 자동 확인해요.</p> : null}
-      {unavailableCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />공식 주소가 없는 {unavailableCount}곳은 선택할 수 없어요.</p> : null}
+      {missingAddressCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />공식 주소가 없는 {missingAddressCount}곳은 선택할 수 없어요.</p> : null}
+      {inactiveCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />운영하지 않는 학교 {inactiveCount}곳은 동선에서 제외돼요.</p> : null}
+
+      {failure ? (
+        <div className="sales-route-recovery" ref={failureRef} tabIndex={-1} role="region" aria-label="동선 계산 안내">
+          <div role="alert">
+            <strong>{failure.kind === "review" ? "확인이 필요한 학교가 있어요" : failure.kind === "pending" ? "위치 확인을 이어갈 수 있어요" : "잠시 계산을 마치지 못했어요"}</strong>
+            <p>{failure.message}</p>
+          </div>
+          {recovery.excludedIds.length > 0 ? (
+            <ul aria-label="위치 확인이 남은 학교">{recovery.excludedIds.map((id) => <li key={id}>{schoolById.get(id)?.name ?? "목록에서 변경된 학교"}</li>)}</ul>
+          ) : null}
+          {failure.kind === "review" && !recovery.canUseRemainder ? <p>확인된 학교가 2곳 미만이에요. 관리자에게 위 학교의 지도 위치 확인을 요청하거나 방문할 학교를 변경해주세요.</p> : null}
+          {recovery.canUseRemainder && recovery.requiresNewStart ? (
+            <label className="sales-route-recovery__start">
+              <span>첫 학교도 확인이 필요해요. 나머지 학교로 이동하려면 출발할 학교를 골라주세요.</span>
+              <select value={recoveryStartId} disabled={busy} onChange={(event) => setRecoveryStartId(event.target.value)} aria-label="나머지 동선의 첫 학교">
+                <option value="">첫 학교 선택</option>
+                {recovery.remainingIds.map((id) => <option key={id} value={id}>{schoolById.get(id)?.name}</option>)}
+              </select>
+            </label>
+          ) : null}
+          {recovery.canUseRemainder ? <p>나머지로 계산해도 위 학교의 담당 배정은 유지됩니다.</p> : null}
+          <div className="sales-route-recovery__actions">
+            <button type="button" disabled={busy} onClick={() => void calculate()}><Icon name="refresh" size={17} />{failure.kind === "pending" ? "위치 확인 이어서 계산" : "선택 그대로 다시 계산"}</button>
+            {recovery.canUseRemainder ? (
+              <button
+                type="button"
+                disabled={busy || (recovery.requiresNewStart && !recovery.remainingIds.includes(recoveryStartId))}
+                onClick={() => void calculate(recovery.remainingIds, recovery.requiresNewStart ? recoveryStartId : startSchoolId)}
+              >위 {recovery.excludedIds.length}곳 빼고 {recovery.remainingIds.length}곳 계산</button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <ul className="sales-route-candidates" aria-label="방문할 학교 선택">
         {candidates.map(({ assignment, school }) => {
@@ -265,7 +339,7 @@ export function SalesRoutePlanner({
                   onChange={(event) => toggleSchool(school.schoolId, event.target.checked)}
                 />
                 <span className="sales-route-candidate__check" aria-hidden="true"><Icon name="check" size={15} /></span>
-                <span><strong>{school.name}</strong><small>{eligible ? (locationReady ? (assignment.monthlyStatus === "completed" ? "방문 완료" : "방문 예정") : "주소로 자동 확인") : "공식 주소 없음"}</small></span>
+                <span><strong>{school.name}</strong><small>{eligible ? (locationReady ? (assignment.monthlyStatus === "completed" ? "방문 완료" : "방문 예정") : "주소로 자동 확인") : school.operationalStatus !== "active" ? "운영하지 않는 학교" : "공식 주소 없음"}</small></span>
               </label>
               <label className="sales-route-candidate__start" data-selected={startSchoolId === school.schoolId ? "true" : "false"}>
                 <input
@@ -273,7 +347,12 @@ export function SalesRoutePlanner({
                   name="sales-route-start"
                   checked={startSchoolId === school.schoolId}
                   disabled={busy || !eligible || !selected}
-                  onChange={() => setStartSchoolId(school.schoolId)}
+                  onChange={() => {
+                    if (busyRef.current) return;
+                    setStartSchoolId(school.schoolId);
+                    setFailure(null);
+                    setRecoveryStartId("");
+                  }}
                 />
                 <span>첫 학교</span>
               </label>
@@ -285,9 +364,8 @@ export function SalesRoutePlanner({
       {eligibleCount < 2 ? (
         <div className="sales-route-empty" role="status"><Icon name="location" /><strong>동선을 만들 학교 정보가 부족해요.</strong><span>공식 주소가 등록된 학교가 2곳 이상 필요합니다.</span></div>
       ) : null}
-      {errorMessage ? <p className="sales-route-error" role="alert">{errorMessage}</p> : null}
       <div className="sales-route-planner__footer">
-        <span aria-live="polite">{busy ? "도로 이동시간을 확인하고 있어요…" : "최대 20곳까지 한 번에 계산할 수 있어요."}</span>
+        <span aria-live="polite">{busy ? "학교 위치와 도로 이동시간을 확인하고 있어요…" : "최대 20곳까지 한 번에 계산할 수 있어요."}</span>
         <GlassButton variant="primary" disabled={busy || selectedCount < 2 || !selectedIds.has(startSchoolId)} onClick={() => void calculate()}>
           {busy ? <><Icon name="refresh" className="is-spinning" />계산 중…</> : <><Icon name="sparkles" />가까운 순서 계산</>}
         </GlassButton>

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import dynamic from "next/dynamic";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { AppIconMark } from "@/components/ui/app-icon-mark";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -33,6 +32,7 @@ import {
 } from "./shell-policy";
 import { DeliveryRecentSchools } from "./delivery-recent-schools";
 import { useTimeGreeting } from "./time-greeting";
+import { AppBrand } from "./app-brand";
 
 const MODE_OPTIONS = [
   { value: "delivery", label: "납품" },
@@ -83,15 +83,6 @@ const SchoolSearch = dynamic(
     ),
   },
 );
-
-function AppBrand({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="app-brand">
-      <span className="app-brand__mark" aria-hidden="true"><AppIconMark /></span>
-      <span className="app-brand__wordmark"><strong>급식길</strong>{compact ? null : <small>온누리종합식품</small>}</span>
-    </div>
-  );
-}
 
 function initials(name: string) {
   return Array.from(name.trim()).slice(0, 2).join("");

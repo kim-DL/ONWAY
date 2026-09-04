@@ -49,4 +49,14 @@ describe("sales route location eligibility", () => {
     expect(canPlanRouteForSchool(school({ address: { road: null, jibun: null, postalCode: null } }))).toBe(false);
     expect(canPlanRouteForSchool(school({ operationalStatus: "inactive" }))).toBe(false);
   });
+
+  it("does not treat out-of-region placeholder coordinates as verified locations", () => {
+    const value = school();
+    const invalid = { ...value, location: { ...value.location, matchStatus: "confirmed" as const, latitude: 0, longitude: 0 } };
+    expect(hasTrustedRouteLocation(invalid)).toBe(false);
+    expect(canPlanRouteForSchool(invalid)).toBe(true);
+    const valid = { ...invalid, location: { ...invalid.location, latitude: 36.35, longitude: 127.4 } };
+    expect(hasTrustedRouteLocation(valid)).toBe(true);
+    expect(hasTrustedRouteLocation({ ...valid, possibleRelocation: true })).toBe(false);
+  });
 });

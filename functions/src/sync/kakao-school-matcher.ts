@@ -103,21 +103,34 @@ export function scoreKakaoCandidate(
   };
 }
 
-function isSameSchoolFacility(school: StoredSchool, candidate: ScoredKakaoCandidate) {
+function isSameSchoolFacility(
+  school: StoredSchool,
+  candidate: ScoredKakaoCandidate,
+  primarySchool: ScoredKakaoCandidate,
+) {
   if (candidate.nameExact || !candidate.roadAddressExact) return false;
-  const schoolName = normalize(school.name);
-  const candidateName = normalize(candidate.name);
-  if (!candidateName.startsWith(schoolName)) return false;
-  const suffix = candidateName.slice(schoolName.length);
+  // Kakao facility names sometimes omit the city prefix used by NEIS. Match a
+  // bounded school-name alias, never an arbitrary substring or nearby business.
+  const aliases = [school.name.trim()];
+  if (/^대전.+학교$/u.test(school.name)) aliases.push(school.name.slice(2).trim());
+  const prefix = new RegExp(`^(?:${aliases.map(escapeRegExp).join("|")})(?=\\s|\\()`, "u")
+    .exec(candidate.name.trim());
+  if (!prefix || distanceMeters(primarySchool, candidate) > 500) return false;
+  const rawSuffix = candidate.name.trim().slice(prefix[0].length).trim();
+  const suffix = normalize(rawSuffix);
   // A school's office or gate is a separate Kakao POI, not another school.
   // Unknown campus names stay in the ambiguity check for manual review.
   if (!suffix || /분교|캠퍼스|분원/u.test(suffix)) return false;
   const categories = candidate.categoryName.split(">").map((category) => category.trim());
-  const separateSchoolName = new RegExp(`^${escapeRegExp(school.name.trim())}\\s+`, "u")
-    .test(candidate.name.trim());
+  const separateSchoolName = /^\s/u.test(candidate.name.trim().slice(prefix[0].length));
+  // Qualifiers belong to the charging equipment, not a second campus. Unknown
+  // qualifiers (e.g. 이전/제2캠퍼스) intentionally remain ambiguous.
+  const chargerSuffix = normalize(rawSuffix.replace(/^(?:\((?:대전|급속|완속)\)\s*)+/u, ""));
   return (categories.includes("학교부속시설") && separateSchoolName)
     || (categories.includes("입출구") && /^(?:정문|후문|동문|서문|남문|북문)$/u.test(suffix))
-    || (categories.includes("전기차 충전소") && suffix === "전기차충전소")
+    || (categories.includes("전기차 충전소") && chargerSuffix === "전기차충전소")
+    || (categories.includes("슈퍼마켓") && /^(?:교내)?매점$/u.test(suffix))
+    || (categories.includes("체육관") && suffix === "체육관")
     || (categories.includes("유치원") && /^병설유치원(?:휴원|폐원)?$/u.test(suffix));
 }
 
@@ -139,7 +152,7 @@ export function decideKakaoSchoolMatch(input: {
   const first = valid[0]!;
   const exactSchoolFound = first.score >= 90 && first.nameExact && first.roadAddressExact;
   const plausible = valid.filter((candidate) => candidate.score >= 60
-    && !(exactSchoolFound && isSameSchoolFacility(input.school, candidate)));
+    && !(exactSchoolFound && isSameSchoolFacility(input.school, candidate, first)));
   if (first.score >= 90 && plausible.length === 1) {
     return { status: "autoMatched", candidate: first, candidates, reason: "HIGH_CONFIDENCE" };
   }

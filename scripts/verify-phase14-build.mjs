@@ -6,13 +6,13 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase20",
+  "phase21",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",
   "manifest.webmanifest",
-  "onnuriway-company-icon-192-v3.png",
-  "onnuriway-company-icon-maskable-512-v3.png",
+  "onnuriway-company-icon-192-v4.png",
+  "onnuriway-company-icon-maskable-512-v4.png",
   "onnuri-food-logo.png",
   "SKIP_WAITING",
 ]) {
@@ -37,10 +37,10 @@ if (serviceWorker.includes("'url':'/api/connectivity'")) {
 }
 
 const expectedIcons = new Map([
-  ["public/icons/onnuriway-company-icon-192-v3.png", [192, 192]],
-  ["public/icons/onnuriway-company-icon-512-v3.png", [512, 512]],
-  ["public/icons/onnuriway-company-icon-maskable-512-v3.png", [512, 512]],
-  ["public/icons/onnuriway-company-apple-touch-icon-v3.png", [180, 180]],
+  ["public/icons/onnuriway-company-icon-192-v4.png", [192, 192]],
+  ["public/icons/onnuriway-company-icon-512-v4.png", [512, 512]],
+  ["public/icons/onnuriway-company-icon-maskable-512-v4.png", [512, 512]],
+  ["public/icons/onnuriway-company-apple-touch-icon-v4.png", [180, 180]],
   ["public/brand/onnuri-food-logo.png", [1200, 446]],
   ["src/app/icon.png", [64, 64]],
 ]);
