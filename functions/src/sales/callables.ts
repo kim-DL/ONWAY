@@ -6,6 +6,9 @@ import { z } from "zod";
 import { requireVerifiedAdmin } from "../admin/admin-authorization.js";
 import { LoginRepository } from "../auth/login-repository.js";
 import { claimsMatchAuthz } from "../auth/login-service.js";
+import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { KakaoLocalClient } from "../sync/kakao-local-client.js";
+import { KakaoMatchService } from "../sync/kakao-match-service.js";
 import {
   changeSalesAssignmentInputSchema,
   claimSalesAssignmentsInputSchema,
@@ -41,6 +44,7 @@ import {
   SalesProfileService,
 } from "./sales-profile-service.js";
 import { KakaoRouteClient } from "./kakao-route-client.js";
+import { KakaoRouteLocationResolver } from "./kakao-route-location-resolver.js";
 import { optimizeSalesRouteInputSchema } from "./sales-route-contract.js";
 import {
   SalesRouteCycleError,
@@ -128,9 +132,14 @@ export const optimizeSalesRoute = onCall(routeCallableOptions, async (request) =
   const input = parsed.data;
   const actor = await requireSalesActor(request);
   const restApiKey = isFunctionsEmulator() ? "" : kakaoRestApiKey.value().trim();
+  const database = getAdminFirestore();
+  const localClient = restApiKey ? new KakaoLocalClient({ restApiKey }) : null;
   const service = new SalesRouteService(
-    undefined,
+    database,
     restApiKey ? new KakaoRouteClient(restApiKey) : undefined,
+    localClient
+      ? new KakaoRouteLocationResolver(new KakaoMatchService({ db: database, client: localClient }))
+      : undefined,
   );
   try {
     return await service.optimize(input, actor);
@@ -145,8 +154,11 @@ export const optimizeSalesRoute = onCall(routeCallableOptions, async (request) =
       throw new HttpsError("not-found", "학교 배정 정보가 변경되었습니다. 목록을 새로 확인해주세요.");
     }
     if (error instanceof SalesRouteLocationError) {
-      throw new HttpsError("failed-precondition", "위치가 확정되지 않은 학교가 포함되어 있습니다.", {
-        reason: "unverified-location",
+      const providerUnavailable = error.reason === "provider-unavailable";
+      throw new HttpsError("failed-precondition", providerUnavailable
+        ? "학교 위치 자동 확인 서비스를 사용할 수 없습니다. 관리자에게 알려주세요."
+        : "일부 학교 위치를 자동 확인하지 못했습니다. 관리자의 Kakao 위치 검토가 필요합니다.", {
+        reason: providerUnavailable ? "location-provider-unavailable" : "location-review-required",
         schoolIds: error.schoolIds,
       });
     }

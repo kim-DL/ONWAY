@@ -6,12 +6,13 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
-import { buildKakaoDirectionsUrl } from "@/features/school-detail/kakao-directions";
+import { buildKakaoDirectionsUrlToCoordinate } from "@/features/school-detail/kakao-directions";
 import {
   type ActiveSalesRoute,
   type SalesRouteMetric,
   type SalesRouteResult,
 } from "./sales-route-contract";
+import { canPlanRouteForSchool, hasTrustedRouteLocation } from "./sales-route-location";
 import { optimizeSalesRoute, salesRouteErrorMessage } from "./sales-route-repository";
 
 const MAX_ROUTE_SCHOOLS = 20;
@@ -20,15 +21,6 @@ export type SalesRouteCandidate = {
   assignment: SalesAssignment;
   school: School;
 };
-
-export function hasTrustedRouteLocation(school: School) {
-  return school.operationalStatus === "active"
-    && ["confirmed", "autoMatched"].includes(school.location.matchStatus)
-    && school.location.latitude !== null
-    && school.location.longitude !== null
-    && Number.isFinite(school.location.latitude)
-    && Number.isFinite(school.location.longitude);
-}
 
 function formatDistance(distanceMeters: number) {
   if (distanceMeters < 1_000) return `${Math.max(10, Math.round(distanceMeters / 10) * 10)}m`;
@@ -75,7 +67,7 @@ function summarizeRoute(result: SalesRouteResult, orderedSchoolIds: readonly str
 }
 
 function defaultSchoolIds(candidates: readonly SalesRouteCandidate[]) {
-  const eligible = candidates.filter(({ school }) => hasTrustedRouteLocation(school));
+  const eligible = candidates.filter(({ school }) => canPlanRouteForSchool(school));
   const unfinished = eligible.filter(({ assignment }) => assignment.monthlyStatus !== "completed");
   return (unfinished.length >= 2 ? unfinished : eligible)
     .slice(0, MAX_ROUTE_SCHOOLS)
@@ -93,7 +85,6 @@ export function SalesRoutePlanner({
   initialRoute: ActiveSalesRoute | null;
   onApply: (route: ActiveSalesRoute) => void;
 }) {
-  const candidateById = useMemo(() => new Map(candidates.map((candidate) => [candidate.school.schoolId, candidate])), [candidates]);
   const defaults = useMemo(() => defaultSchoolIds(candidates), [candidates]);
   const initialIds = initialRoute?.orderedSchoolIds ?? defaults;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialIds));
@@ -103,8 +94,11 @@ export function SalesRoutePlanner({
   const [manuallyAdjusted, setManuallyAdjusted] = useState(initialRoute?.manuallyAdjusted ?? false);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const eligibleCount = candidates.filter(({ school }) => hasTrustedRouteLocation(school)).length;
+  const eligibleCount = candidates.filter(({ school }) => canPlanRouteForSchool(school)).length;
   const unavailableCount = candidates.length - eligibleCount;
+  const pendingLocationCount = candidates.filter(({ school }) => (
+    canPlanRouteForSchool(school) && !hasTrustedRouteLocation(school)
+  )).length;
 
   const selectedCount = selectedIds.size;
   const summary = useMemo(() => {
@@ -137,7 +131,7 @@ export function SalesRoutePlanner({
 
   const selectAll = () => {
     const ids = candidates
-      .filter(({ school }) => hasTrustedRouteLocation(school))
+      .filter(({ school }) => canPlanRouteForSchool(school))
       .slice(0, MAX_ROUTE_SCHOOLS)
       .map(({ school }) => school.schoolId);
     setSelectedIds(new Set(ids));
@@ -198,7 +192,6 @@ export function SalesRoutePlanner({
 
         <ol className="sales-route-order" aria-label="추천 방문 순서">
           {summary.stops.map((stop, index) => {
-            const school = candidateById.get(stop.schoolId)?.school;
             return (
               <li key={stop.schoolId}>
                 <span className="sales-route-order__number" aria-hidden="true">{index + 1}</span>
@@ -207,7 +200,7 @@ export function SalesRoutePlanner({
                   <span>{index === 0 ? "첫 학교" : `${formatDuration(stop.fromPrevious!.durationSeconds)} · ${formatDistance(stop.fromPrevious!.distanceMeters)}`}</span>
                 </div>
                 <div className="sales-route-order__actions">
-                  {school ? <a href={buildKakaoDirectionsUrl(school)} target="_blank" rel="noreferrer" aria-label={`${stop.name} 길안내`}><Icon name="route" size={18} /></a> : null}
+                  <a href={buildKakaoDirectionsUrlToCoordinate(stop.name, stop.latitude, stop.longitude)} target="_blank" rel="noreferrer" aria-label={`${stop.name} 길안내`}><Icon name="route" size={18} /></a>
                   {index > 1 ? <button type="button" onClick={() => moveStop(index, -1)} aria-label={`${stop.name} 한 순서 위로`}><Icon name="arrow-up" size={18} /></button> : null}
                   {index > 0 && index < summary.stops.length - 1 ? <button type="button" onClick={() => moveStop(index, 1)} aria-label={`${stop.name} 한 순서 아래로`}><Icon name="arrow-down" size={18} /></button> : null}
                 </div>
@@ -250,14 +243,16 @@ export function SalesRoutePlanner({
       </div>
       <div className="sales-route-planner__quick" aria-label="빠른 선택">
         <button type="button" onClick={selectSuggested}>미완료 학교</button>
-        <button type="button" onClick={selectAll}>위치 확인 학교 전체</button>
+        <button type="button" onClick={selectAll}>선택 가능한 학교 전체</button>
         <span>{selectedCount}/{Math.min(eligibleCount, MAX_ROUTE_SCHOOLS)}</span>
       </div>
-      {unavailableCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />위치 확인이 필요한 {unavailableCount}곳은 선택할 수 없어요.</p> : null}
+      {pendingLocationCount > 0 ? <p className="sales-route-location-note"><Icon name="sparkles" size={16} />{pendingLocationCount}곳은 계산할 때 공식 주소로 위치를 자동 확인해요.</p> : null}
+      {unavailableCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />공식 주소가 없는 {unavailableCount}곳은 선택할 수 없어요.</p> : null}
 
       <ul className="sales-route-candidates" aria-label="방문할 학교 선택">
         {candidates.map(({ assignment, school }) => {
-          const eligible = hasTrustedRouteLocation(school);
+          const eligible = canPlanRouteForSchool(school);
+          const locationReady = hasTrustedRouteLocation(school);
           const selected = selectedIds.has(school.schoolId);
           const atLimit = !selected && selectedCount >= MAX_ROUTE_SCHOOLS;
           return (
@@ -270,7 +265,7 @@ export function SalesRoutePlanner({
                   onChange={(event) => toggleSchool(school.schoolId, event.target.checked)}
                 />
                 <span className="sales-route-candidate__check" aria-hidden="true"><Icon name="check" size={15} /></span>
-                <span><strong>{school.name}</strong><small>{eligible ? (assignment.monthlyStatus === "completed" ? "방문 완료" : "방문 예정") : "위치 확인 필요"}</small></span>
+                <span><strong>{school.name}</strong><small>{eligible ? (locationReady ? (assignment.monthlyStatus === "completed" ? "방문 완료" : "방문 예정") : "주소로 자동 확인") : "공식 주소 없음"}</small></span>
               </label>
               <label className="sales-route-candidate__start" data-selected={startSchoolId === school.schoolId ? "true" : "false"}>
                 <input
@@ -288,7 +283,7 @@ export function SalesRoutePlanner({
       </ul>
 
       {eligibleCount < 2 ? (
-        <div className="sales-route-empty" role="status"><Icon name="location" /><strong>동선을 만들 학교 위치가 부족해요.</strong><span>관리자가 학교 위치를 2곳 이상 확정하면 사용할 수 있습니다.</span></div>
+        <div className="sales-route-empty" role="status"><Icon name="location" /><strong>동선을 만들 학교 정보가 부족해요.</strong><span>공식 주소가 등록된 학교가 2곳 이상 필요합니다.</span></div>
       ) : null}
       {errorMessage ? <p className="sales-route-error" role="alert">{errorMessage}</p> : null}
       <div className="sales-route-planner__footer">

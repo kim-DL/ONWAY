@@ -2,8 +2,16 @@ import type { School } from "@/domain/school";
 
 const KAKAO_MAP_BASE = "https://map.kakao.com/link";
 
-function finiteCoordinate(value: number | null) {
+function finiteCoordinate(value: number | null): value is number {
   return value !== null && Number.isFinite(value);
+}
+
+export function buildKakaoDirectionsUrlToCoordinate(
+  name: string,
+  latitude: number,
+  longitude: number,
+) {
+  return `${KAKAO_MAP_BASE}/to/${encodeURIComponent(name)},${latitude},${longitude}`;
 }
 
 export function buildKakaoDirectionsUrl(school: School) {
@@ -14,7 +22,11 @@ export function buildKakaoDirectionsUrl(school: School) {
     && finiteCoordinate(school.location.latitude)
     && finiteCoordinate(school.location.longitude)
   ) {
-    return `${KAKAO_MAP_BASE}/to/${encodeURIComponent(school.name)},${school.location.latitude},${school.location.longitude}`;
+    return buildKakaoDirectionsUrlToCoordinate(
+      school.name,
+      school.location.latitude,
+      school.location.longitude,
+    );
   }
   return `${KAKAO_MAP_BASE}/search/${encodeURIComponent(school.name)}`;
 }

@@ -20,6 +20,10 @@ const schoolSchema = z.object({
   schoolId: z.string(),
   name: z.string().trim().min(1),
   operationalStatus: z.enum(["active", "inactiveCandidate", "inactive", "closed", "merged"]),
+  address: z.object({
+    road: z.string().trim().min(1).nullable(),
+    jibun: z.string().trim().min(1).nullable(),
+  }).passthrough(),
   location: z.object({
     latitude: z.number().min(-90).max(90).nullable(),
     longitude: z.number().min(-180).max(180).nullable(),
@@ -28,14 +32,91 @@ const schoolSchema = z.object({
 }).passthrough();
 
 export type SalesRouteActor = { uid: string; employeeId: string };
+export type SalesRouteLocationResolution =
+  | { ok: true; latitude: number; longitude: number }
+  | { ok: false; reason: "review-required" | "provider-unavailable" };
+export interface SalesRouteLocationResolver {
+  resolve(schoolId: string, actor: SalesRouteActor): Promise<SalesRouteLocationResolution>;
+}
 
 export class SalesRouteCycleError extends Error {}
 export class SalesRoutePermissionError extends Error {}
 export class SalesRouteSchoolError extends Error {}
 export class SalesRouteLocationError extends Error {
-  constructor(readonly schoolIds: string[]) {
+  constructor(
+    readonly schoolIds: string[],
+    readonly reason: "review-required" | "provider-unavailable" = "review-required",
+  ) {
     super("Some schools do not have trusted coordinates.");
   }
+}
+
+export type RouteSchool = z.infer<typeof schoolSchema>;
+
+function trustedNode(school: RouteSchool): SalesRouteNode | null {
+  if (
+    school.operationalStatus !== "active"
+    || !["confirmed", "autoMatched"].includes(school.location.matchStatus)
+    || school.location.latitude === null
+    || school.location.longitude === null
+  ) return null;
+  return {
+    schoolId: school.schoolId,
+    name: school.name,
+    latitude: school.location.latitude,
+    longitude: school.location.longitude,
+  };
+}
+
+export async function resolveRouteNodes(
+  schools: readonly RouteSchool[],
+  actor: SalesRouteActor,
+  resolver?: SalesRouteLocationResolver,
+) {
+  const nodes: Array<SalesRouteNode | null> = schools.map(trustedNode);
+  const unresolvedSchoolIds: string[] = [];
+  let providerUnavailable = false;
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const school = schools[index];
+      if (!school) return;
+      if (nodes[index]) continue;
+      const hasOfficialAddress = Boolean(school.address.road ?? school.address.jibun);
+      if (school.operationalStatus !== "active" || !hasOfficialAddress || !resolver) {
+        unresolvedSchoolIds.push(school.schoolId);
+        continue;
+      }
+      try {
+        const resolution = await resolver.resolve(school.schoolId, actor);
+        if (resolution.ok) {
+          nodes[index] = {
+            schoolId: school.schoolId,
+            name: school.name,
+            latitude: resolution.latitude,
+            longitude: resolution.longitude,
+          };
+        } else {
+          unresolvedSchoolIds.push(school.schoolId);
+          providerUnavailable ||= resolution.reason === "provider-unavailable";
+        }
+      } catch {
+        unresolvedSchoolIds.push(school.schoolId);
+        providerUnavailable = true;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(3, schools.length) }, () => worker()));
+  if (unresolvedSchoolIds.length > 0) {
+    throw new SalesRouteLocationError(
+      unresolvedSchoolIds,
+      providerUnavailable ? "provider-unavailable" : "review-required",
+    );
+  }
+  return nodes as SalesRouteNode[];
 }
 
 async function fillRoadMetrics(
@@ -75,6 +156,7 @@ export class SalesRouteService {
   constructor(
     private readonly db: Firestore = getAdminFirestore(),
     private readonly roadClient?: RoadMatrixClient,
+    private readonly locationResolver?: SalesRouteLocationResolver,
   ) {}
 
   async optimize(input: OptimizeSalesRouteInput, actor: SalesRouteActor) {
@@ -104,20 +186,7 @@ export class SalesRouteService {
     }
     if (schoolSnapshots.some((snapshot) => !snapshot.exists)) throw new SalesRouteSchoolError();
     const schools = schoolSnapshots.map((snapshot) => schoolSchema.parse(snapshot.data()));
-    const invalidLocationSchoolIds = schools.flatMap((school) => (
-      school.operationalStatus !== "active"
-      || !["confirmed", "autoMatched"].includes(school.location.matchStatus)
-      || school.location.latitude === null
-      || school.location.longitude === null
-    ) ? [school.schoolId] : []);
-    if (invalidLocationSchoolIds.length > 0) throw new SalesRouteLocationError(invalidLocationSchoolIds);
-
-    const nodes: SalesRouteNode[] = schools.map((school) => ({
-      schoolId: school.schoolId,
-      name: school.name,
-      latitude: school.location.latitude!,
-      longitude: school.location.longitude!,
-    }));
+    const nodes = await resolveRouteNodes(schools, actor, this.locationResolver);
     const matrix = createEstimatedRouteMatrix(nodes);
     const roadMetricCount = this.roadClient
       ? await fillRoadMetrics(nodes, matrix, this.roadClient)
@@ -159,4 +228,3 @@ export class SalesRouteService {
     };
   }
 }
-

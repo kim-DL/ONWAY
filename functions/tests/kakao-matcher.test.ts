@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { mapNeisSchool } from "../src/neis/school-mapper.js";
-import { decideKakaoSchoolMatch } from "../src/sync/kakao-school-matcher.js";
+import { decideKakaoSchoolMatch, schoolAddressQuery } from "../src/sync/kakao-school-matcher.js";
 import type { KakaoPlaceCandidate } from "../src/sync/kakao-local-client.js";
 import type { StoredSchool } from "../src/sync/school-sync-types.js";
 
@@ -50,6 +50,28 @@ describe("Kakao school matcher", () => {
     const decision = decideKakaoSchoolMatch({ school, addressResult, candidates: [candidate()] });
     expect(decision).toMatchObject({ status: "autoMatched", reason: "HIGH_CONFIDENCE" });
     expect(decision.candidate?.score).toBe(100);
+  });
+
+  it("treats NEIS building details and the Daejeon city alias as the same road address", () => {
+    const detailedSchool = {
+      ...school,
+      address: {
+        ...school.address,
+        road: "대전광역시 동구 백룡로11번길 20 대전온누리초등학교 (자양동,대전온누리초등학교)",
+      },
+      district: "dong" as const,
+    };
+    const decision = decideKakaoSchoolMatch({
+      school: detailedSchool,
+      addressResult,
+      candidates: [candidate({
+        roadAddress: "대전 동구 백룡로11번길 20",
+        addressName: "대전 동구 자양동 1",
+      })],
+    });
+    expect(schoolAddressQuery(detailedSchool.address.road!, detailedSchool.name))
+      .toBe("대전광역시 동구 백룡로11번길 20");
+    expect(decision).toMatchObject({ status: "autoMatched", reason: "HIGH_CONFIDENCE" });
   });
 
   it("requires review when multiple plausible candidates exist", () => {

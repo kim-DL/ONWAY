@@ -31,6 +31,26 @@ function normalize(value: string | null | undefined) {
     .replace(/[\p{Separator}\p{Punctuation}\p{Symbol}]+/gu, "") ?? "";
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Keep the NEIS source intact, but remove building details Kakao cannot geocode. */
+export function schoolAddressQuery(address: string, schoolName: string) {
+  const withoutParentheticalDetails = address.replace(/\s*\([^)]*\)\s*/gu, " ");
+  return withoutParentheticalDetails
+    .replace(new RegExp(`\\s+${escapeRegExp(schoolName)}\\s*$`, "u"), "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function comparableRoadAddress(address: string, schoolName: string) {
+  return normalize(
+    schoolAddressQuery(address, schoolName)
+      .replace(/^대전광역시(?=\s)/u, "대전"),
+  );
+}
+
 function distanceMeters(left: { latitude: number; longitude: number }, right: { latitude: number; longitude: number }) {
   const radians = (degrees: number) => degrees * Math.PI / 180;
   const latitudeDelta = radians(right.latitude - left.latitude);
@@ -58,7 +78,8 @@ export function scoreKakaoCandidate(
   const candidateRoad = candidate.roadAddress || candidate.addressName;
   const schoolRoad = school.address.road ?? school.address.jibun ?? "";
   const nameExact = normalize(candidate.name) === normalize(school.name);
-  const roadAddressExact = normalize(candidateRoad) === normalize(schoolRoad);
+  const roadAddressExact = comparableRoadAddress(candidateRoad, school.name)
+    === comparableRoadAddress(schoolRoad, school.name);
   const districtMatched = `${candidate.roadAddress} ${candidate.addressName}`.includes(DISTRICT_LABELS[school.district]);
   const distance = addressResult
     ? distanceMeters(addressResult, candidate)

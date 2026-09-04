@@ -7,6 +7,7 @@ import {
   decideKakaoSchoolMatch,
   isDaejeonCandidate,
   locationDistanceMeters,
+  schoolAddressQuery,
   type KakaoMatchDecision,
   type ScoredKakaoCandidate,
 } from "./kakao-school-matcher.js";
@@ -244,7 +245,9 @@ export class KakaoMatchService {
     }
 
     try {
-      const addressResult = await this.dependencies.client.searchAddress(officialAddress);
+      const addressResult = await this.dependencies.client.searchAddress(
+        schoolAddressQuery(officialAddress, school.name),
+      );
       const candidates = await this.dependencies.client.searchKeyword({
         query: `${school.name} 대전`,
         origin: addressResult,

@@ -17,7 +17,8 @@ import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
-import { SalesRoutePlanner, hasTrustedRouteLocation } from "@/features/sales-route/sales-route-planner";
+import { canPlanRouteForSchool } from "@/features/sales-route/sales-route-location";
+import { SalesRoutePlanner } from "@/features/sales-route/sales-route-planner";
 import type { ActiveSalesRoute } from "@/features/sales-route/sales-route-contract";
 import { readActiveSalesRoute, readLatestActiveSalesRoute, writeActiveSalesRoute } from "@/features/sales-route/sales-route-storage";
 import {
@@ -279,7 +280,7 @@ export function SalesWorkspace({
     const usableActiveRoute = activeRoute?.result.cycleId === workspace.selectedCycleId
       && activeRoute.orderedSchoolIds.every((schoolId) => {
         const school = schoolById.get(schoolId);
-        return ownedIds.has(schoolId) && school ? hasTrustedRouteLocation(school) : false;
+        return ownedIds.has(schoolId) && school ? canPlanRouteForSchool(school) : false;
       })
       ? activeRoute
       : null;
