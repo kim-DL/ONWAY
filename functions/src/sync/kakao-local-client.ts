@@ -42,21 +42,32 @@ export interface KakaoPlaceCandidate {
   placeUrl: string;
 }
 
-export type KakaoFetcher = (url: string, init: { headers: Record<string, string> }) => Promise<{
+export type KakaoFetcher = (url: string, init: { headers: Record<string, string>; signal: AbortSignal }) => Promise<{
   ok: boolean;
   status: number;
   json: () => Promise<unknown>;
 }>;
 
 export class KakaoLocalClientError extends Error {
-  constructor(readonly kind: "HTTP_ERROR" | "INVALID_RESPONSE", message: string) {
+  constructor(readonly kind: "HTTP_ERROR" | "INVALID_RESPONSE" | "TIMEOUT", message: string) {
     super(message);
     this.name = "KakaoLocalClientError";
   }
 }
 
-async function wait(milliseconds: number) {
-  await new Promise((resolve) => setTimeout(resolve, milliseconds));
+async function wait(milliseconds: number, signal: AbortSignal) {
+  signal.throwIfAborted();
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 export class KakaoLocalClient {
@@ -66,6 +77,7 @@ export class KakaoLocalClient {
     restApiKey: string;
     fetcher?: KakaoFetcher;
     retryDelaysMs?: readonly number[];
+    requestTimeoutMs?: number;
   }) {
     if (!options.restApiKey.trim()) throw new Error("KAKAO_REST_API_KEY is required.");
     this.fetcher = options.fetcher ?? ((url, init) => fetch(url, init));
@@ -73,19 +85,40 @@ export class KakaoLocalClient {
 
   private async request(path: string, search: URLSearchParams) {
     const url = `${KAKAO_LOCAL_ENDPOINT}/${path}?${search.toString()}`;
-    const delays = this.options.retryDelaysMs ?? [0, 180, 540];
+    const controller = new AbortController();
+    const timeoutError = new KakaoLocalClientError("TIMEOUT", "Kakao Local request timed out.");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort(timeoutError);
+        reject(timeoutError);
+      }, this.options.requestTimeoutMs ?? 6_000);
+    });
+    try {
+      // Keep one budget across headers, body parsing, backoff and retries.
+      return await Promise.race([this.requestWithRetries(url, controller.signal), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async requestWithRetries(url: string, signal: AbortSignal) {
+    const delays = (this.options.retryDelaysMs ?? [0, 180, 540]).slice(0, 3);
     let lastStatus = 0;
     for (let attempt = 0; attempt < delays.length; attempt += 1) {
+      signal.throwIfAborted();
       const delay = delays[attempt] ?? 0;
-      if (delay > 0) await wait(delay);
+      if (delay > 0) await wait(delay, signal);
       try {
         const response = await this.fetcher(url, {
           headers: { Authorization: `KakaoAK ${this.options.restApiKey}` },
+          signal,
         });
         lastStatus = response.status;
         if (response.ok) return await response.json();
         if (response.status < 500 && response.status !== 429) break;
       } catch {
+        signal.throwIfAborted();
         lastStatus = 0;
       }
     }

@@ -83,6 +83,75 @@ describe("Kakao school matcher", () => {
     expect(decision).toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
   });
 
+  it("matches a NEIS road address ending in the school's local name", () => {
+    const localNameSchool = {
+      ...school,
+      name: "대전가오초등학교",
+      district: "dong" as const,
+      address: { ...school.address, road: "대전광역시 동구 신기로 112 가오초등학교 (가오동)" },
+    };
+    expect(schoolAddressQuery(localNameSchool.address.road, localNameSchool.name))
+      .toBe("대전광역시 동구 신기로 112");
+    expect(decideKakaoSchoolMatch({
+      school: localNameSchool,
+      addressResult,
+      candidates: [candidate({
+        name: localNameSchool.name,
+        roadAddress: "대전 동구 신기로 112",
+        addressName: "대전 동구 가오동 1",
+      })],
+    })).toMatchObject({ status: "autoMatched", reason: "HIGH_CONFIDENCE", candidate: { score: 100 } });
+    expect(schoolAddressQuery("대전광역시 동구 신기로 112 다른초등학교", localNameSchool.name))
+      .toBe("대전광역시 동구 신기로 112 다른초등학교");
+  });
+
+  it("keeps a unique exact school match when Kakao also lists its facilities", () => {
+    const facilities = [
+      ["교무실", "교육,학문 > 학교부속시설"],
+      ["행정실", "교육,학문 > 학교부속시설"],
+      ["정무관", "교육,학문 > 학교부속시설"],
+      ["정문", "교통,수송 > 입출구"],
+      ["후문", "교통,수송 > 입출구"],
+      ["전기차충전소", "교통,수송 > 자동차 > 전기차 충전소"],
+      ["병설유치원 (휴원)", "교육,학문 > 유아교육 > 유치원"],
+    ].map(([suffix, categoryName], index) => candidate({
+      candidateId: `facility-${index}`,
+      placeId: `facility-${index}`,
+      name: `${school.name} ${suffix}`,
+      categoryName,
+    }));
+    const decision = decideKakaoSchoolMatch({ school, addressResult, candidates: [...facilities, candidate()] });
+    expect(decision).toMatchObject({
+      status: "autoMatched", reason: "HIGH_CONFIDENCE", candidate: { name: school.name, score: 100 },
+    });
+    // Keep all evidence available to the administrator, including excluded facilities.
+    expect(decision.candidates).toHaveLength(8);
+  });
+
+  it.each([
+    ["대전다른초등학교", "교육,학문 > 학교 > 초등학교"],
+    [`${school.name} 제2캠퍼스`, "교육,학문 > 학교 > 초등학교"],
+    [`${school.name} 분교장`, "교육,학문 > 학교부속시설"],
+    [`${school.name} 새교육관`, "교육,학문 > 학교 > 초등학교"],
+    [`${school.name}육원`, "교육,학문 > 학교부속시설"],
+  ])("retains genuine or uncertain school candidates for review: %s", (name, categoryName) => {
+    const decision = decideKakaoSchoolMatch({
+      school,
+      addressResult,
+      candidates: [candidate(), candidate({ candidateId: "other", placeId: "other", name, categoryName })],
+    });
+    expect(decision).toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
+  it("does not substitute a school office when the school itself is missing", () => {
+    const decision = decideKakaoSchoolMatch({
+      school,
+      addressResult,
+      candidates: [candidate({ name: `${school.name} 행정실`, categoryName: "교육,학문 > 학교부속시설" })],
+    });
+    expect(decision).toMatchObject({ status: "needsReview", reason: "LOW_CONFIDENCE" });
+  });
+
   it("never auto-confirms an out-of-region namesake", () => {
     const decision = decideKakaoSchoolMatch({
       school,

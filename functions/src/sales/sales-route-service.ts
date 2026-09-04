@@ -53,6 +53,11 @@ export class SalesRouteLocationError extends Error {
 
 export type RouteSchool = z.infer<typeof schoolSchema>;
 
+// Leave room for in-flight provider requests and Firestore reads/writes within
+// the callable's 60-second lifetime. Local calls each have a 6-second budget.
+const LOCATION_SCHEDULING_BUDGET_MS = 12_000;
+const ROAD_SCHEDULING_BUDGET_MS = 18_000;
+
 function trustedNode(school: RouteSchool): SalesRouteNode | null {
   if (
     school.operationalStatus !== "active"
@@ -74,7 +79,7 @@ export async function resolveRouteNodes(
   resolver?: SalesRouteLocationResolver,
 ) {
   const nodes: Array<SalesRouteNode | null> = schools.map(trustedNode);
-  const unresolvedSchoolIds: string[] = [];
+  const schedulingDeadline = Date.now() + LOCATION_SCHEDULING_BUDGET_MS;
   let providerUnavailable = false;
   let nextIndex = 0;
 
@@ -87,8 +92,11 @@ export async function resolveRouteNodes(
       if (nodes[index]) continue;
       const hasOfficialAddress = Boolean(school.address.road ?? school.address.jibun);
       if (school.operationalStatus !== "active" || !hasOfficialAddress || !resolver) {
-        unresolvedSchoolIds.push(school.schoolId);
         continue;
+      }
+      if (providerUnavailable || Date.now() >= schedulingDeadline) {
+        providerUnavailable = true;
+        return;
       }
       try {
         const resolution = await resolver.resolve(school.schoolId, actor);
@@ -100,16 +108,17 @@ export async function resolveRouteNodes(
             longitude: resolution.longitude,
           };
         } else {
-          unresolvedSchoolIds.push(school.schoolId);
           providerUnavailable ||= resolution.reason === "provider-unavailable";
         }
       } catch {
-        unresolvedSchoolIds.push(school.schoolId);
         providerUnavailable = true;
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(3, schools.length) }, () => worker()));
+  const unresolvedSchoolIds = schools
+    .filter((_, index) => nodes[index] === null)
+    .map((school) => school.schoolId);
   if (unresolvedSchoolIds.length > 0) {
     throw new SalesRouteLocationError(
       unresolvedSchoolIds,
@@ -119,16 +128,17 @@ export async function resolveRouteNodes(
   return nodes as SalesRouteNode[];
 }
 
-async function fillRoadMetrics(
+export async function fillRoadMetrics(
   nodes: readonly SalesRouteNode[],
   matrix: ReturnType<typeof createEstimatedRouteMatrix>,
   client: RoadMatrixClient,
 ) {
+  const schedulingDeadline = Date.now() + ROAD_SCHEDULING_BUDGET_MS;
   let nextIndex = 0;
   let haltExternalRequests = false;
   let roadMetricCount = 0;
   const worker = async () => {
-    while (!haltExternalRequests) {
+    while (!haltExternalRequests && Date.now() < schedulingDeadline) {
       const index = nextIndex;
       nextIndex += 1;
       const origin = nodes[index];

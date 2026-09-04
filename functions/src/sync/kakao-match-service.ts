@@ -28,6 +28,7 @@ interface KakaoMatchReview {
   expiresAt: Timestamp;
   confirmedBy: string | null;
   confirmedAt: Timestamp | null;
+  acceptedLocation?: { latitude: number; longitude: number } | null;
 }
 
 function asStoredSchool(document: DocumentData, id: string): StoredSchool {
@@ -95,6 +96,7 @@ function reviewResult(review: KakaoMatchReview, replayed: boolean) {
     status: review.status,
     reason: review.reason,
     candidates: review.candidates,
+    acceptedLocation: review.acceptedLocation ?? null,
     replayed,
   };
 }
@@ -201,6 +203,10 @@ export class KakaoMatchService {
         expiresAt: Timestamp.fromMillis(matchedAt.toMillis() + 7 * 24 * 60 * 60 * 1_000),
         confirmedBy: status === "confirmed" ? current.location.confirmedBy : null,
         confirmedAt: status === "confirmed" ? current.location.confirmedAt as Timestamp | null : null,
+        acceptedLocation: (status === "autoMatched" || status === "confirmed")
+          && nextLocation.latitude !== null && nextLocation.longitude !== null
+          ? { latitude: nextLocation.latitude, longitude: nextLocation.longitude }
+          : null,
       };
       transaction.set(reviewRef, review);
       const eventType = status === "autoMatched"
@@ -348,6 +354,7 @@ export class KakaoMatchService {
         reason: input.candidateId ? "ADMIN_CANDIDATE_CONFIRMED" : "ADMIN_MANUAL_CONFIRMED",
         confirmedBy: actor.employeeId,
         confirmedAt,
+        acceptedLocation: { latitude: location.latitude, longitude: location.longitude },
       });
       const audit = auditDocument({
         logId: auditRef.id,

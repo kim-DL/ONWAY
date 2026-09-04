@@ -636,6 +636,7 @@ export function SalesWorkspace({
               setScope("mine");
               leaveManageMode();
               setRouteSheetOpen(false);
+              data.retry();
               showToast("추천 방문 순서를 학교 목록에 적용했습니다.", "success");
             }}
           />

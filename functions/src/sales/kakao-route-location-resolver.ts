@@ -27,14 +27,15 @@ export class KakaoRouteLocationResolver implements SalesRouteLocationResolver {
     if (result.status !== "autoMatched" && result.status !== "confirmed") {
       return unresolved(result.reason);
     }
-    // KakaoMatchService persists the decision candidate first after score sorting.
-    // Keep that exact ordering here instead of selecting an arbitrary regional result.
-    const candidate = result.candidates[0];
+    // Use the coordinate persisted by the transaction, including an existing
+    // administrator-confirmed location, rather than inferring it from search rank.
+    const candidate = result.acceptedLocation;
     if (
       !candidate
-      || !candidate.regionValid
       || !Number.isFinite(candidate.latitude)
       || !Number.isFinite(candidate.longitude)
+      || candidate.latitude < 36 || candidate.latitude > 36.7
+      || candidate.longitude < 127.1 || candidate.longitude > 127.7
     ) {
       return unresolved(result.reason);
     }

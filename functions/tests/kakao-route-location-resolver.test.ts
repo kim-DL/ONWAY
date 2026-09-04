@@ -29,6 +29,7 @@ describe("Kakao route location resolver", () => {
       status: "autoMatched" as const,
       reason: "HIGH_CONFIDENCE",
       candidates: [candidate],
+      acceptedLocation: { latitude: 36.35, longitude: 127.38 },
       replayed: false,
     }));
     const resolver = new KakaoRouteLocationResolver({ match });
@@ -40,12 +41,13 @@ describe("Kakao route location resolver", () => {
     expect(match).toHaveBeenCalledWith(expect.objectContaining({ schoolId: "SCHOOL-1" }), actor);
   });
 
-  it("does not substitute a different candidate for the accepted top match", async () => {
+  it("preserves the administrator-confirmed coordinate instead of a search candidate", async () => {
     const match = vi.fn(async () => ({
       schoolId: "SCHOOL-1",
       schoolBaseRevision: 2,
-      status: "autoMatched" as const,
-      reason: "HIGH_CONFIDENCE",
+      status: "confirmed" as const,
+      reason: "CONFIRMED_LOCATION_NEARBY",
+      acceptedLocation: { latitude: 36.351, longitude: 127.381 },
       candidates: [
         { ...candidate, regionValid: false },
         { ...candidate, candidateId: "place-2", placeId: "place-2", latitude: 36.4 },
@@ -54,8 +56,9 @@ describe("Kakao route location resolver", () => {
     }));
     const resolver = new KakaoRouteLocationResolver({ match });
     await expect(resolver.resolve("SCHOOL-1", actor)).resolves.toEqual({
-      ok: false,
-      reason: "review-required",
+      ok: true,
+      latitude: 36.351,
+      longitude: 127.381,
     });
   });
 
@@ -67,6 +70,7 @@ describe("Kakao route location resolver", () => {
         status: "failed" as const,
         reason: "KAKAO_API_FAILURE",
         candidates: [],
+        acceptedLocation: null,
         replayed: false,
       })),
     });
@@ -77,6 +81,7 @@ describe("Kakao route location resolver", () => {
         status: "needsReview" as const,
         reason: "LOW_CONFIDENCE",
         candidates: [candidate],
+        acceptedLocation: null,
         replayed: false,
       })),
     });

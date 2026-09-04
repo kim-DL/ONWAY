@@ -142,7 +142,7 @@ export function SalesRoutePlanner({
   };
 
   const calculate = async () => {
-    if (selectedCount < 2 || !selectedIds.has(startSchoolId)) return;
+    if (busy || selectedCount < 2 || !selectedIds.has(startSchoolId)) return;
     setBusy(true);
     setErrorMessage(null);
     try {
@@ -242,8 +242,8 @@ export function SalesRoutePlanner({
         <p><strong>오늘 방문할 학교를 고르세요.</strong><small>첫 학교를 고정한 뒤 이동시간이 짧은 순서로 정리합니다.</small></p>
       </div>
       <div className="sales-route-planner__quick" aria-label="빠른 선택">
-        <button type="button" onClick={selectSuggested}>미완료 학교</button>
-        <button type="button" onClick={selectAll}>선택 가능한 학교 전체</button>
+        <button type="button" disabled={busy} onClick={selectSuggested}>미완료 학교</button>
+        <button type="button" disabled={busy} onClick={selectAll}>선택 가능한 학교 전체</button>
         <span>{selectedCount}/{Math.min(eligibleCount, MAX_ROUTE_SCHOOLS)}</span>
       </div>
       {pendingLocationCount > 0 ? <p className="sales-route-location-note"><Icon name="sparkles" size={16} />{pendingLocationCount}곳은 계산할 때 공식 주소로 위치를 자동 확인해요.</p> : null}
@@ -261,7 +261,7 @@ export function SalesRoutePlanner({
                 <input
                   type="checkbox"
                   checked={selected}
-                  disabled={!eligible || atLimit}
+                  disabled={busy || !eligible || atLimit}
                   onChange={(event) => toggleSchool(school.schoolId, event.target.checked)}
                 />
                 <span className="sales-route-candidate__check" aria-hidden="true"><Icon name="check" size={15} /></span>
@@ -272,7 +272,7 @@ export function SalesRoutePlanner({
                   type="radio"
                   name="sales-route-start"
                   checked={startSchoolId === school.schoolId}
-                  disabled={!eligible || !selected}
+                  disabled={busy || !eligible || !selected}
                   onChange={() => setStartSchoolId(school.schoolId)}
                 />
                 <span>첫 학교</span>

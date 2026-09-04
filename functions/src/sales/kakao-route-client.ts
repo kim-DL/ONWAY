@@ -36,9 +36,8 @@ export class KakaoRouteClient implements RoadMatrixClient {
     if (destinations.length === 0) return new Map<string, SalesRouteMetric>();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6_000);
-    let response: Response;
     try {
-      response = await this.fetcher("https://apis-navi.kakaomobility.com/v1/destinations/directions", {
+      const response = await this.fetcher("https://apis-navi.kakaomobility.com/v1/destinations/directions", {
         method: "POST",
         headers: {
           authorization: `KakaoAK ${this.restApiKey}`,
@@ -55,34 +54,33 @@ export class KakaoRouteClient implements RoadMatrixClient {
         }),
         signal: controller.signal,
       });
+      if (!response.ok) {
+        throw new KakaoRouteRequestError(
+          `Kakao route request failed with status ${response.status}.`,
+          [401, 403, 429].includes(response.status),
+        );
+      }
+      const parsed = kakaoRouteResponseSchema.safeParse(await response.json());
+      if (!parsed.success) throw new KakaoRouteRequestError("Kakao route response was malformed.");
+
+      const metrics = new Map<string, SalesRouteMetric>();
+      for (const route of parsed.data.routes) {
+        const destination = destinations[Number(route.key)];
+        if (!destination || route.result_code !== 0 || !route.summary) continue;
+        metrics.set(destination.schoolId, {
+          fromSchoolId: origin.schoolId,
+          toSchoolId: destination.schoolId,
+          distanceMeters: route.summary.distance,
+          durationSeconds: route.summary.duration,
+          source: "road",
+        });
+      }
+      return metrics;
     } catch (error) {
+      if (error instanceof KakaoRouteRequestError) throw error;
       throw new KakaoRouteRequestError(error instanceof Error ? error.message : "Kakao route request failed.");
     } finally {
       clearTimeout(timeout);
     }
-
-    if (!response.ok) {
-      throw new KakaoRouteRequestError(
-        `Kakao route request failed with status ${response.status}.`,
-        [401, 403, 429].includes(response.status),
-      );
-    }
-    const parsed = kakaoRouteResponseSchema.safeParse(await response.json());
-    if (!parsed.success) throw new KakaoRouteRequestError("Kakao route response was malformed.");
-
-    const metrics = new Map<string, SalesRouteMetric>();
-    for (const route of parsed.data.routes) {
-      const destination = destinations[Number(route.key)];
-      if (!destination || route.result_code !== 0 || !route.summary) continue;
-      metrics.set(destination.schoolId, {
-        fromSchoolId: origin.schoolId,
-        toSchoolId: destination.schoolId,
-        distanceMeters: route.summary.distance,
-        durationSeconds: route.summary.duration,
-        source: "road",
-      });
-    }
-    return metrics;
   }
 }
-
