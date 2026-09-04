@@ -43,7 +43,7 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
   expect(navigationBox?.height).toBeLessThanOrEqual(68);
   await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "column");
   await expect(navigation).toHaveCSS("border-radius", "0px");
-  await expect(navigation).toHaveCSS("background-color", "rgba(250, 250, 247, 0.92)");
+  await expect(navigation).toHaveCSS("background-color", "rgba(255, 255, 255, 0.9)");
   const activeIndicator = await navigation.getByRole("button", { name: "학교" }).evaluate((element) => ({
     shadow: getComputedStyle(element).boxShadow,
     indicatorOpacity: getComputedStyle(element, "::after").opacity,

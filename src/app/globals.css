@@ -4105,3 +4105,150 @@ button { -webkit-tap-highlight-color: transparent; }
   .visit-binary-choice > div > button svg,
   .workspace-header__back { animation: none; transition: none; }
 }
+
+/* Onnuri General Foods identity · exact company mark with purposeful motion */
+.workspace-shell .app-brand__mark,
+.auth-brand__mark,
+.admin-brand > span {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(33, 112, 190, .12);
+  background: #f7fbff;
+  box-shadow: 0 9px 24px rgba(28, 92, 146, .13), inset 0 1px 0 rgba(255, 255, 255, .92);
+}
+.app-brand__mark::after,
+.auth-brand__mark::after,
+.admin-brand > span::after {
+  position: absolute;
+  z-index: 2;
+  inset: -45%;
+  width: 34%;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .72), transparent);
+  pointer-events: none;
+  transform: translateX(-260%) rotate(18deg);
+}
+.app-brand__wordmark small,
+.auth-brand small { letter-spacing: .055em; }
+.admin-brand small {
+  color: rgba(255, 255, 255, .68);
+  letter-spacing: .045em;
+}
+.app-brand__mark .app-icon-mark,
+.auth-brand__mark .app-icon-mark,
+.admin-brand .app-icon-mark {
+  position: relative;
+  z-index: 1;
+  transform-origin: center;
+}
+
+.glass-button:active:not(:disabled),
+.school-search-trigger:active,
+.assignment-card:active,
+.sales-task-row:active,
+.cycle-selector:active { transform: scale(.985); }
+.school-search-trigger > svg,
+.cycle-selector > svg,
+.workspace-header__back > svg { transition: transform 180ms cubic-bezier(.2, .8, .2, 1); }
+.school-search-trigger:hover > svg,
+.cycle-selector:hover > svg { transform: translateX(3px); }
+.workspace-header__back:hover > svg { transform: translateX(-2px); }
+.sales-cycle-progress i,
+.sales-activity-score i { transform-origin: left center; }
+.workspace-shell .status-badge--attention { color: #76423b; background: #f3e3df; }
+.workspace-shell[data-mode="sales"] .sales-zone-chips .smart-chip[aria-pressed="true"] {
+  color: #195f52;
+  border-color: rgba(42, 118, 101, .28);
+  background: #e1f3ed;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-brand__mark,
+  .auth-brand__mark,
+  .admin-brand > span { animation: brand-mark-arrive 460ms cubic-bezier(.18, .82, .24, 1) backwards; }
+  .app-brand__mark::after,
+  .auth-brand__mark::after,
+  .admin-brand > span::after { animation: brand-mark-sheen 820ms 360ms cubic-bezier(.2, .7, .2, 1) both; }
+  .app-brand__wordmark,
+  .auth-brand > span:last-child,
+  .admin-brand > div { animation: brand-copy-arrive 420ms 90ms ease-out backwards; }
+
+  .workspace-content > .shell-page { animation: workspace-page-arrive 300ms cubic-bezier(.2, .78, .24, 1) backwards; }
+  .login-story__copy { animation: workspace-page-arrive 520ms 100ms cubic-bezier(.2, .78, .24, 1) backwards; }
+  .login-card { animation: login-card-arrive 520ms 140ms cubic-bezier(.18, .82, .24, 1) backwards; }
+
+  .shell-hero > div:first-child,
+  .sales-cycle-hero > div:first-child,
+  .sales-activity-hero > div:first-child,
+  .detail-hero > div:last-child { animation: hero-copy-arrive 440ms 70ms cubic-bezier(.2, .8, .2, 1) backwards; }
+  .school-search-trigger,
+  .sales-cycle-overview,
+  .sales-activity-score { animation: content-card-arrive 420ms 130ms cubic-bezier(.2, .8, .2, 1) backwards; }
+
+  .assignment-grid > .assignment-card:nth-child(-n + 6),
+  .sales-task-list > .sales-task-row:nth-child(-n + 6),
+  .delivery-recents__list > button:nth-child(-n + 5),
+  .school-search-results > .school-search-result:nth-child(-n + 6) {
+    animation: content-card-arrive 360ms cubic-bezier(.2, .8, .2, 1) backwards;
+  }
+  .assignment-grid > :nth-child(2),
+  .sales-task-list > :nth-child(2),
+  .delivery-recents__list > :nth-child(2),
+  .school-search-results > :nth-child(2) { animation-delay: 45ms; }
+  .assignment-grid > :nth-child(3),
+  .sales-task-list > :nth-child(3),
+  .delivery-recents__list > :nth-child(3),
+  .school-search-results > :nth-child(3) { animation-delay: 90ms; }
+  .assignment-grid > :nth-child(4),
+  .sales-task-list > :nth-child(4),
+  .delivery-recents__list > :nth-child(4),
+  .school-search-results > :nth-child(4) { animation-delay: 135ms; }
+  .assignment-grid > :nth-child(5),
+  .sales-task-list > :nth-child(5),
+  .delivery-recents__list > :nth-child(5),
+  .school-search-results > :nth-child(5) { animation-delay: 180ms; }
+  .assignment-grid > :nth-child(6),
+  .sales-task-list > :nth-child(6),
+  .school-search-results > :nth-child(6) { animation-delay: 225ms; }
+
+  .workspace-navigation__items button[data-active="true"] svg { animation: navigation-icon-settle 280ms cubic-bezier(.2, .9, .3, 1); }
+  .segmented-control button[aria-pressed="true"] { animation: segmented-choice-settle 220ms cubic-bezier(.2, .85, .3, 1); }
+  .sales-cycle-progress i,
+  .sales-activity-score i { animation: progress-reveal 620ms 180ms cubic-bezier(.2, .8, .2, 1) backwards; }
+}
+
+@keyframes brand-mark-arrive {
+  from { transform: translateY(5px) scale(.88) rotate(-3deg); }
+}
+@keyframes brand-mark-sheen {
+  0% { opacity: 0; transform: translateX(-260%) rotate(18deg); }
+  24% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(560%) rotate(18deg); }
+}
+@keyframes brand-copy-arrive {
+  from { transform: translateX(-5px); }
+}
+@keyframes workspace-page-arrive {
+  from { transform: translateY(7px); }
+}
+@keyframes login-card-arrive {
+  from { transform: translateY(10px) scale(.985); }
+}
+@keyframes hero-copy-arrive {
+  from { transform: translateY(9px); }
+}
+@keyframes content-card-arrive {
+  from { transform: translateY(8px) scale(.992); }
+}
+@keyframes navigation-icon-settle {
+  0% { transform: translateY(2px) scale(.82); }
+  70% { transform: translateY(-2px) scale(1.08); }
+}
+@keyframes segmented-choice-settle {
+  0% { transform: scale(.96); }
+  70% { transform: scale(1.02); }
+}
+@keyframes progress-reveal {
+  from { transform: scaleX(0); }
+}

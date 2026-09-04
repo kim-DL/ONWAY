@@ -29,7 +29,7 @@ function Brand() {
   return (
     <div className="auth-brand" aria-label="급식길">
       <span className="auth-brand__mark" aria-hidden="true"><AppIconMark /></span>
-      <span><strong>급식길</strong><small>ONNURIWAY</small></span>
+      <span><strong>급식길</strong><small>온누리종합식품</small></span>
     </div>
   );
 }

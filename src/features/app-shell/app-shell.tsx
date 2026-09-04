@@ -87,7 +87,7 @@ function AppBrand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="app-brand">
       <span className="app-brand__mark" aria-hidden="true"><AppIconMark /></span>
-      <span className="app-brand__wordmark"><strong>급식길</strong>{compact ? null : <small>ONNURIWAY</small>}</span>
+      <span className="app-brand__wordmark"><strong>급식길</strong>{compact ? null : <small>온누리종합식품</small>}</span>
     </div>
   );
 }

@@ -6,11 +6,14 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase19",
+  "phase20",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",
   "manifest.webmanifest",
+  "onnuriway-company-icon-192-v3.png",
+  "onnuriway-company-icon-maskable-512-v3.png",
+  "onnuri-food-logo.png",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {
@@ -34,10 +37,12 @@ if (serviceWorker.includes("'url':'/api/connectivity'")) {
 }
 
 const expectedIcons = new Map([
-  ["onnuriway-icon-192-v2.png", [192, 192]],
-  ["onnuriway-icon-512-v2.png", [512, 512]],
-  ["onnuriway-icon-maskable-512-v2.png", [512, 512]],
-  ["onnuriway-apple-touch-icon-v2.png", [180, 180]],
+  ["public/icons/onnuriway-company-icon-192-v3.png", [192, 192]],
+  ["public/icons/onnuriway-company-icon-512-v3.png", [512, 512]],
+  ["public/icons/onnuriway-company-icon-maskable-512-v3.png", [512, 512]],
+  ["public/icons/onnuriway-company-apple-touch-icon-v3.png", [180, 180]],
+  ["public/brand/onnuri-food-logo.png", [1200, 446]],
+  ["src/app/icon.png", [64, 64]],
 ]);
 
 const favicon = await readFile(join(projectRoot, "public", "favicon.ico"));
@@ -46,7 +51,7 @@ if (favicon.subarray(0, 6).toString("hex") !== "000001000100") {
 }
 
 for (const [filename, [expectedWidth, expectedHeight]] of expectedIcons) {
-  const iconPath = join(projectRoot, "public", "icons", filename);
+  const iconPath = join(projectRoot, ...filename.split("/"));
   const bytes = await readFile(iconPath);
   const signature = bytes.subarray(0, 8).toString("hex");
   if (signature !== "89504e470d0a1a0a") throw new Error(`${filename} is not a PNG.`);

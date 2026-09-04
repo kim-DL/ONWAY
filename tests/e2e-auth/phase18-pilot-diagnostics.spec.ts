@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
+import { APP_METADATA } from "../../src/lib/app-metadata";
 
 async function login(page: Page) {
   await page.goto("/");
@@ -38,7 +39,7 @@ test("a Pilot participant exports privacy-safe device evidence from an accessibl
   const diagnostics = JSON.parse(serialized ?? "{}") as Record<string, unknown>;
   expect(diagnostics).toMatchObject({
     schemaVersion: 1,
-    appVersion: "phase18-rc1",
+    appVersion: APP_METADATA.buildVersion,
     deviceState: { online: true },
   });
   expect(serialized).not.toMatch(/EMP-|employeeId|schoolId|query|uid|email|phone|userAgent/iu);
@@ -61,6 +62,6 @@ test("a device without Clipboard support downloads the same privacy-safe JSON", 
   const chunks: Buffer[] = [];
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
   const serialized = Buffer.concat(chunks).toString("utf8");
-  expect(JSON.parse(serialized)).toMatchObject({ schemaVersion: 1, appVersion: "phase18-rc1" });
+  expect(JSON.parse(serialized)).toMatchObject({ schemaVersion: 1, appVersion: APP_METADATA.buildVersion });
   expect(serialized).not.toMatch(/EMP-|employeeId|schoolId|query|uid|email|phone|userAgent/iu);
 });

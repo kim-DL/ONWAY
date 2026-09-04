@@ -11,7 +11,7 @@ function ApplicationBootFallback() {
         <h1 className="sr-only">급식길 현장 앱 준비 중</h1>
         <div className="auth-brand" aria-label="급식길">
           <span className="auth-brand__mark" aria-hidden="true"><AppIconMark /></span>
-          <span><strong>급식길</strong><small>ONNURIWAY</small></span>
+          <span><strong>급식길</strong><small>온누리종합식품</small></span>
         </div>
         <span className="auth-spinner" aria-hidden="true" />
         <p>현장 앱을 빠르게 준비하고 있어요.</p>

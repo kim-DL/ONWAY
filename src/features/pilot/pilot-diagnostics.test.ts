@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { APP_METADATA } from "@/lib/app-metadata";
 import {
   createPilotDeviceDiagnostics,
   serializePilotDeviceDiagnostics,
@@ -33,7 +34,7 @@ describe("pilot device diagnostics", () => {
 
     expect(diagnostics).toMatchObject({
       schemaVersion: 1,
-      appVersion: "phase18-rc1",
+      appVersion: APP_METADATA.buildVersion,
       capturedAt: "2026-08-25T00:00:00.000Z",
       deviceState: { online: false, installed: true },
     });

@@ -2764,7 +2764,7 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
           </span>
           <div>
             <strong>급식길</strong>
-            <small>OPERATIONS</small>
+            <small>온누리종합식품</small>
           </div>
         </div>
         <nav aria-label="관리자 주요 메뉴">

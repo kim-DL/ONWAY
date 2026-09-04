@@ -4,44 +4,77 @@ import { join } from "node:path";
 import sharp from "sharp";
 
 const projectRoot = process.cwd();
-const outputDirectory = join(projectRoot, "public", "icons");
-await mkdir(outputDirectory, { recursive: true });
+const iconDirectory = join(projectRoot, "public", "icons");
+const brandDirectory = join(projectRoot, "public", "brand");
+const sourceLogoPath = join(projectRoot, "assets", "brand", "onnuri-food-logo-original.png");
+const browserIconPath = join(projectRoot, "src", "app", "icon.png");
 
-function iconSvg(size, safeInset = 0) {
-  const inset = Math.round(size * safeInset);
-  const contentSize = size - inset * 2;
-  const radius = Math.round(contentSize * 0.28);
-  const x = inset;
-  const y = inset;
-  const barX = Math.round(inset + contentSize * 0.24);
-  const barWidth = Math.round(contentSize * 0.52);
-  const barHeight = Math.max(3, Math.round(contentSize * 0.1));
-  const firstY = Math.round(inset + contentSize * 0.29);
-  const secondY = Math.round(inset + contentSize * 0.47);
-  const thirdY = Math.round(inset + contentSize * 0.65);
-  const shortWidth = Math.round(contentSize * 0.32);
-  const dotRadius = Math.round(contentSize * 0.09);
-  const dotX = Math.round(inset + contentSize * 0.68);
-  const dotY = Math.round(inset + contentSize * 0.52);
+await Promise.all([
+  mkdir(iconDirectory, { recursive: true }),
+  mkdir(brandDirectory, { recursive: true }),
+]);
 
+// The supplied artwork has a transparent outer canvas and a few edge pixels,
+// so an explicit, inspected crop preserves the company mark without resampling
+// those artifacts into the small app-icon variants.
+const COMPANY_LOGO_BOUNDS = { left: 28, top: 135, width: 1718, height: 638 };
+const brandMark = await sharp(sourceLogoPath)
+  .extract(COMPANY_LOGO_BOUNDS)
+  .resize({ width: 1200, withoutEnlargement: true, kernel: sharp.kernel.lanczos3 })
+  .png({ compressionLevel: 9, adaptiveFiltering: true })
+  .toBuffer();
+
+await writeFile(join(brandDirectory, "onnuri-food-logo.png"), brandMark);
+
+function iconBackground(size) {
+  const inset = Math.max(2, Math.round(size * 0.018));
+  const radius = Math.round(size * 0.22);
   return Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <rect width="${size}" height="${size}" fill="#153f35"/>
-      <rect x="${x}" y="${y}" width="${contentSize}" height="${contentSize}" rx="${radius}" fill="#153f35"/>
-      <rect x="${barX}" y="${firstY}" width="${barWidth}" height="${barHeight}" rx="${barHeight / 2}" fill="#d8e563"/>
-      <rect x="${barX}" y="${secondY}" width="${shortWidth}" height="${barHeight}" rx="${barHeight / 2}" fill="#d8e563"/>
-      <rect x="${barX}" y="${thirdY}" width="${barWidth}" height="${barHeight}" rx="${barHeight / 2}" fill="#d8e563"/>
-      <circle cx="${dotX}" cy="${dotY}" r="${dotRadius}" fill="#e97132"/>
+      <defs>
+        <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffffff"/>
+          <stop offset="0.54" stop-color="#f5faff"/>
+          <stop offset="1" stop-color="#eff9f0"/>
+        </linearGradient>
+        <radialGradient id="blue" cx="0" cy="0" r="1">
+          <stop offset="0" stop-color="#22b8f2" stop-opacity=".22"/>
+          <stop offset="1" stop-color="#22b8f2" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="green" cx="1" cy="1" r="1">
+          <stop offset="0" stop-color="#63d231" stop-opacity=".2"/>
+          <stop offset="1" stop-color="#63d231" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="${size}" height="${size}" fill="url(#surface)"/>
+      <circle cx="0" cy="0" r="${Math.round(size * 0.86)}" fill="url(#blue)"/>
+      <circle cx="${size}" cy="${size}" r="${Math.round(size * 0.9)}" fill="url(#green)"/>
+      <rect x="${inset}" y="${inset}" width="${size - inset * 2}" height="${size - inset * 2}" rx="${radius}" fill="none" stroke="#ffffff" stroke-opacity=".72" stroke-width="${Math.max(1, Math.round(size * 0.009))}"/>
     </svg>
   `);
 }
 
-async function writeIcon(filename, size, safeInset = 0) {
-  await sharp(iconSvg(size, safeInset)).png({ compressionLevel: 9 }).toFile(join(outputDirectory, filename));
+async function iconBuffer(size, logoScale) {
+  const logo = await sharp(brandMark)
+    .resize({ width: Math.round(size * logoScale), kernel: sharp.kernel.lanczos3 })
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer();
+  const metadata = await sharp(logo).metadata();
+  const left = Math.round((size - (metadata.width ?? size)) / 2);
+  const top = Math.round((size - (metadata.height ?? size)) / 2);
+
+  return sharp(iconBackground(size))
+    .composite([{ input: logo, left, top }])
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer();
+}
+
+async function writeIcon(filename, size, logoScale) {
+  await writeFile(join(iconDirectory, filename), await iconBuffer(size, logoScale));
 }
 
 async function writeFavicon() {
-  const png = await sharp(iconSvg(32)).png({ compressionLevel: 9 }).toBuffer();
+  const png = await iconBuffer(32, 0.9);
   const icoHeader = Buffer.alloc(22);
   icoHeader.writeUInt16LE(0, 0);
   icoHeader.writeUInt16LE(1, 2);
@@ -56,11 +89,12 @@ async function writeFavicon() {
 }
 
 await Promise.all([
-  writeIcon("onnuriway-icon-192-v2.png", 192, 0),
-  writeIcon("onnuriway-icon-512-v2.png", 512, 0),
-  writeIcon("onnuriway-icon-maskable-512-v2.png", 512, 0.1),
-  writeIcon("onnuriway-apple-touch-icon-v2.png", 180, 0.04),
+  writeIcon("onnuriway-company-icon-192-v3.png", 192, 0.84),
+  writeIcon("onnuriway-company-icon-512-v3.png", 512, 0.84),
+  writeIcon("onnuriway-company-icon-maskable-512-v3.png", 512, 0.66),
+  writeIcon("onnuriway-company-apple-touch-icon-v3.png", 180, 0.8),
+  iconBuffer(64, 0.86).then((buffer) => writeFile(browserIconPath, buffer)),
   writeFavicon(),
 ]);
 
-console.log("Generated refreshed Onnuriway PWA icons in public/icons.");
+console.log("Generated Onnuri General Foods brand assets and PWA icon v3 set.");
