@@ -25,7 +25,7 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: /확인하고.*바로 움직이기/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /좋은 대화가.*기다리고 있어요/ })).toBeVisible({ timeout: 15_000 });
 }
 
 test("sales activity is an actionable own-school queue instead of an export screen", async ({ page }) => {

@@ -90,5 +90,5 @@ test("sales shell provides assigned schools, team scope, and accessible touch ta
   await page.getByRole("button", { name: "전체 보기" }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(5);
   await page.getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: /확인하고.*바로 움직이기/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /좋은 대화가.*기다리고 있어요/ })).toBeVisible();
 });

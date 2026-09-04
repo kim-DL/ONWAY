@@ -32,6 +32,7 @@ import {
   type WorkMode,
 } from "./shell-policy";
 import { DeliveryRecentSchools } from "./delivery-recent-schools";
+import { useTimeGreeting } from "./time-greeting";
 
 const MODE_OPTIONS = [
   { value: "delivery", label: "납품" },
@@ -90,13 +91,6 @@ function AppBrand({ compact = false }: { compact?: boolean }) {
       <span className="app-brand__wordmark"><strong>급식길</strong>{compact ? null : <small>온누리종합식품</small>}</span>
     </div>
   );
-}
-
-function greetingForNow() {
-  const hour = new Date().getHours();
-  if (hour < 11) return "좋은 아침이에요";
-  if (hour < 17) return "힘찬 오후예요";
-  return "오늘도 수고 많았어요";
 }
 
 function initials(name: string) {
@@ -183,12 +177,13 @@ function DeliveryHome({
   onOpenSearch: () => void;
   onSelectSchool: (school: School) => void;
 }) {
+  const greeting = useTimeGreeting();
   return (
     <section className="shell-page shell-home" aria-labelledby="delivery-home-title">
       <div className="shell-hero shell-hero--delivery">
         <div>
           <p className="shell-kicker">DELIVERY · SCHOOL</p>
-          <p className="shell-greeting">{session.displayName}님, {greetingForNow()}.</p>
+          <p className="shell-greeting">{session.displayName}님, {greeting}.</p>
           <h1 id="delivery-home-title">학교를 찾고<br /><em>현장으로.</em></h1>
         </div>
         <button
@@ -326,6 +321,11 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (!selectedSchool) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [selectedSchool]);
 
   const writeHistory = (
     next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean },

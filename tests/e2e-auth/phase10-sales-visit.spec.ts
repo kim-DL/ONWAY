@@ -46,10 +46,10 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
     .evaluateAll((sections) => sections.map((section) => section.classList[0]));
   expect(sectionOrder).toEqual([
     "sales-school-brief",
+    "sales-contact-brief",
     "sales-history",
     "school-photo-gallery",
     "sales-collaboration",
-    "sales-contact-brief",
   ]);
   await expect(page.getByText("미팅 위치", { exact: true })).toHaveCount(0);
   await expect(page.getByText("팀 공유 메모", { exact: true })).toHaveCount(0);

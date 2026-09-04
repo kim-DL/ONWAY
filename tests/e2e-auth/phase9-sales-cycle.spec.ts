@@ -118,7 +118,7 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   await expect(page.getByRole("button", { name: /대전새봄초등학교, 유성구, 담당 영업 C/ })).toBeVisible();
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: /확인하고.*바로 움직이기/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /좋은 대화가.*기다리고 있어요/ })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: /함께 이어가는.*팀의 흐름/ })).toBeVisible();
 });

@@ -508,6 +508,8 @@ export function SchoolDetail({
         <SalesSchoolBrief salesData={salesData} recorded={recordedVisit} canRecord={canRecordVisit} onRecord={openNewVisit} />
       ) : null}
 
+      {mode === "sales" && detailState.status === "ready" ? <SalesContactBrief profile={profile} canEdit={canEdit} onEdit={setEditor} /> : null}
+
       {mode === "sales" && salesData ? (
         <SalesHistoryTimeline
           key={`history-${school.schoolId}`}
@@ -562,8 +564,6 @@ export function SchoolDetail({
           onUpdated={handleSalesProfileUpdated}
         />
       ) : null}
-
-      {mode === "sales" && detailState.status === "ready" ? <SalesContactBrief profile={profile} canEdit={canEdit} onEdit={setEditor} /> : null}
 
       {mode === "delivery" ? <SoftCard className="detail-information">
         <div className="detail-card-heading"><div><p className="shell-kicker">SCHOOL INFO</p><h2>학교 기본 정보</h2></div><StatusBadge>{SCHOOL_TYPE_LABELS[school.schoolType]}</StatusBadge></div>
