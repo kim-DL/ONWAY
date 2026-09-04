@@ -4,9 +4,17 @@ import { join } from "node:path";
 await import("./seed-emulator.js");
 
 const nextCli = join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
+const verifyProductionUx = process.env.ONNURIWAY_E2E_UX === "true";
+if (verifyProductionUx) {
+  const build = spawnSync(process.execPath, [nextCli, "build", "--webpack"], {
+    cwd: process.cwd(), env: process.env, stdio: "inherit",
+  });
+  if (build.error) console.error(build.error.message);
+  if (build.status !== 0) process.exit(build.status ?? 1);
+}
 const nextServer = spawn(
   process.execPath,
-  [nextCli, "dev", "--webpack", "--hostname", "127.0.0.1", "--port", "3103"],
+  [nextCli, ...(verifyProductionUx ? ["start"] : ["dev", "--webpack"]), "--hostname", "127.0.0.1", "--port", "3103"],
   { cwd: process.cwd(), env: process.env, stdio: "inherit" },
 );
 
@@ -30,7 +38,13 @@ try {
   await waitForServer();
   const result = spawnSync(
     process.execPath,
-    [playwrightCli, "test", "tests/e2e-auth/phase9-sales-cycle.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts", "--config", "playwright.phase3.config.ts",
+    [playwrightCli, "test", ...(process.env.ONNURIWAY_E2E_UX === "true"
+      ? process.env.ONNURIWAY_E2E_UX_SUITE === "visits"
+        ? ["tests/e2e-auth/phase10-sales-visit.spec.ts"]
+        : process.env.ONNURIWAY_E2E_UX_SUITE === "sales"
+          ? ["tests/e2e-auth/phase9-sales-cycle.spec.ts"]
+          : ["tests/e2e-auth/phase22-action-reach.spec.ts", "tests/e2e-auth/phase22-form-actions.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts"]
+      : ["tests/e2e-auth/phase9-sales-cycle.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts"]), "--config", "playwright.phase3.config.ts",
       ...(process.env.ONNURIWAY_E2E_GREP ? ["--grep", process.env.ONNURIWAY_E2E_GREP] : [])],
     { cwd: process.cwd(), env: process.env, stdio: "inherit" },
   );

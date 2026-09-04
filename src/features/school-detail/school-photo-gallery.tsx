@@ -14,7 +14,7 @@ import {
 } from "react";
 import { FirebaseError } from "firebase/app";
 
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -106,12 +106,14 @@ function PhotoUploader({
   onDone: () => void;
 }) {
   const { showToast } = useToast();
+  const formId = useId();
   const [file, setFile] = useState<File | null>(null);
   const [photoInfo, setPhotoInfo] = useState<OptimizedSchoolPhoto | null>(null);
   const [caption, setCaption] = useState(photo?.caption ?? SLOT_LABELS[slotId]);
   const [saving, setSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [uploadStage, setUploadStage] = useState<PhotoUploadStage | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const selectionId = useRef(0);
   const galleryInputId = useId();
   const cameraInputId = useId();
@@ -121,6 +123,7 @@ function PhotoUploader({
 
   const selectFile = async (candidate: File | null) => {
     if (!candidate) return;
+    setUploadError(null);
     const requestId = selectionId.current + 1;
     selectionId.current = requestId;
     setOptimizing(true);
@@ -139,7 +142,7 @@ function PhotoUploader({
     } catch (error) {
       if (selectionId.current !== requestId) return;
       setFile(null);
-      showToast(error instanceof Error ? error.message : "사진을 준비하지 못했습니다.");
+      setUploadError(error instanceof Error ? error.message : "사진을 준비하지 못했습니다. 다른 사진을 선택해주세요.");
     } finally {
       if (selectionId.current === requestId) setOptimizing(false);
     }
@@ -147,7 +150,8 @@ function PhotoUploader({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!file) return showToast("촬영하거나 선택한 사진이 필요합니다.");
+    setUploadError(null);
+    if (!file) return setUploadError("촬영하거나 선택한 사진이 필요합니다.");
     setSaving(true);
     setUploadStage("preparing");
     try {
@@ -164,8 +168,12 @@ function PhotoUploader({
       showToast(photo ? "새 버전의 사진으로 교체했습니다." : "현장 사진을 등록했습니다.", "success");
       onDone();
     } catch (error) {
-      showToast(errorMessage(error));
-      if (error instanceof FirebaseError && error.code === "functions/aborted") onDone();
+      if (error instanceof FirebaseError && error.code === "functions/aborted") {
+        onDone();
+        showToast(errorMessage(error));
+      } else {
+        setUploadError(errorMessage(error));
+      }
     } finally {
       setSaving(false);
       setUploadStage(null);
@@ -181,7 +189,7 @@ function PhotoUploader({
         : "저장 중…";
 
   return (
-    <form className="photo-uploader" onSubmit={submit}>
+    <form id={formId} className="photo-uploader" onSubmit={submit}>
       <div
         className="photo-dropzone"
         data-has-file={Boolean(file)}
@@ -200,7 +208,10 @@ function PhotoUploader({
       {photoInfo ? <p className="photo-optimization-result"><Icon name="check" />{photoInfo.optimized ? `${formatPhotoBytes(photoInfo.originalBytes)} → ${formatPhotoBytes(photoInfo.file.size)}로 최적화` : `${formatPhotoBytes(photoInfo.file.size)} · 추가 압축 없이 사용`}<span>{photoInfo.width} × {photoInfo.height}</span></p> : null}
       <label className="photo-caption-field"><span>사진 설명</span><input value={caption} maxLength={2_000} onChange={(event) => setCaption(event.target.value)} placeholder={SLOT_LABELS[slotId]} /></label>
       <div className="photo-privacy-note"><Icon name="sparkles" /><p><strong>개인정보를 한 번 더 확인해주세요.</strong><small>학생 얼굴, 차량번호, 연락처, 문서가 보이는 사진은 등록하지 않습니다.</small></p></div>
-      <GlassButton variant="primary" type="submit" disabled={saving || optimizing || !file}>{saving ? savingLabel : photo ? "새 사진으로 교체" : "현장 사진 등록"}</GlassButton>
+      <BottomSheetActions className="photo-uploader__actions" busy={saving}>
+        {uploadError ? <p className="sheet-action-error" role="alert">{uploadError}</p> : null}
+        <GlassButton variant="primary" type="submit" form={formId} disabled={saving || optimizing || !file}>{saving ? savingLabel : photo ? "새 사진으로 교체" : "현장 사진 등록"}</GlassButton>
+      </BottomSheetActions>
     </form>
   );
 }

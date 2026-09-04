@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { FirebaseError } from "firebase/app";
 import { FunctionsError } from "firebase/functions";
 
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import { SmartChip } from "@/components/ui/smart-chip";
 import type { TagDefinition } from "@/domain/catalog";
@@ -75,17 +75,23 @@ export function SalesCollaboration({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const requestIdRef = useRef(crypto.randomUUID());
+  const savePendingRef = useRef(false);
   const availableTags = useMemo(() => communicationTagOptions(communicationTags), [communicationTags]);
   const tagLabels = useMemo(() => new Map(availableTags.map((tag) => [tag.tagId, tag.label])), [availableTags]);
   const activeTags = useMemo(() => availableTags.filter((tag) => tag.active), [availableTags]);
 
   const openEditor = () => {
+    if (!canEdit || savePendingRef.current) return;
     const activeIds = new Set(activeTags.map((tag) => tag.tagId));
     setDraftTagIds(savedTagIds.filter((tagId) => activeIds.has(tagId)));
     setSaveError(null);
     setEditorOpen(true);
   };
+  const closeEditor = () => {
+    if (!savePendingRef.current) setEditorOpen(false);
+  };
   const toggleTag = (tagId: string) => {
+    if (!canEdit || savePendingRef.current) return;
     if (saveError) requestIdRef.current = crypto.randomUUID();
     setSaveError(null);
     setDraftTagIds((current) => current.includes(tagId)
@@ -93,6 +99,8 @@ export function SalesCollaboration({
       : [...current, tagId]);
   };
   const save = async () => {
+    if (!canEdit || savePendingRef.current) return;
+    savePendingRef.current = true;
     setSaving(true);
     setSaveError(null);
     try {
@@ -122,6 +130,7 @@ export function SalesCollaboration({
       }
       setSaveError(profileError(error));
     } finally {
+      savePendingRef.current = false;
       setSaving(false);
     }
   };
@@ -149,21 +158,24 @@ export function SalesCollaboration({
         open={editorOpen}
         title="커뮤니케이션 참고"
         description="업무에 필요한 참고만 선택해주세요."
-        onClose={() => { if (!saving) setEditorOpen(false); }}
+        onClose={closeEditor}
       >
         <div className="communication-editor">
-          <fieldset>
+          <fieldset disabled={saving}>
             <legend>업무 참고 태그 <span>복수 선택</span></legend>
             <div className="communication-editor__tag-grid">
               {activeTags.map((tag) => (
-                <SmartChip key={tag.tagId} selected={draftTagIds.includes(tag.tagId)} onClick={() => toggleTag(tag.tagId)}>
+                <SmartChip key={tag.tagId} selected={draftTagIds.includes(tag.tagId)} disabled={saving} onClick={() => toggleTag(tag.tagId)}>
                   <span aria-hidden="true"><Icon name="check" size={14} /></span>{tag.label}
                 </SmartChip>
               ))}
             </div>
           </fieldset>
-          {saveError ? <p className="communication-editor__error" role="alert">{saveError}</p> : null}
-          <div className="communication-editor__actions"><button type="button" disabled={saving} onClick={() => setEditorOpen(false)}>취소</button><button type="button" disabled={saving} onClick={() => void save()}>{saving ? "안전하게 저장 중…" : "업무 참고 저장"}</button></div>
+          <BottomSheetActions className="communication-editor__actions" busy={saving}>
+            {saveError ? <p className="communication-editor__error sheet-action-error" role="alert">{saveError}</p> : null}
+            <button type="button" disabled={saving} onClick={closeEditor}>취소</button>
+            <button type="button" disabled={saving} onClick={() => void save()}>{saving ? "안전하게 저장 중…" : "업무 참고 저장"}</button>
+          </BottomSheetActions>
         </div>
       </BottomSheet>
     </section>

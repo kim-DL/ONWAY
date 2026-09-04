@@ -178,11 +178,13 @@ function SalesClaimPicker({
   session,
   assignedSchoolIds,
   busy,
+  submitErrorMessage,
   onSubmit,
 }: {
   session: AuthenticatedSession;
   assignedSchoolIds: Set<string>;
   busy: boolean;
+  submitErrorMessage: string | null;
   onSubmit: (schoolIds: string[]) => Promise<boolean>;
 }) {
   const catalog = useSchoolSearchCatalog(session, "sales");
@@ -220,6 +222,7 @@ function SalesClaimPicker({
         busy={busy}
         actionLabel={(count) => `${count}곳 내 담당으로 가져오기`}
         emptyTitle="현재 선택할 수 있는 미배정 학교가 없습니다."
+        submitErrorMessage={submitErrorMessage}
         onSubmit={onSubmit}
       />
     </div>
@@ -251,6 +254,7 @@ export function SalesWorkspace({
   const [cycleSheetOpen, setCycleSheetOpen] = useState(false);
   const [claimSheetOpen, setClaimSheetOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [claimSubmitError, setClaimSubmitError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const [selectedReleaseIds, setSelectedReleaseIds] = useState<Set<string>>(() => new Set());
   const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
@@ -362,6 +366,7 @@ export function SalesWorkspace({
   const selectedCycleIsCurrent = workspace.selectedCycleId === workspace.currentCycleId;
   const scopeName = scope === "mine" ? "내 담당" : "팀 전체";
   const claimAssignments = async (schoolIds: string[]) => {
+    setClaimSubmitError(null);
     setClaiming(true);
     try {
       const result = await claimSalesAssignments({
@@ -373,7 +378,7 @@ export function SalesWorkspace({
       data.retry();
       return true;
     } catch (error) {
-      showToast(salesAssignmentErrorMessage(error));
+      setClaimSubmitError(salesAssignmentErrorMessage(error));
       data.retry();
       return false;
     } finally {
@@ -486,7 +491,7 @@ export function SalesWorkspace({
               </button>
             ) : null}
             {selectedCycleIsCurrent ? (
-              <button type="button" className="sales-school-command sales-school-command--primary" onClick={() => setClaimSheetOpen(true)}>
+              <button type="button" className="sales-school-command sales-school-command--primary" onClick={() => { setClaimSubmitError(null); setClaimSheetOpen(true); }}>
                 <span><Icon name="building" /></span>
                 <span><strong>학교 추가</strong><small>내 담당으로 가져오기</small></span>
               </button>
@@ -598,6 +603,7 @@ export function SalesWorkspace({
       <BottomSheet
         open={claimSheetOpen}
         title="담당 학교 가져오기"
+        dismissible={!claiming}
         onClose={() => { if (!claiming) setClaimSheetOpen(false); }}
       >
         {claimSheetOpen ? (
@@ -605,6 +611,7 @@ export function SalesWorkspace({
             session={session}
             assignedSchoolIds={model.assignedSchoolIds}
             busy={claiming}
+            submitErrorMessage={claimSubmitError}
             onSubmit={claimAssignments}
           />
         ) : null}
@@ -621,7 +628,6 @@ export function SalesWorkspace({
       <BottomSheet
         open={routeSheetOpen}
         title={model.activeRoute ? "오늘의 방문 동선" : "방문 동선 만들기"}
-        description="첫 학교를 기준으로 이동이 가까운 순서를 계산합니다."
         onClose={() => setRouteSheetOpen(false)}
       >
         {routeSheetOpen ? (
@@ -646,6 +652,7 @@ export function SalesWorkspace({
       <BottomSheet
         open={releaseConfirmOpen}
         title={`${selectedReleaseIds.size}개 학교를 제외할까요?`}
+        dismissible={!releasing}
         description="아직 업무 기록이 없는 학교만 제외됩니다. 제외된 학교는 다른 담당자가 바로 선택할 수 있습니다."
         onClose={() => { if (!releasing) setReleaseConfirmOpen(false); }}
       >

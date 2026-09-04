@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState, type FormEvent } from "react";
+import { useCallback, useId, useRef, useState, type FormEvent } from "react";
 import { FirebaseError } from "firebase/app";
 
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import { SmartChip } from "@/components/ui/smart-chip";
 import type { Product, TagDefinition } from "@/domain/catalog";
@@ -150,6 +150,7 @@ export function SalesVisitSheet({
   onClose: () => void;
   onRecorded: (summary: RecordedVisitSummary) => void;
 }) {
+  const formId = useId();
   const visitDateWindow = visitDateWindowForCycle(assignment.cycleId);
   const editing = initialVisit !== null;
   const [visitedDate, setVisitedDate] = useState(() => initialVisit ? todayInSeoul(initialVisit.visitedAt) : visitDateWindow.initial);
@@ -230,6 +231,7 @@ export function SalesVisitSheet({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (savingRef.current) return;
     setSaveError(null);
     if (!validate() || brochureStatus === null || sampleStatus === null || interestScore === null) return;
     const content = {
@@ -264,6 +266,7 @@ export function SalesVisitSheet({
       : recordSalesVisitInputSchema.safeParse(content);
     if (!parsed.success) {
       setErrors(["입력한 날짜와 방문 내용을 다시 확인해주세요."]);
+      requestAnimationFrame(() => errorSummaryRef.current?.focus());
       return;
     }
     savingRef.current = true;
@@ -294,12 +297,11 @@ export function SalesVisitSheet({
     <BottomSheet
       open
       title={editing ? "방문 기록 수정" : "방문 기록"}
-      description={editing
-        ? `${school.name} · 가장 최근 기록의 저장된 내용을 불러왔습니다.`
-        : `${school.name} · 방문일은 오늘로 준비하고 이번 달 활동을 기록합니다.`}
+      description={school.name}
       onClose={handleClose}
     >
       <form
+        id={formId}
         className="sales-visit-form"
         onChange={clearFeedback}
         onClickCapture={(event) => {
@@ -400,12 +402,12 @@ export function SalesVisitSheet({
         </section>
 
         {errors.length > 0 ? <div ref={errorSummaryRef} className="visit-form-errors" role="alert" tabIndex={-1}><strong>저장 전에 확인해주세요.</strong><ul>{errors.map((error) => <li key={error}>{error}</li>)}</ul></div> : null}
-        {saveError ? <div className="visit-form-save-error" role="alert"><Icon name="sparkles" /><span><strong>저장하지 못했어요.</strong>{saveError}</span></div> : null}
 
-        <div className="sales-visit-form__submit">
+        <BottomSheetActions className="sales-visit-form__submit" busy={saving}>
+          {saveError ? <div className="sheet-action-error" role="alert"><strong>저장하지 못했어요.</strong> {saveError}</div> : null}
           <p><Icon name="check" size={16} />한 번의 저장으로 방문·학교 상태·통계가 함께 반영됩니다.</p>
-          <button type="submit" disabled={saving}>{saving ? "안전하게 저장 중…" : editing ? "수정 내용 저장" : "방문 기록 저장"}</button>
-        </div>
+          <button type="submit" form={formId} disabled={saving}>{saving ? "안전하게 저장 중…" : editing ? "수정 내용 저장" : "방문 기록 저장"}</button>
+        </BottomSheetActions>
       </form>
     </BottomSheet>
   );

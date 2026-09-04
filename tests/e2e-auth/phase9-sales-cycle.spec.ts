@@ -23,6 +23,8 @@ test.beforeAll(async () => {
   const batch = database.batch();
   for (const snapshot of rateLimits.docs) batch.delete(snapshot.ref);
   await batch.commit();
+  // Playwright restarts this worker after a failure; never carry this test-owned assignment into route cases.
+  await database.doc(`salesCycles/2026-08/assignments/${UI_CLAIM_SCHOOL_ID}`).delete();
 
   const schoolSnapshots = await database.collection("schools").limit(1).get();
   const templateSchool = schoolSnapshots.docs[0];
@@ -174,7 +176,7 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   await dialog.getByLabel("학교급").selectOption("elementary");
   await expect(schoolCheckbox).toBeChecked();
 
-  const accessibility = await new AxeBuilder({ page }).include("[role=dialog]").analyze();
+  const accessibility = await new AxeBuilder({ page }).include("dialog[open], [role=dialog]").analyze();
   expect(accessibility.violations).toEqual([]);
   const undersizedTargets = await dialog.locator("button:visible, input:not([type=checkbox]):visible, select:visible").evaluateAll((targets) =>
     targets.flatMap((target) => {
@@ -186,17 +188,38 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   );
   expect(undersizedTargets).toEqual([]);
 
-  await dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기" }).click();
-  await expect(page.getByText("1개 학교를 내 담당으로 가져왔습니다.")).toBeVisible();
-  await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toBeVisible({ timeout: 15_000 });
+  const controlApp = getApps().find((candidate) => candidate.name === "phase9-e2e-control")!;
+  const assignmentRef = getFirestore(controlApp).doc(`salesCycles/2026-08/assignments/${UI_CLAIM_SCHOOL_ID}`);
+  try {
+    // Measure UI feedback after the real callable response, not during emulator cold start.
+    const [claimResponse] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/claimSalesAssignments"), { timeout: 30_000 }),
+      dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기" }).click(),
+    ]);
+    expect(claimResponse.status()).toBe(200);
+    expect(await claimResponse.json()).toMatchObject({ result: { createdCount: 1 } });
+    await expect(page.getByText("1개 학교를 내 담당으로 가져왔습니다.")).toBeVisible();
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toBeVisible({ timeout: 15_000 });
+    expect((await assignmentRef.get()).exists).toBe(true);
 
-  await page.getByRole("button", { name: "내 학교 정리" }).click();
-  await page.getByRole("checkbox", { name: `${UI_CLAIM_SCHOOL_NAME} 담당 학교에서 제외 선택` }).check();
-  await page.getByRole("button", { name: "내 담당에서 제외" }).click();
-  const releaseDialog = page.getByRole("dialog", { name: "1개 학교를 제외할까요?" });
-  await releaseDialog.getByRole("button", { name: "담당에서 제외" }).click();
-  await expect(page.getByText("1개 학교를 내 담당에서 제외했습니다.")).toBeVisible();
-  await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toHaveCount(0, { timeout: 15_000 });
+    await page.getByRole("button", { name: "내 학교 정리" }).click();
+    await page.getByRole("checkbox", { name: `${UI_CLAIM_SCHOOL_NAME} 담당 학교에서 제외 선택` }).check();
+    await page.getByRole("button", { name: "내 담당에서 제외" }).click();
+    const releaseDialog = page.getByRole("dialog", { name: "1개 학교를 제외할까요?" });
+    const [releaseResponse] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/releaseSalesAssignments"), { timeout: 30_000 }),
+      releaseDialog.getByRole("button", { name: "담당에서 제외" }).click(),
+    ]);
+    expect(releaseResponse.status()).toBe(200);
+    expect(await releaseResponse.json()).toMatchObject({ result: { removedCount: 1 } });
+    await expect(page.getByText("1개 학교를 내 담당에서 제외했습니다.")).toBeVisible();
+    await expect(releaseDialog).toBeHidden();
+    await expect(page.locator(".assignment-card", { hasText: UI_CLAIM_SCHOOL_NAME })).toHaveCount(0, { timeout: 15_000 });
+    expect((await assignmentRef.get()).exists).toBe(false);
+  } finally {
+    await assignmentRef.delete();
+  }
 });
 
 test("salesperson creates an accessible route and applies its order on mobile", async ({ page }, testInfo) => {
@@ -215,7 +238,7 @@ test("salesperson creates an accessible route and applies its order on mobile", 
     await page.screenshot({ path: testInfo.outputPath("sales-route-planner.png"), fullPage: true });
   }
 
-  const accessibility = await new AxeBuilder({ page }).include("[role=dialog]").analyze();
+  const accessibility = await new AxeBuilder({ page }).include("dialog[open], [role=dialog]").analyze();
   expect(accessibility.violations).toEqual([]);
   const undersizedTargets = await dialog.locator("button:visible, a:visible").evaluateAll((targets) =>
     targets.flatMap((target) => {
@@ -283,7 +306,7 @@ test("sixteen-school route preserves failed selections and explicitly recovers w
     await expect(remainder).toBeDisabled();
     await recovery.getByRole("combobox", { name: "나머지 동선의 첫 학교" }).selectOption(templateId);
     await expect(remainder).toBeEnabled();
-    const accessibility = await new AxeBuilder({ page }).include("[role=dialog]").analyze();
+    const accessibility = await new AxeBuilder({ page }).include("dialog[open], [role=dialog]").analyze();
     expect(accessibility.violations).toEqual([]);
     await remainder.click();
     await expect(dialog.getByRole("button", { name: /계산 중/ })).toBeDisabled();

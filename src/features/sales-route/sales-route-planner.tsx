@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
+import { BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
@@ -99,6 +100,9 @@ export function SalesRoutePlanner({
   const busyRef = useRef(false);
   const mountedRef = useRef(false);
   const failureRef = useRef<HTMLDivElement>(null);
+  const introRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const previousResultView = useRef(initialRoute !== null);
   const selectionKey = routeRequestKey({ cycleId, schoolIds: [...selectedIds], startSchoolId });
   const currentSelectionKey = useRef(selectionKey);
   const recovery = routeLocationRecovery(failure, [...selectedIds], startSchoolId);
@@ -109,7 +113,13 @@ export function SalesRoutePlanner({
     return () => { mountedRef.current = false; };
   }, []);
   useEffect(() => { currentSelectionKey.current = selectionKey; }, [selectionKey]);
-  useEffect(() => { if (failure) failureRef.current?.focus(); }, [failure]);
+  useEffect(() => {
+    const target = failureRef.current;
+    if (!failure || !target) return;
+    target.focus({ preventScroll: true });
+    const body = target.closest<HTMLElement>(".bottom-sheet__body");
+    if (body) body.scrollTop += target.getBoundingClientRect().top - body.getBoundingClientRect().top;
+  }, [failure]);
   const eligibleCount = candidates.filter(({ school }) => canPlanRouteForSchool(school)).length;
   const inactiveCount = candidates.filter(({ school }) => school.operationalStatus !== "active").length;
   const missingAddressCount = candidates.filter(({ school }) => school.operationalStatus === "active" && !canPlanRouteForSchool(school)).length;
@@ -126,6 +136,16 @@ export function SalesRoutePlanner({
       return null;
     }
   }, [orderedSchoolIds, result]);
+  const showingResult = result !== null && summary !== null;
+  useEffect(() => {
+    if (previousResultView.current === showingResult) return;
+    previousResultView.current = showingResult;
+    const target = showingResult ? summaryRef.current : introRef.current;
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    const body = target.closest<HTMLElement>(".bottom-sheet__body");
+    if (body) body.scrollTop = 0;
+  }, [showingResult]);
 
   const toggleSchool = (schoolId: string, selected: boolean) => {
     if (busyRef.current) return;
@@ -220,7 +240,7 @@ export function SalesRoutePlanner({
         : "거리 추정 기준";
     return (
       <div className="sales-route-planner sales-route-planner--result">
-        <div className="sales-route-summary" role="status" aria-live="polite">
+        <div className="sales-route-summary" ref={summaryRef} tabIndex={-1} role="status" aria-live="polite">
           <span className="sales-route-summary__mark"><Icon name="route" size={22} /></span>
           <div><strong>{summary.stops.length}곳 · {formatDuration(summary.totalDurationSeconds)}</strong><span>{formatDistance(summary.totalDistanceMeters)} · {modeLabel}</span></div>
           <span className="sales-route-summary__mode">추천 순서</span>
@@ -249,7 +269,7 @@ export function SalesRoutePlanner({
           })}
         </ol>
 
-        <div className="sales-route-planner__footer">
+        <BottomSheetActions className="sales-route-planner__footer" busy={busy}>
           <button type="button" className="sales-route-text-action" onClick={() => { setResult(null); setOrderedSchoolIds([]); setFailure(null); }}>학교 다시 선택</button>
           <GlassButton
             variant="primary"
@@ -270,14 +290,14 @@ export function SalesRoutePlanner({
               savedAt: Date.now(),
             })}
           >이 순서로 보기</GlassButton>
-        </div>
+        </BottomSheetActions>
       </div>
     );
   }
 
   return (
     <div className="sales-route-planner">
-      <div className="sales-route-planner__intro">
+      <div className="sales-route-planner__intro" ref={introRef} tabIndex={-1}>
         <span><Icon name="route" size={22} /></span>
         <p><strong>오늘 방문할 학교를 고르세요.</strong><small>첫 학교를 고정한 뒤 이동시간이 짧은 순서로 정리합니다.</small></p>
       </div>
@@ -364,12 +384,12 @@ export function SalesRoutePlanner({
       {eligibleCount < 2 ? (
         <div className="sales-route-empty" role="status"><Icon name="location" /><strong>동선을 만들 학교 정보가 부족해요.</strong><span>공식 주소가 등록된 학교가 2곳 이상 필요합니다.</span></div>
       ) : null}
-      <div className="sales-route-planner__footer">
-        <span aria-live="polite">{busy ? "학교 위치와 도로 이동시간을 확인하고 있어요…" : "최대 20곳까지 한 번에 계산할 수 있어요."}</span>
+      <BottomSheetActions className="sales-route-planner__footer" busy={busy}>
+        <span aria-live="polite">{busy ? "학교 위치·이동시간 확인 중" : `${selectedCount}곳 선택 · 최대 20곳`}</span>
         <GlassButton variant="primary" disabled={busy || selectedCount < 2 || !selectedIds.has(startSchoolId)} onClick={() => void calculate()}>
           {busy ? <><Icon name="refresh" className="is-spinning" />계산 중…</> : <><Icon name="sparkles" />가까운 순서 계산</>}
         </GlassButton>
-      </div>
+      </BottomSheetActions>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
+import { BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 
 export const MAX_BULK_ASSIGNMENT_COUNT = 400;
@@ -60,12 +61,14 @@ export function SchoolAssignmentPicker({
   busy,
   actionLabel,
   emptyTitle = "조건에 맞는 미배정 학교가 없습니다.",
+  submitErrorMessage,
   onSubmit,
 }: {
   candidates: readonly AssignmentCandidate[];
   busy: boolean;
   actionLabel: (count: number) => string;
   emptyTitle?: string;
+  submitErrorMessage?: string | null;
   onSubmit: (schoolIds: string[]) => Promise<boolean>;
 }) {
   const [query, setQuery] = useState("");
@@ -74,6 +77,16 @@ export function SchoolAssignmentPicker({
   const [schoolType, setSchoolType] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [selectionNote, setSelectionNote] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const mountedRef = useRef(false);
+  const processing = busy || submitting;
+  const filtering = query !== deferredQuery;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const candidateIds = useMemo(() => new Set(candidates.map((school) => school.schoolId)), [candidates]);
   const selectedIds = useMemo(
     () => [...selected].filter((schoolId) => candidateIds.has(schoolId)),
@@ -110,18 +123,10 @@ export function SchoolAssignmentPicker({
   );
   const allVisibleSelected = filtered.length > 0 && selectedVisibleCount === filtered.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
-  const selectedByDistrict = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const school of candidates) {
-      if (!selectedIdSet.has(school.schoolId)) continue;
-      counts.set(school.district, (counts.get(school.district) ?? 0) + 1);
-    }
-    return [...counts.entries()];
-  }, [candidates, selectedIdSet]);
-
   const toggleSchool = (schoolId: string) => {
-    if (busy) return;
+    if (processing || submittingRef.current) return;
     setSelectionNote(null);
+    setSubmitError(null);
     if (!selectedIdSet.has(schoolId) && selectedIds.length >= MAX_BULK_ASSIGNMENT_COUNT) {
       setSelectionNote(`한 번에 최대 ${MAX_BULK_ASSIGNMENT_COUNT}곳까지 선택할 수 있습니다.`);
       return;
@@ -136,8 +141,9 @@ export function SchoolAssignmentPicker({
   };
 
   const toggleFiltered = () => {
-    if (busy) return;
+    if (processing || submittingRef.current || filtering) return;
     setSelectionNote(null);
+    setSubmitError(null);
     const remainingCapacity = MAX_BULK_ASSIGNMENT_COUNT - selectedIds.length;
     if (!allVisibleSelected && filtered.length - selectedVisibleCount > remainingCapacity) {
       setSelectionNote(`안전한 일괄 처리를 위해 ${MAX_BULK_ASSIGNMENT_COUNT}곳까지만 선택했습니다.`);
@@ -159,15 +165,30 @@ export function SchoolAssignmentPicker({
   };
 
   const submit = async () => {
-    if (selectedIds.length === 0 || busy) return;
-    if (await onSubmit(selectedIds)) {
-      setSelected(new Set());
-      setSelectionNote(null);
+    if (selectedIds.length === 0 || processing || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const completed = await onSubmit(selectedIds);
+      if (mountedRef.current) {
+        if (completed) {
+          setSelected(new Set());
+          setSelectionNote(null);
+        } else {
+          setSubmitError("처리를 완료하지 못했어요. 선택한 학교를 확인한 뒤 다시 시도해주세요.");
+        }
+      }
+    } catch {
+      if (mountedRef.current) setSubmitError("처리를 완료하지 못했어요. 선택한 학교를 확인한 뒤 다시 시도해주세요.");
+    } finally {
+      submittingRef.current = false;
+      if (mountedRef.current) setSubmitting(false);
     }
   };
 
   return (
-    <section className="assignment-picker" aria-label="미배정 학교 다중 선택" aria-busy={busy}>
+    <section className="assignment-picker" aria-label="미배정 학교 다중 선택" aria-busy={processing}>
       <div className="assignment-picker__filters">
         <label className="assignment-picker__search">
           <span>학교 검색</span>
@@ -178,21 +199,21 @@ export function SchoolAssignmentPicker({
               value={query}
               placeholder="학교명 또는 주소"
               autoComplete="off"
-              disabled={busy}
+              disabled={processing}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
         </label>
         <label>
           <span>자치구</span>
-          <select value={district} disabled={busy} onChange={(event) => setDistrict(event.target.value)}>
+          <select value={district} disabled={processing} onChange={(event) => setDistrict(event.target.value)}>
             <option value="all">전체 자치구</option>
             {districtOptions.map((value) => <option key={value} value={value}>{DISTRICT_LABELS[value] ?? value}</option>)}
           </select>
         </label>
         <label>
           <span>학교급</span>
-          <select value={schoolType} disabled={busy} onChange={(event) => setSchoolType(event.target.value)}>
+          <select value={schoolType} disabled={processing} onChange={(event) => setSchoolType(event.target.value)}>
             <option value="all">전체 학교급</option>
             {typeOptions.map((value) => <option key={value} value={value}>{SCHOOL_TYPE_LABELS[value] ?? value}</option>)}
           </select>
@@ -205,7 +226,7 @@ export function SchoolAssignmentPicker({
             checked={allVisibleSelected}
             indeterminate={someVisibleSelected}
             label={allVisibleSelected ? "검색 결과 선택 해제" : "검색 결과 전체 선택"}
-            disabled={busy || filtered.length === 0}
+            disabled={processing || filtering || filtered.length === 0}
             onChange={toggleFiltered}
           />
           <span aria-hidden="true"><Icon name="check" size={14} /></span>
@@ -216,12 +237,12 @@ export function SchoolAssignmentPicker({
 
       {selectionNote ? <p className="assignment-picker__note" role="status">{selectionNote}</p> : null}
 
-      <div className="assignment-picker__list" role="group" aria-label={`학교 검색 결과 ${filtered.length}곳`}>
+      <div className="assignment-picker__list" role="group" aria-label={`학교 검색 결과 ${filtered.length}곳`} aria-busy={filtering}>
         {filtered.map((school) => {
           const checked = selectedIdSet.has(school.schoolId);
           return (
-            <label key={school.schoolId} className="assignment-picker__row" data-selected={checked} data-disabled={busy}>
-              <input type="checkbox" checked={checked} disabled={busy} onChange={() => toggleSchool(school.schoolId)} />
+            <label key={school.schoolId} className="assignment-picker__row" data-selected={checked} data-disabled={processing}>
+              <input type="checkbox" checked={checked} disabled={processing} onChange={() => toggleSchool(school.schoolId)} />
               <span className="assignment-picker__checkbox" aria-hidden="true"><Icon name="check" size={15} /></span>
               <span className="assignment-picker__school">
                 <strong>{school.name}</strong>
@@ -243,21 +264,16 @@ export function SchoolAssignmentPicker({
         ) : null}
       </div>
 
-      <div className="assignment-picker__commit">
-        <div>
-          <span>선택 바구니</span>
-          <strong>{selectedIds.length}<small>곳</small></strong>
-          {selectedByDistrict.length > 0 ? (
-            <p>{selectedByDistrict.map(([value, count]) => `${DISTRICT_LABELS[value] ?? value} ${count}`).join(" · ")}</p>
-          ) : <p>검색과 필터를 바꿔도 선택은 유지됩니다.</p>}
-        </div>
+      <BottomSheetActions className="assignment-picker__commit" busy={processing}>
+        {submitError ? <p className="assignment-picker__submit-error" role="alert">{submitErrorMessage?.trim() || submitError}</p> : null}
+        <span className="assignment-picker__selected-count" role="status"><strong>{selectedIds.length}곳</strong> 선택</span>
         {selectedIds.length > 0 ? (
-          <button className="assignment-picker__clear" type="button" disabled={busy} onClick={() => setSelected(new Set())}>선택 해제</button>
+          <button className="assignment-picker__clear" type="button" disabled={processing} onClick={() => { if (!submittingRef.current) { setSelected(new Set()); setSubmitError(null); } }}>선택 해제</button>
         ) : null}
-        <GlassButton variant="primary" disabled={selectedIds.length === 0 || busy} onClick={() => void submit()}>
-          {busy ? "일괄 처리 중…" : actionLabel(selectedIds.length)}
+        <GlassButton variant="primary" disabled={selectedIds.length === 0 || processing} onClick={() => void submit()}>
+          {processing ? "일괄 처리 중…" : actionLabel(selectedIds.length)}
         </GlassButton>
-      </div>
+      </BottomSheetActions>
     </section>
   );
 }

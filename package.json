@@ -63,6 +63,7 @@
     "test:e2e:phase8": "node scripts/firebase-emulators.mjs phase8e2e",
     "test:e2e:phase9": "node scripts/firebase-emulators.mjs phase9e2e",
     "test:e2e:phase9:focus": "node scripts/firebase-emulators.mjs phase9focus",
+    "test:e2e:ux": "node scripts/run-ux-e2e.mjs",
     "test:e2e:phase10": "node scripts/firebase-emulators.mjs phase10e2e",
     "test:e2e:phase10:focus": "node scripts/firebase-emulators.mjs phase10focus",
     "test:e2e:phase11": "node scripts/firebase-emulators.mjs phase11e2e",

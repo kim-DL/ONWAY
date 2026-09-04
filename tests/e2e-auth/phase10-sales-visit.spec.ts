@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
@@ -10,6 +10,8 @@ const PROJECT_ID = "demo-onnuriway";
 const FOLLOW_UP_SCHOOL_ID = "SCH-NEIS-G100000004";
 const ZERO_INTEREST_SCHOOL_ID = "SCH-NEIS-G100000002";
 let database: Firestore;
+
+test.setTimeout(90_000);
 
 test.beforeAll(async () => {
   if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -32,6 +34,16 @@ async function openOwnSchool(page: Page, schoolName: string) {
   await page.locator(".assignment-card", { hasText: schoolName }).click();
   await expect(page.getByRole("heading", { name: schoolName })).toBeVisible();
   await expect(page.getByRole("heading", { name: "이번 달, 이어갈 대화." })).toBeVisible();
+}
+
+async function saveThroughCallable(page: Page, button: Locator, callable: "recordSalesVisit" | "updateSalesVisit") {
+  // Keep UI-success assertions separate from emulator process cold-start latency.
+  const [response] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.request().method() === "POST" && candidate.url().endsWith(`/${callable}`), { timeout: 30_000 }),
+    button.click(),
+  ]);
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({ result: { visitId: expect.any(String) } });
 }
 
 test("sales A records a complete visit with sample, hearts, tags, another visitor, and follow-up", async ({ page }) => {
@@ -83,7 +95,7 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
   );
   expect(undersizedTargets).toEqual([]);
 
-  await sheet.getByRole("button", { name: "방문 기록 저장" }).click();
+  await saveThroughCallable(page, sheet.getByRole("button", { name: "방문 기록 저장" }), "recordSalesVisit");
   await expect(page.getByText("방문과 후속 일정을 함께 저장했습니다.")).toBeVisible();
   await expect(sheet).toHaveCount(0);
   const schoolBrief = page.locator(".sales-school-brief");
@@ -102,7 +114,7 @@ test("sales A records a complete visit with sample, hearts, tags, another visito
   await expect(editSheet.getByLabel(/방문 결과/)).toHaveValue("샘플 사용 뒤 가격 자료를 다시 전달하기로 했습니다.");
   await expect(editSheet.getByLabel(/후속 날짜/)).toHaveValue("2026-08-30");
   await editSheet.getByLabel(/방문 결과/).fill("샘플 반응이 좋아 가격 자료를 우선 전달하기로 했습니다.");
-  await editSheet.getByRole("button", { name: "수정 내용 저장" }).click();
+  await saveThroughCallable(page, editSheet.getByRole("button", { name: "수정 내용 저장" }), "updateSalesVisit");
   await expect(page.getByText("최신 방문 기록을 수정했습니다.")).toBeVisible();
   await expect(editSheet).toHaveCount(0);
 
@@ -143,8 +155,9 @@ test("sales B must explicitly choose zero interest and no delivery defaults are 
   await sheet.getByRole("group", { name: /샘플/ }).getByRole("radio", { name: "미전달" }).click();
   await sheet.getByRole("radio", { name: "관심도 미확인 선택" }).click();
   await sheet.getByLabel(/방문 결과/).fill("담당자 부재로 자료를 전달하지 못했습니다.");
-  await sheet.getByRole("button", { name: "방문 기록 저장" }).click();
+  await saveThroughCallable(page, sheet.getByRole("button", { name: "방문 기록 저장" }), "recordSalesVisit");
   await expect(page.getByText("방문 기록을 저장했습니다.")).toBeVisible();
+  await expect(sheet).toHaveCount(0);
   await expect(page.locator(".sales-school-brief").getByText("관심도 미확인", { exact: true })).toBeVisible();
 
   const [visits, profile] = await Promise.all([

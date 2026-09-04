@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -282,33 +283,38 @@ function AdminDialog({
   title,
   eyebrow,
   onClose,
+  busy = false,
   children,
 }: {
   title: string;
   eyebrow: string;
   onClose: () => void;
+  busy?: boolean;
   children: ReactNode;
 }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (!busy) onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, [busy, onClose]);
 
   return (
     <div
       className="admin-dialog-backdrop"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (!busy && event.target === event.currentTarget) onClose();
       }}
     >
       <section
         className="admin-dialog"
         role="dialog"
         aria-modal="true"
+        aria-busy={busy}
         aria-labelledby="admin-dialog-title"
       >
         <header>
@@ -316,7 +322,7 @@ function AdminDialog({
             <p>{eyebrow}</p>
             <h2 id="admin-dialog-title">{title}</h2>
           </div>
-          <button type="button" aria-label="닫기" onClick={onClose}>
+          <button type="button" aria-label="닫기" disabled={busy} onClick={onClose}>
             <Icon name="close" />
           </button>
         </header>
@@ -670,14 +676,16 @@ function SchoolsPage({
 function RoleChecks({
   roles,
   disabledAdmin = true,
+  disabled = false,
   onChange,
 }: {
   roles: AdminRole[];
   disabledAdmin?: boolean;
+  disabled?: boolean;
   onChange: (roles: AdminRole[]) => void;
 }) {
   return (
-    <fieldset className="admin-role-checks">
+    <fieldset className="admin-role-checks" disabled={disabled}>
       <legend>업무 역할</legend>
       {(["delivery", "sales", "viewer", "admin"] as const).map((role) => (
         <label key={role} data-disabled={role === "admin" && disabledAdmin}>
@@ -747,6 +755,10 @@ function NewEmployeeDialog({
   const [status, setStatus] = useState<"idle" | "pin" | "saving" | "done">(
     "idle",
   );
+  const creationPending = useRef(false);
+  const close = () => {
+    if (!creationPending.current) onClose();
+  };
 
   const reserve = async () => {
     setStatus("pin");
@@ -760,8 +772,9 @@ function NewEmployeeDialog({
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!reservation || displayName.trim().length < 2 || roles.length === 0)
+    if (creationPending.current || !reservation || displayName.trim().length < 2 || roles.length === 0)
       return;
+    creationPending.current = true;
     setStatus("saving");
     try {
       await adminRepository.createEmployee({
@@ -776,6 +789,8 @@ function NewEmployeeDialog({
     } catch (error) {
       showToast(adminErrorMessage(error));
       setStatus("idle");
+    } finally {
+      creationPending.current = false;
     }
   };
 
@@ -783,7 +798,8 @@ function NewEmployeeDialog({
     <AdminDialog
       title={status === "done" ? "직원 등록 완료" : "새 직원 등록"}
       eyebrow="EMPLOYEE · CREATE"
-      onClose={onClose}
+      onClose={close}
+      busy={status === "saving"}
     >
       {status === "done" && reservation ? (
         <div className="admin-dialog-body">
@@ -791,7 +807,7 @@ function NewEmployeeDialog({
             pin={reservation.pin}
             title={`${displayName.trim()} 직원 PIN`}
           />
-          <GlassButton variant="primary" onClick={onClose}>
+          <GlassButton variant="primary" onClick={close}>
             확인하고 닫기
           </GlassButton>
         </div>
@@ -806,11 +822,12 @@ function NewEmployeeDialog({
               autoFocus
               value={displayName}
               maxLength={100}
+              disabled={status === "saving"}
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="예: 김온누리"
             />
           </label>
-          <RoleChecks roles={roles} onChange={setRoles} />
+          <RoleChecks roles={roles} onChange={setRoles} disabled={status === "saving"} />
           <label className="admin-switch-row">
             <span>
               <strong>팀 CSV 내보내기</strong>
@@ -819,6 +836,7 @@ function NewEmployeeDialog({
             <input
               type="checkbox"
               checked={exportTeam}
+              disabled={status === "saving"}
               onChange={(event) => setExportTeam(event.target.checked)}
             />
           </label>
@@ -841,7 +859,7 @@ function NewEmployeeDialog({
             )}
           </div>
           <footer>
-            <GlassButton variant="quiet" type="button" onClick={onClose}>
+            <GlassButton variant="quiet" type="button" disabled={status === "saving"} onClick={close}>
               취소
             </GlassButton>
             <GlassButton
@@ -2430,6 +2448,7 @@ function SettingsPage({
   const [saving, setSaving] = useState(false);
   const [activityTags, setActivityTags] = useState<EditableActivityTag[]>(() => editableActivityTags(data.activityTags));
   const [savingTags, setSavingTags] = useState(false);
+  const tagsSavePending = useRef(false);
   const save = async () => {
     setSaving(true);
     try {
@@ -2446,6 +2465,7 @@ function SettingsPage({
     }
   };
   const addActivityTag = (label = "") => {
+    if (tagsSavePending.current) return;
     setActivityTags((current) => current.length >= 20 ? current : [...current, {
       tagId: "",
       label,
@@ -2454,6 +2474,7 @@ function SettingsPage({
     }]);
   };
   const applyDefaultActivityTags = () => {
+    if (tagsSavePending.current) return;
     setActivityTags(DEFAULT_ACTIVITY_TAG_LABELS.map((label) => ({
       tagId: "",
       label,
@@ -2461,7 +2482,16 @@ function SettingsPage({
       clientId: crypto.randomUUID(),
     })));
   };
+  const updateActivityTag = (clientId: string, patch: Partial<Pick<EditableActivityTag, "label" | "active">>) => {
+    if (tagsSavePending.current) return;
+    setActivityTags((current) => current.map((tag) => tag.clientId === clientId ? { ...tag, ...patch } : tag));
+  };
+  const removeActivityTag = (clientId: string) => {
+    if (tagsSavePending.current) return;
+    setActivityTags((current) => current.filter((tag) => tag.clientId !== clientId));
+  };
   const saveActivityTags = async () => {
+    if (tagsSavePending.current) return;
     const cleaned = activityTags.map((tag) => ({ ...tag, label: tag.label.trim() }));
     if (cleaned.length === 0 || cleaned.some((tag) => tag.label.length === 0)) {
       showToast("활동 태그 이름을 한 글자 이상 입력해주세요.");
@@ -2472,6 +2502,7 @@ function SettingsPage({
       showToast("같은 이름의 활동 태그는 한 번만 등록할 수 있습니다.");
       return;
     }
+    tagsSavePending.current = true;
     setSavingTags(true);
     try {
       const result = await adminRepository.updateActivityTags({
@@ -2487,6 +2518,7 @@ function SettingsPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      tagsSavePending.current = false;
       setSavingTags(false);
     }
   };
@@ -2557,7 +2589,7 @@ function SettingsPage({
             </GlassButton>
           </div>
         </article>
-        <article className="admin-panel activity-tag-admin">
+        <article className="admin-panel activity-tag-admin" aria-busy={savingTags}>
           <header>
             <div>
               <p>SALES ACTIVITY TAXONOMY</p>
@@ -2581,20 +2613,22 @@ function SettingsPage({
                     <input
                       maxLength={40}
                       value={tag.label}
+                      disabled={savingTags}
                       placeholder="활동 태그 이름"
-                      onChange={(event) => setActivityTags((current) => current.map((candidate) => candidate.clientId === tag.clientId ? { ...candidate, label: event.target.value } : candidate))}
+                      onChange={(event) => updateActivityTag(tag.clientId, { label: event.target.value })}
                     />
                   </label>
                   <label className="activity-tag-admin__toggle">
                     <input
                       type="checkbox"
                       checked={tag.active}
-                      onChange={(event) => setActivityTags((current) => current.map((candidate) => candidate.clientId === tag.clientId ? { ...candidate, active: event.target.checked } : candidate))}
+                      disabled={savingTags}
+                      onChange={(event) => updateActivityTag(tag.clientId, { active: event.target.checked })}
                     />
                     <span>{tag.active ? "사용" : "중지"}</span>
                   </label>
                   {!tag.tagId ? (
-                    <button type="button" aria-label={`${tag.label || `활동 태그 ${index + 1}`} 삭제`} onClick={() => setActivityTags((current) => current.filter((candidate) => candidate.clientId !== tag.clientId))}>
+                    <button type="button" disabled={savingTags} aria-label={`${tag.label || `활동 태그 ${index + 1}`} 삭제`} onClick={() => removeActivityTag(tag.clientId)}>
                       <Icon name="trash" size={17} />
                     </button>
                   ) : null}
@@ -2606,11 +2640,11 @@ function SettingsPage({
               <Icon name="clipboard" size={24} />
               <strong>아직 활동 태그가 없습니다.</strong>
               <p>현장에서 바로 쓸 수 있는 기본 6개 태그로 시작할 수 있습니다.</p>
-              <GlassButton compact onClick={applyDefaultActivityTags}>기본 태그 구성</GlassButton>
+              <GlassButton compact disabled={savingTags} onClick={applyDefaultActivityTags}>기본 태그 구성</GlassButton>
             </div>
           )}
           <div className="activity-tag-admin__actions">
-            <button type="button" disabled={activityTags.length >= 20} onClick={() => addActivityTag()}><Icon name="sparkles" size={17} />태그 추가</button>
+            <button type="button" disabled={savingTags || activityTags.length >= 20} onClick={() => addActivityTag()}><Icon name="sparkles" size={17} />태그 추가</button>
             <GlassButton variant="primary" disabled={savingTags || activityTags.length === 0} onClick={() => void saveActivityTags()}>
               {savingTags ? "태그 반영 중…" : "활동 태그 저장"}
             </GlassButton>

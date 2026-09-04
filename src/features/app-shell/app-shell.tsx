@@ -271,6 +271,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
 
       <BottomSheet
         open={confirmingLogout}
+        dismissible={!loggingOut}
         title="로그아웃할까요?"
         description="이 기기의 로그인 상태와 비공개 임시 데이터를 안전하게 정리합니다."
         onClose={() => {
@@ -312,11 +313,12 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
+  const selectedSchoolId = selectedSchool?.schoolId;
 
   useEffect(() => {
-    if (!selectedSchool) return;
+    if (!selectedSchoolId) return;
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [selectedSchool]);
+  }, [selectedSchoolId]);
 
   const writeHistory = (
     next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean },

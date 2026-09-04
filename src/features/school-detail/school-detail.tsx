@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useId, useState, type FormEvent } from "react";
 import { FirebaseError } from "firebase/app";
 import dynamic from "next/dynamic";
 
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { FloatingContextBar } from "@/components/ui/floating-context-bar";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
@@ -55,7 +55,7 @@ const SalesVisitSheet = dynamic(
   () => import("@/features/sales-visit/sales-visit-sheet").then((module) => module.SalesVisitSheet),
   {
     loading: () => (
-      <BottomSheet open title="방문 기록 준비 중" description="입력 화면을 안전하게 불러오고 있습니다." onClose={() => undefined}>
+      <BottomSheet open dismissible={false} title="방문 기록 준비 중" description="입력 화면을 안전하게 불러오고 있습니다." onClose={() => undefined}>
         <div className="sales-deferred-loading" role="status">잠시만 기다려주세요.</div>
       </BottomSheet>
     ),
@@ -156,13 +156,16 @@ function FieldProfileEditor({
   section,
   profile,
   saving,
+  saveError,
   onSave,
 }: {
   section: EditorSection;
   profile: SchoolFieldProfile | null;
   saving: boolean;
+  saveError: string | null;
   onSave: (patch: SchoolFieldProfilePatch) => Promise<void>;
 }) {
+  const formId = useId();
   const [draft, setDraft] = useState<SchoolFieldProfilePatch>(() => profileSection(profile, section));
 
   const submit = (event: FormEvent) => {
@@ -171,7 +174,7 @@ function FieldProfileEditor({
   };
 
   return (
-    <form className="field-editor" data-full={section === "all"} onSubmit={submit}>
+    <form id={formId} className="field-editor" data-full={section === "all"} onSubmit={submit}>
       {(section === "all" || section === "contacts") && draft.contacts ? (
         <div className="field-form-grid field-form-grid--contacts">
           {section === "all" ? <div className="field-editor-section-title"><span>01</span><div><strong>학교 연락처</strong><small>영양사 선생님과 급식실에 바로 연결되는 번호</small></div></div> : null}
@@ -226,9 +229,10 @@ function FieldProfileEditor({
         </div>
       ) : null}
 
-      <div className="field-editor__actions">
-        <GlassButton variant="primary" type="submit" disabled={saving}>{saving ? "저장 중…" : "변경사항 저장"}</GlassButton>
-      </div>
+      <BottomSheetActions className="field-editor__actions" busy={saving}>
+        {saveError ? <p className="sheet-action-error" role="alert">{saveError}</p> : null}
+        <GlassButton variant="primary" type="submit" form={formId} disabled={saving}>{saving ? "저장 중…" : "변경사항 저장"}</GlassButton>
+      </BottomSheetActions>
     </form>
   );
 }
@@ -403,6 +407,7 @@ export function SchoolDetail({
   const [editingVisit, setEditingVisit] = useState<SalesVisit | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fieldSaveError, setFieldSaveError] = useState<string | null>(null);
   const detail = detailState.status === "ready" ? detailState.detail : null;
   const school = detail?.school ?? initialSchool;
   const profile = detail?.fieldProfile ?? null;
@@ -416,7 +421,14 @@ export function SchoolDetail({
   const directionsUrl = buildKakaoDirectionsUrl(school);
   const quickPhone = profile?.contacts.dietitianPhone ?? profile?.contacts.cafeteriaPhone ?? school.phone;
 
+  const openFieldEditor = useCallback((section: EditorSection) => {
+    if (!canEdit || detailState.status !== "ready") return;
+    setFieldSaveError(null);
+    setEditor(section);
+  }, [canEdit, detailState.status]);
+
   const saveFieldProfile = async (patch: SchoolFieldProfilePatch) => {
+    setFieldSaveError(null);
     setSaving(true);
     try {
       await schoolDetailRepository.updateFieldProfile({
@@ -432,9 +444,9 @@ export function SchoolDetail({
     } catch (error) {
       if (error instanceof FirebaseError && error.code === "functions/aborted") {
         refreshDetail();
-        showToast("다른 직원이 먼저 수정했습니다. 최신 정보를 불러왔습니다.");
+        setFieldSaveError("다른 직원이 먼저 수정했습니다. 최신 정보를 불러왔습니다. 내용을 확인한 뒤 다시 저장해주세요.");
       } else {
-        showToast(navigator.onLine ? "현장정보를 저장하지 못했습니다." : "인터넷 연결 후 다시 저장해주세요.");
+        setFieldSaveError(navigator.onLine ? "현장정보를 저장하지 못했습니다. 작성 내용은 유지됩니다. 다시 시도해주세요." : "인터넷 연결 후 다시 저장해주세요. 작성 내용은 유지됩니다.");
       }
     } finally {
       setSaving(false);
@@ -508,7 +520,7 @@ export function SchoolDetail({
         <SalesSchoolBrief salesData={salesData} recorded={recordedVisit} canRecord={canRecordVisit} onRecord={openNewVisit} />
       ) : null}
 
-      {mode === "sales" && detailState.status === "ready" ? <SalesContactBrief profile={profile} canEdit={canEdit} onEdit={setEditor} /> : null}
+      {mode === "sales" && detailState.status === "ready" ? <SalesContactBrief profile={profile} canEdit={canEdit} onEdit={openFieldEditor} /> : null}
 
       {mode === "sales" && salesData ? (
         <SalesHistoryTimeline
@@ -525,16 +537,16 @@ export function SchoolDetail({
       ) : null}
 
       {mode === "delivery" ? <section className="field-workspace" aria-labelledby="field-workspace-title">
-        <div className="field-workspace__heading"><div><p>{mode === "delivery" ? "DELIVERY FIELD BRIEF" : "SHARED FIELD BRIEF"}</p><h2 id="field-workspace-title">도착 전에, 필요한 것만.</h2></div><div className="field-workspace__actions">{profile ? <StatusBadge tone={profile.reviewRequired ? "attention" : "success"}>{profile.reviewRequired ? "보완 필요" : "현장 준비 완료"}</StatusBadge> : null}{profile && canEdit ? <button type="button" onClick={() => setEditor("all")}><Icon name="clipboard" size={16} />전체 편집</button> : null}</div></div>
+        <div className="field-workspace__heading"><div><p>{mode === "delivery" ? "DELIVERY FIELD BRIEF" : "SHARED FIELD BRIEF"}</p><h2 id="field-workspace-title">도착 전에, 필요한 것만.</h2></div><div className="field-workspace__actions">{profile ? <StatusBadge tone={profile.reviewRequired ? "attention" : "success"}>{profile.reviewRequired ? "보완 필요" : "현장 준비 완료"}</StatusBadge> : null}{profile && canEdit ? <button type="button" onClick={() => openFieldEditor("all")}><Icon name="clipboard" size={16} />전체 편집</button> : null}</div></div>
 
         {detailState.status === "loading" ? <div className="field-loading"><SkeletonCard /><SkeletonCard /></div> : null}
         {detailState.status === "error" ? (
           <SoftCard className="field-empty-state" role="alert"><span><Icon name="building" /></span><h2>현장정보를 불러오지 못했어요.</h2><p>처음 보는 학교는 온라인 연결이 필요합니다.</p><GlassButton compact onClick={detailState.refresh}>다시 불러오기</GlassButton></SoftCard>
         ) : null}
         {detailState.status === "ready" && !profile ? (
-          <SoftCard className="field-empty-state"><span><Icon name="sparkles" /></span><h2>아직 현장정보가 없습니다.</h2><p>검수시간, 대차, 엘리베이터, 급식실 동선과 하역 위치를 한 번에 남겨 공동자산으로 만드세요.</p>{canEdit ? <GlassButton variant="primary" onClick={() => setEditor("all")}>전체 현장정보 등록</GlassButton> : null}</SoftCard>
+          <SoftCard className="field-empty-state"><span><Icon name="sparkles" /></span><h2>아직 현장정보가 없습니다.</h2><p>검수시간, 대차, 엘리베이터, 급식실 동선과 하역 위치를 한 번에 남겨 공동자산으로 만드세요.</p>{canEdit ? <GlassButton variant="primary" onClick={() => openFieldEditor("all")}>전체 현장정보 등록</GlassButton> : null}</SoftCard>
         ) : null}
-        {profile ? <FieldInfoContent profile={profile} onEdit={setEditor} canEdit={canEdit} /> : null}
+        {profile ? <FieldInfoContent profile={profile} onEdit={openFieldEditor} canEdit={canEdit} /> : null}
       </section> : null}
 
       {detailState.status === "ready" ? (
@@ -573,15 +585,15 @@ export function SchoolDetail({
       <FloatingContextBar label="학교 빠른 작업">
         <a href={directionsUrl} target="_blank" rel="noreferrer"><Icon name="route" /><span>길안내</span></a>
         {mode === "sales" ? (
-          quickPhone ? <a href={phoneHref(quickPhone)}><Icon name="phone" /><span>전화</span></a> : <button type="button" onClick={() => showToast("영양사·급식실 전화번호가 아직 등록되지 않았습니다.")}><Icon name="phone" /><span>전화 등록</span></button>
+          quickPhone ? <a href={phoneHref(quickPhone)}><Icon name="phone" /><span>전화</span></a> : <button type="button" disabled={!canEdit || detailState.status !== "ready"} onClick={() => openFieldEditor("contacts")}><Icon name="phone" /><span>{canEdit ? "전화 등록" : "연락처 없음"}</span></button>
         ) : <button type="button" onClick={() => document.getElementById("school-photo-summary")?.scrollIntoView({ behavior: "smooth" })}><Icon name="building" /><span>사진</span></button>}
         {mode === "sales" ? (
           canRecordVisit ? <button className="visit-record-action" type="button" onClick={openNewVisit}><Icon name="clipboard" /><span>방문기록</span></button> : <button type="button" disabled><Icon name="clipboard" /><span>조회 전용</span></button>
-        ) : canEdit ? <button type="button" onClick={() => setEditor("all")}><Icon name="clipboard" /><span>정보 수정</span></button> : null}
+        ) : canEdit ? <button type="button" onClick={() => openFieldEditor("all")}><Icon name="clipboard" /><span>정보 수정</span></button> : null}
       </FloatingContextBar>
 
       <BottomSheet open={editor !== null} title={editor ? EDITOR_TITLES[editor] : "현장정보 수정"} onClose={() => { if (!saving) setEditor(null); }}>
-        {editor ? <FieldProfileEditor key={`${editor}-${profile?.revision ?? 0}`} section={editor} profile={profile} saving={saving} onSave={saveFieldProfile} /> : null}
+        {editor ? <FieldProfileEditor key={`${editor}-${profile?.revision ?? 0}`} section={editor} profile={profile} saving={saving} saveError={fieldSaveError} onSave={saveFieldProfile} /> : null}
       </BottomSheet>
       {visitSheetOpen && salesData && visitAssignment ? (
         <SalesVisitSheet
