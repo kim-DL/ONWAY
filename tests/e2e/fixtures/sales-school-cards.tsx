@@ -47,6 +47,12 @@ function Fixture() {
         assignment={{ ...assignment(longSchool, "delivered"), assigneeIds: ["EMP-TEST", "EMP-SECOND"],
           monthlyStatus: "followUp", latestVisitId: "VISIT-TEST", latestVisitedAt: date }}
         primaryName="이름이아주긴담당직원" routePosition={16} onSelect={onSelect} /></div>
+      <div data-testid="assignment-recorded-unknown"><AssignmentCard school={primary}
+        assignment={{ ...assignment(primary, "unknown"), latestVisitId: "VISIT-TEST", latestVisitedAt: date }}
+        primaryName="김영업" onSelect={onSelect} /></div>
+      <div data-testid="assignment-mixed"><AssignmentCard school={primary}
+        assignment={{ ...assignment(primary, "unknown"), brochureStatus: "delivered" }}
+        primaryName="김영업" onSelect={onSelect} /></div>
     </section>
     <section className="fixture-list" aria-label="활동 학교">
       {schools.map((value, index) => <div data-testid={`activity-${value.schoolId}`} key={value.schoolId}>
@@ -61,6 +67,11 @@ function Fixture() {
       <div data-testid="manage-disabled"><AssignmentCard school={schools[1]!} assignment={assignment(schools[1]!, "delivered")}
         primaryName="김영업" managing releasable={false} onSelect={onSelect}
         onToggle={() => setEvents((old) => [...old, "unexpected-disabled-toggle"])} /></div>
+      <div data-testid="manage-joint"><AssignmentCard school={primary}
+        assignment={{ ...assignment(primary, "unknown"), assigneeIds: ["EMP-TEST", "EMP-SECOND"] }}
+        primaryName="김영업" managing releasable={false} onSelect={onSelect} /></div>
+      <div data-testid="manage-other-lock"><AssignmentCard school={primary} assignment={assignment(primary, "unknown")}
+        primaryName="김영업" managing releasable={false} onSelect={onSelect} /></div>
     </section>
     <output aria-label="검증 이벤트" data-testid="events">{events.join("|")}</output>
   </main>;

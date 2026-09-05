@@ -99,10 +99,14 @@ export function optimizeSalesRouteOrder(
   let bestOrder = nearestNeighborOrder(nodes, startSchoolId, matrix);
   let bestDuration = routeDuration(bestOrder, matrix);
   let improved = true;
+  let passes = 0;
 
   // A deterministic 2-opt pass removes obvious crossings while always keeping
   // the employee-selected first school fixed.
-  while (improved) {
+  // Bound CPU work on large/asymmetric matrices. This is a recommendation,
+  // never a claim of solving the globally optimal travelling-salesman tour.
+  while (improved && passes < 20) {
+    passes += 1;
     improved = false;
     for (let fromIndex = 1; fromIndex < bestOrder.length - 1; fromIndex += 1) {
       for (let toIndex = fromIndex + 1; toIndex < bestOrder.length; toIndex += 1) {
@@ -122,4 +126,3 @@ export function optimizeSalesRouteOrder(
   }
   return bestOrder;
 }
-

@@ -43,6 +43,7 @@ describe("sales route on-demand location resolution", () => {
   it.each([
     { count: 16, trusted: 0 }, { count: 16, trusted: 9 },
     { count: 20, trusted: 0 }, { count: 20, trusted: 9 },
+    { count: 40, trusted: 0 }, { count: 40, trusted: 9 }, { count: 50, trusted: 20 },
   ])("resolves a $count-school route with $trusted cached locations", async ({ count, trusted }) => {
     const schools = Array.from({ length: count }, (_, index) => school({
       schoolId: String(index),

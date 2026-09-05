@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { School } from "@/domain/school";
+import type { SalesAssignment } from "@/domain/sales";
 import {
+  assignmentReleaseRestrictionMessage,
   deliveryStatusLabel,
   formatCardVisitDate,
   schoolLocationSummary,
+  shouldShowDeliveryStatus,
 } from "./sales-school-card-presentation";
 
 function schoolAddress(
@@ -24,6 +27,67 @@ describe("compact card delivery labels", () => {
     ["unknown", "미확인"],
   ] as const)("renders %s as %s without merging recorded and unknown states", (status, expected) => {
     expect(deliveryStatusLabel(status)).toBe(expected);
+  });
+});
+
+const untouchedAssignment: Pick<SalesAssignment,
+  "monthlyStatus" | "latestVisitId" | "latestVisitedAt" | "brochureStatus" | "sampleStatus" | "assigneeIds"> = {
+  monthlyStatus: "before", latestVisitId: null, latestVisitedAt: null,
+  brochureStatus: "unknown", sampleStatus: "unknown", assigneeIds: ["EMP-TEST"],
+};
+
+describe("compact card delivery visibility", () => {
+  it("hides unknown placeholders only for an untouched before-visit assignment", () => {
+    expect(shouldShowDeliveryStatus(untouchedAssignment, "unknown")).toBe(false);
+  });
+
+  it.each(["delivered", "notDelivered"] as const)("always preserves a recorded %s state", (status) => {
+    expect(shouldShowDeliveryStatus(untouchedAssignment, status)).toBe(true);
+  });
+
+  it.each(["completed", "followUp", "revisit", "onHold"] as const)("preserves unknown for monthly state %s", (monthlyStatus) => {
+    expect(shouldShowDeliveryStatus({ ...untouchedAssignment, monthlyStatus }, "unknown")).toBe(true);
+  });
+
+  it.each([
+    { latestVisitId: "VISIT-TEST", latestVisitedAt: new Date("2026-09-05T00:00:00Z") },
+    { latestVisitId: "VISIT-TEST", latestVisitedAt: null },
+    { latestVisitId: null, latestVisitedAt: new Date("2026-09-05T00:00:00Z") },
+  ])("preserves unknown when either visit field indicates a record: %j", (record) => {
+    expect(shouldShowDeliveryStatus({ ...untouchedAssignment, ...record }, "unknown")).toBe(true);
+  });
+
+  it("handles brochure and sample independently without inventing the other delivery state", () => {
+    const assignment = { ...untouchedAssignment, brochureStatus: "delivered" as const };
+    expect(shouldShowDeliveryStatus(assignment, assignment.brochureStatus)).toBe(true);
+    expect(shouldShowDeliveryStatus(assignment, assignment.sampleStatus)).toBe(false);
+  });
+});
+
+describe("compact card release restriction", () => {
+  it("does not incorrectly claim an untouched joint assignment has a work record", () => {
+    expect(assignmentReleaseRestrictionMessage({ ...untouchedAssignment, assigneeIds: ["EMP-TEST", "EMP-SECOND"] }))
+      .toBe("공동 담당 학교는 관리자에게 변경 요청");
+  });
+
+  it("keeps the joint-assignment restriction explicit even when a visit is also recorded", () => {
+    expect(assignmentReleaseRestrictionMessage({ ...untouchedAssignment, assigneeIds: ["EMP-TEST", "EMP-SECOND"], latestVisitId: "VISIT-TEST" }))
+      .toBe("공동 담당 학교는 관리자에게 변경 요청");
+  });
+
+  it.each([
+    { latestVisitId: "VISIT-TEST" },
+    { latestVisitedAt: new Date("2026-09-05T00:00:00Z") },
+    { monthlyStatus: "completed" as const },
+    { brochureStatus: "delivered" as const },
+    { sampleStatus: "notDelivered" as const },
+  ])("uses the record restriction for a single-assignee recorded state: %j", (record) => {
+    expect(assignmentReleaseRestrictionMessage({ ...untouchedAssignment, ...record }))
+      .toBe("업무 기록이 있어 관리자에게 변경 요청");
+  });
+
+  it("does not invent a work record when another eligibility rule prevents release", () => {
+    expect(assignmentReleaseRestrictionMessage(untouchedAssignment)).toBe("담당 변경은 관리자에게 요청");
   });
 });
 

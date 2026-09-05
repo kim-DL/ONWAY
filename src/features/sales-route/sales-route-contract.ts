@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Keep aligned with the callable contract; covered by contract tests.
+export const MAX_ROUTE_SCHOOLS = 50;
+
 export const salesRouteMetricSchema = z.object({
   fromSchoolId: z.string().min(1).max(128),
   toSchoolId: z.string().min(1).max(128),
@@ -13,16 +16,16 @@ export const salesRouteStopSchema = z.object({
   name: z.string().min(1).max(200),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
-  position: z.number().int().positive().max(20),
+  position: z.number().int().positive().max(MAX_ROUTE_SCHOOLS),
   fromPrevious: salesRouteMetricSchema.nullable(),
 }).strict();
 
 export const salesRouteResultSchema = z.object({
   cycleId: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   calculationMode: z.enum(["road", "hybrid", "distanceEstimate"]),
-  orderedSchoolIds: z.array(z.string().min(1).max(128)).min(2).max(20),
-  stops: z.array(salesRouteStopSchema).min(2).max(20),
-  metrics: z.array(salesRouteMetricSchema).max(400),
+  orderedSchoolIds: z.array(z.string().min(1).max(128)).min(2).max(MAX_ROUTE_SCHOOLS),
+  stops: z.array(salesRouteStopSchema).min(2).max(MAX_ROUTE_SCHOOLS),
+  metrics: z.array(salesRouteMetricSchema).max(MAX_ROUTE_SCHOOLS * (MAX_ROUTE_SCHOOLS - 1)),
   totalDistanceMeters: z.number().int().nonnegative(),
   totalDurationSeconds: z.number().int().nonnegative(),
   warning: z.string().nullable(),
@@ -30,7 +33,7 @@ export const salesRouteResultSchema = z.object({
 
 export const activeSalesRouteSchema = z.object({
   result: salesRouteResultSchema,
-  orderedSchoolIds: z.array(z.string().min(1).max(128)).min(2).max(20),
+  orderedSchoolIds: z.array(z.string().min(1).max(128)).min(2).max(MAX_ROUTE_SCHOOLS),
   manuallyAdjusted: z.boolean(),
   savedAt: z.number().int().nonnegative(),
 }).strict();
@@ -38,4 +41,3 @@ export const activeSalesRouteSchema = z.object({
 export type SalesRouteMetric = z.infer<typeof salesRouteMetricSchema>;
 export type SalesRouteResult = z.infer<typeof salesRouteResultSchema>;
 export type ActiveSalesRoute = z.infer<typeof activeSalesRouteSchema>;
-

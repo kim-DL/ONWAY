@@ -115,7 +115,7 @@ test("sixteen-school route keeps calculate/apply reachable through long lists an
   const trigger = page.getByRole("button", { name: /방문 동선/ });
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "방문 동선 만들기" });
-  await dialog.getByRole("button", { name: "선택 가능한 학교 전체" }).click();
+  await dialog.getByRole("button", { name: /전체 선택/ }).click();
   await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(16);
   const calculate = dialog.getByRole("button", { name: /가까운 순서 계산/ });
   await inspectListScroll(page, dialog, calculate, dialog.locator(".sales-route-candidates > li").last(), ".sales-route-planner__footer");

@@ -2,6 +2,9 @@ import { z } from "zod";
 
 import type { SalesRouteMetric, SalesRouteNode } from "./sales-route-optimizer.js";
 
+// Provider limit, independent from how many schools a complete app route holds.
+export const MAX_KAKAO_ROUTE_DESTINATIONS = 30;
+
 const kakaoRouteResponseSchema = z.object({
   routes: z.array(z.object({
     result_code: z.number().int(),
@@ -34,6 +37,9 @@ export class KakaoRouteClient implements RoadMatrixClient {
 
   async loadFrom(origin: SalesRouteNode, destinations: readonly SalesRouteNode[]) {
     if (destinations.length === 0) return new Map<string, SalesRouteMetric>();
+    if (destinations.length > MAX_KAKAO_ROUTE_DESTINATIONS) {
+      throw new KakaoRouteRequestError("Split destination requests into batches of at most 30.");
+    }
     const destinationByKey = new Map(destinations.map((destination, index) => [String(index), destination]));
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6_000);

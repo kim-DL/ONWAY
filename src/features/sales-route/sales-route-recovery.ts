@@ -1,4 +1,4 @@
-import type { SalesRouteResult } from "./sales-route-contract";
+import { MAX_ROUTE_SCHOOLS, type SalesRouteResult } from "./sales-route-contract";
 
 export type SalesRouteRequest = {
   cycleId: string;
@@ -22,7 +22,7 @@ export function parseSalesRouteFailure(error: unknown): SalesRouteFailure {
     const details = "details" in error ? error.details : null;
     if (details && typeof details === "object" && "reason" in details) {
       const schoolIds = "schoolIds" in details && Array.isArray(details.schoolIds)
-        ? [...new Set(details.schoolIds.filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 128))].slice(0, 20)
+        ? [...new Set(details.schoolIds.filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 128))].slice(0, MAX_ROUTE_SCHOOLS)
         : [];
       if (details.reason === "location-provider-unavailable") {
         return { kind: "provider", message: "위치 확인 서비스가 잠시 응답하지 않아요. 선택한 학교는 그대로 유지됩니다.", schoolIds };

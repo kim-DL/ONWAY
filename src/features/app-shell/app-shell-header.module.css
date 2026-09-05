@@ -1,0 +1,148 @@
+.header {
+  column-gap: 12px;
+}
+
+.header :global(.workspace-header__back) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.header :global(.app-brand--signature .app-brand__mark > svg) {
+  width: 85%;
+  height: 85%;
+}
+
+.header .controls {
+  flex: 1 1 240px;
+  min-width: 0;
+  max-width: 240px;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.modeFrame {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  padding: 1.5px;
+  overflow: hidden;
+  border: 1px solid #dce3e9;
+  border-radius: 17px;
+  background: #edf1f4;
+}
+
+.modeFrame::before,
+.modeFrame::after {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+}
+
+.modeFrame::before {
+  inset: -240%;
+  background: conic-gradient(#dce3e9 0deg, #76adeb 85deg, #dce3e9 155deg, #7fbf98 260deg, #dce3e9 360deg);
+}
+
+.modeFrame::after {
+  inset: 1.5px;
+  border-radius: 14px;
+  background: #f2f4f6;
+}
+
+.header .modeFrame .modeControl {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  width: 100%;
+  padding: 3px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.header .modeFrame .modeControl .modeButton {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #525d6b;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.header .modeFrame .modeControl .modeButton[aria-pressed="true"] {
+  background: #fff;
+  color: #1b64da;
+  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #3182f6;
+}
+
+.header .modeFrame .modeControl .modeButton[data-mode="sales"][aria-pressed="true"] {
+  color: #247647;
+  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #269653;
+}
+
+.header .modeFrame .modeControl .modeButton:focus-visible {
+  outline: 2px solid #1b64da;
+  outline-offset: -3px;
+}
+
+.header .singleMode {
+  min-height: 44px;
+  padding: 8px 14px;
+  color: #525d6b;
+  border: 1px solid #dce3e9;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.header .singleMode i { background: #3182f6; }
+.header .singleMode[data-mode="sales"] i { background: #269653; }
+
+@media (max-width: 760px) {
+  .header .controls { max-width: 220px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modeFrame::before { animation: mode-border-orbit 18s linear infinite; }
+  .modeFrame[data-motion="paused"]::before,
+  .modeFrame:focus-within::before { animation-play-state: paused; }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .modeFrame:hover::before { animation-play-state: paused; }
+  .header .modeFrame .modeControl .modeButton[aria-pressed="false"]:hover { background: #e7ecf1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeFrame::before { animation: none; }
+  .header .modeFrame .modeControl .modeButton { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .modeFrame { border: 1px solid ButtonText; }
+  .modeFrame::before,
+  .modeFrame::after { display: none; animation: none; }
+  .header .modeFrame .modeControl .modeButton { color: ButtonText; }
+  .header .modeFrame .modeControl .modeButton[aria-pressed="true"],
+  .header .modeFrame .modeControl .modeButton[data-mode="sales"][aria-pressed="true"] {
+    color: HighlightText;
+    background: Highlight;
+    forced-color-adjust: none;
+    box-shadow: none;
+  }
+  .header .modeFrame .modeControl .modeButton:focus-visible { outline-color: ButtonText; }
+}
+
+@keyframes mode-border-orbit {
+  to { transform: rotate(360deg); }
+}

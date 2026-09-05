@@ -37,7 +37,7 @@ async function fixture(page: Page, width = 390) {
     .fixture-list > div { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; }
     </style></head><body><div id="root"></div></body></html>`);
   await page.addScriptTag({ content: script });
-  await expect(page.locator(".assignment-card")).toHaveCount(6);
+  await expect(page.locator(".assignment-card")).toHaveCount(10);
   await expect(page.locator(".sales-task-row")).toHaveCount(4);
   await page.evaluate(() => document.fonts.ready);
 }
@@ -96,7 +96,7 @@ for (const width of [320, 390]) {
   });
 }
 
-test("school grades are distinct, district/grade text is not repeated, and all delivery states remain explicit", async ({ page }) => {
+test("school grades are distinct, district/grade text is not repeated, and recorded delivery states remain explicit", async ({ page }) => {
   await fixture(page, 320);
   const glyphs = new Set<string>();
   for (const [grade, label, status] of [
@@ -111,14 +111,51 @@ test("school grades are distinct, district/grade text is not repeated, and all d
       await expect(card.getByRole("img", { name: label, exact: true })).toBeVisible();
     }
     glyphs.add(await assignment.locator("[data-school-type] svg").innerHTML());
-    await expect(assignment.getByText(`홍보지 ${status}`, { exact: true })).toBeVisible();
-    await expect(assignment.getByText(`샘플 ${status}`, { exact: true })).toBeVisible();
+    if (status === "미확인") {
+      await expect(assignment.locator(".school-assignment-delivery")).toHaveCount(0);
+    } else {
+      await expect(assignment.getByText(`홍보지 ${status}`, { exact: true })).toBeVisible();
+      await expect(assignment.getByText(`샘플 ${status}`, { exact: true })).toBeVisible();
+    }
   }
   expect(glyphs.size).toBe(3);
   await expect(page.getByTestId("assignment-long")).toContainText("동선 16번째");
   await expect(page.getByTestId("assignment-long")).toContainText("외 1명");
   await expect(page.getByTestId("assignment-long")).toContainText("최근 방문");
   await expect(page.getByTestId("activity-elementary").locator("small")).toHaveAttribute("title", "대전광역시 대덕구 대화로 242-36");
+});
+
+test("untouched unknown chips disappear from both visual and accessible content without hiding recorded states", async ({ page }) => {
+  await fixture(page);
+  const untouched = page.getByTestId("assignment-elementary");
+  await expect(untouched).toContainText("방문 전");
+  await expect(untouched).not.toContainText("미확인");
+  await expect(untouched.getByRole("button")).toHaveAccessibleName("대전대화초등학교, 대덕구, 담당 김영업, 초등학교, 방문 전");
+  await expect(untouched.locator(".school-assignment-state")).toHaveAttribute("data-has-delivery", "false");
+  const recorded = page.getByTestId("assignment-recorded-unknown");
+  await expect(recorded).toContainText("홍보지 미확인");
+  await expect(recorded).toContainText("샘플 미확인");
+  await expect(recorded.getByRole("button")).toHaveAccessibleName(/방문 전, 홍보지 미확인, 샘플 미확인, 최근 방문/);
+  const mixed = page.getByTestId("assignment-mixed");
+  await expect(mixed).toContainText("홍보지 전달");
+  await expect(mixed).not.toContainText("샘플 미확인");
+  await expect(mixed.getByRole("button")).toHaveAccessibleName("대전대화초등학교, 대덕구, 담당 김영업, 초등학교, 방문 전, 홍보지 전달");
+});
+
+test("disabled manage cards explain the actual restriction with an accessible description", async ({ page }) => {
+  await fixture(page);
+  for (const [id, message] of [
+    ["manage-joint", "공동 담당 학교는 관리자에게 변경 요청"],
+    ["manage-disabled", "업무 기록이 있어 관리자에게 변경 요청"],
+    ["manage-other-lock", "담당 변경은 관리자에게 요청"],
+  ] as const) {
+    const card = page.getByTestId(id);
+    await expect(card).toContainText(message);
+    await expect(card.getByRole("checkbox")).toBeDisabled();
+    await expect(card.getByRole("checkbox")).toHaveAccessibleDescription(message);
+  }
+  await expect(page.getByTestId("manage-joint")).not.toContainText("업무 기록");
+  await expect(page.getByTestId("manage-enabled").getByRole("checkbox")).toHaveAccessibleName("대전대화초등학교 담당 학교에서 제외 선택");
 });
 
 test("real click and controlled manage selection preserve callbacks and disabled protection", async ({ page }) => {
@@ -141,7 +178,7 @@ test("real click and controlled manage selection preserve callbacks and disabled
   expect(disabledName).not.toBeNull();
   await page.mouse.click(disabledName!.x + 4, disabledName!.y + 4);
   await expect(page.getByTestId("events")).toHaveText("select:elementary|select:middle|toggle:elementary:true|toggle:elementary:false");
-  await expect(disabled).toContainText("업무 기록이 있어 담당 변경만 가능");
+  await expect(disabled).toContainText("업무 기록이 있어 관리자에게 변경 요청");
 });
 
 test("keyboard focus is visible on normal cards and manage checkbox; disabled row is skipped", async ({ page }) => {
@@ -153,7 +190,8 @@ test("keyboard focus is visible on normal cards and manage checkbox; disabled ro
   await expect(first).toHaveCSS("outline-style", "solid");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("events")).toHaveText("select:elementary");
-  for (let index = 0; index < 8; index += 1) await page.keyboard.press("Tab");
+  const selectableCards = await page.locator(".fixture-list button").count();
+  for (let index = 0; index < selectableCards; index += 1) await page.keyboard.press("Tab");
   const manage = page.getByTestId("manage-enabled");
   await expect(manage.getByRole("checkbox")).toBeFocused();
   await expect(manage.locator(".assignment-card")).toHaveCSS("outline-width", "3px");

@@ -7,7 +7,7 @@ const documentIdSchema = z.string().trim().min(1).max(128).refine(
 const cycleIdSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 export const MIN_ROUTE_SCHOOLS = 2;
-export const MAX_ROUTE_SCHOOLS = 20;
+export const MAX_ROUTE_SCHOOLS = 50;
 
 export const optimizeSalesRouteInputSchema = z.object({
   cycleId: cycleIdSchema,
@@ -27,4 +27,3 @@ export const optimizeSalesRouteInputSchema = z.object({
 });
 
 export type OptimizeSalesRouteInput = z.infer<typeof optimizeSalesRouteInputSchema>;
-

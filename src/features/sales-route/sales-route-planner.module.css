@@ -1,0 +1,64 @@
+.planner .quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.planner .quick button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid #dfe4eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #4e5968;
+  font-size: .8125rem;
+  line-height: 1.4;
+}
+.planner .quick button span { color: inherit; font-size: .75rem; font-weight: 650; }
+.planner .quick button[aria-pressed="true"] { border-color: #a7c8f8; background: #edf5ff; color: #1b64da; }
+.planner .quick button:disabled { opacity: .5; cursor: not-allowed; }
+.selectionSummary { display: grid; gap: 3px; color: #4e5968; font-size: .8125rem; line-height: 1.45; }
+.selectionSummary strong { color: #191f28; font-size: .875rem; }
+.selectionSummary span { overflow-wrap: anywhere; word-break: keep-all; }
+.limitNote { margin: 0; padding: 10px; border-radius: 8px; color: #785717; background: #fff8e8; font-size: .75rem; line-height: 1.5; }
+.planner .schoolSelect { position: relative; min-height: 44px; }
+/* Bind native checkbox focus to its visible control. An unanchored absolute
+   input can scroll overflow:hidden dialog ancestors completely past their UI. */
+.planner .schoolSelect > input { inset: 0 auto 0 0; width: 26px; height: 100%; margin: 0; }
+.planner .schoolSelect strong { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; word-break: keep-all; font-size: .8125rem; line-height: 1.4; }
+.planner .schoolSelect small { font-size: .6875rem; line-height: 1.4; }
+.planner .startButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #dfe4eb;
+  border-radius: 9px;
+  color: #4e5968;
+  background: #fff;
+  font-size: .75rem;
+  line-height: 1.4;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.planner .startButton svg { flex: none; }
+.planner .startButton[aria-pressed="true"] { border-color: #a7c8f8; color: #1b64da; background: #edf5ff; }
+.planner .startButton:disabled { opacity: .45; cursor: not-allowed; }
+.planner .startButton:focus-visible,
+.planner .quick button:focus-visible,
+.planner .schoolSelect:has(input:focus-visible) { outline: 3px solid #1b64da; outline-offset: 2px; }
+@media (max-width: 360px) {
+  .planner .startButton { flex-direction: column; gap: 2px; padding: 6px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .planner .startButton { transition: none; }
+}
+@media (forced-colors: active) {
+  .planner .startButton:focus-visible,
+  .planner .quick button:focus-visible,
+  .planner .schoolSelect:has(input:focus-visible) { outline-color: Highlight; }
+  .planner .startButton[aria-pressed="true"],
+  .planner .quick button[aria-pressed="true"] { border-color: Highlight; outline: 1px solid Highlight; }
+}

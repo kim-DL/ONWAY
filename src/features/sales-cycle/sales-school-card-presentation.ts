@@ -17,6 +17,25 @@ export function deliveryStatusLabel(status: SalesAssignment["brochureStatus"]) {
   return { delivered: "전달", notDelivered: "미전달", unknown: "미확인" }[status];
 }
 
+type AssignmentVisitState = Pick<SalesAssignment, "monthlyStatus" | "latestVisitId" | "latestVisitedAt">;
+
+export function shouldShowDeliveryStatus(assignment: AssignmentVisitState, status: SalesAssignment["brochureStatus"]) {
+  // Hide untouched placeholders only. A visit pointer or date means an unknown
+  // value belongs to an existing record and must not silently disappear.
+  return status !== "unknown" || assignment.monthlyStatus !== "before"
+    || assignment.latestVisitId !== null || assignment.latestVisitedAt !== null;
+}
+
+export function assignmentReleaseRestrictionMessage(assignment: AssignmentVisitState & Pick<SalesAssignment,
+  "assigneeIds" | "brochureStatus" | "sampleStatus">) {
+  if (assignment.assigneeIds.length > 1) return "공동 담당 학교는 관리자에게 변경 요청";
+  if (assignment.monthlyStatus !== "before" || assignment.latestVisitId !== null || assignment.latestVisitedAt !== null
+    || assignment.brochureStatus !== "unknown" || assignment.sampleStatus !== "unknown") {
+    return "업무 기록이 있어 관리자에게 변경 요청";
+  }
+  return "담당 변경은 관리자에게 요청";
+}
+
 export function schoolLocationSummary(school: Pick<School, "district" | "address">) {
   const district = DISTRICT_LABELS[school.district];
   const address = school.address.road?.trim() || school.address.jibun?.trim();

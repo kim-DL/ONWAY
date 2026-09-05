@@ -39,7 +39,7 @@ function roadMatrix(): SalesRouteMatrix {
 }
 
 describe("sales route contract and optimizer", () => {
-  it.each([2, 9, 16, 20])("retains every one of %i schools exactly once with the chosen start", (count) => {
+  it.each([2, 9, 16, 20, 31, 40, 50])("retains every one of %i schools exactly once with the chosen start", (count) => {
     const schools = Array.from({ length: count }, (_, index) => ({
       schoolId: `S-${index}`, name: `학교 ${index}`, latitude: 36.3 + index * 0.004, longitude: 127.4 + index * 0.002,
     }));
@@ -52,9 +52,9 @@ describe("sales route contract and optimizer", () => {
     expect(new Set(result)).toEqual(new Set(schoolIds));
   });
 
-  it("rejects more than twenty schools rather than silently truncating them", () => {
+  it("rejects more than fifty schools rather than silently truncating them", () => {
     expect(optimizeSalesRouteInputSchema.safeParse({
-      cycleId: "2026-09", schoolIds: Array.from({ length: 21 }, (_, index) => String(index)), startSchoolId: "0",
+      cycleId: "2026-09", schoolIds: Array.from({ length: 51 }, (_, index) => String(index)), startSchoolId: "0",
     }).success).toBe(false);
   });
   it("requires two unique schools and keeps the selected first school fixed", () => {
@@ -84,6 +84,12 @@ describe("sales route contract and optimizer", () => {
 });
 
 describe("Kakao route client", () => {
+  it("never submits more than the provider's 30-destination request limit", async () => {
+    const fetcher = vi.fn();
+    const client = new KakaoRouteClient("test-key", fetcher);
+    await expect(client.loadFrom(nodes[0]!, Array.from({ length: 31 }, () => nodes[1]!))).rejects.toThrow("at most 30");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("does not assign malformed or unknown provider keys to another school", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ routes: ["", " ", "00", "0.0", "1e0", "-1", "99"].map(key => ({
       result_code: 0, key, summary: { distance: 1, duration: 1 },

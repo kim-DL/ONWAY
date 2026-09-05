@@ -277,8 +277,8 @@ test("sixteen-school route preserves failed selections and explicitly recovers w
     await login(page, PHASE3_TEST_PINS.salesA);
     await page.getByRole("button", { name: /방문 동선/ }).click();
     const dialog = page.getByRole("dialog", { name: "방문 동선 만들기" });
-    await dialog.getByRole("button", { name: "선택 가능한 학교 전체" }).click();
-    await dialog.locator(".sales-route-candidates > li", { hasText: "동선검증1초등학교" }).getByRole("radio").locator("xpath=ancestor::label").click();
+    await dialog.getByRole("button", { name: /전체 선택/ }).click();
+    await dialog.getByRole("button", { name: "동선검증1초등학교 첫 학교로 선택", exact: true }).click();
     const requests: { schoolIds: string[]; startSchoolId: string }[] = [];
     const secondRequestGate = new Promise<void>((resolve) => { releaseRequest = resolve; });
     await page.route("**/optimizeSalesRoute", async (route) => {
@@ -301,7 +301,7 @@ test("sixteen-school route preserves failed selections and explicitly recovers w
     await expect(recovery.getByRole("list", { name: "위치 확인이 남은 학교" })).toContainText("동선검증2초등학교");
     await expect(recovery).not.toContainText("400");
     await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(16);
-    await expect(dialog.locator(".sales-route-candidates > li", { hasText: "동선검증1초등학교" }).getByRole("radio")).toBeChecked();
+    await expect(dialog.getByRole("button", { name: "동선검증1초등학교 첫 학교로 선택", exact: true })).toHaveAttribute("aria-pressed", "true");
     const remainder = recovery.getByRole("button", { name: "위 2곳 빼고 14곳 계산" });
     await expect(remainder).toBeDisabled();
     await recovery.getByRole("combobox", { name: "나머지 동선의 첫 학교" }).selectOption(templateId);
@@ -363,8 +363,8 @@ test("route outages and pending checks keep selection, while changed selections 
   await expect(recovery).toContainText("확인된 학교가 2곳 미만이에요");
   await expect(recovery.getByRole("button", { name: /빼고/ })).toHaveCount(0);
   await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(2);
-  const otherFirstSchool = dialog.locator(".sales-route-candidate__start input:not(:checked)").first();
-  await otherFirstSchool.locator("xpath=ancestor::label").click();
+  const otherFirstSchool = dialog.locator(".sales-route-candidate__start[aria-pressed=false]").first();
+  await otherFirstSchool.click();
   await expect(recovery).toHaveCount(0);
 });
 

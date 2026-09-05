@@ -9,6 +9,7 @@ import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import { buildKakaoDirectionsUrlToCoordinate } from "@/features/school-detail/kakao-directions";
 import {
+  MAX_ROUTE_SCHOOLS,
   type ActiveSalesRoute,
   type SalesRouteMetric,
   type SalesRouteResult,
@@ -16,8 +17,7 @@ import {
 import { canPlanRouteForSchool, hasTrustedRouteLocation } from "./sales-route-location";
 import { optimizeSalesRoute } from "./sales-route-repository";
 import { parseSalesRouteFailure, routeLocationRecovery, routeRequestKey, type SalesRouteFailure } from "./sales-route-recovery";
-
-const MAX_ROUTE_SCHOOLS = 20;
+import styles from "./sales-route-planner.module.css";
 
 export type SalesRouteCandidate = {
   assignment: SalesAssignment;
@@ -126,6 +126,13 @@ export function SalesRoutePlanner({
   const pendingLocationCount = candidates.filter(({ school }) => (
     canPlanRouteForSchool(school) && !hasTrustedRouteLocation(school)
   )).length;
+  const eligibleIds = candidates.filter(({ school }) => canPlanRouteForSchool(school)).map(({ school }) => school.schoolId);
+  const unfinishedIds = candidates.filter(({ school, assignment }) => canPlanRouteForSchool(school)
+    && assignment.monthlyStatus !== "completed").map(({ school }) => school.schoolId);
+  const matchesSelection = (ids: readonly string[]) => {
+    const permitted = ids.slice(0, MAX_ROUTE_SCHOOLS);
+    return permitted.length === selectedIds.size && permitted.every((id) => selectedIds.has(id));
+  };
 
   const selectedCount = selectedIds.size;
   const summary = useMemo(() => {
@@ -160,24 +167,11 @@ export function SalesRoutePlanner({
     if (!next.has(startSchoolId)) setStartSchoolId([...next][0] ?? "");
   };
 
-  const selectSuggested = () => {
+  const selectGroup = (availableIds: readonly string[]) => {
     if (busyRef.current) return;
-    setSelectedIds(new Set(defaults));
-    setStartSchoolId(defaults[0] ?? "");
-    setResult(null);
-    setOrderedSchoolIds([]);
-    setFailure(null);
-    setRecoveryStartId("");
-  };
-
-  const selectAll = () => {
-    if (busyRef.current) return;
-    const ids = candidates
-      .filter(({ school }) => canPlanRouteForSchool(school))
-      .slice(0, MAX_ROUTE_SCHOOLS)
-      .map(({ school }) => school.schoolId);
+    const ids = availableIds.slice(0, MAX_ROUTE_SCHOOLS);
     setSelectedIds(new Set(ids));
-    setStartSchoolId(ids[0] ?? "");
+    setStartSchoolId((current) => ids.includes(current) ? current : ids[0] ?? "");
     setResult(null);
     setOrderedSchoolIds([]);
     setFailure(null);
@@ -296,16 +290,28 @@ export function SalesRoutePlanner({
   }
 
   return (
-    <div className="sales-route-planner">
+    <div className={`sales-route-planner ${styles.planner}`}>
       <div className="sales-route-planner__intro" ref={introRef} tabIndex={-1}>
         <span><Icon name="route" size={22} /></span>
-        <p><strong>오늘 방문할 학교를 고르세요.</strong><small>첫 학교를 고정한 뒤 이동시간이 짧은 순서로 정리합니다.</small></p>
+        <p><strong>오늘 방문할 학교</strong><small>방문할 곳을 선택하고 첫 학교를 정해주세요.</small></p>
       </div>
-      <div className="sales-route-planner__quick" aria-label="빠른 선택">
-        <button type="button" disabled={busy} onClick={selectSuggested}>미완료 학교</button>
-        <button type="button" disabled={busy} onClick={selectAll}>{eligibleCount > MAX_ROUTE_SCHOOLS ? "전체 (최대 20곳)" : "선택 가능한 학교 전체"}</button>
-        <span>{selectedCount}/{eligibleCount}</span>
+      <div className={`sales-route-planner__quick ${styles.quick}`} role="group" aria-label="방문할 학교 일괄 선택">
+        <button type="button" disabled={busy || unfinishedIds.length === 0}
+          aria-pressed={matchesSelection(unfinishedIds)} onClick={() => selectGroup(unfinishedIds)}>
+          미완료 선택 <span>{unfinishedIds.length > MAX_ROUTE_SCHOOLS ? `${MAX_ROUTE_SCHOOLS} / ${unfinishedIds.length}` : unfinishedIds.length}곳</span>
+        </button>
+        <button type="button" disabled={busy || eligibleCount === 0}
+          aria-pressed={matchesSelection(eligibleIds)} onClick={() => selectGroup(eligibleIds)}>
+          전체 선택 <span>{eligibleCount > MAX_ROUTE_SCHOOLS ? `${MAX_ROUTE_SCHOOLS} / ${eligibleCount}` : eligibleCount}곳</span>
+        </button>
       </div>
+      <div className={styles.selectionSummary} aria-live="polite">
+        <strong>{selectedCount}곳 선택</strong>
+        <span>{startSchoolId ? `첫 학교 · ${schoolById.get(startSchoolId)?.name ?? "학교 정보 확인 필요"}` : "아래 목록에서 첫 학교를 선택해주세요."}</span>
+      </div>
+      {eligibleCount > MAX_ROUTE_SCHOOLS ? <p className={styles.limitNote}>
+        한 번에 최대 {MAX_ROUTE_SCHOOLS}곳까지 계산할 수 있어요. 일괄 선택은 목록 앞 {MAX_ROUTE_SCHOOLS}곳에 적용됩니다. 체크를 바꿔 방문할 학교를 조정해주세요.
+      </p> : null}
       {pendingLocationCount > 0 ? <p className="sales-route-location-note"><Icon name="sparkles" size={16} />{pendingLocationCount}곳은 계산할 때 공식 주소로 위치를 자동 확인해요.</p> : null}
       {missingAddressCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />공식 주소가 없는 {missingAddressCount}곳은 선택할 수 없어요.</p> : null}
       {inactiveCount > 0 ? <p className="sales-route-location-note"><Icon name="location" size={16} />운영하지 않는 학교 {inactiveCount}곳은 동선에서 제외돼요.</p> : null}
@@ -351,31 +357,31 @@ export function SalesRoutePlanner({
           const atLimit = !selected && selectedCount >= MAX_ROUTE_SCHOOLS;
           return (
             <li key={school.schoolId} data-disabled={!eligible ? "true" : "false"} data-selected={selected ? "true" : "false"}>
-              <label className="sales-route-candidate__select">
+              <label className={`sales-route-candidate__select ${styles.schoolSelect}`}>
                 <input
                   type="checkbox"
                   checked={selected}
                   disabled={busy || !eligible || atLimit}
+                  aria-label={`${school.name} 방문 선택`}
                   onChange={(event) => toggleSchool(school.schoolId, event.target.checked)}
                 />
                 <span className="sales-route-candidate__check" aria-hidden="true"><Icon name="check" size={15} /></span>
                 <span><strong>{school.name}</strong><small>{eligible ? (locationReady ? (assignment.monthlyStatus === "completed" ? "방문 완료" : "방문 예정") : "주소로 자동 확인") : school.operationalStatus !== "active" ? "운영하지 않는 학교" : "공식 주소 없음"}</small></span>
               </label>
-              <label className="sales-route-candidate__start" data-selected={startSchoolId === school.schoolId ? "true" : "false"}>
-                <input
-                  type="radio"
-                  name="sales-route-start"
-                  checked={startSchoolId === school.schoolId}
-                  disabled={busy || !eligible || !selected}
-                  onChange={() => {
+              <button type="button" className={`sales-route-candidate__start ${styles.startButton}`}
+                data-selected={startSchoolId === school.schoolId ? "true" : "false"}
+                aria-pressed={startSchoolId === school.schoolId}
+                aria-label={`${school.name} 첫 학교로 선택`}
+                disabled={busy || !eligible || !selected}
+                onClick={() => {
                     if (busyRef.current) return;
                     setStartSchoolId(school.schoolId);
                     setFailure(null);
                     setRecoveryStartId("");
-                  }}
-                />
-                <span>첫 학교</span>
-              </label>
+                }}>
+                <Icon name={startSchoolId === school.schoolId ? "check" : "location"} size={16} />
+                <span>{startSchoolId === school.schoolId ? "첫 학교" : "여기서 시작"}</span>
+              </button>
             </li>
           );
         })}
@@ -385,7 +391,7 @@ export function SalesRoutePlanner({
         <div className="sales-route-empty" role="status"><Icon name="location" /><strong>동선을 만들 학교 정보가 부족해요.</strong><span>공식 주소가 등록된 학교가 2곳 이상 필요합니다.</span></div>
       ) : null}
       <BottomSheetActions className="sales-route-planner__footer" busy={busy}>
-        <span aria-live="polite">{busy ? "학교 위치·이동시간 확인 중" : `${selectedCount}곳 선택 · 최대 20곳`}</span>
+        <span aria-live="polite">{busy ? "학교 위치·이동시간 확인 중" : `${selectedCount}곳 선택 · 최대 ${MAX_ROUTE_SCHOOLS}곳`}</span>
         <GlassButton variant="primary" disabled={busy || selectedCount < 2 || !selectedIds.has(startSchoolId)} onClick={() => void calculate()}>
           {busy ? <><Icon name="refresh" className="is-spinning" />계산 중…</> : <><Icon name="sparkles" />가까운 순서 계산</>}
         </GlassButton>

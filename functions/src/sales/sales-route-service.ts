@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import type { OptimizeSalesRouteInput } from "./sales-route-contract.js";
-import { KakaoRouteRequestError, type RoadMatrixClient } from "./kakao-route-client.js";
+import { KakaoRouteRequestError, MAX_KAKAO_ROUTE_DESTINATIONS, type RoadMatrixClient } from "./kakao-route-client.js";
 import {
   createEstimatedRouteMatrix,
   optimizeSalesRouteOrder,
@@ -151,6 +151,19 @@ export async function fillRoadMetrics(
   client: RoadMatrixClient,
 ) {
   const schedulingDeadline = Date.now() + ROAD_SCHEDULING_BUDGET_MS;
+  // Schedule bounded provider calls, not whole origins: a large route must not
+  // put 39/49 destinations in one request or multiply worker concurrency.
+  const jobs = nodes.flatMap((origin) => {
+    // Nearby legs are the most useful when the provider budget runs out.
+    const destinations = nodes.filter((node) => node.schoolId !== origin.schoolId)
+      .sort((a, b) => routeMetric(matrix, origin.schoolId, a.schoolId).distanceMeters
+        - routeMetric(matrix, origin.schoolId, b.schoolId).distanceMeters);
+    return Array.from({ length: Math.ceil(destinations.length / MAX_KAKAO_ROUTE_DESTINATIONS) }, (_, batch) => ({
+      origin,
+      batch,
+      destinations: destinations.slice(batch * MAX_KAKAO_ROUTE_DESTINATIONS, (batch + 1) * MAX_KAKAO_ROUTE_DESTINATIONS),
+    }));
+  }).sort((a, b) => a.batch - b.batch);
   let nextIndex = 0;
   let haltExternalRequests = false;
   let roadMetricCount = 0;
@@ -158,9 +171,9 @@ export async function fillRoadMetrics(
     while (!haltExternalRequests && Date.now() < schedulingDeadline) {
       const index = nextIndex;
       nextIndex += 1;
-      const origin = nodes[index];
-      if (!origin) return;
-      const destinations = nodes.filter((node) => node.schoolId !== origin.schoolId);
+      const job = jobs[index];
+      if (!job) return;
+      const { origin, destinations } = job;
       try {
         const roadMetrics = await client.loadFrom(origin, destinations);
         const row = matrix.get(origin.schoolId)!;
@@ -215,9 +228,7 @@ export class SalesRouteService {
     const schools = schoolSnapshots.map((snapshot) => schoolSchema.parse(snapshot.data()));
     const nodes = await resolveRouteNodes(schools, actor, this.locationResolver);
     const matrix = createEstimatedRouteMatrix(nodes);
-    const roadMetricCount = this.roadClient
-      ? await fillRoadMetrics(nodes, matrix, this.roadClient)
-      : 0;
+    if (this.roadClient) await fillRoadMetrics(nodes, matrix, this.roadClient);
     const orderedSchoolIds = optimizeSalesRouteOrder(nodes, input.startSchoolId, matrix);
     const nodeById = new Map(nodes.map((node) => [node.schoolId, node]));
     const legs = orderedSchoolIds.slice(1).map((schoolId, index) =>
@@ -226,7 +237,7 @@ export class SalesRouteService {
     const roadLegCount = legs.filter((metric) => metric.source === "road").length;
     const calculationMode = roadLegCount === legs.length
       ? "road" as const
-      : roadMetricCount === 0
+      : roadLegCount === 0
         ? "distanceEstimate" as const
         : "hybrid" as const;
     const metrics: SalesRouteMetric[] = [];

@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { SoftCard } from "@/components/ui/soft-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -33,11 +32,8 @@ import {
 import { DeliveryRecentSchools } from "./delivery-recent-schools";
 import { useTimeGreeting } from "./time-greeting";
 import { AppBrand } from "./app-brand";
-
-const MODE_OPTIONS = [
-  { value: "delivery", label: "납품" },
-  { value: "sales", label: "영업" },
-] as const;
+import { ShellHeader } from "./app-shell-header";
+import { useHeaderMotionPreference } from "./header-motion-preference";
 
 const subscribeToStoredMode = () => () => undefined;
 
@@ -86,46 +82,6 @@ const SchoolSearch = dynamic(
 
 function initials(name: string) {
   return Array.from(name.trim()).slice(0, 2).join("");
-}
-
-function ShellHeader({
-  session,
-  mode,
-  availableModes,
-  onModeChange,
-  onDetailBack,
-}: {
-  session: AuthenticatedSession;
-  mode: WorkMode;
-  availableModes: readonly WorkMode[];
-  onModeChange: (mode: WorkMode) => void;
-  onDetailBack?: (() => void) | undefined;
-}) {
-  return (
-    <header className="workspace-header">
-      {onDetailBack ? (
-        <button className="workspace-header__back" type="button" onClick={onDetailBack}>
-          <Icon name="arrow-left" /><span>학교 목록</span>
-        </button>
-      ) : <AppBrand />}
-      <div className="workspace-header__controls">
-        {availableModes.length > 1 ? (
-          <SegmentedControl
-            className="mode-control"
-            label="업무 모드"
-            options={MODE_OPTIONS.filter((option) => availableModes.includes(option.value))}
-            value={mode}
-            onChange={onModeChange}
-          />
-        ) : (
-          <span className="mode-label"><i aria-hidden="true" />{mode === "delivery" ? "납품 모드" : "영업 모드"}</span>
-        )}
-        <div className="employee-avatar" aria-label={`${session.displayName} 로그인됨`}>
-          {initials(session.displayName)}
-        </div>
-      </div>
-    </header>
-  );
 }
 
 function ShellNavigation({
@@ -198,6 +154,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [exportingDiagnostics, setExportingDiagnostics] = useState(false);
+  const { paused: headerMotionPaused, setPaused: setHeaderMotionPaused } = useHeaderMotionPreference();
 
   const roleLabels = session.claims.roleScopes.map((scope) => ({
     delivery: "납품",
@@ -261,6 +218,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
           <div><span className="settings-list__icon"><Icon name="download" /></span><span><strong>기기 앱</strong><small>{installState === "installed" ? "홈 화면에서 독립 실행됩니다." : "설치하면 오프라인에서도 빠르게 시작합니다."}</small></span>{installState === "available" ? <button className="pwa-install-action" type="button" onClick={() => void install()}>앱 설치</button> : <StatusBadge tone={installState === "installed" ? "success" : "neutral"}>{installState === "installed" ? "설치됨" : "브라우저에서 사용 중"}</StatusBadge>}</div>
           <div><span className="settings-list__icon"><Icon name={isOnline ? "refresh" : "wifi-off"} /></span><span><strong>네트워크</strong><small>{isOnline ? "최신 정보와 권한을 확인할 수 있습니다." : "저장된 학교 정보만 표시합니다."}</small></span><StatusBadge tone={isOnline ? "success" : "attention"}>{isOnline ? "온라인" : "오프라인"}</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>기기 데이터</strong><small>로그아웃하면 비공개 로컬 상태를 정리합니다.</small></span><StatusBadge tone="info">이 기기</StatusBadge></div>
+          <div><span className="settings-list__icon"><Icon name="sparkles" /></span><span><strong>테두리 애니메이션</strong><small>기기의 동작 감소 설정을 함께 따릅니다.</small></span><button className="pwa-install-action" type="button" role="switch" aria-label="테두리 애니메이션" aria-checked={!headerMotionPaused} onClick={() => setHeaderMotionPaused(!headerMotionPaused)}>{headerMotionPaused ? "꺼짐" : "켜짐"}</button></div>
           <div><span className="settings-list__icon"><Icon name="clipboard" /></span><span><strong>기기 진단</strong><small>개인정보 없이 성능·캐시·연결 상태만 내보냅니다. {APP_METADATA.buildVersion}</small></span><button className="pwa-install-action" type="button" disabled={exportingDiagnostics} onClick={() => void exportDeviceDiagnostics()}>{exportingDiagnostics ? "준비 중…" : "진단 내보내기"}</button></div>
         </SoftCard>
 
@@ -437,7 +395,6 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     <main className="workspace-shell" data-mode={mode} data-detail={selectedSchool ? "true" : "false"}>
       <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
       <ShellHeader
-        session={session}
         mode={mode}
         availableModes={availableModes}
         onModeChange={changeMode}
