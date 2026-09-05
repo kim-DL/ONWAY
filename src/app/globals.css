@@ -5757,3 +5757,95 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
   :is(.glass-button, .smart-chip):focus-visible,
   :is(.workspace-shell, .admin-shell) :is(.glass-button, .smart-chip):focus-visible { outline-color: Highlight; }
 }
+
+/* School lists: compact information rows, with school-level color confined to the mark. */
+.workspace-shell[data-mode="sales"] .school-assignment-card {
+  width: 100%;
+  min-height: 0;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+  box-shadow: 0 2px 8px rgba(25, 31, 40, .035);
+}
+.school-assignment-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.school-assignment-heading__body { flex: 1; min-width: 0; }
+.school-assignment-heading__body > strong,
+.school-activity-row__body > strong {
+  display: block;
+  color: #191f28;
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.school-assignment-heading > svg { flex: none; margin-top: 4px; color: #8b95a1; }
+.school-assignment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin-top: 4px;
+  color: #596573;
+  font-size: .75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.school-assignment-meta__route { color: #1b64da; font-weight: 700; }
+.school-assignment-state { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.school-assignment-delivery { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.school-assignment-delivery > span { display: inline-flex; align-items: center; gap: 4px; color: #596573; font-size: .75rem; line-height: 1.5; }
+.school-assignment-delivery > span[data-state="delivered"] { color: #356554; }
+.school-assignment-delivery svg { flex: none; }
+.school-assignment-note { color: #596573; font-size: .75rem; line-height: 1.5; }
+.workspace-shell .school-assignment-card .status-badge,
+.workspace-shell .school-activity-row .status-badge {
+  min-height: 24px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: .6875rem;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.workspace-shell[data-mode="sales"] .school-assignment-card[data-disabled="true"] { opacity: 1; filter: none; background: #f7f8fa; }
+.school-assignment-card.assignment-card--selectable .school-assignment-heading { padding-right: 28px; }
+.school-assignment-card.assignment-card--selectable > input { width: 44px; height: 44px; top: 4px; right: 4px; }
+.school-assignment-card .assignment-card__check { width: 22px; height: 22px; top: 14px; right: 14px; }
+.workspace-shell[data-mode="sales"] .school-assignment-card[data-disabled="true"] .assignment-card__check { border-style: dashed; background: #eef0f3; }
+
+.workspace-shell[data-mode="sales"] .school-activity-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 78px;
+  padding: 12px 14px;
+  color: #191f28;
+  border-color: #edf0f3;
+}
+.school-activity-row__body { flex: 1; min-width: 0; }
+.school-activity-row__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.school-activity-row__meta > small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #596573; font-size: .75rem; line-height: 1.5; }
+.school-activity-row > svg { flex: none; }
+.workspace-shell[data-mode="sales"] .school-activity-row:hover { background: #f7f9fc; box-shadow: none; }
+.workspace-shell[data-mode="sales"] :is(.school-assignment-card, .school-activity-row):focus-visible,
+.workspace-shell[data-mode="sales"] .school-assignment-card:has(input:focus-visible) {
+  outline: 3px solid #1b64da;
+  outline-offset: -3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell[data-mode="sales"] :is(.school-assignment-card, .school-activity-row),
+  .workspace-shell[data-mode="sales"] .school-activity-row > svg { animation: none; transition: none; transform: none; }
+}
+@media (forced-colors: active) {
+  .workspace-shell[data-mode="sales"] :is(.school-assignment-card, .school-activity-row):focus-visible,
+  .workspace-shell[data-mode="sales"] .school-assignment-card:has(input:focus-visible) { outline-color: Highlight; }
+}

@@ -43,6 +43,8 @@ try {
         ? ["tests/e2e-auth/phase3-auth.spec.ts", "tests/e2e-auth/phase22-login-recovery.spec.ts"]
         : process.env.ONNURIWAY_E2E_UX_SUITE === "visits"
         ? ["tests/e2e-auth/phase10-sales-visit.spec.ts"]
+        : process.env.ONNURIWAY_E2E_UX_SUITE === "cards"
+          ? ["tests/e2e-auth/phase9-sales-cycle.spec.ts", "tests/e2e-auth/phase10-sales-visit.spec.ts", "tests/e2e-auth/phase12-csv-export.spec.ts"]
         : process.env.ONNURIWAY_E2E_UX_SUITE === "sales"
           ? ["tests/e2e-auth/phase9-sales-cycle.spec.ts"]
           : ["tests/e2e-auth/phase22-action-reach.spec.ts", "tests/e2e-auth/phase22-form-actions.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts"]

@@ -7,12 +7,12 @@ import { Icon } from "@/components/ui/icon";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { SoftCard } from "@/components/ui/soft-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { useSalesWorkspace } from "./use-sales-workspace";
+import { ActivityRow } from "./sales-school-cards";
 
 const QUEUES = [
   { value: "next", label: "방문 전" },
@@ -20,16 +20,7 @@ const QUEUES = [
   { value: "completed", label: "완료" },
 ] as const;
 
-const DISTRICT_LABELS: Record<School["district"], string> = {
-  dong: "동구",
-  jung: "중구",
-  seo: "서구",
-  yuseong: "유성구",
-  daedeok: "대덕구",
-};
-
 type Queue = (typeof QUEUES)[number]["value"];
-type ActivityItem = { assignment: SalesAssignment; school: School };
 
 function belongsToQueue(assignment: SalesAssignment, queue: Queue) {
   if (queue === "next") return assignment.monthlyStatus === "before";
@@ -37,30 +28,6 @@ function belongsToQueue(assignment: SalesAssignment, queue: Queue) {
     || assignment.monthlyStatus === "revisit"
     || assignment.monthlyStatus === "onHold";
   return assignment.monthlyStatus === "completed";
-}
-
-function queueLabel(assignment: SalesAssignment) {
-  if (assignment.monthlyStatus === "followUp") return "후속 필요";
-  if (assignment.monthlyStatus === "revisit") return "재방문";
-  if (assignment.monthlyStatus === "completed") return "완료";
-  if (assignment.monthlyStatus === "onHold") return "보류";
-  return "방문 전";
-}
-
-function ActivityRow({ item, onSelect }: { item: ActivityItem; onSelect: (school: School) => void }) {
-  const { assignment, school } = item;
-  const attention = assignment.monthlyStatus === "followUp" || assignment.monthlyStatus === "revisit";
-  return (
-    <button className="sales-task-row" type="button" onClick={() => onSelect(school)}>
-      <span className="sales-task-row__icon"><Icon name={attention ? "clock" : assignment.monthlyStatus === "completed" ? "check" : "building"} size={19} /></span>
-      <span className="sales-task-row__school">
-        <strong>{school.name}</strong>
-        <small>{DISTRICT_LABELS[school.district]} · {school.address.road ?? "주소 확인 필요"}</small>
-      </span>
-      <StatusBadge tone={attention ? "attention" : assignment.monthlyStatus === "completed" ? "success" : "neutral"}>{queueLabel(assignment)}</StatusBadge>
-      <Icon name="chevron-right" size={18} />
-    </button>
-  );
 }
 
 export function SalesActivityWorkspace({

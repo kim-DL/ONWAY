@@ -1,0 +1,59 @@
+.mark {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid var(--school-type-border);
+  border-radius: 10px;
+  color: var(--school-type-ink);
+  background: var(--school-type-surface);
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.glyph {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.elementary {
+  --school-type-ink: #2d69b0;
+  --school-type-surface: #edf5ff;
+  --school-type-border: #dce9f8;
+}
+
+.middle {
+  --school-type-ink: #287a78;
+  --school-type-surface: #edf7f5;
+  --school-type-border: #dcece8;
+}
+
+.high {
+  --school-type-ink: #686d96;
+  --school-type-surface: #f1f2f8;
+  --school-type-border: #e4e5ef;
+}
+
+.special {
+  --school-type-ink: #57718d;
+  --school-type-surface: #f0f4f8;
+  --school-type-border: #e0e7ef;
+}
+
+.other {
+  --school-type-ink: #657284;
+  --school-type-surface: #f2f4f6;
+  --school-type-border: #e3e7ed;
+}
+
+@media (forced-colors: active) {
+  .mark {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+}
