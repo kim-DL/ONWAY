@@ -76,4 +76,21 @@
   PWA 서비스 워커/아이콘 빌드 검사 통과.
 - 브라우저 검사는 총 67개(컴포넌트 54 + 통합 13)이며,
   실제 직원 휴대폰의 인증 세션에서 수행한 검사는 아니다.
-- 운영 배포 식별자는 배포 완료 후 기록한다.
+
+## 운영 배포
+
+- 코드 커밋: `624ad47`.
+- 2026-09-05 23:29 KST 운영 배포 생성, 상태 `READY` 확인.
+- 운영 주소: https://onnuriway.vercel.app
+- 배포 ID: `dpl_HGgkGY6D37G71URSigdiwbf7Ya1h`.
+- 불변 주소: https://onnuriway-katqer22y-daeins-projects.vercel.app
+- Firebase 프로젝트 `onnuriway`, `asia-northeast3`의 `optimizeSalesRoute`,
+  `matchSchoolWithKakao` 두 함수 갱신 성공. 다른 함수·보안 규칙·인증 설정은 배포하지 않았다.
+- 운영 로그인 화면을 실제 브라우저에서 확인했고 페이지 오류가 없었다.
+  새 서비스 워커 제어 상태와 `app-shell-phase25` 캐시 적용도 확인했다.
+  신규 Vercel 배포의 최근 10분 error 수준 로그 조회 결과는 0건이었다.
+  이는 출시 직후의 제한된 확인이며 지속 모니터링을 새로 설정한 것은 아니다.
+- 프런트엔드 이전 배포: `dpl_7u7Hp3g7KiJsNaY4RXiNBbCmfUi7`.
+  필요 시 `vercel rollback <이전 배포 ID> --scope daeins-projects`로 복구할 수 있다.
+  백엔드는 해당 이전 커밋의 두 함수만 재배포하며 관리자 확정/복구된 위치 데이터는
+  자동으로 되돌리지 않는다. 학교 위치의 변경 전 백업은 위 경로에 별도로 보관했다.
