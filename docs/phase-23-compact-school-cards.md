@@ -27,4 +27,12 @@
 
 ## Release
 
-User has requested direct production delivery, not preview. Deploy to the existing onnuriway Vercel project after final checks, retain the previous deployment as rollback. Production read-only smoke check and deployment identity are recorded after deployment.
+Deployed directly to [onnuriway.vercel.app](https://onnuriway.vercel.app/) as requested, without a preview deployment.
+
+- Code commit: `43f1d41`.
+- Deployment: `dpl_FLDegC4ugPZLoP4H1KnjXsRCFAmN`, READY, production alias applied.
+- Immutable URL: `https://onnuriway-clqp1xfkq-daeins-projects.vercel.app`.
+- Previous deployment retained: `dpl_9QjH1LtVtAamTWa7SgUSQAyTLbaS`.
+- Final cloud production build and TypeScript passed. Final width/min-width CSS corrections were verified by the standalone 12-case browser suite before deployment.
+- Production read-only smoke: existing signed-in session survives the PWA Update action; school/activity navigation and opening school details work; no browser errors/warnings observed. No actual school data was changed.
+- Same production account, viewport and 419.73px card width: ordinary assigned card height decreased from 242.45px to 108.39px (about 55%). Activity row measured 78px. These are specific verified samples, not a fixed-height limit for all names or accessibility text settings.
