@@ -43,3 +43,15 @@
 - 이전 배포/복구 대상: `dpl_BaWVExpz9AWpkayZ9p84Zt1iKYKH` (phase29),
   `https://onnuriway-ai22uibq2-daeins-projects.vercel.app`.
 - Firebase/인증/학교·방문 데이터·보안 규칙 변경 없음.
+
+## 운영 반영 결과
+
+- 코드 커밋: `0fea031`.
+- 배포: `dpl_CN2pysNZ3VMBdUbbskkimhPTPLih`, Production / Ready.
+- 생성: 2026-09-06 02:41:19 KST. 운영: `https://onnuriway.vercel.app`.
+- 불변 URL: `https://onnuriway-53rhoj8wp-daeins-projects.vercel.app`.
+- 기존 phase29 브라우저에서 실제 업데이트 안내/버튼을 통해 phase30으로 전환했다.
+  결과 캐시는 `app-shell-phase30`만 남았으며 익명 PIN 화면 정상·브라우저 오류 없음.
+- 조회 시 해당 배포의 최근 10분 오류 로그 없음. 운영 직원 로그인/데이터 수정은
+  수행하지 않았고 로그인 이후 검증은 격리된 에뮬레이터에서만 수행했다.
+- 이전 배포로 되돌릴 수 있으며 서버/데이터 마이그레이션 없음.
