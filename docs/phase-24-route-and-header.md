@@ -84,6 +84,16 @@ relative 레이블 안에 위치를 고정했다. 수정 후 부모 스크롤 0/
 
 - Firebase `onnuriway` / `asia-northeast3`의 `optimizeSalesRoute`만 배포 성공.
   다른 함수·학교 배정·권한·방문 기록은 변경하지 않았다.
-- Vercel 프런트엔드 운영 배포 정보는 배포 완료 후 기록한다.
+- Vercel 운영 배포 READY: `dpl_7u7Hp3g7KiJsNaY4RXiNBbCmfUi7`.
+  코드 `aff57d8`, 원격 빌드 43초, Next.js 16.3.2.
+  운영 별칭: https://onnuriway.vercel.app
+  불변 배포: https://onnuriway-bxzib3g16-daeins-projects.vercel.app
+  이전 운영 배포(프런트엔드 롤백용): `dpl_FLDegC4ugPZLoP4H1KnjXsRCFAmN`.
+- 최초 CLI 요청은 Not authorized로 실패했다. 팀/프로젝트 일치를 읽기 전용으로
+  확인하고 `--scope daeins-projects`를 명시한 운영 요청은 정상 완료됐다.
+  프로젝트 생성/이동, 권한 완화, 새 미리보기 배포는 하지 않았다.
+- 운영 주소를 실제 브라우저로 열어 PIN 입력 화면 정상 표시와 브라우저 오류
+  없음 확인. 배포 ID에 한정한 최근 10분 Vercel error 로그 조회는 0건이었다.
+  이는 장기간 모니터링이나 실제 직원 계정의 현장 경로 검증을 의미하지 않는다.
 - 40곳 실제 호출의 자동 브라우저 검증은 에뮬레이터 환경이다. 실제 휴대폰의
   키보드/OS별 스크롤과 현장 주행 자체를 자동 검증한 것으로 주장하지 않는다.
