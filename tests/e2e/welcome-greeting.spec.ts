@@ -88,7 +88,7 @@ async function visibleCharacterCount(page: Page) {
 }
 
 async function expectTypingComplete(page: Page) {
-  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "complete");
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "complete", { timeout: 10_000 });
   await expect.poll(() => visibleCharacterCount(page)).toBe(await greetingCharacters(page).count());
   await expect(visualGreeting(page).locator('[data-cursor="true"]')).toHaveCount(0);
 }
@@ -397,6 +397,7 @@ test("typing preserves readable SSR and announces one full greeting while progre
 });
 
 test("typing reserves the final Korean line wrapping and card geometry from the first character", async ({ page }, testInfo) => {
+  test.setTimeout(45_000);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const text = "김대인 부장님, 오늘 하루도 수고가 많으셨습니다.";
   for (const width of [320, 390, 430]) {
@@ -541,14 +542,80 @@ test("each revealed character is a whole grapheme including composed Korean and 
   await expectTypingComplete(page);
 });
 
-test("a longer greeting completes within a brief entrance rather than extending indefinitely", async ({ page }) => {
+test("an oversized greeting is immediately readable instead of accelerating or typing indefinitely", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const text = `김대인 부장님, ${"오늘도 좋은 인연과 따뜻한 대화가 함께하는 하루 보내세요. ".repeat(4)}`;
-  await fixture(page, { greetingText: text, width: 430 });
-  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
-  const started = Date.now();
+  await fixture(page, { greetingText: text, width: 430, hydrate: false });
+  const states = await visualGreeting(page).evaluate(element => new Promise<string[]>(resolve => {
+    const observed = [element.getAttribute("data-typing") ?? ""];
+    const observer = new MutationObserver(() => observed.push(element.getAttribute("data-typing") ?? ""));
+    observer.observe(element, { attributes: true, attributeFilter: ["data-typing"] });
+    window.dispatchEvent(new Event("welcome-fixture-hydrate"));
+    setTimeout(() => { observer.disconnect(); resolve(observed); }, 600);
+  }));
+  expect(states.every(state => state === "complete")).toBe(true);
+  await expect(visualGreeting(page)).toHaveText(text);
   await expectTypingComplete(page);
-  expect(Date.now() - started).toBeLessThan(2_500);
+});
+
+test("human typing has a slower uneven cadence, a comma pause, and usable controls throughout", async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const text = "김대인 부장님, 오늘 하루도 수고가 많으셨습니다.";
+  const { errors } = await fixture(page, { placement: "sales", greetingText: text, hydrate: false });
+  const characters = Array.from(new Intl.Segmenter("ko", { granularity: "grapheme" }).segment(text), value => value.segment);
+  // Measure the actual browser's reveal mutations, not a duplicated timing
+  // helper or a fast-forwarded timeout. This also catches an unintended reset.
+  const timing = visualGreeting(page).evaluate(element => new Promise<Array<{ count: number; elapsed: number; cursor: string | null }>>((resolve, reject) => {
+    const samples: Array<{ count: number; elapsed: number; cursor: string | null }> = [];
+    const start = performance.now();
+    const deadline = setTimeout(() => { observer.disconnect(); reject(new Error("Typing did not finish within its 10-second verification budget.")); }, 10_000);
+    const observer = new MutationObserver(() => {
+      const count = Array.from(element.querySelectorAll("[data-greeting-character]")).filter(character => getComputedStyle(character).visibility === "visible").length;
+      if (count !== samples.at(-1)?.count) samples.push({ count, elapsed: performance.now() - start, cursor: element.querySelector('[data-cursor="true"]')?.textContent ?? null });
+      if (samples.length > 1 && element.getAttribute("data-typing") === "complete") {
+        clearTimeout(deadline);
+        observer.disconnect();
+        resolve(samples);
+      }
+    });
+    observer.observe(element, { attributes: true, subtree: true, attributeFilter: ["data-typing", "style", "data-cursor"] });
+    window.dispatchEvent(new Event("welcome-fixture-hydrate"));
+  }));
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  const beforeInteraction = await visibleCharacterCount(page);
+  await page.getByTestId("rerender-page").click();
+  await expect(page.locator("[data-fixture-revision]")).toHaveAttribute("data-fixture-revision", "1");
+  expect(await visibleCharacterCount(page)).toBeGreaterThanOrEqual(beforeInteraction);
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  await greeting(page).screenshot({ path: `output/playwright/welcome-greeting/human-typing-mid-390-${testInfo.project.name}.png` });
+
+  const samples = await timing;
+  await testInfo.attach("observed-human-typing-timing", { body: JSON.stringify(samples, null, 2), contentType: "application/json" });
+  expect(samples.map(sample => sample.count)).toEqual(Array.from({ length: characters.length + 1 }, (_, index) => index));
+  const first = samples[1]!;
+  const completion = samples.at(-1)!;
+  expect(first.elapsed).toBeGreaterThanOrEqual(240);
+  expect(completion.elapsed).toBeGreaterThan(3_500);
+  expect(completion.elapsed).toBeLessThan(8_000);
+  const plainLetterGaps = samples.slice(2).flatMap((sample, index) => {
+    const characterIndex = sample.count - 1;
+    const current = characters[characterIndex]!;
+    const previous = characters[characterIndex - 1]!;
+    return !/[\s,;:.!?…。！？]/u.test(current + previous) ? [sample.elapsed - samples[index + 1]!.elapsed] : [];
+  });
+  expect(Math.min(...plainLetterGaps)).toBeGreaterThanOrEqual(90);
+  expect(Math.max(...plainLetterGaps) - Math.min(...plainLetterGaps)).toBeGreaterThan(15);
+  const commaCount = characters.indexOf(",") + 1;
+  const commaPause = samples[commaCount + 1]!.elapsed - samples[commaCount]!.elapsed;
+  expect(commaPause).toBeGreaterThanOrEqual(350);
+  expect(commaPause).toBeGreaterThan(plainLetterGaps.reduce((sum, value) => sum + value, 0) / plainLetterGaps.length * 2);
+  for (const sample of samples.slice(1, -1)) {
+    const lastInk = characters.slice(0, sample.count).findLast(character => character.trim());
+    expect(sample.cursor).toBe(lastInk);
+  }
+  await expectTypingComplete(page);
+  await greeting(page).screenshot({ path: `output/playwright/welcome-greeting/human-typing-complete-390-${testInfo.project.name}.png` });
+  expect(errors).toEqual([]);
 });
 
 test("the visible greeting types even when its separate title ornament is below a short viewport", async ({ page }) => {
