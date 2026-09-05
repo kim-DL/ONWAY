@@ -49,4 +49,21 @@
   검증이 아니라 실제 React/브라우저 및 테스트 계정 기반 검사다.
 - 최종 production build, 프런트엔드/Functions TypeScript, 전체 ESLint,
   생성 서비스 워커의 phase26 및 두 마스코트 에셋 포함 검사 통과.
-- 운영 배포 식별자는 완료 후 기록한다.
+
+## 운영 반영
+
+- 코드 커밋: `38ff0aa`.
+- 2026-09-06 00:23:34 KST 생성, Vercel production READY 확인.
+- 운영: https://onnuriway.vercel.app
+- 배포 ID: `dpl_CWYMofYY9z3CWV3DHoiTiqSvq5Yu`.
+- 고정 URL: https://onnuriway-f3ermtxy0-daeins-projects.vercel.app
+- 프런트엔드만 배포했다. Firebase Functions·보안 규칙·인증 설정 및
+  실제 학교·방문 데이터는 변경하지 않았다.
+- 운영 브라우저에서 로그인 화면 정상 표시 및 콘솔 오류 없음 확인.
+  실제 직원 계정으로 로그인하거나 운영 데이터를 생성하지 않았다.
+- 새 서비스 워커의 제어 상태와 `app-shell-phase26` 캐시,
+  애니메이션·정지 이미지 두 파일의 사전 캐시 포함을 확인했다.
+- 배포 후 최근 10분 범위의 Vercel 오류 로그 조회 결과 없음.
+  이는 해당 시점의 확인이며 지속 모니터링을 뜻하지 않는다.
+- 이전 운영 배포(롤백 대상): `dpl_HGgkGY6D37G71URSigdiwbf7Ya1h`,
+  https://onnuriway-katqer22y-daeins-projects.vercel.app
