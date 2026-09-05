@@ -13,30 +13,16 @@ import {
   productSchema,
   tagDefinitionSchema,
 } from "@/domain/catalog";
+import { employeeDirectorySchema } from "@/domain/identity";
 import {
-  authCredentialSchema,
-  authzSchema,
-  employeeDirectorySchema,
-  employeeSchema,
-  pinIndexSchema,
-} from "@/domain/identity";
-import {
-  employeeCycleStatsSchema,
   salesAssignmentSchema,
   salesCycleSchema,
   salesProfileSchema,
   salesVisitSchema,
   salesZoneSchema,
-  teamCycleStatsSchema,
 } from "@/domain/sales";
 import { schoolFieldProfileSchema, schoolPhotoSchema, schoolSchema } from "@/domain/school";
-import {
-  auditLogSchema,
-  exportJobSchema,
-  neisSyncChangeSchema,
-  neisSyncRunSchema,
-  publicAppSettingsSchema,
-} from "@/domain/system";
+import { publicAppSettingsSchema } from "@/domain/system";
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object") {
@@ -120,22 +106,10 @@ export const salesVisitConverter = createFirestoreConverter(salesVisitSchema, "v
 export const salesCycleConverter = createFirestoreConverter(salesCycleSchema, "cycleId");
 export const salesAssignmentConverter = createFirestoreConverter(salesAssignmentSchema, "schoolId");
 export const salesZoneConverter = createFirestoreConverter(salesZoneSchema, "zoneId");
-export const employeeCycleStatsConverter = createFirestoreConverter(
-  employeeCycleStatsSchema,
-  "employeeId",
-);
-export const teamCycleStatsConverter = createFirestoreConverter(teamCycleStatsSchema);
 export const employeeDirectoryConverter = createFirestoreConverter(
   employeeDirectorySchema,
   "employeeId",
 );
-export const employeeConverter = createFirestoreConverter(employeeSchema, "employeeId");
-export const authCredentialConverter = createFirestoreConverter(
-  authCredentialSchema,
-  "employeeId",
-);
-export const pinIndexConverter = createFirestoreConverter(pinIndexSchema);
-export const authzConverter = createFirestoreConverter(authzSchema);
 export const productConverter = createFirestoreConverter(productSchema, "productId");
 export const communicationTagConverter = createFirestoreConverter(tagDefinitionSchema, "tagId");
 export const activityTagConverter = createFirestoreConverter(tagDefinitionSchema, "tagId");
@@ -144,8 +118,4 @@ export const commonSearchCatalogConverter = createFirestoreConverter(
   commonSearchCatalogSchema,
   "catalogId",
 );
-export const exportJobConverter = createFirestoreConverter(exportJobSchema, "jobId");
-export const auditLogConverter = createFirestoreConverter(auditLogSchema, "logId");
-export const neisSyncRunConverter = createFirestoreConverter(neisSyncRunSchema, "runId");
-export const neisSyncChangeConverter = createFirestoreConverter(neisSyncChangeSchema);
 export const publicAppSettingsConverter = createFirestoreConverter(publicAppSettingsSchema);

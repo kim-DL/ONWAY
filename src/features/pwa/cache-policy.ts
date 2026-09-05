@@ -1,4 +1,4 @@
-export const PWA_CACHE_VERSION = "phase30";
+export const PWA_CACHE_VERSION = "phase31";
 
 export const PWA_CACHE_NAMES = {
   appShell: `app-shell-${PWA_CACHE_VERSION}`,

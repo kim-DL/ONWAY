@@ -6,7 +6,7 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase30",
+  "phase31",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",

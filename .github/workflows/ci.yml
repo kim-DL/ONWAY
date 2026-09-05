@@ -59,11 +59,17 @@ jobs:
       - name: PWA artifact gate
         run: npm run verify:pwa:build
 
-      - name: JavaScript budget gate
+      - name: JavaScript and CSS budget gate
         run: npm run verify:performance:build
 
       - name: Safe configuration browser tests
         run: npm run test:e2e
+
+      - name: Deferred sales tools regression
+        run: npm run test:e2e:ux
+        env:
+          ONNURIWAY_E2E_UX_SUITE: optimization
+          ONNURIWAY_E2E_GREP: loads on first open
 
       - name: Phase 17 emulator and production journey
         run: npm run test:acceptance:emulator

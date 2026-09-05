@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 
-import { SchoolAssignmentPicker } from "@/components/assignment/school-assignment-picker";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
@@ -15,9 +15,7 @@ import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
-import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
 import { canPlanRouteForSchool } from "@/features/sales-route/sales-route-location";
-import { SalesRoutePlanner } from "@/features/sales-route/sales-route-planner";
 import type { ActiveSalesRoute } from "@/features/sales-route/sales-route-contract";
 import { readActiveSalesRoute, readLatestActiveSalesRoute, writeActiveSalesRoute } from "@/features/sales-route/sales-route-storage";
 import {
@@ -31,6 +29,28 @@ import { useSalesWorkspace } from "./use-sales-workspace";
 import { AssignmentCard } from "./sales-school-cards";
 import { SalesDistrictFilter } from "./sales-district-filter";
 import { buildSalesDistrictOptions } from "./sales-district-filter-model";
+
+const SalesRoutePlanner = dynamic(
+  () => import("@/features/sales-route/sales-route-planner").then((module) => module.SalesRoutePlanner),
+  {
+    loading: () => (
+      <div className="sales-claim-loading" role="status">
+        <Icon name="refresh" /><span>방문 동선 입력 화면을 준비하고 있어요.</span>
+      </div>
+    ),
+  },
+);
+
+const SalesClaimPicker = dynamic(
+  () => import("./sales-claim-picker").then((module) => module.SalesClaimPicker),
+  {
+    loading: () => (
+      <div className="sales-claim-loading" role="status">
+        <Icon name="refresh" /><span>학교 선택 화면을 준비하고 있어요.</span>
+      </div>
+    ),
+  },
+);
 
 const SCOPE_OPTIONS = [
   { value: "mine", label: "내 학교" },
@@ -54,61 +74,6 @@ function WorkspaceSkeleton() {
       <div className="sales-cycle-skeleton__hero" />
       <div className="assignment-grid">{[0, 1, 2].map((item) => <SkeletonCard key={item} />)}</div>
     </section>
-  );
-}
-
-function SalesClaimPicker({
-  session,
-  assignedSchoolIds,
-  busy,
-  submitErrorMessage,
-  onSubmit,
-}: {
-  session: AuthenticatedSession;
-  assignedSchoolIds: Set<string>;
-  busy: boolean;
-  submitErrorMessage: string | null;
-  onSubmit: (schoolIds: string[]) => Promise<boolean>;
-}) {
-  const catalog = useSchoolSearchCatalog(session, "sales");
-  const catalogItems = catalog.status === "ready" ? catalog.catalog.items : null;
-  const candidates = useMemo(() => catalogItems
-    ? catalogItems
-      .filter((school) => school.operationalStatus === "active" && !assignedSchoolIds.has(school.schoolId))
-      .map((school) => ({
-        schoolId: school.schoolId,
-        name: school.name,
-        district: school.district,
-        schoolType: school.schoolType,
-        address: school.addressSummary,
-      }))
-    : [], [assignedSchoolIds, catalogItems]);
-
-  if (catalog.status === "loading") {
-    return <div className="sales-claim-loading" role="status"><Icon name="refresh" /><span>전체 학교 목록을 준비하고 있어요.</span></div>;
-  }
-  if (catalog.status === "error") {
-    return (
-      <div className="sales-claim-empty" role="alert">
-        <span><Icon name="wifi-off" size={24} /></span>
-        <h3>학교 목록을 불러오지 못했어요.</h3>
-        <p>네트워크 연결을 확인한 뒤 다시 시도해주세요.</p>
-        <GlassButton compact onClick={catalog.retry}>다시 불러오기</GlassButton>
-      </div>
-    );
-  }
-
-  return (
-    <div className="sales-claim-composer">
-      <SchoolAssignmentPicker
-        candidates={candidates}
-        busy={busy}
-        actionLabel={(count) => `${count}곳 내 담당으로 가져오기`}
-        emptyTitle="현재 선택할 수 있는 미배정 학교가 없습니다."
-        submitErrorMessage={submitErrorMessage}
-        onSubmit={onSubmit}
-      />
-    </div>
   );
 }
 
@@ -160,13 +125,12 @@ export function SalesWorkspace({
     if (!workspace) return null;
     const schools = new Map(workspace.schools.map((school) => [school.schoolId, school]));
     const employees = new Map(workspace.employees.map((employee) => [employee.employeeId, employee.displayName]));
-    const schoolById = new Map(workspace.schools.map((school) => [school.schoolId, school]));
     const ownedIds = new Set(workspace.assignments
       .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
       .map((assignment) => assignment.schoolId));
     const usableActiveRoute = activeRoute?.result.cycleId === workspace.selectedCycleId
       && activeRoute.orderedSchoolIds.every((schoolId) => {
-        const school = schoolById.get(schoolId);
+        const school = schools.get(schoolId);
         return ownedIds.has(schoolId) && school ? canPlanRouteForSchool(school) : false;
       })
       ? activeRoute

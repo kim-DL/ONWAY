@@ -61,13 +61,15 @@ export function PwaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let verification = 0;
     let recoveryCleanup: (() => void) | undefined;
 
     const verifyConnectivity = async () => {
+      const currentVerification = ++verification;
       recoveryCleanup?.();
       recoveryCleanup = undefined;
       const reachable = await probeNetworkReachability();
-      if (!active) return;
+      if (!active || currentVerification !== verification) return;
       setIsOnline(reachable);
       if (!reachable) {
         recoveryCleanup = subscribeToNetworkRecovery(() => {
@@ -79,6 +81,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     };
     const handleOffline = () => {
       if (!active) return;
+      verification += 1;
       setIsOnline(false);
       recoveryCleanup?.();
       recoveryCleanup = subscribeToNetworkRecovery(() => {
