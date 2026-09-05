@@ -77,7 +77,15 @@ Core Web Vitals 개선률로 해석하지 않는다. gzip은 파일별 합산이
 ## 배포 및 복구
 
 - PWA 캐시 phase31. 이전 캐시 정리와 사용자 동의 업데이트 흐름은 유지한다.
-- 운영 배포/업데이트 확인은 검증 완료 후 기록한다.
+- 코드 커밋 `ef1c1c8`, Next.js 16.3.2 / Production / READY.
+- 배포 `dpl_D9h7nnr6kG6a7XkraMYzGzYyRmfM`, 생성 2026-09-06 03:17:11 KST.
+  Vercel 빌드 45초, 운영 `https://onnuriway.vercel.app`.
+  불변 URL `https://onnuriway-2yyj7y05w-daeins-projects.vercel.app`.
+- 기존 phase30 서비스워커를 가진 브라우저에서 실제 업데이트 안내/버튼을 통해 전환했다.
+  이후 `app-shell-phase31`만 남았고 PIN 화면 정상, 브라우저 오류 없음.
+- 새 배포의 최근 10분 error 로그 조회 결과 없음. 전체 장기 모니터링 결과라는 의미는 아니다.
+  운영 직원 PIN 로그인/데이터 수정 없이 로그인 이후 동작은 격리 에뮬레이터로 검증했다.
+- 로컬 Node 22.23.2 사용, `npm ci --dry-run --ignore-scripts`로 lockfile 일치 확인.
 - 복구 대상: phase30 `dpl_CN2pysNZ3VMBdUbbskkimhPTPLih`,
   `https://onnuriway-53rhoj8wp-daeins-projects.vercel.app` (코드 `0fea031`).
 - 제거한 코드/CSS는 Git 이력으로 복구 가능하다. 원본 이미지·사용자 데이터 삭제 없음.
