@@ -41,4 +41,17 @@
   기존 40개 학교 동선·담당 학교 업무 흐름 포함. 실제 직원 운영 데이터 사용 없음.
 - 실제 앱 390px 영업 홈 및 활동 화면 캡처 시각 검토 완료.
 - 최종 production build, 전체 ESLint 및 생성 서비스 워커 검사 통과.
-- 운영 반영 식별자는 배포 완료 후 기록.
+
+## 운영 반영
+
+- 코드 커밋: `e30f566`.
+- 생성: 2026-09-06 01:06:33 KST, Vercel production READY.
+- 운영: https://onnuriway.vercel.app
+- 배포 ID: `dpl_ZvywRMFba6NfGNGB8PMdw8BsvTLj`.
+- 고정 URL: https://onnuriway-9rpg3nuvb-daeins-projects.vercel.app
+- 운영 브라우저에서 이전 `app-shell-phase26` 캐시를 유지한 채 새 배포 접속,
+  업데이트 버튼 표시 → 클릭 → phase27 서비스 워커 제어 및 v2 두 자산 캐시를 확인.
+- 업데이트 후 로그인 화면 정상, 브라우저 오류 없음. 실제 직원 계정 로그인은 하지 않음.
+- 해당 시점 최근 10분 배포 오류 로그 없음. 지속 모니터링을 의미하지 않음.
+- 이전 운영 배포(롤백 대상): `dpl_CWYMofYY9z3CWV3DHoiTiqSvq5Yu`,
+  https://onnuriway-f3ermtxy0-daeins-projects.vercel.app
