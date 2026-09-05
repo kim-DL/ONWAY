@@ -26,9 +26,10 @@
   width: 100%;
   padding: 1.5px;
   overflow: hidden;
-  border: 1px solid #dce3e9;
+  border: 1px solid rgb(49 130 246 / 18%);
   border-radius: 17px;
   background: #edf1f4;
+  box-shadow: 0 2px 10px rgb(49 130 246 / 6%);
 }
 
 .modeFrame::before,
@@ -41,11 +42,20 @@
 
 .modeFrame::before {
   inset: -240%;
-  background: conic-gradient(#dce3e9 0deg, #76adeb 85deg, #dce3e9 155deg, #7fbf98 260deg, #dce3e9 360deg);
+  /* Two brand families, separated by a pearl highlight, not a rainbow. */
+  background: conic-gradient(
+    #bfd9fa 0deg,
+    #3182f6 65deg,
+    #1b64da 110deg,
+    #e8f3ff 165deg,
+    #269653 240deg,
+    #62bd8b 285deg,
+    #bfd9fa 360deg
+  );
 }
 
 .modeFrame::after {
-  inset: 1.5px;
+  inset: 2px;
   border-radius: 14px;
   background: #f2f4f6;
 }
@@ -113,7 +123,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .modeFrame::before { animation: mode-border-orbit 18s linear infinite; }
+  .modeFrame::before { animation: mode-border-orbit 8s linear infinite; }
   .modeFrame[data-motion="paused"]::before,
   .modeFrame:focus-within::before { animation-play-state: paused; }
 }

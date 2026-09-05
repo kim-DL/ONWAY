@@ -115,7 +115,7 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   await expect(page.getByRole("heading", { name: /함께 이어가는.*팀의 흐름/ })).toBeVisible();
   await expect(page.locator(".assignment-card")).toHaveCount(5);
   await expect(page.getByText(/순위|저성과|실적 경쟁/)).toHaveCount(0);
-  await page.getByRole("button", { name: "유성구", exact: true }).click();
+  await page.getByRole("radiogroup", { name: "행정구 필터" }).getByRole("radio", { name: "유성구, 1곳" }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(1);
   await expect(page.getByRole("button", { name: /대전새봄초등학교, 유성구, 담당 영업 C/ })).toBeVisible();
 

@@ -61,4 +61,20 @@ describe("Kakao Local request deadlines", () => {
     expect(transient).toHaveBeenCalledTimes(3);
     expect(denied).toHaveBeenCalledTimes(1);
   });
+
+  it.each([null, "", " ", "NaN", "Infinity", 181])("rejects invalid longitude instead of coercing it to a usable coordinate: %j", async (longitude) => {
+    const client = new KakaoLocalClient({ restApiKey: "test", fetcher: async () => ({
+      ok: true, status: 200, json: async () => ({ documents: [{ address_name: "대전", x: longitude, y: "36.34" }] }),
+    }) });
+    await expect(client.searchAddress("대전")).rejects.toMatchObject({ kind: "INVALID_RESPONSE" });
+  });
+
+  it("retains HTTP status for cross-endpoint retry decisions", async () => {
+    const fetcher = vi.fn<KakaoFetcher>()
+      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
+      .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    const client = new KakaoLocalClient({ restApiKey: "test", retryDelaysMs: [0, 0, 0], fetcher });
+    await expect(client.searchAddress("대전")).rejects.toMatchObject({ kind: "HTTP_ERROR", httpStatus: 429 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
 });

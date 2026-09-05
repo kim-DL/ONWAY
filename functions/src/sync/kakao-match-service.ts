@@ -4,13 +4,12 @@ import { Timestamp, type DocumentData, type Firestore } from "firebase-admin/fir
 
 import type { KakaoLocalClient } from "./kakao-local-client.js";
 import {
-  decideKakaoSchoolMatch,
   isDaejeonCandidate,
   locationDistanceMeters,
-  schoolAddressQuery,
   type KakaoMatchDecision,
   type ScoredKakaoCandidate,
 } from "./kakao-school-matcher.js";
+import { lookupKakaoSchool } from "./kakao-school-lookup.js";
 import type { ConfirmKakaoMatchInput, MatchSchoolWithKakaoInput } from "./sync-contract.js";
 import type { StoredSchool, StoredSchoolLocation } from "./school-sync-types.js";
 import type { SyncActor } from "./neis-sync-service.js";
@@ -269,14 +268,7 @@ export class KakaoMatchService {
 
     let decision: KakaoMatchDecision;
     try {
-      const addressResult = await this.dependencies.client.searchAddress(
-        schoolAddressQuery(officialAddress, school.name),
-      );
-      const candidates = await this.dependencies.client.searchKeyword({
-        query: `${school.name} 대전`,
-        origin: addressResult,
-      });
-      decision = decideKakaoSchoolMatch({ school, addressResult, candidates });
+      decision = await lookupKakaoSchool(school, this.dependencies.client);
     } catch {
       decision = { status: "failed", candidate: null, candidates: [], reason: "KAKAO_API_FAILURE" };
     }

@@ -1,11 +1,12 @@
 import { z } from "zod";
 
 const KAKAO_LOCAL_ENDPOINT = "https://dapi.kakao.com/v2/local";
+const coordinateSchema = z.union([z.number(), z.string().trim().min(1).pipe(z.coerce.number())]);
 
 const addressDocumentSchema = z.object({
   address_name: z.string(),
-  x: z.coerce.number(),
-  y: z.coerce.number(),
+  x: coordinateSchema.pipe(z.number().min(-180).max(180)),
+  y: coordinateSchema.pipe(z.number().min(-90).max(90)),
   road_address: z.object({ address_name: z.string() }).nullable().optional(),
 }).passthrough();
 
@@ -15,8 +16,8 @@ const keywordDocumentSchema = z.object({
   category_name: z.string().trim().max(500),
   address_name: z.string().trim().max(500),
   road_address_name: z.string().trim().max(500),
-  x: z.coerce.number(),
-  y: z.coerce.number(),
+  x: coordinateSchema.pipe(z.number().min(-180).max(180)),
+  y: coordinateSchema.pipe(z.number().min(-90).max(90)),
   place_url: z.string().url(),
 }).passthrough();
 
@@ -49,7 +50,7 @@ export type KakaoFetcher = (url: string, init: { headers: Record<string, string>
 }>;
 
 export class KakaoLocalClientError extends Error {
-  constructor(readonly kind: "HTTP_ERROR" | "INVALID_RESPONSE" | "TIMEOUT", message: string) {
+  constructor(readonly kind: "HTTP_ERROR" | "INVALID_RESPONSE" | "TIMEOUT", message: string, readonly httpStatus?: number) {
     super(message);
     this.name = "KakaoLocalClientError";
   }
@@ -116,13 +117,15 @@ export class KakaoLocalClient {
         });
         lastStatus = response.status;
         if (response.ok) return await response.json();
-        if (response.status < 500 && response.status !== 429) break;
+        // A quota response must survive as 429. Retrying here can mask it with a
+        // later 5xx/timeout and incorrectly trigger another endpoint's fallback.
+        if (response.status < 500) break;
       } catch {
         signal.throwIfAborted();
         lastStatus = 0;
       }
     }
-    throw new KakaoLocalClientError("HTTP_ERROR", `Kakao Local request failed (${lastStatus || "network"}).`);
+    throw new KakaoLocalClientError("HTTP_ERROR", `Kakao Local request failed (${lastStatus || "network"}).`, lastStatus);
   }
 
   async searchAddress(address: string): Promise<KakaoAddressResult | null> {

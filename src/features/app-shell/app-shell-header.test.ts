@@ -44,7 +44,7 @@ describe("shell header", () => {
           ...(state === "detail" ? { onDetailBack: () => undefined } : {}),
         }));
         // Files are generated verification artifacts, never production assets.
-        writeFileSync(new URL(`${mode}-${state}.html`, directory), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${globalCss}</style><style>${scopedCss}</style></head><body><main class="workspace-shell" data-mode="${mode}">${html}</main></body></html>`);
+        writeFileSync(new URL(`${mode}-${state}.html`, directory), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${globalCss}</style><style>${scopedCss}</style></head><body><main class="workspace-shell" data-mode="${mode}"><div class="aurora-background" aria-hidden="true"><i></i><i></i><i></i></div>${html}</main></body></html>`);
       }
     }
     expect(scopedCss).not.toContain(":global(");

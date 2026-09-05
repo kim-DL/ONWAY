@@ -134,6 +134,62 @@ function isSameSchoolFacility(
     || (categories.includes("유치원") && /^병설유치원(?:휴원|폐원)?$/u.test(suffix));
 }
 
+const SCHOOL_GRADE_LABELS: Partial<Record<StoredSchool["schoolType"], string>> = {
+  elementary: "초등학교", middle: "중학교", high: "고등학교",
+};
+
+const HIGH_SCHOOL_SUBTYPES = new Set([
+  "특목고등학교", "특수목적고등학교", "자율형사립고등학교", "자율형공립고등학교",
+  "마이스터고등학교", "일반고등학교", "일반계고등학교", "특성화고등학교",
+]);
+
+function matchesSchoolCategory(school: StoredSchool, candidate: KakaoPlaceCandidate) {
+  const grade = SCHOOL_GRADE_LABELS[school.schoolType];
+  const categories = candidate.categoryName.split(">").map((category) => category.trim());
+  const schoolIndex = categories.lastIndexOf("학교");
+  // Name/address alone can also identify an office incorrectly named as the
+  // school. Unknown school types remain review-only rather than guessing.
+  if (!grade || schoolIndex < 0 || categories[schoolIndex + 1] !== grade) return false;
+  const subtype = categories.slice(schoolIndex + 2);
+  // Kakao puts foreign-language and autonomous private schools one level
+  // below high school. Allow known school types, never facility descendants.
+  return subtype.length === 0 || (grade === "고등학교" && subtype.length === 1
+    && HIGH_SCHOOL_SUBTYPES.has(subtype[0]!));
+}
+
+function isSiblingSchoolFacility(
+  school: StoredSchool,
+  candidate: ScoredKakaoCandidate,
+  primarySchool: ScoredKakaoCandidate,
+) {
+  const grade = SCHOOL_GRADE_LABELS[school.schoolType];
+  if (!grade) return false;
+  // Shared addresses do not establish identity. This exception requires an
+  // exact primary school's name/address AND its catalog school grade.
+  if (!primarySchool.nameExact || !primarySchool.roadAddressExact
+    || !matchesSchoolCategory(school, primarySchool)
+    || candidate.nameExact || !candidate.roadAddressExact
+    || candidate.placeId === primarySchool.placeId || candidate.candidateId === primarySchool.candidateId
+    || distanceMeters(primarySchool, candidate) > 500) return false;
+
+  const name = school.name.trim();
+  if (!name.endsWith(grade)) return false;
+  const stem = name.slice(0, -grade.length);
+  if (!stem) return false;
+  const stems = [stem];
+  if (stem.startsWith("대전") && stem.length > 2) stems.push(stem.slice(2));
+  const prefix = new RegExp(`^(?:${stems.map(escapeRegExp).join("|")})(초등학교|중학교|고등학교)(?=\\s)`, "u")
+    .exec(candidate.name.trim());
+  if (!prefix || prefix[1] === grade) return false;
+
+  const suffix = candidate.name.trim().slice(prefix[0].length).trim();
+  const categories = candidate.categoryName.split(">").map((category) => category.trim());
+  // A co-located middle/high school's office is not another candidate for the
+  // exact primary school. Unknown buildings, campuses and other POIs still
+  // require review; retain every candidate in the review evidence.
+  return categories.at(-1) === "학교부속시설" && /^(?:행정실|교무실|강당)$/u.test(suffix);
+}
+
 export function decideKakaoSchoolMatch(input: {
   school: StoredSchool;
   addressResult: KakaoAddressResult | null;
@@ -150,10 +206,12 @@ export function decideKakaoSchoolMatch(input: {
     return { status: "needsReview", candidate: null, candidates, reason: "OUT_OF_REGION" };
   }
   const first = valid[0]!;
-  const exactSchoolFound = first.score >= 90 && first.nameExact && first.roadAddressExact;
+  const exactSchoolFound = first.score >= 90 && first.nameExact && first.roadAddressExact
+    && matchesSchoolCategory(input.school, first);
   const plausible = valid.filter((candidate) => candidate.score >= 60
-    && !(exactSchoolFound && isSameSchoolFacility(input.school, candidate, first)));
-  if (first.score >= 90 && plausible.length === 1) {
+    && !(exactSchoolFound && (isSameSchoolFacility(input.school, candidate, first)
+      || isSiblingSchoolFacility(input.school, candidate, first))));
+  if (exactSchoolFound && plausible.length === 1) {
     return { status: "autoMatched", candidate: first, candidates, reason: "HIGH_CONFIDENCE" };
   }
   return {

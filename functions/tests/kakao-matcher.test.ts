@@ -52,6 +52,70 @@ describe("Kakao school matcher", () => {
     expect(decision.candidate?.score).toBe(100);
   });
 
+  it.each([
+    ["elementary", "초등학교"], ["middle", "중학교"], ["high", "고등학교"],
+  ] as const)("keeps a unique exact %s school without an address lookup when its category matches", (schoolType, grade) => {
+    const current = { ...school, name: `대전온누리${grade}`, schoolType };
+    expect(decideKakaoSchoolMatch({
+      school: current, addressResult: null,
+      candidates: [candidate({ name: current.name, categoryName: `교육,학문 > 학교 > ${grade}` })],
+    })).toMatchObject({ status: "autoMatched", candidate: { score: 90 } });
+  });
+
+  it.each([
+    "교육,학문 > 학교부속시설", "교육,학문 > 학교 > 중학교",
+    "교육,학문 > 학교 > 고등학교", "교육,학문 > 학원",
+    "교육,학문 > 초등학교", "교육,학문 > 학교", "",
+  ])("never auto-confirms a unique name/address match with an incompatible category: %s", categoryName => {
+    for (const address of [addressResult, null]) {
+      expect(decideKakaoSchoolMatch({ school, addressResult: address, candidates: [candidate({ categoryName })] }))
+        .toMatchObject({ status: "needsReview", reason: "LOW_CONFIDENCE" });
+    }
+  });
+
+  it.each(["special", "other"] as const)("does not infer an automatic category rule for %s schools", schoolType => {
+    expect(decideKakaoSchoolMatch({
+      school: { ...school, schoolType }, addressResult,
+      candidates: [candidate({ categoryName: "교육,학문 > 학교 > 특수학교" })],
+    })).toMatchObject({ status: "needsReview", reason: "LOW_CONFIDENCE" });
+  });
+
+  it.each([
+    ["대전외국어고등학교", "교육,학문 > 학교 > 고등학교 > 특목고등학교"],
+    ["대전대신고등학교", "교육,학문 > 학교 > 고등학교 > 자율형사립고등학교"],
+  ])("accepts the live Kakao school hierarchy for %s: %s", (name, categoryName) => {
+    const current = { ...school, name, schoolType: "high" as const };
+    for (const address of [addressResult, null]) {
+      expect(decideKakaoSchoolMatch({
+        school: current, addressResult: address, candidates: [candidate({ name, categoryName })],
+      })).toMatchObject({ status: "autoMatched", reason: "HIGH_CONFIDENCE", candidate: { name } });
+    }
+  });
+
+  it.each(["특수목적고등학교", "자율형공립고등학교", "마이스터고등학교", "일반고등학교", "일반계고등학교", "특성화고등학교"])(
+    "recognizes the known high-school subtype %s", subtype => {
+      const current = { ...school, name: "대전온누리고등학교", schoolType: "high" as const };
+      expect(decideKakaoSchoolMatch({
+        school: current, addressResult: null,
+        candidates: [candidate({ name: current.name, categoryName: `교육,학문 > 학교 > 고등학교 > ${subtype}` })],
+      })).toMatchObject({ status: "autoMatched" });
+    },
+  );
+
+  it.each([
+    "교육,학문 > 학교 > 고등학교 > 학교부속시설",
+    "교육,학문 > 학교 > 고등학교 > 행정실",
+    "교육,학문 > 학교 > 고등학교 > 미분류",
+    "교육,학문 > 학교 > 고등학교 > 특목고등학교 > 행정실",
+    "교육,학문 > 학교 > 학교부속시설 > 고등학교",
+    "교육,학문 > 학원 > 고등학교 > 특목고등학교",
+  ])("rejects facility or unknown descendants rather than broadening school identity: %s", categoryName => {
+    const current = { ...school, name: "대전온누리고등학교", schoolType: "high" as const };
+    expect(decideKakaoSchoolMatch({
+      school: current, addressResult: null, candidates: [candidate({ name: current.name, categoryName })],
+    })).toMatchObject({ status: "needsReview", reason: "LOW_CONFIDENCE" });
+  });
+
   it("treats NEIS building details and the Daejeon city alias as the same road address", () => {
     const detailedSchool = {
       ...school,
@@ -202,5 +266,95 @@ describe("Kakao school matcher", () => {
     });
     expect(decision).toMatchObject({ status: "needsReview", reason: "OUT_OF_REGION", candidate: null });
     expect(decision.candidates[0]?.regionValid).toBe(false);
+  });
+});
+
+describe("co-located sibling school facilities", () => {
+  const middleSchool: StoredSchool = {
+    ...school, name: "대전괴정중학교", schoolType: "middle",
+    address: { ...school.address, road: "대전광역시 서구 가장로 15" },
+  };
+  const primary = candidate({
+    candidateId: "10234433", placeId: "10234433", name: middleSchool.name,
+    categoryName: "교육,학문 > 학교 > 중학교", roadAddress: "대전 서구 가장로 15",
+  });
+  const highOffice = candidate({
+    candidateId: "8296157", placeId: "8296157", name: "대전괴정고등학교 행정실",
+    categoryName: "교육,학문 > 학교부속시설", roadAddress: primary.roadAddress,
+    // Synthetic coordinates model the observed approximately 77m separation.
+    latitude: primary.latitude + 0.00069,
+  });
+  const middleAddress = { ...addressResult, roadAddress: primary.roadAddress };
+  const decide = (others: KakaoPlaceCandidate[], main: KakaoPlaceCandidate = primary) => decideKakaoSchoolMatch({
+    school: middleSchool, addressResult: middleAddress, candidates: [main, ...others],
+  });
+
+  it("keeps the exact middle school when its same-address high school has an administrative office", () => {
+    const ownFacilities = ["교무실", "강당"].map((suffix, index) => ({
+      ...primary, candidateId: `own-${index}`, placeId: `own-${index}`,
+      name: `${middleSchool.name} ${suffix}`, categoryName: "교육,학문 > 학교부속시설",
+    }));
+    const decision = decide([highOffice, ...ownFacilities]);
+    expect(decision).toMatchObject({ status: "autoMatched", reason: "HIGH_CONFIDENCE", candidate: { placeId: primary.placeId, score: 100 } });
+    expect(decision.candidates).toHaveLength(4);
+    expect(decision.candidates.find(item => item.placeId === highOffice.placeId)).toMatchObject({ score: 60 });
+  });
+
+  it.each(["행정실", "교무실", "강당"])("excludes only the known sibling facility %s, including its local-name alias", suffix => {
+    expect(decide([{ ...highOffice, name: `괴정고등학교 ${suffix}` }])).toMatchObject({ status: "autoMatched" });
+  });
+
+  it("does not require geocoder proximity when exact name/address/grade uniquely identify the primary school", () => {
+    expect(decideKakaoSchoolMatch({ school: middleSchool, addressResult: null, candidates: [primary, highOffice] }))
+      .toMatchObject({ status: "autoMatched", candidate: { placeId: primary.placeId, score: 90 } });
+  });
+
+  it.each([
+    ["대전다른중학교 행정실", "교육,학문 > 학교부속시설"],
+    ["대전다른고등학교 행정실", "교육,학문 > 학교부속시설"],
+    ["대전괴정고등학교", "교육,학문 > 학교 > 고등학교"],
+    ["대전괴정고등학교 행정실", "교육,학문 > 학교 > 고등학교"],
+    ["대전괴정고등학교 행정실", "교육,학문 > 학원"],
+    ["대전괴정고등학교 새교육관", "교육,학문 > 학교부속시설"],
+    ["대전괴정고등학교 제2캠퍼스 행정실", "교육,학문 > 학교부속시설"],
+    ["대전괴정고등학교 분교 행정실", "교육,학문 > 학교부속시설"],
+    ["대전괴정고등학교행정실", "교육,학문 > 학교부속시설"],
+    ["대전괴정고등학교 행정실 (이전)", "교육,학문 > 학교부속시설"],
+  ])("preserves review for unrelated or uncertain facility %s (%s)", (name, categoryName) => {
+    expect(decide([{ ...highOffice, name, categoryName }]))
+      .toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
+  it.each(["교육,학문 > 학교 > 고등학교", "교육,학문 > 학교부속시설", "교육,학문 > 학원"])(
+    "does not apply the exception when the primary category conflicts with its catalog grade: %s", categoryName => {
+      expect(decide([highOffice], { ...primary, categoryName }))
+        .toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+    },
+  );
+
+  it("keeps a second exact same-grade school with a different place ID ambiguous", () => {
+    expect(decide([highOffice, { ...primary, candidateId: "other-middle", placeId: "other-middle" }]))
+      .toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
+  it.each([
+    { candidateId: primary.candidateId },
+    { placeId: primary.placeId },
+    { candidateId: primary.candidateId, placeId: primary.placeId },
+  ])("does not discard an identity collision with inconsistent school data: %j", identity => {
+    expect(decide([{ ...highOffice, ...identity }]))
+      .toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
+  it("does not suppress a distant facility even when its reported address matches", () => {
+    expect(decideKakaoSchoolMatch({
+      school: middleSchool, addressResult: { ...middleAddress, latitude: 36.353 },
+      candidates: [primary, { ...highOffice, latitude: 36.356 }],
+    })).toMatchObject({ status: "needsReview", reason: "MULTIPLE_PLAUSIBLE_CANDIDATES" });
+  });
+
+  it("does not substitute the sibling office if the primary school's exact name is absent", () => {
+    expect(decideKakaoSchoolMatch({ school: middleSchool, addressResult: middleAddress, candidates: [highOffice] }))
+      .toMatchObject({ status: "needsReview", reason: "LOW_CONFIDENCE" });
   });
 });

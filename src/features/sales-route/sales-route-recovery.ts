@@ -31,7 +31,7 @@ export function parseSalesRouteFailure(error: unknown): SalesRouteFailure {
         return { kind: "pending", message: "일부 학교의 위치 확인에 시간이 더 필요해요. 다시 시도하면 확인된 위치에 이어서 계산합니다.", schoolIds };
       }
       if (details.reason === "location-review-required" && schoolIds.length > 0) {
-        return { kind: "review", message: "아래 학교는 공식 주소와 지도 위치를 한 번 더 확인해야 해요. 학교를 제외하지 않고 선택을 유지했어요.", schoolIds };
+        return { kind: "review", message: "아래 학교의 지도 위치를 확정하지 못했어요. 관리자에게 학교명과 주소 확인을 요청해주세요. 지도 정보가 수정되기 전에는 다시 계산해도 같을 수 있어요. 선택한 학교는 유지됩니다.", schoolIds };
       }
     }
     return failure("현재 운영 중인 월과 학교 정보를 다시 확인해주세요. 문제가 계속되면 관리자에게 알려주세요.");

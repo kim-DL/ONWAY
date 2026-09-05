@@ -21,7 +21,9 @@ test.beforeAll(async () => {
   const batch = db.batch();
   for (const [index, schoolId] of extraIds.entries()) {
     batch.set(db.doc(`schools/${schoolId}`), { ...school, schoolId,
-      name: index === 5 ? "대전선화초등학교" : index === 36 ? "대전외국어고등학교" : `동선확인${String(index).padStart(2, "0")}초등학교`,
+      name: index === 4 ? "대전괴정중학교" : index === 5 ? "대전선화초등학교" : index === 36 ? "대전외국어고등학교" : `동선확인${String(index).padStart(2, "0")}초등학교`,
+      district: ["seo", "jung", "daedeok", "dong", "yuseong"][index % 5],
+      schoolType: index === 4 ? "middle" : index === 36 ? "high" : "elementary",
       source: { ...school.source, schoolCode: schoolId },
       location: { ...school.location, latitude: 36.31 + Math.floor(index / 10) * .008, longitude: 127.32 + (index % 10) * .01, matchStatus: "confirmed" },
     });
@@ -44,13 +46,21 @@ test.afterAll(async () => {
   await batch.commit();
 });
 
-test("forty schools calculate through the real callable from both reported first schools and persist all stops", async ({ page }, testInfo) => {
+test("district filters preserve all forty schools for real callable routes from reported first schools", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/");
   await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.salesA);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await expect(page.locator(".assignment-card")).toHaveCount(40);
+  const districts = page.getByRole("radiogroup", { name: "행정구 필터" });
+  const seo = districts.getByRole("radio", { name: /^서구,/ });
+  const count = Number((await seo.getAttribute("aria-label"))!.match(/, (\d+)곳/)![1]);
+  await seo.click();
+  await expect(seo).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".assignment-card")).toHaveCount(count);
+  await districts.getByRole("radio", { name: "전체 지역, 40곳" }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(40);
   const untouched = page.locator(".assignment-card", { hasText: "대전선화초등학교" });
   await expect(untouched).not.toContainText(/홍보지 미확인|샘플 미확인/);
@@ -60,7 +70,7 @@ test("forty schools calculate through the real callable from both reported first
   await dialog.getByRole("button", { name: /전체.*40/ }).click();
   await expect(dialog.locator("input[type=checkbox]:checked")).toHaveCount(40);
 
-  for (const name of ["대전선화초등학교", "대전외국어고등학교"]) {
+  for (const name of ["대전괴정중학교", "대전선화초등학교", "대전외국어고등학교"]) {
     const row = dialog.locator(".sales-route-candidates > li", { hasText: name });
     await row.getByRole("button", { name: /첫 학교/ }).click();
     const calculate = dialog.getByRole("button", { name: /가까운 순서 계산/ });
@@ -78,7 +88,7 @@ test("forty schools calculate through the real callable from both reported first
     await expect(dialog.locator(".sales-route-order > li").first()).toContainText(name);
     expect(await dialog.evaluate(element => element.scrollHeight <= element.clientHeight + 2)).toBe(true);
     await expect(dialog.getByRole("button", { name: "이 순서로 보기" })).toBeInViewport({ ratio: 1 });
-    if (name === "대전선화초등학교") await dialog.getByRole("button", { name: /학교 다시 선택/ }).click();
+    if (name !== "대전외국어고등학교") await dialog.getByRole("button", { name: /학교 다시 선택/ }).click();
   }
   expect((await new AxeBuilder({ page }).include("dialog[open]").analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("forty-school-route.png"), fullPage: false });

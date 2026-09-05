@@ -64,11 +64,14 @@ test("header orbit supports an indefinite user pause, reduced motion, and forced
   const frame = page.locator("[data-motion]");
   const pseudo = () => frame.evaluate((element) => {
     const style = getComputedStyle(element, "::before");
-    return { name: style.animationName, state: style.animationPlayState, count: style.animationIterationCount, display: style.display };
+    return { name: style.animationName, state: style.animationPlayState, count: style.animationIterationCount,
+      duration: style.animationDuration, background: style.backgroundImage, display: style.display };
   });
   expect((await pseudo()).state).toBe("paused");
   await frame.evaluate((element) => element.setAttribute("data-motion", "running"));
-  expect(await pseudo()).toMatchObject({ name: "mode-border-orbit", state: "running", count: "infinite" });
+  expect(await pseudo()).toMatchObject({ name: "mode-border-orbit", state: "running", count: "infinite", duration: "8s" });
+  expect((await pseudo()).background).toContain("rgb(49, 130, 246)");
+  expect((await pseudo()).background).toContain("rgb(38, 150, 83)");
   await frame.evaluate((element) => element.setAttribute("data-motion", "paused"));
   await page.mouse.move(0, 700);
   expect((await pseudo()).state).toBe("paused");
@@ -80,4 +83,34 @@ test("header orbit supports an indefinite user pause, reduced motion, and forced
   await expect(selected).toHaveCSS("box-shadow", "none");
   expect(await selected.evaluate((element) => getComputedStyle(element).color)).not.toBe("rgb(36, 118, 71)");
   expect((await new AxeBuilder({ page }).include(".workspace-header").analyze()).violations).toEqual([]);
+});
+
+test("both modes share a static layered aurora without interfering with content or forced colors", async ({ page }, testInfo) => {
+  const backgrounds: string[] = [];
+  await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
+    contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
+  }));
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const mode of ["delivery", "sales"]) {
+    const fixture = readFileSync(new URL(`../../output/playwright/header-layout/${mode}-dual.html`, import.meta.url), "utf8");
+    await page.setContent(fixture.replace("<head>", '<head><base href="http://header.fixture/">'));
+    const canvas = page.locator(".aurora-background");
+    await expect(canvas).toHaveCSS("pointer-events", "none");
+    await expect(canvas).toHaveCSS("animation-name", "none");
+    await expect(canvas).toHaveAttribute("aria-hidden", "true");
+    const background = await canvas.evaluate((element) => getComputedStyle(element).backgroundImage);
+    expect(background).toContain("radial-gradient");
+    expect(background).toContain("rgba(174, 223, 205, 0.22)");
+    backgrounds.push(background);
+    // Exercise readable production text/surface styles against the actual canvas.
+    await page.locator("main").evaluate((element) => element.insertAdjacentHTML("beforeend", '<section class="shell-page"><h1>학교 방문 준비</h1><p class="shell-greeting">오늘도 반가워요.</p><article class="soft-card" style="padding:24px;margin-top:24px"><h2>내 담당 학교</h2><p>오늘의 방문 기록과 다음 일정을 확인해요.</p></article></section>'));
+    expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
+    await page.screenshot({ path: `output/playwright/header-layout/aurora-${mode}-${testInfo.project.name}.png` });
+  }
+  expect(backgrounds[0]).toBe(backgrounds[1]);
+  await page.emulateMedia({ forcedColors: "active" });
+  const canvas = page.locator(".aurora-background");
+  await expect(canvas).toHaveCSS("background-image", "none");
+  await expect(canvas.locator("i").first()).toHaveCSS("display", "none");
 });

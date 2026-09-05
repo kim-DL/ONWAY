@@ -5164,14 +5164,23 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .workspace-shell .aurora-background {
+  pointer-events: none;
   background:
-    radial-gradient(circle at 8% 3%, rgba(112, 169, 250, .14), transparent 31rem),
-    radial-gradient(circle at 92% 22%, rgba(188, 215, 255, .12), transparent 34rem),
-    linear-gradient(155deg, #fbfdff 0%, #f7f9fc 48%, #f5f7fa 100%);
+    radial-gradient(ellipse 88% 58% at 2% -6%, rgba(100, 168, 255, .24), transparent 72%),
+    radial-gradient(ellipse 72% 48% at 102% 20%, rgba(144, 194, 255, .2), transparent 74%),
+    radial-gradient(ellipse 76% 56% at 92% 104%, rgba(174, 223, 205, .22), transparent 72%),
+    linear-gradient(158deg, #fbfdff 0%, #f5f8fd 48%, #f8fbfa 100%);
 }
-.workspace-shell .aurora-background i:nth-child(1),
-.workspace-shell .aurora-background i:nth-child(2),
-.workspace-shell .aurora-background i:nth-child(3) { background: #72aaf8; opacity: .035; }
+.workspace-shell .aurora-background::after { opacity: .012; }
+.workspace-shell .aurora-background i:nth-child(1) { background: #90c2ff; opacity: .06; }
+.workspace-shell .aurora-background i:nth-child(2) { background: #aeefd5; opacity: .04; }
+.workspace-shell .aurora-background i:nth-child(3) { display: none; }
+
+@media (forced-colors: active) {
+  .workspace-shell .aurora-background { background: Canvas; }
+  .workspace-shell .aurora-background::after,
+  .workspace-shell .aurora-background i { display: none; }
+}
 
 /* Controls are neutral by default; only the current choice receives a quiet blue cue. */
 .workspace-shell .mode-control {

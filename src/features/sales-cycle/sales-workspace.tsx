@@ -8,7 +8,6 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
-import { SmartChip } from "@/components/ui/smart-chip";
 import { SoftCard } from "@/components/ui/soft-card";
 import { useToast } from "@/components/ui/toast";
 import type { SalesCycle } from "@/domain/sales";
@@ -29,7 +28,8 @@ import {
 import { createSalesSessionNamespace } from "./sales-workspace-repository";
 import { useSalesWorkspace } from "./use-sales-workspace";
 import { AssignmentCard } from "./sales-school-cards";
-import { DISTRICT_LABELS } from "./sales-school-card-presentation";
+import { SalesDistrictFilter } from "./sales-district-filter";
+import { buildSalesDistrictOptions } from "./sales-district-filter-model";
 
 const SCOPE_OPTIONS = [
   { value: "mine", label: "내 학교" },
@@ -198,10 +198,10 @@ export function SalesWorkspace({
     const followUp = scopeAssignments.filter((assignment) => ["followUp", "revisit"].includes(assignment.monthlyStatus)).length;
     const sample = scopeAssignments.filter((assignment) => assignment.sampleStatus === "delivered").length;
     const progress = scopeAssignments.length === 0 ? 0 : Math.round((completed / scopeAssignments.length) * 100);
-    const availableDistricts = [...new Set(scopeAssignments.flatMap((assignment) => {
+    const districtOptions = buildSalesDistrictOptions(scopeAssignments.flatMap((assignment) => {
       const school = schools.get(assignment.schoolId);
-      return school ? [school.district] : [];
-    }))];
+      return school ? [school] : [];
+    }), district);
     const assignedSchoolIds = new Set(workspace.assignments.map((assignment) => assignment.schoolId));
     const ownRouteCandidates = workspace.assignments
       .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
@@ -214,7 +214,7 @@ export function SalesWorkspace({
       visibleAssignments,
       employees,
       totals: { assigned: scopeAssignments.length, completed, before, followUp, sample, progress },
-      availableDistricts,
+      districtOptions,
       assignedSchoolIds,
       ownRouteCandidates,
       routeRank,
@@ -414,13 +414,8 @@ export function SalesWorkspace({
         </div>
       ) : null}
 
-      {model.availableDistricts.length > 1 ? (
-        <div className="sales-zone-chips" aria-label="행정구 필터">
-          <SmartChip selected={district === "all"} onClick={() => setDistrict("all")}>전체 지역</SmartChip>
-          {model.availableDistricts.map((districtId) => (
-            <SmartChip key={districtId} selected={district === districtId} onClick={() => setDistrict(districtId)}>{DISTRICT_LABELS[districtId]}</SmartChip>
-          ))}
-        </div>
+      {model.districtOptions.length > 2 || district !== "all" ? (
+        <SalesDistrictFilter options={model.districtOptions} value={district} onChange={setDistrict} />
       ) : null}
 
       {model.visibleAssignments.length > 0 ? (
