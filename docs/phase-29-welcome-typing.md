@@ -36,3 +36,15 @@
 - 브라우저로 로컬 빌드의 PIN 화면 정상 렌더링과 오류 없음 확인.
 - 이전 운영/롤백 대상: `dpl_GDCSKEqu9DtAoLjtdh9MFFnXDM62` (phase28),
   `https://onnuriway-je2kpogao-daeins-projects.vercel.app`.
+
+## 운영 반영 결과
+
+- 코드 커밋: `e4b2172`.
+- 배포: `dpl_BaWVExpz9AWpkayZ9p84Zt1iKYKH`, Production / Ready.
+- 생성: 2026-09-06 02:25:57 KST. 운영: `https://onnuriway.vercel.app`.
+- 불변 URL: `https://onnuriway-ai22uibq2-daeins-projects.vercel.app`.
+- 기존 phase28 서비스 워커를 사용하는 브라우저에서 업데이트 안내를 확인하고
+  실제 ‘업데이트’ 버튼으로 전환했다. 캐시는 `app-shell-phase29`만 남았다.
+- 업데이트 후 익명 PIN 화면 정상, 브라우저 오류 없음. 조회 시 해당 배포의
+  최근 10분 오류 로그 없음. 운영 직원 로그인/업무 데이터 수정은 수행하지 않았다.
+- 이전 배포로 복구 가능하며 서버·데이터 마이그레이션은 없다.
