@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { QuantumCloudLoader } from "@/components/ui/quantum-cloud-loader";
 import { useHeaderMotionPreference } from "./header-motion-preference";
+import { TypingGreeting } from "./typing-greeting";
 import styles from "./welcome-greeting.module.css";
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 const FORCED_COLORS = "(forced-colors: active)";
 
-function isMotionRestricted() {
-  return document.visibilityState !== "visible"
-    || window.matchMedia(REDUCED_MOTION).matches
-    || window.matchMedia(FORCED_COLORS).matches;
+function getMotionEnvironment() {
+  const hidden = document.visibilityState !== "visible";
+  const reduced = window.matchMedia(REDUCED_MOTION).matches || window.matchMedia(FORCED_COLORS).matches;
+  return (hidden ? 1 : 0) | (reduced ? 2 : 0);
 }
 
 function subscribeToMotionEnvironment(onChange: () => void) {
@@ -25,39 +26,48 @@ function subscribeToMotionEnvironment(onChange: () => void) {
 }
 
 // Never flash an animated frame before the saved/OS motion preference is known.
-const serverMotionRestricted = () => true;
+const serverMotionRestricted = () => 3;
 
 export function WelcomeGreeting({ children, title, accent, titleId, className = "" }: {
-  children?: ReactNode;
+  children?: string;
   title: string;
   accent: string;
   titleId: string;
   className?: string;
 }) {
   const mascotRef = useRef<HTMLSpanElement>(null);
+  const copyRef = useRef<HTMLParagraphElement>(null);
   const { paused } = useHeaderMotionPreference();
-  const restricted = useSyncExternalStore(subscribeToMotionEnvironment, isMotionRestricted, serverMotionRestricted);
+  const environment = useSyncExternalStore(subscribeToMotionEnvironment, getMotionEnvironment, serverMotionRestricted);
   const [inView, setInView] = useState(false);
+  const [copyInView, setCopyInView] = useState(false);
 
   useEffect(() => {
     const target = mascotRef.current;
-    if (!target) return;
+    const copy = copyRef.current;
+    if (!target || !copy) return;
     if (typeof IntersectionObserver === "undefined") {
-      const frame = requestAnimationFrame(() => setInView(true));
+      const frame = requestAnimationFrame(() => { setInView(true); setCopyInView(true); });
       return () => cancelAnimationFrame(frame);
     }
-    const observer = new IntersectionObserver(([entry]) => {
-      setInView(entry?.isIntersecting ?? false);
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === target) setInView(entry.isIntersecting);
+        if (entry.target === copy) setCopyInView(entry.isIntersecting);
+      }
     }, { threshold: 0 });
     observer.observe(target);
+    observer.observe(copy);
     return () => observer.disconnect();
   }, []);
 
-  const running = !paused && !restricted && inView;
+  const running = !paused && environment === 0 && inView;
 
   return (
     <div className={styles.greeting} data-welcome-greeting>
-      <p className={`${className} ${styles.copy}`} data-greeting-copy>{children}</p>
+      <p ref={copyRef} className={`${className} ${styles.copy}`} data-greeting-copy>
+        <TypingGreeting text={children ?? ""} disabled={paused || (environment & 2) !== 0} active={copyInView && (environment & 1) === 0} />
+      </p>
       <div className={styles.headline} data-welcome-headline>
         <h1 id={titleId} className={styles.title} data-welcome-title>
           <span className={styles.leadRow} data-welcome-lead-row>

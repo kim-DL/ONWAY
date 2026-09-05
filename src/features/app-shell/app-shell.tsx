@@ -133,7 +133,7 @@ function DeliveryHome({
           <p className="shell-kicker">DELIVERY · SCHOOL</p>
           <WelcomeGreeting className="shell-greeting" titleId="delivery-home-title"
             title="학교를 찾고" accent="현장으로.">
-            {session.displayName}님, {greeting}.
+            {`${session.displayName}님, ${greeting}.`}
           </WelcomeGreeting>
         </div>
         <button

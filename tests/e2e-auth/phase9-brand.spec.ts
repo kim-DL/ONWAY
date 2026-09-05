@@ -117,8 +117,11 @@ test("company signature stays visible without crowding mobile mode controls and 
   const header = page.locator(".workspace-header");
   const mascot = page.locator("[data-welcome-mascot]");
   const cloud = mascot.locator("[data-quantum-cloud]");
+  const greetingVisual = page.locator("[data-greeting-visual]");
   await expect(page.locator("#delivery-home-title")).toBeVisible();
   await expect(cloud).toHaveAttribute("data-motion", "paused");
+  await expect(greetingVisual).toHaveAttribute("data-typing", "complete");
+  await expect(page.locator("[data-greeting-accessible]")).toContainText("브랜드 테스트님,");
   await expect(mascot.locator("img, video, canvas")).toHaveCount(0);
   await expect(cloud.locator("[data-quantum-particle]")).toHaveCount(4);
   await expectHeadlineMascotPlacement(page);
@@ -162,15 +165,25 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "company-wave-arrive");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-iteration-count", "1");
   await expect(cloud).toHaveAttribute("data-motion", "running");
+  // Turning motion back on does not erase a sentence that was already readable.
+  await expect(greetingVisual).toHaveAttribute("data-typing", "complete");
   await expect.poll(() => cloud.locator("[data-quantum-particle]").evaluateAll(elements => elements.map(element => getComputedStyle(element).animationPlayState)))
     .toEqual(["running", "running", "running", "running"]);
   const navigation = page.getByRole("navigation", { name: "주요 메뉴" });
   await navigation.getByRole("button", { name: "활동", exact: true }).click();
   await expect(page.locator("#sales-activity-title")).toBeVisible();
+  await expect(greetingVisual).toHaveAttribute("data-typing", /pending|typing/);
+  await expect(greetingVisual).toHaveAttribute("data-typing", "complete");
   await expect(cloud).toHaveAttribute("data-motion", "running");
   await page.setViewportSize({ width: 390, height: 844 });
   await expectHeadlineMascotPlacement(page);
   await page.screenshot({ path: "output/playwright/welcome-mascot/activity-live-app.png", fullPage: false });
+
+  // Real page return remounts just as it does for staff, without a global replay counter.
+  await navigation.getByRole("button", { name: "학교", exact: true }).click();
+  await expect(page.locator("#sales-cycle-title")).toBeVisible();
+  await expect(greetingVisual).toHaveAttribute("data-typing", /pending|typing/);
+  await expect(greetingVisual).toHaveAttribute("data-typing", "complete");
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "설정", exact: true }).click();
   const motionToggle = page.getByRole("switch", { name: "화면 애니메이션" });
@@ -182,6 +195,7 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(header.locator('[data-motion="paused"]')).toHaveCount(1);
   await navigation.getByRole("button", { name: "학교", exact: true }).click();
   await expect(cloud).toHaveAttribute("data-motion", "paused");
+  await expect(greetingVisual).toHaveAttribute("data-typing", "complete");
   await expect.poll(() => cloud.locator("[data-quantum-particle]").evaluateAll(elements => elements.map(element => getComputedStyle(element).animationPlayState)))
     .toEqual(["paused", "paused", "paused", "paused"]);
 });

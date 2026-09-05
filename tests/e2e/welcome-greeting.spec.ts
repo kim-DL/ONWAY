@@ -29,6 +29,8 @@ type FixtureOptions = {
   longName?: boolean;
   initialPaused?: boolean;
   hydrate?: boolean;
+  greetingText?: string;
+  realClock?: boolean;
 };
 
 async function hydrate(page: Page) {
@@ -54,14 +56,17 @@ async function fixture(page: Page, options: FixtureOptions = {}) {
       <meta name="viewport" content="width=device-width, initial-scale=1"><title>웰컴 인사 검증</title>
       <style>${globals}</style><style>${moduleCss}</style><style>
         #welcome-fixture { display:block; padding:16px; min-height:100vh; width:100%; min-width:0; }
-        .fixture-controls { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+        .fixture-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px; }
         .fixture-controls button, [data-testid="page-bottom"] { min-height:44px; padding:8px 12px; color:#191f28; background:#fff; border:1px solid #b0b8c1; border-radius:8px; }
         .fixture-controls output { font-size:.875rem; color:#4e5968; }
         #welcome-fixture [data-testid="next-content"] { margin:12px 0 0; font:700 1.1rem/1.5 sans-serif; }
         .fixture-spacer { height:1600px; }
       </style></head><body><div id="root"></div></body></html>` });
   });
-  await page.goto(`https://welcome.fixture/?placement=${options.placement ?? "delivery"}&long=${options.longName ?? false}`);
+  const query = new URLSearchParams({ placement: options.placement ?? "delivery", long: String(options.longName ?? false) });
+  if (options.greetingText !== undefined) query.set("copy", options.greetingText);
+  if (options.realClock) query.set("clock", "true");
+  await page.goto(`https://welcome.fixture/?${query}`);
   await page.addScriptTag({ content: script });
   await expect(page.locator("#root")).toHaveAttribute("data-ssr-ready", "true");
   await expect(page.locator("[data-welcome-greeting]")).toHaveCount(1);
@@ -74,6 +79,19 @@ const mascot = (page: Page) => page.locator("[data-welcome-mascot]");
 const cloud = (page: Page) => page.locator("[data-quantum-cloud]");
 const greeting = (page: Page) => page.locator("[data-welcome-greeting]");
 const particles = (page: Page) => page.locator("[data-quantum-particle]");
+const visualGreeting = (page: Page) => page.locator("[data-greeting-visual]");
+const accessibleGreeting = (page: Page) => page.locator("[data-greeting-accessible]");
+const greetingCharacters = (page: Page) => page.locator("[data-greeting-character]");
+
+async function visibleCharacterCount(page: Page) {
+  return greetingCharacters(page).evaluateAll(elements => elements.filter(element => getComputedStyle(element).visibility === "visible").length);
+}
+
+async function expectTypingComplete(page: Page) {
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "complete");
+  await expect.poll(() => visibleCharacterCount(page)).toBe(await greetingCharacters(page).count());
+  await expect(visualGreeting(page).locator('[data-cursor="true"]')).toHaveCount(0);
+}
 
 async function expectMotion(page: Page, state: "running" | "paused") {
   await expect(cloud(page)).toHaveAttribute("data-motion", state);
@@ -114,7 +132,7 @@ async function expectReadableLayout(target: Locator, enlarged = false) {
       }
       return lines.filter(line => line.width > 0 && line.height > 0);
     };
-    const copyLines = textLines(copy);
+    const copyLines = textLines(copy.querySelector("[data-greeting-visual]") ?? copy);
     const titleLines = [...textLines(lead), ...textLines(accent)];
     const particleBoxes = Array.from(element.querySelectorAll("[data-quantum-particle]"), particle => particle.getBoundingClientRect());
     return {
@@ -165,7 +183,8 @@ for (const placement of ["delivery", "sales", "activity", "team"] as const) {
       await expectMotion(page, "paused");
       await expectReadableLayout(greeting(page));
       const copy = page.locator("[data-greeting-copy]");
-      await expect(copy).toHaveText("김온누리직원님, 오늘도 반가워요.");
+      await expect(accessibleGreeting(page)).toHaveText("김온누리직원님, 오늘도 반가워요.");
+      await expect(visualGreeting(page)).toHaveText("김온누리직원님, 오늘도 반가워요.");
       await greeting(page).screenshot({ path: `output/playwright/welcome-greeting/${placement}-${width}-normal-${testInfo.project.name}.png` });
       if (width === 390 || width === 1280) {
         const initialSize = await copy.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -341,4 +360,218 @@ test("ornament adds no loading semantics or focus targets and shared controls re
   const result = await new AxeBuilder({ page }).include("[data-welcome-greeting]").include(".fixture-controls")
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(result.violations).toEqual([]);
+});
+
+test("typing preserves readable SSR and announces one full greeting while progressively revealing once", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const text = "김대인 부장님, 오늘 하루도 수고가 많으셨습니다.";
+  const { errors } = await fixture(page, { placement: "sales", greetingText: text, hydrate: false });
+  await expectTypingComplete(page);
+  await expect(accessibleGreeting(page)).toHaveText(text);
+  await expect(visualGreeting(page)).toHaveAttribute("aria-hidden", "true");
+  expect((await page.locator("[data-greeting-copy]").ariaSnapshot()).split(text)).toHaveLength(2);
+  await expect(greeting(page).locator("[aria-live], [role=status], [role=alert]")).toHaveCount(0);
+
+  await hydrate(page);
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  const total = await greetingCharacters(page).count();
+  const first = await visibleCharacterCount(page);
+  expect(first).toBeGreaterThan(0);
+  expect(first).toBeLessThan(total);
+  await expect.poll(() => visibleCharacterCount(page), { intervals: [30] }).toBeGreaterThan(first);
+  await expect(accessibleGreeting(page)).toHaveText(text);
+  await expectTypingComplete(page);
+
+  // Watch for an intermediate restart, not just a second completed endpoint.
+  const restartCount = await visualGreeting(page).evaluate(element => new Promise<number>(resolve => {
+    let restarts = 0;
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute("data-typing") !== "complete") restarts += 1;
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ["data-typing"] });
+    setTimeout(() => { observer.disconnect(); resolve(restarts); }, 2_200);
+  }));
+  expect(restartCount).toBe(0);
+  await expectTypingComplete(page);
+  expect(errors).toEqual([]);
+});
+
+test("typing reserves the final Korean line wrapping and card geometry from the first character", async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const text = "김대인 부장님, 오늘 하루도 수고가 많으셨습니다.";
+  for (const width of [320, 390, 430]) {
+    await fixture(page, { placement: "sales", greetingText: text, width, hydrate: false });
+    const measure = () => page.locator("[data-greeting-copy]").evaluate(element => {
+      const copy = element.getBoundingClientRect();
+      const title = document.querySelector("[data-welcome-title]")!.getBoundingClientRect();
+      const next = document.querySelector('[data-testid="next-content"]')!.getBoundingClientRect();
+      const round = (value: number) => Math.round(value * 1_000) / 1_000;
+      const letters = Array.from(element.querySelectorAll("[data-greeting-character]"), letter => {
+        const box = letter.getBoundingClientRect();
+        return [round(box.x - copy.x), round(box.y - copy.y), round(box.width), round(box.height)];
+      });
+      // Ignore the existing whole-page entrance transform; check only layout
+      // relative to the paragraph so a normal page transition is not a false shift.
+      return { copy: [round(copy.width), round(copy.height)], titleTop: round(title.top - copy.top), nextTop: round(next.top - copy.top), letters };
+    });
+    const finalLayout = await measure();
+    const expectUnchangedLayout = async () => {
+      const current = await measure();
+      current.copy.forEach((value, index) => expect(value).toBeCloseTo(finalLayout.copy[index]!, 2));
+      expect(current.titleTop).toBeCloseTo(finalLayout.titleTop, 2);
+      expect(current.nextTop).toBeCloseTo(finalLayout.nextTop, 2);
+      expect(current.letters).toHaveLength(finalLayout.letters.length);
+      current.letters.forEach((letter, index) => letter.forEach((value, axis) =>
+        expect(value).toBeCloseTo(finalLayout.letters[index]![axis]!, 2)));
+    };
+    await hydrate(page);
+    await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+    await expectUnchangedLayout();
+    if (width === 390) await greeting(page).screenshot({ path: `output/playwright/welcome-greeting/typing-390-${testInfo.project.name}.png` });
+    await expectTypingComplete(page);
+    if (width === 390) await greeting(page).screenshot({ path: `output/playwright/welcome-greeting/typing-complete-390-${testInfo.project.name}.png` });
+    await expectUnchangedLayout();
+    await expectReadableLayout(greeting(page), width === 320);
+  }
+});
+
+test("returning to a remounted page replays typing but ordinary rerenders do not", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await fixture(page, { greetingText: "김대인 부장님, 오늘 하루도 수고가 많으셨습니다." });
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  const startedCount = await visibleCharacterCount(page);
+  await page.getByTestId("rerender-page").click();
+  expect(await visibleCharacterCount(page)).toBeGreaterThanOrEqual(startedCount);
+  await expectTypingComplete(page);
+  await page.getByTestId("rerender-page").click();
+  await expectTypingComplete(page);
+
+  await page.getByTestId("toggle-page").click();
+  await expect(greeting(page)).toHaveCount(0);
+  await page.getByTestId("toggle-page").click();
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  expect(await visibleCharacterCount(page)).toBeLessThan(await greetingCharacters(page).count());
+  await expectTypingComplete(page);
+});
+
+test("turning motion off finishes the greeting immediately and enabling it does not replay this page", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await fixture(page, { greetingText: "김대인 부장님, 오늘 하루도 수고가 많으셨습니다." });
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  await page.getByRole("switch", { name: "인사 애니메이션" }).click();
+  await expectTypingComplete(page);
+  await page.getByRole("switch", { name: "인사 애니메이션" }).click();
+  await expectTypingComplete(page);
+  await page.waitForTimeout(250);
+  await expectTypingComplete(page);
+
+  await page.getByRole("switch", { name: "인사 애니메이션" }).click();
+  await page.getByTestId("toggle-page").click();
+  await page.getByTestId("toggle-page").click();
+  await expectTypingComplete(page);
+});
+
+test("reduced motion and forced colors show the whole greeting without a cursor or a later replay", async ({ page }) => {
+  for (const media of [{ reducedMotion: "reduce", forcedColors: "none" }, { reducedMotion: "no-preference", forcedColors: "active" }] as const) {
+    await page.emulateMedia(media);
+    await fixture(page, { greetingText: "김대인 부장님, 오늘 하루도 수고가 많으셨습니다." });
+    await expectTypingComplete(page);
+    await page.emulateMedia({ reducedMotion: "no-preference", forcedColors: "none" });
+    await expectTypingComplete(page);
+    await page.waitForTimeout(250);
+    await expectTypingComplete(page);
+  }
+  await fixture(page, { greetingText: "김대인 부장님, 오늘 하루도 수고가 많으셨습니다." });
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expectTypingComplete(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expectTypingComplete(page);
+});
+
+test("scroll and document visibility pause unfinished typing without resetting it or replaying completion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await fixture(page, { greetingText: "김대인 부장님, 오늘 하루도 수고가 많으셨습니다." });
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  await page.getByTestId("page-bottom").scrollIntoViewIfNeeded();
+  await expectMotion(page, "paused");
+  const stopped = await visibleCharacterCount(page);
+  await page.waitForTimeout(250);
+  expect(await visibleCharacterCount(page)).toBe(stopped);
+  await greeting(page).scrollIntoViewIfNeeded();
+  await expectMotion(page, "running");
+  expect(await visibleCharacterCount(page)).toBeGreaterThanOrEqual(stopped);
+  await expectTypingComplete(page);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expectMotion(page, "paused");
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document, "visibilityState");
+    Reflect.deleteProperty(document, "hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expectMotion(page, "running");
+  await expectTypingComplete(page);
+});
+
+test("a time-of-day greeting change is immediately readable and does not restart typing", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await fixture(page, { greetingText: "김대인 부장님, 오늘 하루도 수고가 많으셨습니다." });
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  await page.getByTestId("update-copy").click();
+  await expectTypingComplete(page);
+  await expect(accessibleGreeting(page)).toHaveText("김대인 부장님, 편안한 저녁 보내세요.");
+  await expect(visualGreeting(page)).toHaveText("김대인 부장님, 편안한 저녁 보내세요.");
+  await page.getByTestId("rerender-page").click();
+  await expectTypingComplete(page);
+});
+
+test("each revealed character is a whole grapheme including composed Korean and emoji", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const text = "김대인 부장님, 좋은 하루예요 👩🏻‍🍳 e\u0301.";
+  await fixture(page, { greetingText: text });
+  const segments = Array.from(new Intl.Segmenter("ko", { granularity: "grapheme" }).segment(text), value => value.segment);
+  expect(await greetingCharacters(page).allTextContents()).toEqual(segments);
+  expect(segments).toContain("👩🏻‍🍳");
+  expect(segments).toContain("e\u0301");
+  await expectTypingComplete(page);
+});
+
+test("a longer greeting completes within a brief entrance rather than extending indefinitely", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const text = `김대인 부장님, ${"오늘도 좋은 인연과 따뜻한 대화가 함께하는 하루 보내세요. ".repeat(4)}`;
+  await fixture(page, { greetingText: text, width: 430 });
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  const started = Date.now();
+  await expectTypingComplete(page);
+  expect(Date.now() - started).toBeLessThan(2_500);
+});
+
+test("the visible greeting types even when its separate title ornament is below a short viewport", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await fixture(page, { placement: "sales", hydrate: false });
+  await page.addStyleTag({ content: ".shell-page { animation:none !important; }" });
+  const height = await page.locator("[data-greeting-copy]").evaluate(element => Math.ceil(element.getBoundingClientRect().bottom + 1));
+  await page.setViewportSize({ width: 390, height });
+  expect((await mascot(page).boundingBox())!.y).toBeGreaterThan(height);
+  await hydrate(page);
+  await expectMotion(page, "paused");
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  await expectTypingComplete(page);
+});
+
+test("the real time-greeting hook hydrates its fallback into an animated current welcome", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const { errors } = await fixture(page, { placement: "sales", realClock: true, hydrate: false });
+  await expect(accessibleGreeting(page)).toHaveText("김대인 부장님, 반가워요.");
+  await hydrate(page);
+  await expect(accessibleGreeting(page)).not.toContainText("반가워요");
+  await expect(visualGreeting(page)).toHaveAttribute("data-typing", "typing");
+  expect(await visibleCharacterCount(page)).toBeLessThan(await greetingCharacters(page).count());
+  await expectTypingComplete(page);
+  expect(errors).toEqual([]);
 });

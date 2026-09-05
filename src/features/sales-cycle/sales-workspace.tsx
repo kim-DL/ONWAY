@@ -314,7 +314,7 @@ export function SalesWorkspace({
           <WelcomeGreeting className="sales-cycle-hero__greeting" titleId="sales-cycle-title"
             title={scope === "mine" ? "오늘 움직일" : "함께 이어가는"}
             accent={scope === "mine" ? "학교의 흐름." : "팀의 흐름."}>
-            {session.displayName}님, {greeting}.
+            {`${session.displayName}님, ${greeting}.`}
           </WelcomeGreeting>
           <button className="cycle-selector" type="button" onClick={() => setCycleSheetOpen(true)}>
             <Icon name="calendar" size={18} />
