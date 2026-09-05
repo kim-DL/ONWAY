@@ -6,7 +6,7 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase25",
+  "phase26",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",
@@ -14,6 +14,8 @@ for (const required of [
   "onnuriway-company-icon-192-v4.png",
   "onnuriway-company-icon-maskable-512-v4.png",
   "onnuri-food-logo.png",
+  "bloub-welcome-v1.webp",
+  "bloub-welcome-still-v1.png",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {

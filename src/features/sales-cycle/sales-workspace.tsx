@@ -14,6 +14,7 @@ import type { SalesCycle } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
+import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
 import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
 import { canPlanRouteForSchool } from "@/features/sales-route/sales-route-location";
 import { SalesRoutePlanner } from "@/features/sales-route/sales-route-planner";
@@ -310,7 +311,7 @@ export function SalesWorkspace({
       <div className="sales-cycle-hero">
         <div className="sales-cycle-hero__copy">
           <p className="shell-kicker">SALES · MONTHLY ROUTE</p>
-          <p className="sales-cycle-hero__greeting">{session.displayName}님, {greeting}.</p>
+          <WelcomeGreeting className="sales-cycle-hero__greeting">{session.displayName}님, {greeting}.</WelcomeGreeting>
           <h1 id="sales-cycle-title">{scope === "mine" ? <>오늘 움직일<br /><em>학교의 흐름.</em></> : <>함께 이어가는<br /><em>팀의 흐름.</em></>}</h1>
           <button className="cycle-selector" type="button" onClick={() => setCycleSheetOpen(true)}>
             <Icon name="calendar" size={18} />

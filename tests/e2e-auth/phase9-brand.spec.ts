@@ -87,6 +87,10 @@ test("company signature stays visible without crowding mobile mode controls and 
   // next dev. Wait for that boundary before testing the header's visible state.
   await expect(page.locator(".workspace-shell")).toBeVisible({ timeout: 30_000 });
   const header = page.locator(".workspace-header");
+  const mascot = page.locator("[data-welcome-mascot]");
+  await expect(page.locator("#delivery-home-title")).toBeVisible();
+  await expect(mascot).toHaveAttribute("data-motion", "paused");
+  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v1.png");
   const modeControl = header.getByRole("group", { name: "업무 모드" });
   await expect(header.locator(".employee-avatar")).toHaveCount(0);
   await expect(modeControl.getByRole("button")).toHaveCount(2);
@@ -125,13 +129,24 @@ test("company signature stays visible without crowding mobile mode controls and 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "company-wave-arrive");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-iteration-count", "1");
+  await expect(mascot).toHaveAttribute("data-motion", "running");
+  await expect.poll(() => mascot.locator("img").evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(320);
+  const navigation = page.getByRole("navigation", { name: "주요 메뉴" });
+  await navigation.getByRole("button", { name: "활동", exact: true }).click();
+  await expect(page.locator("#sales-activity-title")).toBeVisible();
+  await expect(mascot).toHaveAttribute("data-motion", "running");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "output/playwright/welcome-mascot/activity-live-app.png", fullPage: false });
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "설정", exact: true }).click();
-  const motionToggle = page.getByRole("switch", { name: "테두리 애니메이션" });
+  const motionToggle = page.getByRole("switch", { name: "화면 애니메이션" });
   await expect(motionToggle).toHaveAttribute("aria-checked", "true");
   await motionToggle.click();
   await expect(motionToggle).toHaveAttribute("aria-checked", "false");
   await expect(header.locator('[data-motion="paused"]')).toHaveCount(1);
   await page.reload();
   await expect(header.locator('[data-motion="paused"]')).toHaveCount(1);
+  await navigation.getByRole("button", { name: "학교", exact: true }).click();
+  await expect(mascot).toHaveAttribute("data-motion", "paused");
+  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v1.png");
 });

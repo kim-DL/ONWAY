@@ -1,0 +1,56 @@
+.greeting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.greeting .copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: 1.65;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.mascot {
+  position: relative;
+  display: block;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 52px;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+}
+
+.image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 76px;
+  height: 76px;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+}
+
+/* Every frame's visible pixels fit inside the reserved 64×52 slot. Only the
+   source's transparent canvas extends beyond it; no animation frame is cropped. */
+.image[hidden] { display: none; }
+
+@media (max-width: 359px) {
+  .greeting { gap: 8px; }
+  .mascot { flex-basis: 56px; width: 56px; }
+  .image { width: 68px; height: 68px; }
+}
+
+@media (forced-colors: active) {
+  .mascot { visibility: hidden; }
+}

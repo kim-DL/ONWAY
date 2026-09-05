@@ -11,6 +11,7 @@ import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
+import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
 import { useSalesWorkspace } from "./use-sales-workspace";
 import { ActivityRow } from "./sales-school-cards";
 
@@ -96,7 +97,7 @@ export function SalesActivityWorkspace({
       <header className="sales-activity-hero">
         <div>
           <p className="shell-kicker">SALES · ACTION DESK</p>
-          <p className="shell-greeting">{session.displayName}님, {greeting}.</p>
+          <WelcomeGreeting className="shell-greeting">{session.displayName}님, {greeting}.</WelcomeGreeting>
           <h1 id="sales-activity-title">좋은 대화가<br /><em>기다리고 있어요.</em></h1>
           <span className="sales-activity-hero__cycle">{model.cycleId} · 내 담당 학교 {model.total}곳</span>
         </div>

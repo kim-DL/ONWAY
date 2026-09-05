@@ -21,6 +21,9 @@ describe("Phase 14 PWA cache allowlist", () => {
     expect(isPublicAssetPath("/favicon.ico")).toBe(true);
     expect(isPublicAssetPath("/icons/onnuriway-company-icon-512-v4.png")).toBe(true);
     expect(isPublicAssetPath("/brand/onnuri-food-logo.png")).toBe(true);
+    expect(isPublicAssetPath("/brand/bloub-welcome-v1.webp")).toBe(true);
+    expect(isPublicAssetPath("/brand/bloub-welcome-still-v1.png")).toBe(true);
+    expect(isPublicAssetPath("/brand/unlisted-private-file.png")).toBe(false);
     expect(isPublicAssetPath("/api/sales/export")).toBe(false);
     expect(isPublicAssetPath("/google.firestore.v1.Firestore/Listen/channel")).toBe(false);
   });

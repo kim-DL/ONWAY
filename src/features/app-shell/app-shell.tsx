@@ -31,6 +31,7 @@ import {
 } from "./shell-policy";
 import { DeliveryRecentSchools } from "./delivery-recent-schools";
 import { useTimeGreeting } from "./time-greeting";
+import { WelcomeGreeting } from "./welcome-greeting";
 import { AppBrand } from "./app-brand";
 import { ShellHeader } from "./app-shell-header";
 import { useHeaderMotionPreference } from "./header-motion-preference";
@@ -130,7 +131,7 @@ function DeliveryHome({
       <div className="shell-hero shell-hero--delivery">
         <div>
           <p className="shell-kicker">DELIVERY · SCHOOL</p>
-          <p className="shell-greeting">{session.displayName}님, {greeting}.</p>
+          <WelcomeGreeting className="shell-greeting">{session.displayName}님, {greeting}.</WelcomeGreeting>
           <h1 id="delivery-home-title">학교를 찾고<br /><em>현장으로.</em></h1>
         </div>
         <button
@@ -218,7 +219,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
           <div><span className="settings-list__icon"><Icon name="download" /></span><span><strong>기기 앱</strong><small>{installState === "installed" ? "홈 화면에서 독립 실행됩니다." : "설치하면 오프라인에서도 빠르게 시작합니다."}</small></span>{installState === "available" ? <button className="pwa-install-action" type="button" onClick={() => void install()}>앱 설치</button> : <StatusBadge tone={installState === "installed" ? "success" : "neutral"}>{installState === "installed" ? "설치됨" : "브라우저에서 사용 중"}</StatusBadge>}</div>
           <div><span className="settings-list__icon"><Icon name={isOnline ? "refresh" : "wifi-off"} /></span><span><strong>네트워크</strong><small>{isOnline ? "최신 정보와 권한을 확인할 수 있습니다." : "저장된 학교 정보만 표시합니다."}</small></span><StatusBadge tone={isOnline ? "success" : "attention"}>{isOnline ? "온라인" : "오프라인"}</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>기기 데이터</strong><small>로그아웃하면 비공개 로컬 상태를 정리합니다.</small></span><StatusBadge tone="info">이 기기</StatusBadge></div>
-          <div><span className="settings-list__icon"><Icon name="sparkles" /></span><span><strong>테두리 애니메이션</strong><small>기기의 동작 감소 설정을 함께 따릅니다.</small></span><button className="pwa-install-action" type="button" role="switch" aria-label="테두리 애니메이션" aria-checked={!headerMotionPaused} onClick={() => setHeaderMotionPaused(!headerMotionPaused)}>{headerMotionPaused ? "꺼짐" : "켜짐"}</button></div>
+          <div><span className="settings-list__icon"><Icon name="sparkles" /></span><span><strong>화면 애니메이션</strong><small>캐릭터와 테두리에 적용됩니다. 기기의 동작 감소 설정을 따릅니다.</small></span><button className="pwa-install-action" type="button" role="switch" aria-label="화면 애니메이션" aria-checked={!headerMotionPaused} onClick={() => setHeaderMotionPaused(!headerMotionPaused)}>{headerMotionPaused ? "꺼짐" : "켜짐"}</button></div>
           <div><span className="settings-list__icon"><Icon name="clipboard" /></span><span><strong>기기 진단</strong><small>개인정보 없이 성능·캐시·연결 상태만 내보냅니다. {APP_METADATA.buildVersion}</small></span><button className="pwa-install-action" type="button" disabled={exportingDiagnostics} onClick={() => void exportDeviceDiagnostics()}>{exportingDiagnostics ? "준비 중…" : "진단 내보내기"}</button></div>
         </SoftCard>
 
