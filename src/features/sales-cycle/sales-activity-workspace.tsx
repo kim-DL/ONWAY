@@ -97,8 +97,8 @@ export function SalesActivityWorkspace({
       <header className="sales-activity-hero">
         <div>
           <p className="shell-kicker">SALES · ACTION DESK</p>
-          <WelcomeGreeting className="shell-greeting"
-            title={<h1 id="sales-activity-title">좋은 대화가<br /><em>기다리고 있어요.</em></h1>}>
+          <WelcomeGreeting className="shell-greeting" titleId="sales-activity-title"
+            title="좋은 대화가" accent="기다리고 있어요.">
             {session.displayName}님, {greeting}.
           </WelcomeGreeting>
           <span className="sales-activity-hero__cycle">{model.cycleId} · 내 담당 학교 {model.total}곳</span>

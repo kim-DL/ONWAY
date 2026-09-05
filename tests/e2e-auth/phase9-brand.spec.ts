@@ -55,30 +55,28 @@ test.afterAll(async () => { await cleanupBrandFixture?.(); });
 async function expectHeadlineMascotPlacement(page: Page) {
   const geometry = await page.locator("[data-welcome-greeting]").evaluate(element => {
     const copy = element.querySelector("[data-greeting-copy]")!.getBoundingClientRect();
-    const greeting = element.getBoundingClientRect();
     const headline = element.querySelector("[data-welcome-headline]")!.getBoundingClientRect();
     const title = element.querySelector("[data-welcome-title]")!.getBoundingClientRect();
+    const lead = element.querySelector("[data-welcome-title-lead]")!.getBoundingClientRect();
+    const accent = element.querySelector("[data-welcome-title-accent]")!.getBoundingClientRect();
     const mascot = element.querySelector("[data-welcome-mascot]")!.getBoundingClientRect();
     return {
       headlineBelowGreeting: headline.top >= copy.bottom - 1,
-      compact: greeting.width <= 14 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize) + .5,
-      mascotRightOfTitle: mascot.left >= title.right + 3,
+      adjacentGap: mascot.left - lead.right,
       mascotWithinHeadline: mascot.left >= headline.left && mascot.right <= headline.right + 1,
-      mascotCenterOffset: Math.abs((mascot.top + mascot.bottom) / 2 - (headline.top + headline.bottom) / 2),
-      mascotBelowTitle: mascot.top >= title.bottom + 3,
-      mascotRightOffset: Math.abs(mascot.right - headline.right),
+      mascotWithinFirstLine: mascot.top < lead.bottom && mascot.bottom > lead.top,
+      accentBelowLead: accent.top >= lead.bottom - 1,
+      accentUsesFullWidth: Math.abs(accent.width - title.width) <= 1,
       viewportOverflow: document.documentElement.scrollWidth - innerWidth,
     };
   });
   expect(geometry.headlineBelowGreeting).toBe(true);
   expect(geometry.mascotWithinHeadline).toBe(true);
-  if (geometry.compact) {
-    expect(geometry.mascotBelowTitle).toBe(true);
-    expect(geometry.mascotRightOffset).toBeLessThanOrEqual(1);
-  } else {
-    expect(geometry.mascotRightOfTitle).toBe(true);
-    expect(geometry.mascotCenterOffset).toBeLessThanOrEqual(1);
-  }
+  expect(geometry.adjacentGap).toBeGreaterThanOrEqual(3);
+  expect(geometry.adjacentGap).toBeLessThanOrEqual(18);
+  expect(geometry.mascotWithinFirstLine).toBe(true);
+  expect(geometry.accentBelowLead).toBe(true);
+  expect(geometry.accentUsesFullWidth).toBe(true);
   expect(geometry.viewportOverflow).toBeLessThanOrEqual(1);
 }
 
@@ -118,9 +116,11 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(page.locator(".workspace-shell")).toBeVisible({ timeout: 30_000 });
   const header = page.locator(".workspace-header");
   const mascot = page.locator("[data-welcome-mascot]");
+  const cloud = mascot.locator("[data-quantum-cloud]");
   await expect(page.locator("#delivery-home-title")).toBeVisible();
-  await expect(mascot).toHaveAttribute("data-motion", "paused");
-  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v2.png");
+  await expect(cloud).toHaveAttribute("data-motion", "paused");
+  await expect(mascot.locator("img, video, canvas")).toHaveCount(0);
+  await expect(cloud.locator("[data-quantum-particle]")).toHaveCount(4);
   await expectHeadlineMascotPlacement(page);
   const modeControl = header.getByRole("group", { name: "업무 모드" });
   await expect(header.locator(".employee-avatar")).toHaveCount(0);
@@ -134,7 +134,7 @@ test("company signature stays visible without crowding mobile mode controls and 
   const salesButton = modeControl.getByRole("button", { name: "영업", exact: true });
   await expect(salesButton).toHaveCSS("color", "rgb(36, 118, 71)");
 
-  for (const width of [320, 390, 768, 1280]) {
+  for (const width of [320, 360, 390, 430, 768, 1280]) {
     await page.setViewportSize({ width, height: width > 760 ? 900 : 844 });
     await expectHeadlineMascotPlacement(page);
     const geometry = await header.evaluate((element) => {
@@ -161,13 +161,13 @@ test("company signature stays visible without crowding mobile mode controls and 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "company-wave-arrive");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-iteration-count", "1");
-  await expect(mascot).toHaveAttribute("data-motion", "running");
-  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-v2.webp");
-  await expect.poll(() => mascot.locator("img").evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(320);
+  await expect(cloud).toHaveAttribute("data-motion", "running");
+  await expect.poll(() => cloud.locator("[data-quantum-particle]").evaluateAll(elements => elements.map(element => getComputedStyle(element).animationPlayState)))
+    .toEqual(["running", "running", "running", "running"]);
   const navigation = page.getByRole("navigation", { name: "주요 메뉴" });
   await navigation.getByRole("button", { name: "활동", exact: true }).click();
   await expect(page.locator("#sales-activity-title")).toBeVisible();
-  await expect(mascot).toHaveAttribute("data-motion", "running");
+  await expect(cloud).toHaveAttribute("data-motion", "running");
   await page.setViewportSize({ width: 390, height: 844 });
   await expectHeadlineMascotPlacement(page);
   await page.screenshot({ path: "output/playwright/welcome-mascot/activity-live-app.png", fullPage: false });
@@ -181,6 +181,7 @@ test("company signature stays visible without crowding mobile mode controls and 
   await page.reload();
   await expect(header.locator('[data-motion="paused"]')).toHaveCount(1);
   await navigation.getByRole("button", { name: "학교", exact: true }).click();
-  await expect(mascot).toHaveAttribute("data-motion", "paused");
-  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v2.png");
+  await expect(cloud).toHaveAttribute("data-motion", "paused");
+  await expect.poll(() => cloud.locator("[data-quantum-particle]").evaluateAll(elements => elements.map(element => getComputedStyle(element).animationPlayState)))
+    .toEqual(["paused", "paused", "paused", "paused"]);
 });

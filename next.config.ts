@@ -17,8 +17,6 @@ const withSerwist = withSerwistInit({
     { url: "/icons/onnuriway-company-icon-maskable-512-v4.png", revision: pwaBuildRevision },
     { url: "/icons/onnuriway-company-apple-touch-icon-v4.png", revision: pwaBuildRevision },
     { url: "/brand/onnuri-food-logo.png", revision: pwaBuildRevision },
-    { url: "/brand/bloub-welcome-v2.webp", revision: pwaBuildRevision },
-    { url: "/brand/bloub-welcome-still-v2.png", revision: pwaBuildRevision },
     { url: "/favicon.ico", revision: pwaBuildRevision },
   ],
   cacheOnNavigation: false,

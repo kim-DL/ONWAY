@@ -311,8 +311,9 @@ export function SalesWorkspace({
       <div className="sales-cycle-hero">
         <div className="sales-cycle-hero__copy">
           <p className="shell-kicker">SALES · MONTHLY ROUTE</p>
-          <WelcomeGreeting className="sales-cycle-hero__greeting"
-            title={<h1 id="sales-cycle-title">{scope === "mine" ? <>오늘 움직일<br /><em>학교의 흐름.</em></> : <>함께 이어가는<br /><em>팀의 흐름.</em></>}</h1>}>
+          <WelcomeGreeting className="sales-cycle-hero__greeting" titleId="sales-cycle-title"
+            title={scope === "mine" ? "오늘 움직일" : "함께 이어가는"}
+            accent={scope === "mine" ? "학교의 흐름." : "팀의 흐름."}>
             {session.displayName}님, {greeting}.
           </WelcomeGreeting>
           <button className="cycle-selector" type="button" onClick={() => setCycleSheetOpen(true)}>

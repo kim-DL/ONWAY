@@ -1,0 +1,134 @@
+.cloud {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  width: 120px;
+  height: 58px;
+  flex: 0 0 auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.particle {
+  position: absolute;
+  top: calc(50% - var(--particle-size) / 2);
+  left: calc(50% - var(--particle-size) / 2);
+  display: block;
+  width: var(--particle-size);
+  height: var(--particle-size);
+  animation-timing-function: cubic-bezier(.37, 0, .63, 1);
+  animation-iteration-count: infinite;
+  animation-play-state: paused;
+}
+
+.core {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: currentColor;
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 38%),
+    inset -1px -1px 0 rgb(35 57 73 / 8%),
+    0 2px 5px var(--particle-shadow),
+    0 0 13px var(--particle-glow);
+}
+
+.cloud[data-motion="running"] .particle {
+  animation-play-state: running;
+  will-change: transform, opacity;
+}
+
+.coral {
+  --particle-size: 12px;
+  --particle-shadow: rgb(189 92 67 / 12%);
+  --particle-glow: rgb(238 153 128 / 36%);
+  z-index: 3;
+  color: #ee9980;
+  transform: translate3d(-31px, 5px, 0) scale(.72);
+  opacity: .55;
+  animation-name: coral-orbit;
+  animation-duration: 4.2s;
+}
+
+.blue {
+  --particle-size: 18px;
+  --particle-shadow: rgb(50 105 170 / 14%);
+  --particle-glow: rgb(62 149 232 / 32%);
+  z-index: 1;
+  color: #3e95e8;
+  transform: translate3d(26px, -3px, 0) scale(1);
+  opacity: .96;
+  animation-name: blue-orbit;
+  animation-duration: 6.8s;
+}
+
+.champagne {
+  --particle-size: 14px;
+  --particle-shadow: rgb(146 113 48 / 12%);
+  --particle-glow: rgb(214 181 119 / 35%);
+  z-index: 4;
+  color: #d6b577;
+  transform: translate3d(-18px, 1px, 0) scale(.82);
+  opacity: .75;
+  animation-name: champagne-orbit;
+  animation-duration: 3.6s;
+}
+
+.sage {
+  --particle-size: 10px;
+  --particle-shadow: rgb(61 120 103 / 12%);
+  --particle-glow: rgb(111 187 165 / 34%);
+  z-index: 0;
+  color: #6fbba5;
+  transform: translate3d(43px, 4px, 0) scale(.58);
+  opacity: .4;
+  animation-name: sage-orbit;
+  animation-duration: 8.6s;
+  animation-direction: alternate;
+}
+
+/* Only transform and opacity move; solid cores and small glows remain static.
+   Closed orbits share exact endpoints. The wide sage sweep reverses smoothly. */
+@keyframes coral-orbit {
+  0%, 100% { transform: translate3d(-31px, 5px, 0) scale(.72); opacity: .55; }
+  25% { transform: translate3d(-16px, -5px, 0) scale(.95); opacity: .82; }
+  50% { transform: translate3d(31px, 0, 0) scale(1.18); opacity: 1; }
+  75% { transform: translate3d(16px, 5px, 0) scale(.95); opacity: .82; }
+}
+
+@keyframes blue-orbit {
+  0%, 100% { transform: translate3d(26px, -3px, 0) scale(1); opacity: .96; }
+  25% { transform: translate3d(13px, 6px, 0) scale(.88); opacity: .78; }
+  50% { transform: translate3d(-26px, 2px, 0) scale(.68); opacity: .52; }
+  75% { transform: translate3d(-13px, -6px, 0) scale(.88); opacity: .78; }
+}
+
+@keyframes champagne-orbit {
+  0%, 100% { transform: translate3d(-18px, 1px, 0) scale(.82); opacity: .75; }
+  20% { transform: translate3d(-11px, -4px, 0) scale(.94); opacity: .88; }
+  50% { transform: translate3d(18px, 0, 0) scale(1.08); opacity: 1; }
+  80% { transform: translate3d(11px, 4px, 0) scale(.94); opacity: .88; }
+}
+
+@keyframes sage-orbit {
+  0% { transform: translate3d(43px, 4px, 0) scale(.58); opacity: .4; }
+  20% { transform: translate3d(29px, -4px, 0) scale(.72); opacity: .6; }
+  50% { transform: translate3d(0, 2px, 0) scale(1); opacity: .9; }
+  80% { transform: translate3d(-29px, -4px, 0) scale(.72); opacity: .6; }
+  100% { transform: translate3d(-43px, 4px, 0) scale(.58); opacity: .4; }
+}
+
+/* Keep the separated poses (or the current frame) instead of collapsing all
+   particles at the center, including before hydration and when motion is off. */
+@media (prefers-reduced-motion: reduce) {
+  .cloud .particle {
+    animation-play-state: paused !important;
+    will-change: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .cloud { visibility: hidden; }
+  .cloud .particle { animation-play-state: paused !important; will-change: auto; }
+}

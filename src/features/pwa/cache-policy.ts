@@ -1,4 +1,4 @@
-export const PWA_CACHE_VERSION = "phase27";
+export const PWA_CACHE_VERSION = "phase28";
 
 export const PWA_CACHE_NAMES = {
   appShell: `app-shell-${PWA_CACHE_VERSION}`,
@@ -14,8 +14,6 @@ const PUBLIC_ASSET_PATHS = new Set([
   "/icons/onnuriway-company-icon-maskable-512-v4.png",
   "/icons/onnuriway-company-apple-touch-icon-v4.png",
   "/brand/onnuri-food-logo.png",
-  "/brand/bloub-welcome-v2.webp",
-  "/brand/bloub-welcome-still-v2.png",
 ]);
 
 export function isAppShellPath(pathname: string) {

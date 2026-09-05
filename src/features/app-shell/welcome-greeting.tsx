@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { QuantumCloudLoader } from "@/components/ui/quantum-cloud-loader";
 import { useHeaderMotionPreference } from "./header-motion-preference";
 import styles from "./welcome-greeting.module.css";
 
-const ANIMATION = "/brand/bloub-welcome-v2.webp";
-const POSTER = "/brand/bloub-welcome-still-v2.png";
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 const FORCED_COLORS = "(forced-colors: active)";
 
@@ -28,17 +27,17 @@ function subscribeToMotionEnvironment(onChange: () => void) {
 // Never flash an animated frame before the saved/OS motion preference is known.
 const serverMotionRestricted = () => true;
 
-export function WelcomeGreeting({ children, title, className = "" }: {
+export function WelcomeGreeting({ children, title, accent, titleId, className = "" }: {
   children?: ReactNode;
-  title: ReactNode;
+  title: string;
+  accent: string;
+  titleId: string;
   className?: string;
 }) {
   const mascotRef = useRef<HTMLSpanElement>(null);
   const { paused } = useHeaderMotionPreference();
   const restricted = useSyncExternalStore(subscribeToMotionEnvironment, isMotionRestricted, serverMotionRestricted);
   const [inView, setInView] = useState(false);
-  const [animationFailed, setAnimationFailed] = useState(false);
-  const [posterFailed, setPosterFailed] = useState(false);
 
   useEffect(() => {
     const target = mascotRef.current;
@@ -54,22 +53,21 @@ export function WelcomeGreeting({ children, title, className = "" }: {
     return () => observer.disconnect();
   }, []);
 
-  const running = !paused && !restricted && inView && !animationFailed;
-  const source = running ? ANIMATION : POSTER;
+  const running = !paused && !restricted && inView;
 
   return (
     <div className={styles.greeting} data-welcome-greeting>
       <p className={`${className} ${styles.copy}`} data-greeting-copy>{children}</p>
       <div className={styles.headline} data-welcome-headline>
-        <div className={styles.title} data-welcome-title>{title}</div>
-        <span ref={mascotRef} className={styles.mascot} aria-hidden="true" data-welcome-mascot data-motion={running ? "running" : "paused"}>
-          {/* Native animated WebP preserves all 200 frames/10 seconds. Replacing
-              the source with a still stops decoded motion, unlike CSS animation-play-state. */}
-          {/* eslint-disable-next-line @next/next/no-img-element -- Already optimised, versioned animation + native still fallback. */}
-          <img key={source} src={source} alt="" width={320} height={320} draggable={false} decoding="async"
-            className={styles.image} hidden={!running && posterFailed}
-            onError={() => { if (running) setAnimationFailed(true); else setPosterFailed(true); }} />
-        </span>
+        <h1 id={titleId} className={styles.title} data-welcome-title>
+          <span className={styles.leadRow} data-welcome-lead-row>
+            <span className={styles.lead} data-welcome-title-lead>{title}</span>
+            <span ref={mascotRef} className={styles.mascot} aria-hidden="true" data-welcome-mascot data-motion={running ? "running" : "paused"}>
+              <QuantumCloudLoader paused={!running} />
+            </span>
+          </span>
+          <em className={styles.accent} data-welcome-title-accent>{accent}</em>
+        </h1>
       </div>
     </div>
   );

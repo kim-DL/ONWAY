@@ -12,67 +12,55 @@
   overflow-wrap: anywhere;
 }
 
-.headline {
-  display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(64px, 1fr);
-  align-items: center;
-  gap: 12px;
+.headline,
+.lead {
   min-width: 0;
 }
 
-.title {
-  min-width: 0;
+.greeting .title {
+  margin-block: 0;
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
 
-.greeting .title > h1 {
-  margin-block: 0;
+/* Compact artwork beside the first phrase, never pushed to the card edge.
+   The second line keeps the full title width instead of wrapping for artwork. */
+.leadRow {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 108px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
+
+.accent { display: block; }
 
 .mascot {
   position: relative;
   display: block;
-  justify-self: center;
-  width: 64px;
-  height: 56px;
-  overflow: visible;
+  width: 108px;
+  height: 1em;
+  min-height: 32px;
   pointer-events: none;
   user-select: none;
 }
 
-.image {
+.mascot > span {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  display: block;
-  width: 76px;
-  height: 76px;
-  max-width: none;
-  transform: translate(-50%, -50%);
-  object-fit: contain;
+  inset: calc(50% - 4px) auto auto 50%;
+  transform: translate(-50%, -50%) scale(.9);
 }
-
-/* Every frame's visible pixels fit inside the reserved 64×56 slot. Only the
-   source's transparent canvas extends beyond it; no animation frame is cropped. */
-.image[hidden] { display: none; }
 
 /* Let the existing score panel stack when enlarged text needs the width. */
 :global(.sales-activity-hero):has(.greeting) {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
 }
 
-/* Preserve readable title space at text zoom instead of squeezing it into a
-   narrow column. The decoration stays visible, below and right of the title. */
+/* Accessibility fallback, not the composition used on normal staff phones. */
 @container welcome-hero (max-width: 14rem) {
-  .greeting .headline { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
-  .mascot { justify-self: end; }
-}
-
-@media (max-width: 359px) {
-  .headline { grid-template-columns: minmax(0, max-content) minmax(56px, 1fr); gap: 8px; }
-  .mascot { width: 56px; }
-  .image { width: 68px; height: 68px; }
+  .leadRow { grid-template-columns: minmax(0, 1fr) 72px; gap: 6px; }
+  .mascot { width: 72px; }
+  .mascot > span { transform: translate(-50%, -50%) scale(.6); }
 }
 
 @media (forced-colors: active) {

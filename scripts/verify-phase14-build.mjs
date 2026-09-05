@@ -6,7 +6,7 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase27",
+  "phase28",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",
@@ -14,8 +14,6 @@ for (const required of [
   "onnuriway-company-icon-192-v4.png",
   "onnuriway-company-icon-maskable-512-v4.png",
   "onnuri-food-logo.png",
-  "bloub-welcome-v2.webp",
-  "bloub-welcome-still-v2.png",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {
@@ -28,6 +26,7 @@ for (const forbidden of [
   "googleapis",
   "employeeLogin",
   "exportCsv",
+  "bloub-welcome",
 ]) {
   if (serviceWorker.toLowerCase().includes(forbidden.toLowerCase())) {
     throw new Error(`Generated service worker unexpectedly contains ${forbidden}.`);
