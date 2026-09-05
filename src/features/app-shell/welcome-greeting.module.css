@@ -1,29 +1,41 @@
 .greeting {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  container-type: inline-size;
+  container-name: welcome-hero;
   min-width: 0;
   width: 100%;
 }
 
 .greeting .copy {
-  flex: 1 1 auto;
   min-width: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
   line-height: 1.65;
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
 
+.headline {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(64px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.greeting .title > h1 {
+  margin-block: 0;
+}
+
 .mascot {
   position: relative;
   display: block;
-  flex: 0 0 64px;
+  justify-self: center;
   width: 64px;
-  height: 52px;
+  height: 56px;
   overflow: visible;
   pointer-events: none;
   user-select: none;
@@ -41,13 +53,25 @@
   object-fit: contain;
 }
 
-/* Every frame's visible pixels fit inside the reserved 64×52 slot. Only the
+/* Every frame's visible pixels fit inside the reserved 64×56 slot. Only the
    source's transparent canvas extends beyond it; no animation frame is cropped. */
 .image[hidden] { display: none; }
 
+/* Let the existing score panel stack when enlarged text needs the width. */
+:global(.sales-activity-hero):has(.greeting) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+}
+
+/* Preserve readable title space at text zoom instead of squeezing it into a
+   narrow column. The decoration stays visible, below and right of the title. */
+@container welcome-hero (max-width: 14rem) {
+  .greeting .headline { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .mascot { justify-self: end; }
+}
+
 @media (max-width: 359px) {
-  .greeting { gap: 8px; }
-  .mascot { flex-basis: 56px; width: 56px; }
+  .headline { grid-template-columns: minmax(0, max-content) minmax(56px, 1fr); gap: 8px; }
+  .mascot { width: 56px; }
   .image { width: 68px; height: 68px; }
 }
 

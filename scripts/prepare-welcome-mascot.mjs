@@ -8,25 +8,25 @@ import sharp from "sharp";
 
 // Technical export only: preserve the supplied canvas, colours, alpha, every
 // frame, its duration and the complete repeating cycle. No crop or resampling.
-// Usage: node scripts/prepare-welcome-mascot.mjs "path/to/bloub-my-cycle.gif"
+// Usage: node scripts/prepare-welcome-mascot.mjs "path/to/bloub-my-cycle onnuri.gif"
 const sourceArgument = process.argv[2];
-assert(sourceArgument, "Pass the original bloub-my-cycle.gif path.");
+assert(sourceArgument, "Pass the original bloub-my-cycle onnuri.gif path.");
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = resolve(sourceArgument);
 const outputDirectory = join(projectRoot, "public", "brand");
-const animationPath = join(outputDirectory, "bloub-welcome-v1.webp");
-const posterPath = join(outputDirectory, "bloub-welcome-still-v1.png");
+const animationPath = join(outputDirectory, "bloub-welcome-v2.webp");
+const posterPath = join(outputDirectory, "bloub-welcome-still-v2.png");
 const source = await readFile(sourcePath);
 const sourceMetadata = await sharp(source, { animated: true }).metadata();
 
 assert.equal(sourceMetadata.format, "gif");
 assert.equal(sourceMetadata.width, 320);
 assert.equal(sourceMetadata.pageHeight, 320);
-assert.equal(sourceMetadata.pages, 314);
+assert.equal(sourceMetadata.pages, 200);
 assert.equal(sourceMetadata.hasAlpha, true);
 assert.equal(sourceMetadata.loop, 0);
-assert.equal(sourceMetadata.delay?.length, 314);
+assert.equal(sourceMetadata.delay?.length, 200);
 assert(sourceMetadata.delay.every((delay) => delay === 50));
 
 const animation = await sharp(source, { animated: true })

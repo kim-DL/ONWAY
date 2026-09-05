@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -52,6 +52,36 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => { await cleanupBrandFixture?.(); });
 
+async function expectHeadlineMascotPlacement(page: Page) {
+  const geometry = await page.locator("[data-welcome-greeting]").evaluate(element => {
+    const copy = element.querySelector("[data-greeting-copy]")!.getBoundingClientRect();
+    const greeting = element.getBoundingClientRect();
+    const headline = element.querySelector("[data-welcome-headline]")!.getBoundingClientRect();
+    const title = element.querySelector("[data-welcome-title]")!.getBoundingClientRect();
+    const mascot = element.querySelector("[data-welcome-mascot]")!.getBoundingClientRect();
+    return {
+      headlineBelowGreeting: headline.top >= copy.bottom - 1,
+      compact: greeting.width <= 14 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize) + .5,
+      mascotRightOfTitle: mascot.left >= title.right + 3,
+      mascotWithinHeadline: mascot.left >= headline.left && mascot.right <= headline.right + 1,
+      mascotCenterOffset: Math.abs((mascot.top + mascot.bottom) / 2 - (headline.top + headline.bottom) / 2),
+      mascotBelowTitle: mascot.top >= title.bottom + 3,
+      mascotRightOffset: Math.abs(mascot.right - headline.right),
+      viewportOverflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  });
+  expect(geometry.headlineBelowGreeting).toBe(true);
+  expect(geometry.mascotWithinHeadline).toBe(true);
+  if (geometry.compact) {
+    expect(geometry.mascotBelowTitle).toBe(true);
+    expect(geometry.mascotRightOffset).toBeLessThanOrEqual(1);
+  } else {
+    expect(geometry.mascotRightOfTitle).toBe(true);
+    expect(geometry.mascotCenterOffset).toBeLessThanOrEqual(1);
+  }
+  expect(geometry.viewportOverflow).toBeLessThanOrEqual(1);
+}
+
 test("company signature stays visible without crowding mobile mode controls and honors reduced motion", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const connectionEvents: Record<string, unknown>[] = [];
@@ -90,7 +120,8 @@ test("company signature stays visible without crowding mobile mode controls and 
   const mascot = page.locator("[data-welcome-mascot]");
   await expect(page.locator("#delivery-home-title")).toBeVisible();
   await expect(mascot).toHaveAttribute("data-motion", "paused");
-  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v1.png");
+  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v2.png");
+  await expectHeadlineMascotPlacement(page);
   const modeControl = header.getByRole("group", { name: "업무 모드" });
   await expect(header.locator(".employee-avatar")).toHaveCount(0);
   await expect(modeControl.getByRole("button")).toHaveCount(2);
@@ -103,8 +134,9 @@ test("company signature stays visible without crowding mobile mode controls and 
   const salesButton = modeControl.getByRole("button", { name: "영업", exact: true });
   await expect(salesButton).toHaveCSS("color", "rgb(36, 118, 71)");
 
-  for (const width of [320, 390, 1280]) {
+  for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: width > 760 ? 900 : 844 });
+    await expectHeadlineMascotPlacement(page);
     const geometry = await header.evaluate((element) => {
       const brand = element.querySelector(".app-brand--signature")!.getBoundingClientRect();
       const controls = element.querySelector(".workspace-header__controls")!.getBoundingClientRect();
@@ -130,12 +162,14 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "company-wave-arrive");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-iteration-count", "1");
   await expect(mascot).toHaveAttribute("data-motion", "running");
+  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-v2.webp");
   await expect.poll(() => mascot.locator("img").evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(320);
   const navigation = page.getByRole("navigation", { name: "주요 메뉴" });
   await navigation.getByRole("button", { name: "활동", exact: true }).click();
   await expect(page.locator("#sales-activity-title")).toBeVisible();
   await expect(mascot).toHaveAttribute("data-motion", "running");
   await page.setViewportSize({ width: 390, height: 844 });
+  await expectHeadlineMascotPlacement(page);
   await page.screenshot({ path: "output/playwright/welcome-mascot/activity-live-app.png", fullPage: false });
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "설정", exact: true }).click();
@@ -148,5 +182,5 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(header.locator('[data-motion="paused"]')).toHaveCount(1);
   await navigation.getByRole("button", { name: "학교", exact: true }).click();
   await expect(mascot).toHaveAttribute("data-motion", "paused");
-  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v1.png");
+  await expect(mascot.locator("img")).toHaveAttribute("src", "/brand/bloub-welcome-still-v2.png");
 });

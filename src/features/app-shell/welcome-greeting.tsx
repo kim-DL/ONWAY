@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { useHeaderMotionPreference } from "./header-motion-preference";
 import styles from "./welcome-greeting.module.css";
 
-const ANIMATION = "/brand/bloub-welcome-v1.webp";
-const POSTER = "/brand/bloub-welcome-still-v1.png";
+const ANIMATION = "/brand/bloub-welcome-v2.webp";
+const POSTER = "/brand/bloub-welcome-still-v2.png";
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 const FORCED_COLORS = "(forced-colors: active)";
 
@@ -28,7 +28,11 @@ function subscribeToMotionEnvironment(onChange: () => void) {
 // Never flash an animated frame before the saved/OS motion preference is known.
 const serverMotionRestricted = () => true;
 
-export function WelcomeGreeting({ children, className = "" }: { children?: ReactNode; className?: string }) {
+export function WelcomeGreeting({ children, title, className = "" }: {
+  children?: ReactNode;
+  title: ReactNode;
+  className?: string;
+}) {
   const mascotRef = useRef<HTMLSpanElement>(null);
   const { paused } = useHeaderMotionPreference();
   const restricted = useSyncExternalStore(subscribeToMotionEnvironment, isMotionRestricted, serverMotionRestricted);
@@ -54,16 +58,19 @@ export function WelcomeGreeting({ children, className = "" }: { children?: React
   const source = running ? ANIMATION : POSTER;
 
   return (
-    <div className={`${className} ${styles.greeting}`} data-welcome-greeting>
-      <p className={styles.copy} data-greeting-copy>{children}</p>
-      <span ref={mascotRef} className={styles.mascot} aria-hidden="true" data-welcome-mascot data-motion={running ? "running" : "paused"}>
-        {/* Native animated WebP preserves all 314 frames/15.7 seconds. Replacing
-            the source with a still stops decoded motion, unlike CSS animation-play-state. */}
-        {/* eslint-disable-next-line @next/next/no-img-element -- Already optimised, versioned animation + native still fallback. */}
-        <img key={source} src={source} alt="" width={320} height={320} draggable={false} decoding="async"
-          className={styles.image} hidden={!running && posterFailed}
-          onError={() => { if (running) setAnimationFailed(true); else setPosterFailed(true); }} />
-      </span>
+    <div className={styles.greeting} data-welcome-greeting>
+      <p className={`${className} ${styles.copy}`} data-greeting-copy>{children}</p>
+      <div className={styles.headline} data-welcome-headline>
+        <div className={styles.title} data-welcome-title>{title}</div>
+        <span ref={mascotRef} className={styles.mascot} aria-hidden="true" data-welcome-mascot data-motion={running ? "running" : "paused"}>
+          {/* Native animated WebP preserves all 200 frames/10 seconds. Replacing
+              the source with a still stops decoded motion, unlike CSS animation-play-state. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- Already optimised, versioned animation + native still fallback. */}
+          <img key={source} src={source} alt="" width={320} height={320} draggable={false} decoding="async"
+            className={styles.image} hidden={!running && posterFailed}
+            onError={() => { if (running) setAnimationFailed(true); else setPosterFailed(true); }} />
+        </span>
+      </div>
     </div>
   );
 }

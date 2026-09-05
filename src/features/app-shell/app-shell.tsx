@@ -131,8 +131,10 @@ function DeliveryHome({
       <div className="shell-hero shell-hero--delivery">
         <div>
           <p className="shell-kicker">DELIVERY · SCHOOL</p>
-          <WelcomeGreeting className="shell-greeting">{session.displayName}님, {greeting}.</WelcomeGreeting>
-          <h1 id="delivery-home-title">학교를 찾고<br /><em>현장으로.</em></h1>
+          <WelcomeGreeting className="shell-greeting"
+            title={<h1 id="delivery-home-title">학교를 찾고<br /><em>현장으로.</em></h1>}>
+            {session.displayName}님, {greeting}.
+          </WelcomeGreeting>
         </div>
         <button
           className="school-search-trigger"
