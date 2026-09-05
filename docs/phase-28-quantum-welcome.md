@@ -48,4 +48,13 @@
 
 - 반영 전 운영: `dpl_ZvywRMFba6NfGNGB8PMdw8BsvTLj` (phase27)
   `https://onnuriway-9rpg3nuvb-daeins-projects.vercel.app`
-- 새 배포 ID와 운영 PWA 업데이트 검증은 배포 완료 후 기록한다.
+- 코드 커밋: `938e1a2`.
+- 배포: `dpl_GDCSKEqu9DtAoLjtdh9MFFnXDM62`, Production / Ready.
+- 생성: 2026-09-06 02:02:38 KST. 운영 별칭: `https://onnuriway.vercel.app`.
+- 불변 URL: `https://onnuriway-je2kpogao-daeins-projects.vercel.app`.
+- 운영 브라우저의 phase27 서비스 워커에서 업데이트 안내가 나타나는 것을 확인하고
+  실제 ‘업데이트’ 버튼으로 전환했다. 결과 캐시는 `app-shell-phase28`만 남았고
+  기존 `bloub` 자산 캐시는 0개였다. 익명 PIN 화면 정상, 브라우저 오류 없음.
+- 배포 후 조회한 해당 배포의 최근 10분 오류 로그 없음. 운영 직원 로그인이나
+  업무 데이터 변경은 수행하지 않았으며 로그인 이후 검증은 위 에뮬레이터 결과다.
+- 필요 시 위 phase27 배포로 되돌릴 수 있다. 서버·데이터 마이그레이션 없음.
