@@ -246,7 +246,10 @@ assertBudget(customerStylesheetGzipBytes <= 9.75 * 1024, `customer CSS gzip ${cu
 // document-picker recovery add shared photo reliability code. Measured 35,876B
 // gzip in deferred customer boundaries. Allocate 1KiB, with no new dependency
 // and no change to initial JS, school/sales, CSS or inventory budgets.
-assertBudget(customerJavascriptGzipBytes <= 35.5 * 1024, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 35.5KiB`);
+// P2-B adds the memory-only revalidation coordinator and freshness state to the
+// existing customer boundary. Measured 36,705B gzip; add only 512B while the
+// initial, inventory, school/sales and stylesheet budgets remain unchanged.
+assertBudget(customerJavascriptGzipBytes <= 36 * 1024, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 36KiB`);
 assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${salesWorkspaceGzipBytes}B exceeds 14KiB`);
 // Phase 49: personal accessible count toggle, guarded More actions, read-only
 // lot confirmations and two-state expiry entry. Retired and overwritten CSS
@@ -254,9 +257,11 @@ assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${sales
 // allocate a narrow 28.5KiB / 6.5KiB feature envelope. The shared photo CSS
 // remains 6,711/1,928B and JS stays within its unchanged 24KiB budget. Initial,
 // school/sales/customer/admin assets and all isolation checks remain unchanged.
+// P2-B's coordinator and freshness state measure 25,028B gzip. Give this lazy
+// boundary a 1KiB allowance without changing any initial or unrelated budget.
 assertBudget(inventoryStylesheetRawBytes <= 28.5 * 1024, `inventory CSS raw ${inventoryStylesheetRawBytes}B exceeds 28.5KiB`);
 assertBudget(inventoryStylesheetGzipBytes <= 6.5 * 1024, `inventory CSS gzip ${inventoryStylesheetGzipBytes}B exceeds 6.5KiB`);
-assertBudget(inventoryJavascriptGzipBytes <= 24 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 24KiB`);
+assertBudget(inventoryJavascriptGzipBytes <= 25 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25KiB`);
 assertBudget(inventoryViewerJavascriptGzipBytes <= 2.25 * 1024, `inventory photo viewer JavaScript gzip ${inventoryViewerJavascriptGzipBytes}B exceeds 2.25KiB`);
 
 const report = {
@@ -275,11 +280,11 @@ const report = {
     combinedSchoolStylesheetGzipBytes: (44.5 + 1.625) * 1024,
     customerStylesheetRawBytes: 48 * 1024,
     customerStylesheetGzipBytes: 9.75 * 1024,
-    customerJavascriptGzipBytes: 35.5 * 1024,
+    customerJavascriptGzipBytes: 36 * 1024,
     salesWorkspaceGzipBytes: 14 * 1024,
     inventoryStylesheetRawBytes: 28.5 * 1024,
     inventoryStylesheetGzipBytes: 6.5 * 1024,
-    inventoryJavascriptGzipBytes: 24 * 1024,
+    inventoryJavascriptGzipBytes: 25 * 1024,
     inventoryViewerJavascriptGzipBytes: 2.25 * 1024,
   },
   measurements: {

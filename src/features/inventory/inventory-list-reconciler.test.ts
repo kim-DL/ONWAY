@@ -65,6 +65,19 @@ describe("inventory catalog read/write reconciliation", () => {
     expect(snapshot).toEqual([original, remote]);
   });
 
+  it("overlays progressive pages on the old catalog, protects writes, then drops absent rows at completion", () => {
+    const reconciler = new InventoryListReconciler(session);
+    const first = product();
+    const later = product({ productId: "later-product", name: "뒤 페이지 품목" });
+    const removed = product({ productId: "removed-product", name: "서버에서 삭제된 품목" });
+    const saved = product({ stockRevision: 4, quantityByLocation: { ...inventoryLocationMap(0), refrigerated: 31 } });
+    reconciler.begin();
+    expect(reconciler.reconcile([first], [first, later, removed])).toEqual([first, later, removed]);
+    reconciler.record(session, saved);
+    expect(reconciler.reconcile([first, later], [first, later, removed])).toEqual([saved, later, removed]);
+    expect(reconciler.reconcile([first, later])).toEqual([saved, later]);
+  });
+
   it("clears its overlay after success or failure so a later fresh server read wins", () => {
     const reconciler = new InventoryListReconciler(session);
     const local = product({ stockRevision: 4 });

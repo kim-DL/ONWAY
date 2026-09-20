@@ -18,10 +18,14 @@ const customers: Customer[] = ["온누리유통", "온누리식품", "온누리�
 // below are the production components, without any access to operating data.
 (window as unknown as { customerSearchFixtures: Customer[] }).customerSearchFixtures = customers;
 const session = { uid: "FIXTURE", displayName: "김대인 부장", claims: { employeeId: "FIXTURE", companyId: "onnuri", sessionVersion: 1, permissionsVersion: 1 } } as AuthenticatedSession;
-createRoot(document.getElementById("root")!).render(
+const root = createRoot(document.getElementById("root")!);
+let workspaceVersion = 0;
+function renderWorkspace() { root.render(
   <main className="workspace-shell" data-mode="customer">
     <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
     <div aria-hidden="true" style={{ height: 120, padding: "24px 20px", fontWeight: 700 }}>온누리종합식품</div>
-    <div className="workspace-content"><CustomerWorkspace session={session} /></div>
+    <div className="workspace-content"><CustomerWorkspace key={workspaceVersion} session={session} /></div>
   </main>,
-);
+); }
+(window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture = () => { workspaceVersion += 1; renderWorkspace(); };
+renderWorkspace();

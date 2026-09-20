@@ -52,6 +52,9 @@ for (const width of [320, 390]) {
     await input.fill("온누리");
     const cards = page.locator("[data-customer-card]");
     await expect(cards).toHaveCount(3);
+    await page.evaluate(() => (window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture());
+    await expect(page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true })).toHaveValue("온누리");
+    await expect(cards).toHaveCount(3);
     const search = input.locator("..");
     const close = page.getByRole("button", { name: "검색 닫기", exact: true });
     const searchBox = (await search.boundingBox())!;

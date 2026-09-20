@@ -2,6 +2,8 @@ import { clearSearchClientState } from "@/features/search/search-catalog-cache";
 import { clearSalesWorkspaceClientState } from "@/features/sales-cycle/sales-workspace-cache";
 import { clearSchoolDetailClientState } from "@/features/school-detail/school-detail-cache";
 import { clearSchoolPhotoClientState } from "@/features/school-detail/school-photo-cache";
+import { clearCustomerWorkspaceSnapshot } from "@/features/customers/customer-workspace-snapshot";
+import { clearInventoryWorkspaceSnapshot } from "@/features/inventory/inventory-workspace-snapshot";
 
 const PRIVATE_STORAGE_PREFIX = "onnuriway:private:";
 const blobUrls = new Set<string>();
@@ -21,6 +23,8 @@ export function forgetPrivateBlobUrl(url: string) {
 }
 
 export async function clearPrivateClientState() {
+  clearCustomerWorkspaceSnapshot();
+  clearInventoryWorkspaceSnapshot();
   for (const url of blobUrls) {
     try {
       URL.revokeObjectURL(url);

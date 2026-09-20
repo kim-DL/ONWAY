@@ -278,6 +278,55 @@ Functions는 전체 무차별 배포를 피하고 변경된 Callable 목록과 �
 3. Service Worker cache version `phase35` 명명과 현재 Phase 49+ 릴리스의 관계를 정리하되, cache key 변경은 업데이트/오프라인 회귀 검증과 함께 수행한다.
 4. 기존 bundle budget(초기·거래처·재고 lazy chunk)과 1,000개 목록 progressive rendering을 최신 코드에서 다시 측정한다.
 
+### 2026-09-20 P2-A 체감속도 연구 — 완료/구현 전
+
+- 격리 production static export + Chromium 360×800 + demo Firebase Emulator에서 100/500/1,000개 재고를 계측했다. 목록 Callable은 1/5/10회, 논리 문서 read는 query cursor sentinel을 포함해 약 100/504/1,009개다.
+- warm normal first usable 목록은 500개 약 1.34초, 1,000개 약 1.84초였다. 1,000개 각 page에 300ms를 더하면 약 4.84초였고, 같은 세션 모드 재진입도 context+10 page를 다시 읽어 약 4.35초였다. 첫 100개 run은 callable cold start가 섞여 절대시간 비교에서 제외했다.
+- 재고 검색/장소/필터는 1,000개에서도 약 27ms·추가 요청 0회였다. 상세→목록 복귀도 목록 재조회 0회다. 실제 병목은 모든 page 완료 전 목록을 숨기는 구조와 모드 재진입 시 Memory/UI 상태를 버리는 구조다.
+- 거래처는 background 성공 중 기존 목록을 유지하지만 250개 전체 page를 60초 timer 및 focus/online/visibility에서 재검증한다. refresh 실패와 retry는 기존 목록을 숨긴다. 8명 실제 활성시간·focus 빈도·현재 거래처 수는 미확인이다.
+- `phase35` cache 이름은 namespace일 뿐 현재 Phase와 맞출 필요가 없다. navigation/public asset/학교 thumbnail 정책과 사용자 승인형 worker update를 유지하며 업무 데이터 cache는 추가하지 않는다.
+- P2-B 권장 순서: (1) session Memory revalidation coordinator와 in-flight/event dedupe·freshness UI, (2) 인증 namespace별 목록/필터/scroll snapshot 복원, (3) 재고 첫 100개 page progressive publish. durable cache, realtime listener, offline write queue는 범위 밖이다.
+- 임시 계측 코드는 제거했다. 제품 최적화, dependency, deploy, commit/push, 운영 데이터 접근·변경은 하지 않았다. 실제 Galaxy S20+ 설치 PWA/현장 네트워크는 미확인이다.
+
+### 2026-09-20 P2-B revalidation coordinator/freshness — 완료/미배포
+
+- 범위는 inventory/customer의 session Memory revalidation만이다. `uid:sessionVersion:permissionsVersion`별 coordinator가 in-flight 요청을 합치고 last-success 60초 TTL로 focus/visibility/online 연속 이벤트를 coalescing한다. logout·권한/session 변경과 인증 실패에서는 coordinator와 민감 화면 상태를 폐기한다. IndexedDB, persistent Firestore cache, Service Worker 업무 cache, realtime listener, offline write queue는 추가하지 않았다.
+- background 갱신은 기존 목록을 유지하며 `최신 정보 확인 중 · 마지막 확인 HH:MM`, 성공 후 `마지막 확인 HH:MM`, 일시 실패 후 `갱신 실패 · 기존 정보 표시 · 마지막 확인 HH:MM`을 작은 status text로 표시한다. 인증/권한 실패는 기존대로 목록과 편집 상태를 비운다. 거래처의 기존 offline clear 정책과 재고의 in-memory draft 유지 정책도 바꾸지 않았다.
+- 대표 순차 이벤트 기준 revalidation batch 수는 customer가 최초 성공 뒤 TTL 안 visibility+focus+online에서 기존 총 4회(최초 1+추가 3) → 총 1회, TTL 이후 같은 연속 이벤트에서 총 4회 → 총 2회(최초 1+갱신 1)다. inventory는 TTL 안 기존 총 2회(online이 1회 추가) → 총 1회, TTL 이후 기존 총 3회(visibility+online) → 총 2회다. 동시에 들어온 이벤트/in-flight는 한 promise만 사용한다. 한 inventory batch는 context 1회와 전체 100개 page 요청을 포함하므로 1,000개에서는 억제한 batch당 Callable 11회(context 1+list 10)를 피한다.
+- write의 authoritative 성공/실패 처리는 변경하지 않았다. 거래처 저장 뒤 `retry`, 재고 설정 저장 뒤 `refresh`는 force revalidation으로 TTL을 우회한다. 재고 수량/lot/상품 write는 기존 mutation 응답과 `InventoryListReconciler`를 계속 사용하며 불필요한 전체 목록 read를 새로 만들지 않는다.
+- PASS: coordinator/customer/inventory 집중 34/34, customer 전체 265/265, inventory unit/Functions 315/315, performance 18/18, PWA 17/17, typecheck(app/Functions), lint, `git diff --check`, production static build, PWA/Hosting build gate, inventory production UI E2E 10/10 + demo Emulator integration 10/10, customer mobile Chromium E2E 24/24. 성능 build gate도 통과했다(initial gzip 140,763B, customer lazy 36,705B/36KiB, inventory lazy 25,028B/25KiB). P2-B의 lazy-only 증가만 customer +0.5KiB/inventory +1KiB 예산으로 기록했고 초기·CSS·다른 feature 예산은 바꾸지 않았다.
+- 남은 위험: 실제 8명 사용 환경의 focus 빈도/read 감소량과 Galaxy S20+ 설치 PWA 체감은 아직 미측정이다. 60초 TTL 안에는 다른 사용자의 최신 write가 늦게 보일 수 있지만 강제 refresh/write 후 최신화는 억제하지 않는다. 이번 단계는 mode unmount 뒤 목록/필터/scroll을 복원하지 않으므로 모드 재진입은 여전히 전체 목록을 읽는다.
+- 다음 단계는 같은 session namespace와 invalidation 경계를 재사용해 **Memory snapshot 복원**을 진행해도 된다. 다만 재고 첫-page progressive publish는 그 다음 단계로 분리하고, snapshot 단계에서 logout/session 변경·offline 정책·write reconcile을 다시 회귀 검증한다. deploy, commit, push, dependency, P3 디자인 변경은 실행하지 않았다.
+
+### 2026-09-20 P2-B2 session Memory snapshot 복원 — 완료/미배포
+
+- customer와 inventory에 각각 작은 module Memory snapshot store를 두고 namespace당 feature snapshot을 최대 1개만 보관한다. namespace는 기존 coordinator의 `uid:sessionVersion:permissionsVersion`을 그대로 쓰며 다른 namespace가 들어오면 이전 coordinator·snapshot·reconciler를 먼저 폐기한다. durable cache, IndexedDB, local/sessionStorage 업무 snapshot, 사진/Blob cache는 추가하지 않았다.
+- customer snapshot은 authoritative 목록·freshness/last-success와 검색어·검색창 상태·scroll만 저장한다. inventory snapshot은 authoritative context/전체 목록·기준일·freshness/last-success와 검색어·장소·임박/비활성 필터·표시 limit·scroll만 저장하며 기존 `InventoryListReconciler`도 같은 namespace에서 유지한다. editor/form draft, modal, busy/error, mutation 중간값은 저장하지 않는다.
+- warm 재진입은 snapshot을 첫 render부터 사용한다. TTL 안에는 customer/list와 inventory context/list 요청이 모두 0회이며, TTL 만료 시에도 snapshot을 먼저 표시한 뒤 기존 coordinator로 background revalidation한다. 1,000개 inventory 대표 시나리오는 이전 context 1 + list 10 = 11회에서 TTL 안 context 0 + list 0 = 0회로 줄었다. P2-A의 약 4.35초 전체 재조회 loader 대신 동기 Memory render/다음 paint에 기존 목록을 사용할 수 있게 됐으며 별도 절대시간 필드 계측값은 만들지 않았다.
+- 모드 재진입 때 customer 검색어·검색창·scroll, inventory 검색어·장소·임박/비활성 필터·표시 limit·scroll을 복원한다. scroll은 목록 commit 뒤 유효 최대 범위로 clamp하며 layout-effect cleanup으로 DOM 축소 전 위치를 보존한다. 데이터가 줄면 범위를 벗어난 위치로 강제 이동하지 않는다.
+- logout은 두 store를 즉시 clear하고, uid/sessionVersion/permissionsVersion 변경은 snapshot 반환 전에 이전 entry를 폐기하며, 인증/권한 실패도 catalog/UI를 비운다. customer offline clear와 inventory write/draft 정책은 유지했다. customer authoritative save에는 write generation을, inventory에는 기존 reconciler와 authoritative product update를 적용해 늦은 목록 응답이나 재진입 snapshot이 write 결과를 되돌리지 못하게 했다.
+- PASS: snapshot/coordinator 집중 39/39, customer 전체 270/270, inventory unit/Functions 320/320, auth 28/28와 logout snapshot 직접 회귀 1/1, performance 18/18, PWA 17/17, typecheck(app/Functions), lint, production static build와 performance/PWA/Hosting gate, inventory production UI E2E 10/10 + demo Emulator integration 10/10, customer mobile E2E 전체 24/24 및 snapshot remount 집중 4/4. 최신 build gate는 initial gzip 140,764B, customer lazy 36,812B/36KiB, inventory lazy 24,926B/25KiB, worker 41,238B, exported/shipped 98개·precache 69개로 통과했다.
+- 남은 위험은 snapshot이 탭 reload/종료에서 사라지는 의도된 Memory 범위, 60초 TTL 동안 다른 사용자의 write가 늦게 보일 수 있는 점, 실제 Galaxy S20+·현장 네트워크 T2 미계측이다. P2-B3 첫-page progressive publish는 진행 가능하지만, page 중간 publish가 retained reconciler/write generation을 우회해 authoritative write를 되돌리지 않도록 결합해야 한다. deploy, commit, push, dependency, P3 및 progressive publish는 실행하지 않았다.
+
+### 2026-09-20 P2-B3 inventory first-page progressive publish — 완료/미배포
+
+- 기존 `listInventoryProducts` 100개 cursor 계약과 5,000개 방어 한계는 그대로다. repository가 각 page 뒤 dedupe된 누적 목록과 page count/complete만 callback으로 내보내고, workspace가 기존 coordinator task 안에서 snapshot listener로 publish한다. 별도 서버 contract, durable cache, 상태관리 계층은 추가하지 않았다.
+- cold load는 첫 page가 오기 전까지만 기존 loading을 유지하고 첫 page부터 실제 카드·검색·장소/필터를 사용할 수 있다. 이후 page는 `최신 정보 확인 중` freshness 아래 비차단으로 합쳐진다. stale refresh는 기존 full snapshot을 baseline으로 유지하면서 도착한 page만 덮어쓰고, final page에서 baseline을 제거해 전체 서버 catalog를 authoritative하게 확정한다. 표시 limit·scroll은 B2 snapshot 정책을 유지한다.
+- 모든 partial/final publish는 현재 coordinator generation과 namespace 및 retained reconciler identity를 검사한다. `InventoryListReconciler`는 매 page마다 기존 baseline/누적 page 위에 in-flight write 결과를 마지막으로 적용하므로 입고·출고·조정·lot/product write 직후 늦은 page가 값을 되돌리지 않는다. final reconcile에서는 서버에서 사라진 기존 row도 정상 제거된다.
+- 통제된 300ms/page 기준 pagination T2는 500개 1,500ms(5 page 완료) → 300ms(첫 page), 1,000개 3,000ms(10 page 완료) → 300ms다. T4는 각각 1,500ms/3,000ms로 동일하다. 요청은 5/10회, 논리 read는 약 504/1,009개로 변경 전과 같으며 E2E의 150ms/page 1,000개에서도 terminal page 전에 60개 카드와 검색이 usable함을 확인했다.
+- page 실패는 이미 publish된 목록을 `stale-error`로 유지하고, 인증/권한 실패는 partial catalog까지 폐기한다. refresh 중 모드 재진입은 같은 in-flight를 join하고 현재 partial snapshot을 즉시 복원하며 이후 page 알림을 이어받는다. logout/session/permissions/offline invalidation 뒤의 늦은 callback은 generation/reconciler guard로 snapshot에 들어오지 않는다.
+- PASS: progressive 집중 44/44, inventory unit/Functions 328/328, auth/logout 29/29, performance 18/18, PWA 17/17, typecheck(app/Functions), lint, production build와 performance/PWA/Hosting gate, inventory production UI E2E + demo Emulator 10/10. 최신 build gate는 initial gzip 140,765B, inventory lazy 25,163B/25KiB, worker 41,238B, exported/shipped 98개·precache 69개다. `git diff --check`도 통과했다.
+- P2의 coordinator/freshness, session snapshot 복원, inventory progressive publish 3단계는 모두 완료됐다. 다음은 실제 Galaxy S20+ 설치 PWA와 현장망에서 T2/T3/read 감소를 재측정한 뒤 상세 cache 또는 제한적 JS prefetch가 필요한지 판단한다. customer progressive, inventory detail cache, JS prefetch, persistent cache, realtime listener, offline queue, dependency, deploy, commit/push, P3는 실행하지 않았다.
+
+### 2026-09-20 P2 checkpoint 통합 검증 — 승인 요청 가능/미커밋·미배포
+
+- P1 checkpoint `0766882` 이후 dirty worktree 28개 파일은 revalidation/freshness, customer·inventory session Memory snapshot, inventory first-page progressive publish와 그 테스트·성능 budget·두 P2 문서뿐이다. unrelated 변경은 확인되지 않았다.
+- PASS: lint, app/Functions typecheck, 전체 unit 1,395/1,408(13 skip), `npm run test:acceptance`, `npm run test:acceptance:emulator`, safe-config/customer mobile 포함 browser 262/262, production full user journey 65/75(10 skip), inventory production UI E2E + demo Emulator 10/10, P2 집중 55/55, production build, PWA/performance/Hosting gate, `git diff --check`. 첫 acceptance의 safe-config mobile 1건은 cold compile 중 5초 assertion을 넘긴 일시 실패였고 동일 브라우저 전체 및 acceptance 전체 재실행에서 통과했다. acceptance emulator가 마지막에 demo `out/`을 만든 뒤 production build를 다시 생성해 세 build gate를 최종 확인했다.
+- 핵심 계약은 1,000개 TTL 내 재진입 context/list 0회, stale snapshot 즉시 표시 뒤 background revalidation, 첫 100개 page의 terminal 이전 usable publish, 500/1,000개 요청 5/10회·논리 read 약 504/1,009개 유지, write/reconciler 우선, namespace/logout/auth·permission invalidation, refresh/page 실패 시 usable 목록 유지로 모두 통과했다.
+- 최종 build 수치는 initial gzip 140,765B, customer lazy 36,812B/36KiB, inventory lazy 25,163B/25KiB, worker 41,238B, exported/shipped 98개, precache 69개다. 성능 gate는 5,000개 index 109.59ms, search p95 1.25ms·max 5.22ms, typing network 0회로 통과했다.
+- 남은 위험은 실제 Galaxy S20+·현장망 및 8명 동시 사용에서의 T2/T3/read 감소 미계측, 의도된 탭 Memory 수명, 60초 TTL 내 타 사용자 write 지연 가능성, customer lazy budget 잔여 52B와 inventory lazy 잔여 437B다. npm audit의 firebase-tools 계열 moderate 7건은 P1의 문서화된 일시 예외이며 dependency는 변경하지 않았다.
+- **P2 checkpoint 승인 요청 가능 — 아직 미커밋/미배포**
+
 ### P3 — 디자인 디테일
 
 1. 실기기에서 재고 카드 밀도, 토글/checkbox alignment, 사진 확대 affordance와 고정 action의 safe-area/키보드 겹침을 점검한다.

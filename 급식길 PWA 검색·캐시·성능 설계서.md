@@ -1,6 +1,6 @@
 # 급식길 PWA 검색·캐시·성능 설계서
 
-**문서 버전:** 1.1  
+**문서 버전:** 1.3
 **대상:** 급식길 PWA MVP  
 **관련 문서:** MVP 기획서 v1.3 / 데이터베이스 상세 설계서 v1.3 / 인증·권한·보안 설계서 v1.3 / 디자인 시스템 v1.0 / 화면·UX 상세 명세서 v1.2
 
@@ -16,13 +16,116 @@
 | 학교 사진 | Thumbnail/Preview는 Memory와 `onnuriway-photo-cache-v1` IndexedDB에 최대 24개/36MiB로 보관한다. Original은 Memory 전용이다. |
 | 영업 Workspace | 활성 탭의 Memory에만 최대 18개 Cycle을 유지한다. IndexedDB store는 구버전 잔여 데이터를 지우기 위해서만 열며 새 영업 데이터를 기록하지 않는다. |
 | 거래처 | 전체 업무정보와 사진은 Memory 전용이다. 보이는 동안 최대 60초 주기·focus·online 복귀 시 Callable로 재검증하고 offline/auth 변경 시 제거한다. 최근 거래처는 권한 namespace가 포함된 localStorage에 ID 최대 5개만 저장한다. |
-| 재고 | 목록·상세·사진·수정 결과는 인증된 Component Memory 전용이고 durable cache나 offline queue가 없다. 개인 실사 모드만 같은 세션·한국 날짜 범위의 sessionStorage preference로 저장한다. |
+| 재고 | 목록·상세·사진·수정 결과는 인증된 Component/Module Memory 전용이고 durable cache나 offline queue가 없다. 목록은 인증 namespace snapshot으로 재진입을 복원하고 cold/stale 조회는 첫 100개 page부터 progressive publish한다. 개인 실사 모드만 같은 세션·한국 날짜 범위의 sessionStorage preference로 저장한다. |
 | Service Worker | Serwist `phase35` cache 이름을 사용한다. App Shell navigation은 NetworkFirst 3초, 명시적 public asset과 학교 thumbnail만 CacheFirst다. Firebase/Callable/Storage/API/업무 응답은 Runtime Cache 대상이 아니다. |
 
 - 로그아웃·권한/세션 무효화 시 `onnuriway:private:` local/sessionStorage, 등록된 Blob URL, 검색·학교 상세·사진 IndexedDB 및 영업 Memory를 지운다.
 - 새 Service Worker는 자동 `skipWaiting`하지 않는다. 사용자가 업데이트를 선택했을 때만 교체·reload한다.
-- 재고 목록은 100개 단위 페이지를 끝까지 읽되 5,000개에서 방어적으로 중단한다. 저장 중 시작된 조회와의 race만 `InventoryListReconciler`가 Memory에서 병합하고 다음 새 조회를 다시 권위 있는 값으로 취급한다.
+- 재고 목록은 100개 단위 페이지를 끝까지 읽되 5,000개에서 방어적으로 중단한다. 첫 page부터 누적 목록을 publish하고, background refresh의 미완료 page는 기존 snapshot을 baseline으로 유지한다. 모든 중간/최종 publish에 `InventoryListReconciler`의 in-flight write overlay를 적용하며 최종 page에서 baseline을 제거해 서버 전체 목록을 다시 authoritative하게 확정한다.
 - 현재 번들 예산과 마지막 검증 수치는 `docs/phase-49-inventory-count-mode.md`, 현재 재검증 필요 항목은 `docs/HANDOFF.md`를 기준으로 한다.
+
+## P2-A 현장 체감속도 연구 — 2026-09-20
+
+이번 단계는 제품 최적화를 적용하지 않고, 사용자 여정에서 기다림이 생기는 위치와 최소 개선 후보만 확인했다. 운영 데이터·운영 telemetry·dependency·Service Worker cache key는 변경하지 않았다. 임시 계측은 격리 production static export와 demo Firebase Emulator에서만 실행한 뒤 제거했다.
+
+### 측정 모델
+
+| 단계 | 정의 | 이번 판정 원칙 |
+| --- | --- | --- |
+| T1 — Interaction feedback | tap/click 뒤 첫 시각 반응 | 선택 상태, sheet, busy 상태 또는 loading boundary가 나타나는 시점. 200ms 안쪽인지 관찰하되 가짜 완료를 만들지 않는다. |
+| T2 — Usable state | 다음 업무 행동이 가능한 시점 | 목록 검색·필터, 상세 action, 다음 navigation이 실제로 가능한 시점이다. |
+| T3 — Fresh state | 서버 최신성 확인이 끝난 시점 | Callable/Firestore 응답과 schema 검증을 마친 authoritative 상태다. |
+| T4 — Complete | 사진·후속 page·background 작업까지 끝난 시점 | T2보다 늦어도 괜찮으며 T4를 앞당기기 위해 T1/T2를 block하지 않는다. |
+
+### 계측 환경과 해석 경계
+
+- Node 22.23.2, Next.js 16.3.3 production static export, Chromium 360×800, demo Auth/Functions/Firestore/Storage Emulator를 사용했다.
+- 업무 Service Worker는 lab 요청 수를 오염시키지 않도록 차단했다. 정상 조건과 `getInventoryContext`/`listInventoryProducts` 요청별 300ms 추가 지연 조건을 비교했다.
+- 절대시간은 로컬 Functions cold start와 호스트 부하에 민감하다. 첫 100개 run의 목록 4.97초·상세 3.97초는 callable cold start가 섞였으므로 규모 비교 근거로 쓰지 않는다. 요청 수, 이후 warm run, 지연 주입 전후의 상대 차이를 우선한다.
+- 실제 Galaxy S20+ 설치 PWA, 제조사 WebView, 현장 LTE/5G/Wi-Fi, 카메라·키보드·safe-area는 미확인이다.
+
+### 핵심 사용자 여정별 T1/T2/T3/T4
+
+| 여정 | T1 | T2 | T3 | T4 및 관찰 |
+| --- | --- | --- | --- | --- |
+| PWA 실행 → 로그인된 첫 화면 | 정적 auth splash와 브랜드가 즉시 화면을 점유한다. | cached Auth 확인과 App Shell dynamic chunk가 준비되면 업무 shell을 쓸 수 있다. 기존 4× CPU production gate의 warm relaunch 목표/통과 기준은 1초 미만이다. | token/authz 검증이 끝나야 온라인 최신 권한이다. | 현재 모드의 업무 데이터·사진이 뒤따른다. 이번 계측은 PIN 로그인으로 시작했으므로 실제 설치 PWA의 로그인 유지 launch는 별도 실기기 확인이 필요하다. |
+| 모드 전환 — 거래처/학교납품/영업/재고 | mode 선택과 header/shell 상태가 먼저 바뀌고 dynamic loading boundary가 공간을 유지한다. | 학교납품은 shell과 로컬 최근 학교, 영업·거래처·재고는 각 workspace chunk와 최초 데이터가 준비돼야 완전 usable하다. | 각 workspace의 서버 read가 끝나는 시점이다. | 설치 PWA에서는 hash asset이 precache되지만 workspace component는 모드 전환 때 unmount된다. 거래처·영업·재고의 component Memory와 필터·검색·표시 limit은 재사용되지 않는다. 자동화 helper 전체는 약 0.47~0.53초였으나 picker 조작까지 포함하므로 순수 T1 수치로 해석하지 않는다. |
+| 재고 최초 진입 | skeleton/loading 문구가 먼저 나타난다. | `getInventoryContext`와 **모든** 100개 page가 모두 끝나야 60개 카드가 처음 나타난다. | 현재 구조에서는 T2와 사실상 같다. | viewport 근처 비공개 thumbnail이 이후 개별 Callable로 로드된다. 첫 page를 받았어도 usable list를 공개하지 않는다. |
+| 재고 검색/장소/필터 | input/pressed 상태가 즉시 바뀐다. | 100/500/1,000개에서 각각 약 16/23/27ms, 추가 요청 0회였다. | 새 서버 검증은 없고 마지막 catalog snapshot의 freshness를 따른다. | 렌더는 처음 60개로 제한되고 `품목 더 보기`마다 60개씩 늘어난다. 로컬 filtering 자체는 병목이 아니다. |
+| 재고 목록 → 상세 → 목록 | sheet와 `최신 재고를 확인하고 있어요`가 먼저 열린다. | warm Emulator에서 상세 Callable 뒤 약 142~156ms에 facts/action이 usable했다. | `getInventoryProduct` 1회가 끝나는 시점이다. | 사진이 있으면 preview가 별도로 끝난다. 상세→목록 복귀는 목록 read 0회이고 기존 DOM·필터·스크롤을 유지한다. 같은 상세 재오픈은 다시 1회 읽는다. |
+| 재고 입고/출고/조정 저장 | 같은 submit event에서 `busy`, `저장 중…`, disable, dismiss 방지가 적용되고 중복 submit을 막는다. | 서버 확정 전 수량을 성공으로 표시하지 않으며 form은 저장 중 상태로 남는다. | mutation Callable의 transaction/revision/request ID/audit가 확정된 응답 시점이다. | 정상 신규 응답은 product+detail을 함께 반영해 전체 목록 재조회 없이 끝난다. replay 등 detail이 없는 응답만 상세 1회 재검증한다. 실패하면 form과 입력을 유지하고 localized error를 표시하며 rollback할 optimistic 수량은 없다. |
+| 거래처 목록 → 상세 → 목록 | cold 진입은 전체 loader, 상세 tap은 이미 받은 객체로 sheet를 즉시 연다. | 목록은 모든 250개 page가 끝나야 usable하고, 상세는 별도 detail read 없이 usable하다. | 목록 Callable 완료 시점이다. | 전경 사진은 viewport 근처에서 별도 Callable로 로드한다. 같은 mount에서 상세→목록은 목록 read 0회지만 다른 모드에서 돌아오면 다시 전체 구독/조회한다. |
+| reconnect/화면 재진입/PWA 재실행 | reconnect/visibility에는 기존 UI가 남을 수 있지만 모드 재진입은 workspace remount로 빈 loading 상태부터 시작한다. | 재고는 context+전체 page, 거래처는 전체 page가 끝나야 다시 usable하다. | background refresh 성공 시점이다. | 재고 visibility는 성공 후 60초 이상일 때 전체 재조회하고 online은 즉시 재조회한다. 거래처는 visible 동안 60초 timer와 focus/online/visibility에서 재검증한다. Auth/session invalidation과 거래처 offline clear 등 현재 민감 상태 폐기 경계를 유지한다. |
+
+### Cold/Warm과 규모별 재고 결과
+
+| 상태 | 100개 | 500개 | 1,000개 | 판단 |
+| --- | ---: | ---: | ---: | --- |
+| 목록 Callable | 1 | 5 | 10 | page가 직렬로 이어진다. |
+| 대략적 Firestore 문서 read | 100 | 504 | 1,009 | 각 non-terminal query의 101번째 cursor sentinel이 다음 page에서 다시 읽힌다. |
+| warm normal first usable list | cold-start 혼입으로 제외 | 약 1.34초 | 약 1.84초 | 첫 60개 렌더가 아니라 전체 page 완료 시간이 T2를 결정한다. |
+| 1,000개 + page당 300ms | — | — | 약 4.84초 | 정상 run 대비 약 3초 증가하여 10개 직렬 page와 일치한다. |
+| 같은 세션 모드 재진입 | context 1 + page 1 | context 1 + page 5 | context 1 + page 10 | Memory/필터/선택/limit을 버리고 cold data path를 반복한다. 1,000개 정상 약 1.34초, 지연 조건 약 4.35초였다. |
+| 상세→목록 복귀 | 목록 read 0 | 목록 read 0 | 목록 read 0 | 같은 workspace mount 안에서는 좋은 warm path다. |
+
+정확히 100개 단위일 때도 서버 query는 다음 cursor 존재 여부를 알기 위해 최대 101개를 읽는다. 500개는 504개, 1,000개는 1,009개 문서를 읽는다. 이 수치는 billing export가 아니라 query 구조에서 계산한 논리 read 상한이며, Emulator의 청구량을 뜻하지 않는다.
+
+### 실제 병목 분류
+
+#### A. Network/read 낭비
+
+- 재고의 모드 재진입·online reconnect·60초 이상 visibility 복귀는 보유한 Memory snapshot을 재사용하지 않고 context 1회와 전체 100개 page를 반복한다.
+- 재고 page는 직렬이다. 1,000개에서 네트워크 RTT가 page마다 누적된다.
+- 거래처는 250개 page 전체를 최초/재진입에 다시 읽고, visible 60초 timer 외에 focus·online·visibility도 elapsed-time 확인 없이 refresh를 시도한다. pending 중인 중복은 막지만 완료 직후의 연속 event는 새 refresh가 될 수 있다.
+- 거래처가 `N≤250`이고 8명 모두 계속 visible하다는 상한 가정에서는 timer만으로 분당 `8×N`, 시간당 `480×N` 문서 read가 된다. 예를 들어 N=250이면 시간당 120,000 logical reads다. 실제 활성 시간·focus 빈도·현재 N이 없으므로 비용 결론은 미확인이다.
+
+#### B. Execution 병목
+
+- 재고 1,000개 filtering/sort와 60개 progressive DOM은 27ms 수준으로 현재 주 병목이 아니다.
+- Inventory/Customer/Sales workspace dynamic chunk는 cold 최초 진입 비용이 있지만 현재 build gate에서 inventory workspace JS gzip 22,083B, 전체 inventory JS 24,314B, customer JS 35,876B, sales workspace 14,324B로 예산 안이다.
+- 상세 사진은 별도 loading이며 viewport/사용 시점 경계를 가진다. 사진 없는 상세의 warm T2는 한 Callable 지연이 지배했다.
+
+#### C. 체감속도 UX 병목
+
+- 재고는 첫 page가 준비돼도 전체 page가 끝날 때까지 목록 전체를 loading 문구로 대체한다. 이는 가장 큰 T2 병목이다.
+- 모드 전환은 workspace unmount로 필터, 검색어, `품목 더 보기` limit과 선택 상태를 잃는다. 별도 scroll 복원도 구현돼 있지 않으며 모드 간 실제 scroll 위치는 이번 lab에서 따로 계측하지 않았다. 같은 세션 warm 복귀가 cold처럼 보인다.
+- 거래처 retry는 이미 가진 목록이 있어도 `loading + []`로 바꾼다. background refresh 성공 중에는 기존 목록을 유지하지만 실패하면 빈 error 화면으로 바뀐다.
+- 전체 spinner/skeleton을 늘리는 것은 해결이 아니다. 이미 가진 snapshot은 유지하고 작은 `최신 정보 확인 중` 상태만 필요한 경우가 많다.
+
+#### D. 신뢰성 병목
+
+- 재고·거래처 목록에는 `마지막 확인`, `최신 확인 중`, `갱신 실패—기존 정보 표시`를 구분하는 공통 상태가 없어 사용자가 현재 숫자의 freshness를 판단하기 어렵다.
+- 재고 background refresh는 old list를 유지할 수 있지만 calendar notice 외에는 catalog revalidation을 명확히 알리지 않는다.
+- 거래처 refresh 실패는 stale snapshot을 숨기므로 사용자는 데이터가 없어진 것처럼 느낄 수 있다.
+- write는 authoritative 성공/실패와 busy 상태가 분리돼 있어 신뢰성 경계가 좋다. 이 흐름에 optimistic 확정이나 offline queue를 추가하지 않는다.
+
+### TOP 5 최소 개선 후보
+
+| 순위 | 후보 / 좋아지는 여정 | T 단계 | read 감소 | stale 위험 | 보안·로그아웃 영향 | 범위 / 회귀 위험 | 효과 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 인증 session key별 **Memory snapshot 재사용 + stale-while-revalidate**. 재고·거래처 모드 복귀에서 목록/필터/scroll을 먼저 복원한다. | T2, T3 신뢰 | TTL 안 skip을 함께 적용하면 감소, 아니면 동일 | background 최신화 전 잠깐 존재 | durable 저장 금지, auth/logout/session invalidation에서 즉시 폐기하고 offline은 각 기능의 현 정책 유지 | 중간 / 권한 전환·mutation reconcile 회귀 중간 | 큼 |
+| 2 | 재고 **첫 page progressive publish**. 100개가 오면 검색 가능한 60개를 보여주고 뒤 page를 계속 합친다. | T2, T4 | 없음 | page 수집 중 결과 수·정렬이 변할 수 있음 | Memory 전용, 기존 session 검증 유지 | 중간 / 정렬·선택·mutation race 중간 | 큼 |
+| 3 | inventory/customer **revalidation coordinator**. in-flight dedupe, last-success 60초, focus+visibility+online event coalescing, 기존 snapshot 유지와 작은 상태 표시를 묶는다. | T2, T3 | 예 | TTL 범위 | auth/offline clear는 우선, session key 격리 | 작음~중간 / reconnect 회귀 중간 | 큼 |
+| 4 | 재고 상세를 `productId + revision + stockRevision` 기준 session Memory로 재사용하고 즉시 열면서 필요 시 background detail validation한다. | T2, T3 | 반복 상세에서 예 | lot detail이 summary revision과 어긋날 위험 | logout/offline 폐기, write 응답으로 즉시 갱신 | 중간 / 동시 수정 회귀 중간~큼 | 중간 |
+| 5 | 현재 dynamic boundary는 유지하되 사용 가능성이 높은 다음 모드의 **JS chunk만 제한 prefetch**한다. 업무 data prefetch는 하지 않는다. | cold T2 | Firestore read 변화 없음 | 데이터 stale 없음 | 민감 데이터 영향 없음 | 작음 / 저속망 bandwidth 회귀 작음~중간 | 작음~중간 |
+
+P2-B에서는 3 → 1 → 2 순서로 구현하는 것을 권장한다. 먼저 revalidation 상태·dedupe·TTL을 한 경계로 만들어 read와 freshness 표현을 안정화하고, 다음으로 session Memory snapshot과 UI 상태 복원을 붙인다. 마지막으로 1,000개 재고에서 첫 page를 공개하되 `InventoryListReconciler`와 정렬/검색 결과가 page 수집 중에도 안전한지 검증한다. 상세 cache와 chunk prefetch는 앞의 세 항목으로 체감 문제가 남을 때만 진행한다.
+
+### P2-B 구현 결과 — 2026-09-20
+
+- B1: customer/inventory의 `uid:sessionVersion:permissionsVersion` Memory coordinator가 in-flight 요청과 focus/visibility/online burst를 합치고 last-success 60초 TTL, background 기존 목록 유지, freshness UI를 제공한다.
+- B2: 같은 namespace에서 customer/inventory authoritative catalog와 목록 UI/scroll을 Memory snapshot으로 즉시 복원한다. logout, namespace 변경, 인증·권한 실패에서는 폐기하며 write 응답을 snapshot/reconciler에 먼저 반영한다.
+- B3: inventory repository의 기존 100개 pagination은 그대로 두고 page 완료마다 dedupe된 누적 목록을 callback으로 publish한다. cold load는 첫 page부터 loading을 벗어나 검색/장소/필터를 사용할 수 있고, stale refresh는 기존 snapshot baseline 위에 새 page를 덮어써 목록을 비우지 않는다. final page는 baseline 없이 전체 수집 결과를 reconcile하여 기존 full-load와 같은 authoritative catalog로 확정한다.
+- 매 progressive publish는 현재 coordinator generation, namespace와 retained `InventoryListReconciler` identity가 모두 유효할 때만 snapshot에 들어간다. 읽는 동안 확정된 입고/출고/조정/lot/product write는 reconciler overlay가 뒤 page보다 우선하며, logout/session/permissions 변경·offline invalidation 뒤 늦은 page는 무시한다.
+- 통제된 page당 300ms 조건에서 network pagination만 비교하면 500개 T2는 전체 5 page 1,500ms → 첫 page 300ms, 1,000개 T2는 전체 10 page 3,000ms → 첫 page 300ms로 분리된다. T4는 각각 1,500ms/3,000ms로 동일하고 Callable 5/10회 및 논리 read 약 504/1,009개도 증가하지 않는다. 실제 context/render 시간을 포함한 절대값은 기기·Functions 상태에 따라 달라지므로 P2-A 원칙대로 상대 차이를 사용한다.
+- P2 핵심 3단계는 완료됐다. 다음 최적화는 자동으로 상세 cache/JS prefetch로 넘어가지 않고 실제 Galaxy S20+·현장망에서 T2/T3와 read 감소를 먼저 재측정한 뒤 결정한다.
+
+### PWA / Service Worker 결론
+
+- `phase35`는 현재 제품 Phase 번호가 아니라 runtime cache namespace의 마지막 의도적 invalidation 이름이다. 오래됐다는 이유만으로 바꾸지 않는다.
+- navigation `/`은 NetworkFirst 3초, `_next/static`과 명시적 public asset은 CacheFirst, 학교 thumbnail route만 별도 CacheFirst다.
+- 새 worker는 `skipWaiting: false`이고 사용자 `업데이트` 동작 뒤 교체한다. precache된 hash asset 덕분에 warm PWA launch와 이미 방문한 dynamic chunk는 네트워크 의존이 작다.
+- Firebase/Callable/Storage relay/API/거래처·재고·영업 응답은 계속 runtime cache에서 제외한다. P2-A 결과는 Service Worker 업무 cache나 persistent Firestore cache를 추가할 근거가 아니다.
 
 ---
 

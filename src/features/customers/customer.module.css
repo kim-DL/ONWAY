@@ -71,6 +71,8 @@
 .locationResults button:focus-visible,
 .adminList button:focus-visible { outline: 2px solid var(--customer-accent); outline-offset: 2px; }
 .resultCount { margin: 16px 2px 9px; color: var(--customer-muted); font-size: .8125rem; font-weight: 650; }
+.freshness { margin: 10px 2px 0; color: var(--customer-muted); font-size: .6875rem; line-height: 1.5; }
+.freshness[data-freshness="stale-error"] { color: #8a5a13; }
 .results { display: grid; gap: 10px; }
 .card { position: relative; isolation: isolate; min-width: 0; border: 1px solid var(--customer-line); border-radius: 14px; background: var(--customer-paper); box-shadow: 0 3px 12px rgb(25 31 40 / 3%); transition: border-color 150ms ease, box-shadow 150ms ease; }
 .card:hover { border-color: var(--customer-accent); box-shadow: 0 5px 16px rgb(25 31 40 / 5%); }

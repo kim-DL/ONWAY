@@ -11,7 +11,7 @@ function product(productId = "product-1"): InventoryProduct {
   return inventoryProductSchema.parse({ productId, companyId: "onnuri", name: "검증용 닭가슴살", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 10, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 0, stockRevision: 0, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1" });
 }
 beforeEach(() => { mock.invoke.mockReset(); mock.services.auth.currentUser = { uid: "employee-1" }; });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("inventory callable boundary", () => {
   it("requests summaries with detail and metadata writes while accepting legacy products that have no summary yet", async () => {
     mock.invoke.mockResolvedValueOnce({ data: { product: product(), lots: [] } }).mockResolvedValueOnce({ data: product() });
@@ -37,6 +37,39 @@ describe("inventory callable boundary", () => {
     const rows = await inventoryRepository.list();
     expect(rows.map((row) => row.productId)).toEqual(["product-1", "product-2"]);
     expect(mock.invoke.mock.calls).toEqual([["listInventoryProducts", { afterId: null, includeSummary: true }], ["listInventoryProducts", { afterId: "product-1", includeSummary: true }]]);
+  });
+  it("publishes each accumulated page without adding requests", async () => {
+    mock.invoke.mockResolvedValueOnce({ data: { products: [product()], nextCursor: "product-1" } }).mockResolvedValueOnce({ data: { products: [product("product-2")], nextCursor: null } });
+    const progress: Array<{ ids: string[]; pageCount: number; complete: boolean }> = [];
+    const rows = await inventoryRepository.list((products, state) => progress.push({ ids: products.map((item) => item.productId), ...state }));
+    expect(progress).toEqual([
+      { ids: ["product-1"], pageCount: 1, complete: false },
+      { ids: ["product-1", "product-2"], pageCount: 2, complete: true },
+    ]);
+    expect(rows.map((row) => row.productId)).toEqual(["product-1", "product-2"]);
+    expect(mock.invoke).toHaveBeenCalledTimes(2);
+  });
+  it.each([{ total: 500, pages: 5 }, { total: 1_000, pages: 10 }])("separates first-page T2 from all $pages pages for $total products", async ({ total, pages }) => {
+    vi.useFakeTimers();
+    const catalog = Array.from({ length: total }, (_, index) => product(`product-${String(index + 1).padStart(4, "0")}`));
+    let request = 0;
+    mock.invoke.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const page = request++;
+      return { data: { products: catalog.slice(page * 100, (page + 1) * 100), nextCursor: page + 1 < pages ? `cursor-${page + 1}` : null } };
+    });
+    const startedAt = Date.now();
+    let firstUsableAt: number | null = null;
+    const loading = inventoryRepository.list((_products, progress) => {
+      if (progress.pageCount === 1) firstUsableAt = Date.now() - startedAt;
+    });
+
+    await vi.advanceTimersByTimeAsync(300);
+    expect(firstUsableAt).toBe(300);
+    await vi.runAllTimersAsync();
+    await expect(loading).resolves.toHaveLength(total);
+    expect(Date.now() - startedAt).toBe(pages * 300);
+    expect(mock.invoke).toHaveBeenCalledTimes(pages);
   });
   it("rejects repeated cursors instead of silently looping", async () => {
     mock.invoke.mockResolvedValue({ data: { products: [product()], nextCursor: "product-1" } });

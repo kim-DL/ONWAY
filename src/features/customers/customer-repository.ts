@@ -12,6 +12,14 @@ import {
   type Customer, type CustomerPoint, type CustomerRegion, type LocationCandidate, type SaveCustomerInput,
 } from "@/domain/customer";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
+import { REVALIDATION_TTL_MS, type RevalidationFreshness } from "@/lib/revalidation-coordinator";
+
+import {
+  beginCustomerCatalogRead, commitCustomerCatalogRead, discardCustomerWorkspaceCatalog,
+  getCustomerRevalidationCoordinator, updateCustomerCatalogFreshness,
+} from "./customer-workspace-snapshot";
+
+export type CustomerRevalidationState = { status: RevalidationFreshness; lastSuccessAt: number | null };
 
 export function customerErrorMessage(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
@@ -57,64 +65,104 @@ async function list(): Promise<Customer[]> {
   return customers;
 }
 
-function subscribe(onData: (customers: Customer[]) => void, onError: (error: unknown) => void): () => void {
+function subscribe(namespace: string, onData: (customers: Customer[], refreshedAt: number) => void,
+  onError: (error: unknown, hadData: boolean) => void,
+  onFreshness: (state: CustomerRevalidationState) => void = () => undefined,
+  options: { hasData?: boolean; forceInitial?: boolean } = {}): () => void {
   const services = getFirebaseClientServices();
   if (!services?.auth.currentUser) {
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) onError(Object.assign(new Error("Customer authentication required."), { code: "unauthenticated" })); });
+    queueMicrotask(() => { if (!cancelled) onError(Object.assign(new Error("Customer authentication required."), { code: "unauthenticated" }), false); });
     return () => { cancelled = true; };
   }
   const uid = services.auth.currentUser.uid;
+  const coordinator = getCustomerRevalidationCoordinator(namespace);
   let closed = false;
+  let terminal = false;
   let pending = false;
+  let loaded = options.hasData === true;
   let generation = 0;
+  let queuedForce = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const clear = () => {
     generation += 1;
-    if (!closed) onData([]);
+    loaded = false;
+    discardCustomerWorkspaceCatalog(namespace);
+    if (!closed) { onData([], Date.now()); onFreshness({ status: "idle", lastSuccessAt: null }); }
     clearTimeout(timer);
   };
-  const refresh = async () => {
-    if (closed || pending || document.visibilityState === "hidden" || !navigator.onLine) return;
+  const schedule = () => {
+    clearTimeout(timer);
+    const remaining = coordinator.remainingTtl(loaded);
+    timer = setTimeout(() => void refresh(), remaining > 0 ? remaining : REVALIDATION_TTL_MS);
+  };
+  const refresh = async (force = false) => {
+    if (closed || terminal || pending || document.visibilityState === "hidden" || !navigator.onLine) return;
+    const run = coordinator.run(async () => {
+      const writeGeneration = beginCustomerCatalogRead(namespace);
+      return { customers: await list(), writeGeneration };
+    }, { force, hasData: loaded });
+    if (run.kind === "skipped") { schedule(); return; }
+    if (force && run.kind === "joined") queuedForce = true;
     pending = true;
     const requestGeneration = generation;
     clearTimeout(timer);
+    if (loaded && run.kind === "started") {
+      updateCustomerCatalogFreshness(namespace, "refreshing", coordinator.getLastSuccessAt());
+      onFreshness({ status: "refreshing", lastSuccessAt: coordinator.getLastSuccessAt() });
+    }
     try {
-      const customers = await list();
-      if (!closed && generation === requestGeneration && services.auth.currentUser?.uid === uid) onData(customers);
+      const result = await run.promise;
+      if (generation === requestGeneration && services.auth.currentUser?.uid === uid) {
+        loaded = true;
+        const refreshedAt = coordinator.getLastSuccessAt() ?? Date.now();
+        const customers = commitCustomerCatalogRead(namespace, result.customers, refreshedAt, result.writeGeneration);
+        if (!closed && customers) {
+          onData(customers, refreshedAt);
+          onFreshness({ status: "fresh", lastSuccessAt: refreshedAt });
+        }
+      }
     } catch (error) {
       if (!closed && generation === requestGeneration) {
-        onData([]);
-        onError(error);
+        const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+        const invalidSession = ["permission-denied", "unauthenticated", "failed-precondition"].some((reason) => code.endsWith(reason));
+        if (invalidSession) { terminal = true; clear(); }
+        else {
+          updateCustomerCatalogFreshness(namespace, loaded ? "stale-error" : "idle", coordinator.getLastSuccessAt());
+          onFreshness({ status: loaded ? "stale-error" : "idle", lastSuccessAt: coordinator.getLastSuccessAt() });
+        }
+        onError(error, loaded && !invalidSession);
       }
     } finally {
       pending = false;
-      if (!closed && requestGeneration !== generation && services.auth.currentUser?.uid === uid
+      if (!closed && queuedForce && services.auth.currentUser?.uid === uid && navigator.onLine) {
+        queuedForce = false;
+        void refresh(true);
+      } else if (!closed && requestGeneration !== generation && services.auth.currentUser?.uid === uid
         && navigator.onLine && document.visibilityState === "visible") {
         // A reconnect can occur while the previous request is still settling.
         // Revalidate immediately instead of leaving an empty view for a minute.
         void refresh();
-      } else if (!closed) timer = setTimeout(() => void refresh(), 60_000);
+      } else if (!closed) schedule();
     }
   };
   const onVisibility = () => { if (document.visibilityState === "visible") void refresh(); };
   const onOffline = () => {
     clear();
-    onError(Object.assign(new Error("Customer connection unavailable."), { code: "unavailable" }));
+    onError(Object.assign(new Error("Customer connection unavailable."), { code: "unavailable" }), false);
   };
   const onOnline = () => void refresh();
   const stopAuth = onAuthStateChanged(services.auth, (user) => {
-    if (user?.uid !== uid) clear();
+    if (user?.uid !== uid) { terminal = true; clear(); }
   });
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("focus", onOnline);
   window.addEventListener("online", onOnline);
   window.addEventListener("offline", onOffline);
-  if (navigator.onLine) void refresh();
+  if (navigator.onLine) void refresh(options.forceInitial === true);
   else queueMicrotask(() => { if (!closed) onOffline(); });
   return () => {
     closed = true;
-    generation += 1;
     clearTimeout(timer);
     stopAuth();
     document.removeEventListener("visibilitychange", onVisibility);

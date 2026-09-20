@@ -51,8 +51,8 @@ async function login(page: Page, pin: string) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
   await page.getByLabel("직원 PIN").fill(pin);
-  await page.getByRole("button", { name: "급식길 시작하기" }).click();
   const contextResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/getInventoryContext"));
+  await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await chooseMode(page, "inventory");
   await expect(page.getByRole("navigation").getByRole("button", { name: "실사", exact: true })).toHaveCount(0);
   const response = await contextResponse;
@@ -811,15 +811,30 @@ test("all locations sum one product and require each location's count, with prog
     const events = await productRef.collection("events").get();
     expect(events.docs.map((doc) => doc.data().kind)).toEqual(["count_match", "count_match"]);
 
-    // Change only the demo configuration, then remount the real workspace so
-    // the next actual context callable returns a non-count day.
+    // A warm remount must show the snapshot without a context/list request.
+    // Then simulate a real reconnect to force the changed demo configuration.
     await settingsRef.set({ ...settings, weekday: (weekday + 1) % 7, revision: 1 });
     await page.getByRole("switch", { name: "재고조사 모드", exact: true }).uncheck();
     await chooseMode(page, "sales");
-    const refreshed = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/getInventoryContext"));
+    let warmContextRequests = 0;
+    const countWarmContext = (request: Request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/getInventoryContext")) warmContextRequests += 1;
+    };
+    page.on("request", countWarmContext);
     await chooseMode(page, "inventory");
-    expect((await refreshed).ok()).toBe(true);
     await expect(card).toHaveCount(1);
+    await page.waitForTimeout(150);
+    expect(warmContextRequests).toBe(0);
+    page.off("request", countWarmContext);
+
+    const refreshed = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/getInventoryContext"));
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+      window.dispatchEvent(new Event("offline"));
+      Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+      window.dispatchEvent(new Event("online"));
+    });
+    expect((await refreshed).ok()).toBe(true);
     await expect(page.getByRole("progressbar")).toHaveCount(0);
     await expect(page.getByText("오늘은 재고조사일", { exact: true })).toHaveCount(0);
     await expect(article).toHaveAttribute("data-count-highlight", "neutral");
@@ -951,12 +966,20 @@ test("a 1,000-product catalog fetches every server page while rendering 60 rows 
     for (const product of catalog.slice(offset, offset + 400)) batch.create(db().doc(`${INVENTORY_PRODUCT_PATH}/${product.productId}`), product);
     await batch.commit();
   }
+  const pageDelayMs = 150;
+  await page.route("**/listInventoryProducts", async (route) => {
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, pageDelayMs));
+    await route.fulfill({ response });
+  });
   const responses: Array<Promise<{ order: number; afterId: string | null; nextCursor: string | null; page: ReturnType<typeof inventoryListPageSchema.parse> }>> = [];
   const requestOrder = new Map<Request, number>();
   let roots = 0;
   let terminalPages = 0;
+  let firstCatalogRequestAt = 0;
   page.on("request", (request) => {
     if (request.method() !== "POST" || !new URL(request.url()).pathname.endsWith("/listInventoryProducts")) return;
+    if (!firstCatalogRequestAt) firstCatalogRequestAt = Date.now();
     requestOrder.set(request, requestOrder.size);
     const input = request.postDataJSON() as { data: { afterId: string | null } };
     if (input.data.afterId === null) roots += 1;
@@ -975,6 +998,15 @@ test("a 1,000-product catalog fetches every server page while rendering 60 rows 
   });
   await login(page, PHASE3_TEST_PINS.salesC);
   await page.getByRole("group", { name: "보관 장소", exact: true }).getByRole("button", { name: "냉동2", exact: true }).click();
+  const cards = page.getByRole("button", { name: /^카탈로그 검증 제품 \d{4}, .*상세 보기$/ });
+  await expect(cards).toHaveCount(60);
+  const firstPageUsableMs = Date.now() - firstCatalogRequestAt;
+  expect(terminalPages).toBe(0);
+  const progressiveSearch = page.getByRole("searchbox", { name: "품목 검색", exact: true });
+  await progressiveSearch.fill("카탈로그 검증 제품 0001");
+  await expect(cards).toHaveCount(1);
+  await progressiveSearch.fill("");
+  await info.attach("catalog-1000-progressive-timing", { body: JSON.stringify({ pageDelayMs, firstPageUsableMs }), contentType: "application/json" });
   await expect(page.getByText("1,000개 품목", { exact: true })).toBeVisible();
   // Development StrictMode starts two overlapping effects. Verify every
   // independent list to completion instead of assuming one global response order.
@@ -990,7 +1022,6 @@ test("a 1,000-product catalog fetches every server page while rendering 60 rows 
     expect(ids).toEqual(catalog.map((product) => product.productId));
   }
 
-  const cards = page.getByRole("button", { name: /^카탈로그 검증 제품 \d{4}, .*상세 보기$/ });
   await expect(cards).toHaveCount(60);
   await captureInventoryList(page, info, "catalog-1000-initial-360");
   await verifyFloatingAction(page, cards, info, "catalog-1000-floating-360");
@@ -1007,8 +1038,24 @@ test("a 1,000-product catalog fetches every server page while rendering 60 rows 
   const detail = page.getByRole("dialog", { name: "카탈로그 검증 제품 1000", exact: true });
   for (const value of ["대량 목록 검증 제조사", "1kg", "대한민국"]) await expect(detail.locator("dd").filter({ hasText: value })).toBeVisible();
   await detail.getByRole("button", { name: "닫기", exact: true }).click();
-  await page.getByRole("searchbox", { name: "품목 검색", exact: true }).fill("");
+  const search = page.getByRole("searchbox", { name: "품목 검색", exact: true });
+  await search.fill("카탈로그");
   await expect(cards).toHaveCount(60);
+  await page.getByRole("button", { name: "품목 더 보기", exact: true }).click();
+  await expect(cards).toHaveCount(120);
+  const savedScrollTop = await page.locator(".workspace-content").evaluate((element) => {
+    element.scrollTop = 600; element.dispatchEvent(new Event("scroll")); return element.scrollTop;
+  });
+  expect(savedScrollTop).toBeGreaterThan(0);
+  const warmRequestCount = responses.length;
+  await chooseMode(page, "sales");
+  await chooseMode(page, "inventory");
+  await expect(search).toHaveValue("카탈로그");
+  await expect(page.getByRole("group", { name: "보관 장소", exact: true }).getByRole("button", { name: "냉동2", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(cards).toHaveCount(120);
+  await expect.poll(() => page.locator(".workspace-content").evaluate((element) => element.scrollTop)).toBe(savedScrollTop);
+  await page.waitForTimeout(150);
+  expect(responses).toHaveLength(warmRequestCount);
   expect(responses).toHaveLength(requestCount);
   for (const width of [768, 1280]) {
     await page.setViewportSize({ width, height: 800 });

@@ -24,9 +24,13 @@ export class InventoryListReconciler {
     return true;
   }
 
-  reconcile(snapshot: InventoryProduct[]): InventoryProduct[] | null {
+  reconcile(snapshot: InventoryProduct[], baseline: InventoryProduct[] = []): InventoryProduct[] | null {
     if (this.disposed || !this.reading) return null;
-    const products = new Map(snapshot.filter((product) => product.status !== "deleted").map((product) => [product.productId, product]));
+    const products = new Map(baseline.filter((product) => product.status !== "deleted").map((product) => [product.productId, product]));
+    for (const product of snapshot) {
+      if (product.status === "deleted") products.delete(product.productId);
+      else products.set(product.productId, product);
+    }
     for (const product of this.changes.values()) {
       if (product.status === "deleted") products.delete(product.productId);
       else products.set(product.productId, product);

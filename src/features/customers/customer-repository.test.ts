@@ -12,6 +12,7 @@ vi.mock("firebase/auth", () => ({ onAuthStateChanged: (_auth: unknown, callback:
 
 import { customerDraftSchema, customerSchema, getCustomerChoseong, normalizeCustomerName, type SaveCustomerInput } from "@/domain/customer";
 import { customerErrorMessage, customerRepository } from "./customer-repository";
+import { clearCustomerWorkspaceSnapshot } from "./customer-workspace-snapshot";
 
 const customer = customerSchema.parse({
   customerId: "one", companyId: "onnuri", name: "강은유통", normalizedName: normalizeCustomerName("강은유통"), choseongName: getCustomerChoseong("강은유통"),
@@ -25,6 +26,7 @@ let viewport: EventTarget;
 let connection: { onLine: boolean };
 const cleanups: Array<() => void> = [];
 beforeEach(() => {
+  clearCustomerWorkspaceSnapshot();
   vi.useFakeTimers(); sdk.call.mockReset();
   auth = { currentUser: { uid: "one" } };
   sdk.services.mockReturnValue({ auth, functions: {} });
@@ -33,7 +35,7 @@ beforeEach(() => {
   vi.stubGlobal("document", page); vi.stubGlobal("window", viewport); vi.stubGlobal("navigator", connection);
   sdk.call.mockResolvedValue({ data: { customers: [customer], nextCursor: null } });
 });
-afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); clearCustomerWorkspaceSnapshot(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("sensitive customer repository lifecycle", () => {
   it("loads paginated results without storing them or accepting company input", async () => {
@@ -72,23 +74,23 @@ describe("sensitive customer repository lifecycle", () => {
     let resolve!: (value: unknown) => void;
     sdk.call.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
     const receive = vi.fn(); const error = vi.fn();
-    const stop = customerRepository.subscribe(receive, error); stop();
+    const stop = customerRepository.subscribe("one:1:1", receive, error); stop();
     resolve({ data: { customers: [customer], nextCursor: null } });
     await vi.advanceTimersByTimeAsync(0);
     expect(receive).not.toHaveBeenCalled(); expect(error).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
   });
   it("clears sensitive memory on offline and authentication changes", async () => {
     const receive = vi.fn(); const error = vi.fn();
-    cleanups.push(customerRepository.subscribe(receive, error));
+    cleanups.push(customerRepository.subscribe("one:1:1", receive, error));
     await vi.advanceTimersByTimeAsync(0);
-    expect(receive).toHaveBeenLastCalledWith([customer]);
+    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
     connection.onLine = false; viewport.dispatchEvent(new Event("offline"));
-    expect(receive).toHaveBeenLastCalledWith([]); expect(error).toHaveBeenCalled();
+    expect(receive).toHaveBeenLastCalledWith([], expect.any(Number)); expect(error).toHaveBeenCalled();
     auth.currentUser = null; sdk.authListener?.(null);
-    expect(receive).toHaveBeenLastCalledWith([]);
+    expect(receive).toHaveBeenLastCalledWith([], expect.any(Number));
   });
   it("revalidates on focus while avoiding overlapping and hidden-page polling", async () => {
-    cleanups.push(customerRepository.subscribe(vi.fn(), vi.fn()));
+    cleanups.push(customerRepository.subscribe("one:1:1", vi.fn(), vi.fn()));
     await vi.advanceTimersByTimeAsync(0);
     page.visibilityState = "hidden";
     await vi.advanceTimersByTimeAsync(60_000);
@@ -96,6 +98,62 @@ describe("sensitive customer repository lifecycle", () => {
     page.visibilityState = "visible"; page.dispatchEvent(new Event("visibilitychange")); viewport.dispatchEvent(new Event("focus"));
     await vi.advanceTimersByTimeAsync(0);
     expect(sdk.call).toHaveBeenCalledTimes(2);
+  });
+  it("coalesces focus, visibility, and online bursts inside the last-success TTL", async () => {
+    const freshness = vi.fn();
+    cleanups.push(customerRepository.subscribe("one:1:1", vi.fn(), vi.fn(), freshness));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sdk.call).toHaveBeenCalledTimes(1);
+
+    page.dispatchEvent(new Event("visibilitychange"));
+    viewport.dispatchEvent(new Event("focus"));
+    viewport.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sdk.call).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sdk.call).toHaveBeenCalledTimes(2);
+    expect(freshness).toHaveBeenLastCalledWith({ status: "fresh", lastSuccessAt: expect.any(Number) });
+  });
+  it("keeps the successful list visible when a background refresh fails", async () => {
+    const receive = vi.fn(); const error = vi.fn(); const freshness = vi.fn();
+    cleanups.push(customerRepository.subscribe("one:1:1", receive, error, freshness));
+    await vi.advanceTimersByTimeAsync(0);
+    sdk.call.mockRejectedValueOnce({ code: "functions/unavailable" });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(receive).toHaveBeenCalledTimes(1);
+    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
+    expect(error).toHaveBeenLastCalledWith({ code: "functions/unavailable" }, true);
+    expect(freshness).toHaveBeenLastCalledWith({ status: "stale-error", lastSuccessAt: expect.any(Number) });
+  });
+  it("deduplicates an in-flight refresh across lifecycle events", async () => {
+    let resolve!: (value: unknown) => void;
+    sdk.call.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    cleanups.push(customerRepository.subscribe("one:1:1", vi.fn(), vi.fn()));
+    page.dispatchEvent(new Event("visibilitychange")); viewport.dispatchEvent(new Event("focus")); viewport.dispatchEvent(new Event("online"));
+    expect(sdk.call).toHaveBeenCalledTimes(1);
+    resolve({ data: { customers: [customer], nextCursor: null } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sdk.call).toHaveBeenCalledTimes(1);
+  });
+  it("reuses a warm snapshot inside TTL and revalidates it after TTL", async () => {
+    const first = customerRepository.subscribe("one:1:1", vi.fn(), vi.fn());
+    await vi.advanceTimersByTimeAsync(0);
+    first();
+
+    const warmReceive = vi.fn();
+    const warm = customerRepository.subscribe("one:1:1", warmReceive, vi.fn(), vi.fn(), { hasData: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sdk.call).toHaveBeenCalledTimes(1);
+    expect(warmReceive).not.toHaveBeenCalled();
+    warm();
+
+    await vi.advanceTimersByTimeAsync(60_001);
+    const staleReceive = vi.fn();
+    cleanups.push(customerRepository.subscribe("one:1:1", staleReceive, vi.fn(), vi.fn(), { hasData: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sdk.call).toHaveBeenCalledTimes(2);
+    expect(staleReceive).toHaveBeenCalledWith([customer], expect.any(Number));
   });
   it("renders safe localized errors and never returns backend input strings", () => {
     expect(customerErrorMessage({ code: "functions/aborted", message: "00123*" })).toContain("다른 직원이");
@@ -105,20 +163,20 @@ describe("sensitive customer repository lifecycle", () => {
   it("reports an initial offline connection rather than leaving the UI loading", async () => {
     connection.onLine = false;
     const receive = vi.fn(); const error = vi.fn();
-    cleanups.push(customerRepository.subscribe(receive, error));
+    cleanups.push(customerRepository.subscribe("one:1:1", receive, error));
     await vi.advanceTimersByTimeAsync(0);
-    expect(receive).toHaveBeenCalledWith([]); expect(error).toHaveBeenCalledTimes(1); expect(sdk.call).not.toHaveBeenCalled();
+    expect(receive).toHaveBeenCalledWith([], expect.any(Number)); expect(error).toHaveBeenCalledTimes(1); expect(sdk.call).not.toHaveBeenCalled();
   });
   it("immediately revalidates a reconnect that occurred while the old request was pending", async () => {
     let resolve!: (value: unknown) => void;
     sdk.call.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
     const receive = vi.fn();
-    cleanups.push(customerRepository.subscribe(receive, vi.fn()));
+    cleanups.push(customerRepository.subscribe("one:1:1", receive, vi.fn()));
     connection.onLine = false; viewport.dispatchEvent(new Event("offline"));
     connection.onLine = true; viewport.dispatchEvent(new Event("online"));
     resolve({ data: { customers: [customer], nextCursor: null } });
     await vi.advanceTimersByTimeAsync(0);
     expect(sdk.call).toHaveBeenCalledTimes(2);
-    expect(receive).toHaveBeenLastCalledWith([customer]);
+    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
   });
 });

@@ -23,12 +23,14 @@ async function call<T>(name: string, input: unknown, schema: z.ZodType<T>): Prom
   if (services.auth.currentUser?.uid !== uid) throw Object.assign(new Error("Inventory session changed"), { code: "unauthenticated" });
   return schema.parse(result.data);
 }
-async function list(): Promise<contract.InventoryProduct[]> {
+export type InventoryListProgress = { pageCount: number; complete: boolean };
+async function list(onProgress?: (products: contract.InventoryProduct[], progress: InventoryListProgress) => void): Promise<contract.InventoryProduct[]> {
   const initialUid = getFirebaseClientServices()?.auth.currentUser?.uid;
   if (!initialUid) throw Object.assign(new Error("Inventory authentication required"), { code: "unauthenticated" });
   const products = new Map<string, contract.InventoryProduct>();
   const cursors = new Set<string>();
   let afterId: string | null = null;
+  let pageCount = 0;
   do {
     const page: z.infer<typeof contract.inventoryListPageSchema> = await call("listInventoryProducts", { afterId, includeSummary: true }, contract.inventoryListPageSchema);
     if (getFirebaseClientServices()?.auth.currentUser?.uid !== initialUid) throw Object.assign(new Error("Inventory session changed"), { code: "unauthenticated" });
@@ -36,6 +38,8 @@ async function list(): Promise<contract.InventoryProduct[]> {
     afterId = page.nextCursor;
     if (afterId && (cursors.has(afterId) || products.size >= 5_000)) throw new Error("Inventory pagination limit");
     if (afterId) cursors.add(afterId);
+    pageCount += 1;
+    onProgress?.(Array.from(products.values()), { pageCount, complete: afterId === null });
   } while (afterId);
   return Array.from(products.values());
 }
