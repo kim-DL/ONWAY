@@ -42,5 +42,7 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "customers", "fieldPath": "*", "indexes": [] }
+  ]
 }

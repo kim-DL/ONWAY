@@ -1,0 +1,75 @@
+/* Crossing-capsule rhythm inspired by SchawnnahJ's Uiverse loader.
+   Rebuilt with fixed boxes and compositor transforms, not animated width or shadows.
+   Attribution and reference license: docs/phase-41-motion-and-photo-polish.md. */
+.loader {
+  --loader-unit: 8px;
+  --loader-first: #367cc8;
+  --loader-second: #8bbbdc;
+  --loader-third: #579dad;
+  --loader-fourth: #a6cdd5;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--loader-unit) * 6);
+  height: calc(var(--loader-unit) * 6);
+  vertical-align: middle;
+  line-height: 1;
+  pointer-events: none;
+}
+.loader[data-size="small"] { --loader-unit: 4px; }
+.loader[data-size="large"] { --loader-unit: 10px; }
+:global(.workspace-shell[data-mode="customer"]) .loader[data-tone="auto"],
+.loader[data-tone="customer"] {
+  --loader-first: #298d80; --loader-second: #9dcebd;
+  --loader-third: #5aaab0; --loader-fourth: #7db9a5;
+}
+:global(.workspace-shell[data-mode="sales"]) .loader[data-tone="auto"],
+.loader[data-tone="sales"] {
+  --loader-first: #d77c66; --loader-second: #edb8a7;
+  --loader-third: #b9908f; --loader-fourth: #dfaa98;
+}
+.loader[data-tone="inherit"] {
+  --loader-first: currentColor; --loader-second: currentColor;
+  --loader-third: currentColor; --loader-fourth: currentColor;
+}
+.mark { position: relative; display: block; width: 100%; height: 100%; transform: rotate(-15deg); isolation: isolate; }
+.piece {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: var(--loader-unit); height: var(--loader-unit);
+  border-radius: calc(var(--loader-unit) * .45);
+  background: currentColor;
+  animation-duration: 2.4s;
+  animation-timing-function: cubic-bezier(.45, 0, .2, 1);
+  animation-iteration-count: infinite;
+  animation-play-state: paused;
+  opacity: .9;
+}
+.piece[data-loader-piece="first"] { color: var(--loader-first); transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -2), calc(var(--loader-unit) * -1)); animation-name: cross-first; }
+.piece[data-loader-piece="second"] { color: var(--loader-second); transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * 2), var(--loader-unit)); animation-name: cross-second; }
+.piece[data-loader-piece="third"] { color: var(--loader-third); transform: translate(-50%, -50%) translate(var(--loader-unit), calc(var(--loader-unit) * 2)); animation-name: cross-third; }
+.piece[data-loader-piece="fourth"] { color: var(--loader-fourth); transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -1), calc(var(--loader-unit) * -2)); animation-name: cross-fourth; }
+.loader[data-motion="running"] .piece { animation-play-state: running; }
+@keyframes cross-first {
+  0%, 100% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -2), calc(var(--loader-unit) * -1)); }
+  35% { transform: translate(-50%, -50%) translate(0, calc(var(--loader-unit) * -1)) scaleX(4.6); }
+  70% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * 2), calc(var(--loader-unit) * -1)); }
+}
+@keyframes cross-second {
+  0%, 100% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * 2), var(--loader-unit)); }
+  35% { transform: translate(-50%, -50%) translate(0, var(--loader-unit)) scaleX(4.6); }
+  70% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -2), var(--loader-unit)); }
+}
+@keyframes cross-third {
+  0%, 100% { transform: translate(-50%, -50%) translate(var(--loader-unit), calc(var(--loader-unit) * 2)); }
+  35% { transform: translate(-50%, -50%) translate(var(--loader-unit), 0) scaleY(4.6); }
+  70% { transform: translate(-50%, -50%) translate(var(--loader-unit), calc(var(--loader-unit) * -2)); }
+}
+@keyframes cross-fourth {
+  0%, 100% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -1), calc(var(--loader-unit) * -2)); }
+  35% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -1), 0) scaleY(4.6); }
+  70% { transform: translate(-50%, -50%) translate(calc(var(--loader-unit) * -1), calc(var(--loader-unit) * 2)); }
+}
+@media (prefers-reduced-motion: reduce) { .loader .piece { animation: none; } }
+@media (forced-colors: active) { .loader .piece { color: CanvasText; animation: none; } }

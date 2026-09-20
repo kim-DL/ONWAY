@@ -4,9 +4,11 @@ import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 
 import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { formatNullablePhoneNumber } from "../shared/phone-number.js";
 import {
   EMPTY_FIELD_PROFILE,
   fieldProfileSchema,
+  schoolContactInputSchema,
   type FieldProfile,
   type FieldProfilePatch,
   type UpdateFieldProfileInput,
@@ -83,7 +85,10 @@ export function mergeFieldProfile(
   };
   const merged = {
     ...base,
-    contacts: input.patch.contacts ?? base.contacts,
+    contacts: input.patch.contacts ? schoolContactInputSchema.parse({
+      dietitianPhone: formatNullablePhoneNumber(input.patch.contacts.dietitianPhone),
+      cafeteriaPhone: formatNullablePhoneNumber(input.patch.contacts.cafeteriaPhone),
+    }) : base.contacts,
     cafeteria: input.patch.cafeteria ?? base.cafeteria,
     inspection: input.patch.inspection ?? base.inspection,
     equipment: input.patch.equipment ?? base.equipment,

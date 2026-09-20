@@ -7,6 +7,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import { SoftCard } from "@/components/ui/soft-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ToastProvider, useToast } from "@/components/ui/toast";
@@ -20,12 +21,15 @@ import {
   serializePilotDeviceDiagnostics,
 } from "@/features/pilot/pilot-diagnostics";
 import { APP_METADATA } from "@/lib/app-metadata";
+import { customHistoryState } from "@/lib/browser-history";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import {
   getAvailableModes,
   getInitialMode,
   getNavigation,
   normalizeView,
+  isSchoolWorkMode,
+  isWorkMode,
   type ShellView,
   type WorkMode,
 } from "./shell-policy";
@@ -66,6 +70,16 @@ const SalesWorkspace = dynamic(
   { loading: () => <WorkspaceFeatureLoading label="영업 화면을 준비하고 있습니다." /> },
 );
 
+const CustomerWorkspace = dynamic(
+  () => import("@/features/customers/customer-workspace").then((module) => module.CustomerWorkspace),
+  { loading: () => <WorkspaceFeatureLoading label="거래처 화면을 준비하고 있습니다." /> },
+);
+
+const InventoryWorkspace = dynamic(
+  () => import("@/features/inventory/inventory-workspace").then((module) => module.InventoryWorkspace),
+  { loading: () => <WorkspaceFeatureLoading label="재고 화면을 준비하고 있습니다." /> },
+);
+
 const SchoolSearch = dynamic(
   () => import("@/features/search/school-search").then((module) => module.SchoolSearch),
   {
@@ -73,7 +87,7 @@ const SchoolSearch = dynamic(
       <div className="school-search-layer" role="dialog" aria-modal="true" aria-label="학교 검색 준비 중">
         <span className="school-search-backdrop" />
         <section className="school-search-panel school-search-panel--loading" role="status">
-          <span className="search-pulse" aria-hidden="true" />
+          <OnnuriLoader size="large" decorative />
           <strong>이 기기의 학교 지도를 여는 중이에요.</strong>
         </section>
       </div>
@@ -160,7 +174,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
   const { paused: headerMotionPaused, setPaused: setHeaderMotionPaused } = useHeaderMotionPreference();
 
   const roleLabels = session.claims.roleScopes.map((scope) => ({
-    delivery: "납품",
+    delivery: "학교납품",
     sales: "영업",
     viewer: "조회",
     admin: "관리",
@@ -286,11 +300,12 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     replace = false,
   ) => {
     const state = {
-      ...(typeof window.history.state === "object" && window.history.state ? window.history.state : {}),
+      ...customHistoryState(window.history.state),
       onnuriwayShell: { version: 1, ...next },
     };
-    if (replace) window.history.replaceState(state, "", window.location.href);
-    else window.history.pushState(state, "", window.location.href);
+    // Workspace modes share one URL; do not request a Next route restoration.
+    if (replace) window.history.replaceState(state, "");
+    else window.history.pushState(state, "");
   };
 
   useEffect(() => {
@@ -307,14 +322,14 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         searchOpen?: unknown;
       } | undefined;
       if (!snapshot || snapshot.version !== 1) return;
-      const restoredMode = (snapshot.mode === "delivery" || snapshot.mode === "sales")
+      const restoredMode = isWorkMode(snapshot.mode)
         && availableModes.includes(snapshot.mode)
         ? snapshot.mode
-        : availableModes[0] ?? "delivery";
+        : getInitialMode(session.claims.roleScopes);
       const restoredView = snapshot.view === "schools" || snapshot.view === "activity" || snapshot.view === "settings"
         ? normalizeView(restoredMode, snapshot.view)
         : "schools";
-      const restoredSchool = snapshot.school
+      const restoredSchool = isSchoolWorkMode(restoredMode) && snapshot.school
         && typeof snapshot.school === "object"
         && typeof (snapshot.school as { schoolId?: unknown }).schoolId === "string"
         ? snapshot.school as School
@@ -322,13 +337,13 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
       setChosenMode(restoredMode);
       setView(restoredView);
       setSelectedSchool(restoredSchool);
-      const nextSearchOpen = snapshot.searchOpen === true && restoredSchool === null;
+      const nextSearchOpen = isSchoolWorkMode(restoredMode) && snapshot.searchOpen === true && restoredSchool === null;
       if (nextSearchOpen) setSearchMounted(true);
       setSearchOpen(nextSearchOpen);
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [availableModes, mode]);
+  }, [availableModes, mode, session.claims.roleScopes]);
 
   const openSearch = () => {
     setSearchMounted(true);
@@ -361,9 +376,11 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   };
 
   const changeMode = (nextMode: WorkMode) => {
+    if (!availableModes.includes(nextMode) || nextMode === mode) return;
     setChosenMode(nextMode);
     setView((current) => normalizeView(nextMode, current));
     setSelectedSchool(null);
+    setSearchOpen(false);
     const nextView = normalizeView(nextMode, view);
     writeHistory({ mode: nextMode, view: nextView, school: null, searchOpen: false });
     try {
@@ -382,10 +399,14 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   };
 
   let content;
-  if (selectedSchool) {
+  if (selectedSchool && isSchoolWorkMode(mode)) {
     content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} />;
   } else if (view === "settings") {
     content = <SettingsPage session={session} />;
+  } else if (mode === "customer") {
+    content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
+  } else if (mode === "inventory") {
+    content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
   } else if (view === "activity" && mode === "sales") {
     content = <SalesActivityWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} onOpenSchools={() => navigate("schools")} />;
   } else if (mode === "sales") {
@@ -405,7 +426,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
       />
       <ShellNavigation mode={mode} view={view} onNavigate={navigate} />
       <div className="workspace-content">{content}</div>
-      {searchMounted ? (
+      {searchMounted && isSchoolWorkMode(mode) ? (
         <SchoolSearch
           open={searchOpen}
           session={session}

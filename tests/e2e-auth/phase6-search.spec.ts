@@ -63,6 +63,25 @@ test("keyboard selection records recent schools and the search dialog remains ac
   const accessibilityScan = await new AxeBuilder({ page }).include(".school-search-panel").analyze();
   expect(accessibilityScan.violations).toEqual([]);
 
+  await expect(input).toHaveAttribute("type", "search");
+  await expect(input).toHaveAttribute("inputmode", "search");
+  await expect(input).toHaveAttribute("autocomplete", "off");
+  // Finishing a Korean syllable must not accidentally select the first school.
+  await input.dispatchEvent("keydown", { key: "Enter", code: "Enter", isComposing: true });
+  await expect(page.getByRole("dialog", { name: "어느 학교로 갈까요?" })).toBeVisible();
+
+  const previousViewport = page.viewportSize()!;
+  // A short visible viewport approximates the space remaining over a keyboard;
+  // native Android autofill controls themselves are outside browser emulation.
+  await page.setViewportSize({ width: 390, height: 380 });
+  await expect(page.locator(".school-search-layer")).toHaveAttribute("data-compact", "true");
+  await expect(input).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("option", { name: /대전새봄초등학교/ }).first()).toBeInViewport({ ratio: 1 });
+  expect((await page.getByRole("listbox", { name: "학교 검색 결과" }).boundingBox())!.height).toBeGreaterThan(140);
+  await expect(page.getByRole("button", { name: "학교 검색 닫기" }).last()).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: test.info().outputPath("school-search-keyboard-space.png") });
+  await page.setViewportSize(previousViewport);
+
   await input.press("Enter");
   await expect(page.getByRole("heading", { name: "대전새봄초등학교" })).toBeVisible();
   await page.getByRole("button", { name: "학교 목록" }).click();

@@ -3,6 +3,10 @@ const HEADERS = {
   "Content-Type": "text/plain; charset=utf-8",
 } as const;
 
-export function HEAD() {
-  return new Response(null, { status: 204, headers: HEADERS });
+// Keep the URL used by installed PWAs. Hosting serves HEAD for this static GET
+// resource; the no-store policy also lives in firebase.json (export drops headers).
+export const dynamic = "force-static";
+
+export function GET() {
+  return new Response("online\n", { status: 200, headers: HEADERS });
 }

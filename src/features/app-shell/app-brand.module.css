@@ -1,0 +1,16 @@
+.companyName {
+  /* A quiet two-weight signature: retain the existing size and line box while
+     relating the wordmark to the blue/green company mark above it. */
+  white-space: nowrap;
+  letter-spacing: -.045em;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 56%);
+}
+
+.nameLead { color: #315b65; font-weight: 780; }
+.nameDescriptor { color: #526675; font-weight: 650; }
+
+@media (forced-colors: active) {
+  .companyName { text-shadow: none; }
+  .nameLead,
+  .nameDescriptor { color: CanvasText; }
+}

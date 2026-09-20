@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
 import { AppIconMark } from "@/components/ui/app-icon-mark";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import { useAuth } from "./auth-context";
 
@@ -13,7 +14,7 @@ function AppShellFallback() {
       <div className="auth-splash" role="status" aria-live="polite">
         <h1 className="sr-only">급식길 업무 화면 준비 중</h1>
         <Brand />
-        <span className="auth-spinner" aria-hidden="true" />
+        <OnnuriLoader size="large" decorative />
         <p>저장된 업무 화면을 여는 중이에요.</p>
       </div>
     </main>
@@ -40,7 +41,7 @@ function AuthSplash() {
       <div className="auth-splash" role="status" aria-live="polite">
         <h1 className="sr-only">급식길 로그인 확인 중</h1>
         <Brand />
-        <span className="auth-spinner" aria-hidden="true" />
+        <OnnuriLoader size="large" decorative />
         <p>안전하게 로그인 정보를 확인하고 있어요.</p>
       </div>
     </main>
@@ -149,7 +150,7 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
             {error ? <p id="pin-error" className="pin-error" role="alert" aria-live="assertive">{error}</p> : null}
             <button type="submit" disabled={pin.length !== 6 || submitting || adminSubmitting}>
               <span>{submitting ? "확인 중" : "급식길 시작하기"}</span>
-              <span aria-hidden="true">→</span>
+              {submitting ? <OnnuriLoader size="small" tone="inherit" decorative /> : <span aria-hidden="true">→</span>}
             </button>
           </form>
           <div className="admin-login-separator"><span>또는</span></div>
@@ -159,7 +160,7 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
             disabled={adminSubmitting || submitting}
             onClick={() => void submitAdmin()}
           >
-            <span className="google-mark" aria-hidden="true">G</span>
+            {adminSubmitting ? <OnnuriLoader size="small" decorative /> : <span className="google-mark" aria-hidden="true">G</span>}
             {adminSubmitting ? "관리자 확인 중…" : "Google로 관리자 로그인"}
           </button>
         </div>

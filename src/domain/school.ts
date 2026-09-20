@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidPhoneNumber } from "@/lib/phone-number";
 
 import {
   districtSchema,
@@ -184,6 +185,12 @@ const EMPTY_SCHOOL_CONTACT = {
   cafeteriaPhone: null,
 } as const;
 
+const phoneNumberInputSchema = z.string().trim().refine(isValidPhoneNumber, "연락처를 확인해주세요.").nullable();
+const schoolContactInputSchema = z.object({
+  dietitianPhone: phoneNumberInputSchema,
+  cafeteriaPhone: phoneNumberInputSchema,
+}).strict();
+
 export const schoolFieldProfileSchema = z
   .object({
     schoolId: documentIdSchema,
@@ -205,7 +212,7 @@ export const schoolFieldProfileSchema = z
 
 export const schoolFieldProfilePatchSchema = z
   .object({
-    contacts: schoolContactSchema.optional(),
+    contacts: schoolContactInputSchema.optional(),
     cafeteria: cafeteriaSchema.optional(),
     inspection: inspectionSchema.optional(),
     equipment: equipmentSchema.optional(),

@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 
 test("renders a safe configuration boundary without Firebase environment values", async ({ page }) => {
   await page.goto("/");
+  await page.waitForLoadState("networkidle");
 
   await expect(page).toHaveTitle("급식길");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(

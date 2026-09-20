@@ -12,8 +12,10 @@ const harness = vi.hoisted(() => ({
   onIdTokenChanged: vi.fn(),
   onSnapshot: vi.fn(),
   signOut: vi.fn(),
+  clearPrivateClientState: vi.fn<() => Promise<void>>(),
   ensureFirebaseAppCheckReady: vi.fn<() => Promise<void>>(),
   employeeLogin: vi.fn<() => Promise<{ data: { customToken: string } }>>(),
+  employeeLogout: vi.fn<() => Promise<{ data: { ok: boolean } }>>(),
   signInWithCustomToken: vi.fn<() => Promise<unknown>>(),
   signInWithPopup: vi.fn<() => Promise<unknown>>(),
   writeVerifiedOfflineSession: vi.fn(),
@@ -41,7 +43,11 @@ vi.mock("firebase/firestore", () => ({
   doc: (_db: unknown, collection: string, uid: string) => ({ collection, uid }),
   getDocFromServer: vi.fn(), onSnapshot: harness.onSnapshot,
 }));
-vi.mock("firebase/functions", () => ({ httpsCallable: () => harness.employeeLogin }));
+vi.mock("firebase/functions", () => ({
+  httpsCallable: (_functions: unknown, name: string) => name === "employeeLogout"
+    ? harness.employeeLogout
+    : harness.employeeLogin,
+}));
 vi.mock("@/lib/firebase/client", () => ({
   getFirebaseClientServices: () => ({ auth: {}, firestore: {}, functions: {} }),
   ensureFirebaseAppCheckReady: harness.ensureFirebaseAppCheckReady,
@@ -53,7 +59,7 @@ vi.mock("@/features/pwa/network-status", () => ({
 vi.mock("./offline-session", () => ({
   readVerifiedOfflineSession: () => null, writeVerifiedOfflineSession: harness.writeVerifiedOfflineSession,
 }));
-vi.mock("./private-client-state", () => ({ clearPrivateClientState: async () => undefined }));
+vi.mock("./private-client-state", () => ({ clearPrivateClientState: harness.clearPrivateClientState }));
 
 import { AuthProvider } from "./auth-context";
 
@@ -68,6 +74,8 @@ function renderProvider() {
   return (AuthProvider({ children: null }) as ReactElement<{ value: {
     login: (pin: string) => Promise<void>;
     loginWithGoogle: () => Promise<void>;
+    logout: () => Promise<void>;
+    dismissInvalidSession: () => void;
   } }>).props.value;
 }
 
@@ -98,11 +106,175 @@ beforeEach(() => {
   harness.setPersistence.mockReset().mockResolvedValue(undefined);
   harness.onIdTokenChanged.mockReset().mockReturnValue(vi.fn());
   harness.onSnapshot.mockReset().mockReturnValue(vi.fn());
-  harness.signOut.mockResolvedValue(undefined);
+  harness.signOut.mockReset().mockResolvedValue(undefined);
+  harness.clearPrivateClientState.mockReset().mockResolvedValue(undefined);
   harness.ensureFirebaseAppCheckReady.mockReset().mockResolvedValue(undefined);
   harness.employeeLogin.mockReset().mockResolvedValue({ data: { customToken: "test-only-custom-token" } });
+  harness.employeeLogout.mockReset().mockResolvedValue({ data: { ok: true } });
   harness.signInWithCustomToken.mockReset().mockResolvedValue(undefined);
   harness.signInWithPopup.mockReset().mockResolvedValue(undefined);
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((finish) => { resolve = finish; });
+  return { promise, resolve };
+}
+
+describe("private-screen session termination", () => {
+  it("hides a revoked session before deferred private cleanup and ignores queued authz/token callbacks", async () => {
+    const cleanupPending = deferred<void>();
+    harness.clearPrivateClientState.mockReturnValueOnce(cleanupPending.promise);
+    const context = renderProvider();
+    const cleanup = harness.effect?.();
+    await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
+    tokenCallback(user("A"));
+    await flushCallbacks();
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    snapshotCallback(authz("A"));
+    harness.setState.mockClear();
+    harness.writeVerifiedOfflineSession.mockClear();
+
+    snapshotCallback({
+      ...authz("A"),
+      data: () => ({ employeeId: "EMP-A", active: false, sessionVersion: 1, permissionsVersion: 1 }),
+    });
+    expect(harness.setState).toHaveBeenLastCalledWith({
+      status: "invalid", message: "세션이 변경되었습니다. 다시 로그인해주세요.",
+    });
+    expect(harness.clearPrivateClientState).toHaveBeenCalledTimes(1);
+    expect(harness.signOut).not.toHaveBeenCalled();
+
+    harness.setState.mockClear();
+    snapshotCallback(authz("A"));
+    tokenCallback(user("A"));
+    tokenCallback(null);
+    await flushCallbacks();
+    expect(harness.setState).not.toHaveBeenCalled();
+    expect(harness.writeVerifiedOfflineSession).not.toHaveBeenCalled();
+    expect(harness.onSnapshot).toHaveBeenCalledTimes(1);
+
+    cleanupPending.resolve(undefined);
+    await flushCallbacks();
+    expect(harness.signOut).toHaveBeenCalledTimes(1);
+    snapshotCallback(authz("A"));
+    tokenCallback(user("A"));
+    await flushCallbacks();
+    expect(harness.setState).not.toHaveBeenCalled();
+    context.dismissInvalidSession();
+    expect(harness.setState).toHaveBeenLastCalledWith({ status: "unauthenticated" });
+    if (cleanup) cleanup();
+  });
+
+  it("queues return-to-login until both private cleanup and the old signOut finish", async () => {
+    const cleanupPending = deferred<void>();
+    const signOutPending = deferred<void>();
+    harness.clearPrivateClientState.mockReturnValueOnce(cleanupPending.promise);
+    harness.signOut.mockReturnValueOnce(signOutPending.promise);
+    const context = renderProvider();
+    const cleanup = harness.effect?.();
+    await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
+    tokenCallback(user("A"));
+    await flushCallbacks();
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    snapshotCallback({ metadata: { fromCache: false }, exists: () => false, data: () => undefined });
+    context.dismissInvalidSession();
+    expect(harness.setState).toHaveBeenLastCalledWith({ status: "resolving" });
+    harness.setState.mockClear();
+    tokenCallback(null);
+    cleanupPending.resolve(undefined);
+    await flushCallbacks();
+    expect(harness.signOut).toHaveBeenCalledTimes(1);
+    expect(harness.setState).not.toHaveBeenCalled();
+    signOutPending.resolve(undefined);
+    await flushCallbacks();
+    expect(harness.setState).toHaveBeenLastCalledWith({ status: "unauthenticated" });
+
+    await context.login("test-only-pin");
+    tokenCallback(user("B"));
+    await flushCallbacks();
+    const freshSnapshot = harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void;
+    freshSnapshot(authz("B"));
+    expect(harness.setState).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "authenticated", session: expect.objectContaining({ uid: "B" }),
+    }));
+    if (cleanup) cleanup();
+  });
+
+  it("hides immediately while remote logout and cleanup are pending, without stale reauthentication", async () => {
+    const remotePending = deferred<{ data: { ok: boolean } }>();
+    const cleanupPending = deferred<void>();
+    harness.employeeLogout.mockReturnValueOnce(remotePending.promise);
+    harness.clearPrivateClientState.mockReturnValueOnce(cleanupPending.promise);
+    const context = renderProvider();
+    const cleanup = harness.effect?.();
+    await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
+    tokenCallback(user("A"));
+    await flushCallbacks();
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    snapshotCallback(authz("A"));
+    harness.setState.mockClear();
+    harness.writeVerifiedOfflineSession.mockClear();
+
+    const attempt = context.logout();
+    expect(harness.setState).toHaveBeenLastCalledWith({ status: "resolving" });
+    expect(harness.employeeLogout).toHaveBeenCalledTimes(1);
+    expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
+    harness.setState.mockClear();
+    snapshotCallback(authz("A"));
+    tokenCallback(user("A"));
+    await flushCallbacks();
+    expect(harness.setState).not.toHaveBeenCalled();
+    expect(harness.writeVerifiedOfflineSession).not.toHaveBeenCalled();
+    await context.logout();
+    expect(harness.employeeLogout).toHaveBeenCalledTimes(1);
+
+    remotePending.resolve({ data: { ok: true } });
+    await flushCallbacks();
+    expect(harness.clearPrivateClientState).toHaveBeenCalledTimes(1);
+    tokenCallback(null);
+    expect(harness.setState).not.toHaveBeenCalled();
+    cleanupPending.resolve(undefined);
+    await attempt;
+    expect(harness.signOut).toHaveBeenCalledTimes(1);
+    expect(harness.setState).toHaveBeenLastCalledWith({ status: "unauthenticated" });
+    harness.setState.mockClear();
+    snapshotCallback(authz("A"));
+    expect(harness.setState).not.toHaveBeenCalled();
+    if (cleanup) cleanup();
+  });
+
+  it("ignores a token result that finishes after logout starts", async () => {
+    const tokenPending = deferred<{ claims: Record<string, unknown> }>();
+    const context = renderProvider();
+    const cleanup = harness.effect?.();
+    await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
+    tokenCallback({ ...user("A"), getIdTokenResult: () => tokenPending.promise });
+    await flushCallbacks();
+    await context.logout();
+    harness.setState.mockClear();
+    tokenPending.resolve(await user("A").getIdTokenResult());
+    await flushCallbacks();
+    expect(harness.onSnapshot).not.toHaveBeenCalled();
+    expect(harness.setState).not.toHaveBeenCalled();
+    expect(harness.writeVerifiedOfflineSession).not.toHaveBeenCalled();
+    if (cleanup) cleanup();
+  });
+
+  it("keeps sensitive screens hidden if local signOut rejects", async () => {
+    const context = renderProvider();
+    harness.signOut.mockRejectedValueOnce(new Error("private storage detail"));
+    await expect(context.logout()).rejects.toThrow("private storage detail");
+    expect(harness.setState).toHaveBeenNthCalledWith(1, { status: "resolving" });
+    expect(harness.setState).toHaveBeenLastCalledWith({
+      status: "invalid", message: "로그아웃을 완료하지 못했습니다. 앱을 다시 열어 로그인해주세요.",
+    });
+    expect(harness.setState).not.toHaveBeenCalledWith(expect.objectContaining({ status: "authenticated" }));
+  });
 });
 
 describe("PIN login failure recovery", () => {

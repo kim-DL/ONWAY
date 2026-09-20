@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import { buildKakaoDirectionsUrlToCoordinate } from "@/features/school-detail/kakao-directions";
@@ -393,7 +394,7 @@ export function SalesRoutePlanner({
       <BottomSheetActions className="sales-route-planner__footer" busy={busy}>
         <span aria-live="polite">{busy ? "학교 위치·이동시간 확인 중" : `${selectedCount}곳 선택 · 최대 ${MAX_ROUTE_SCHOOLS}곳`}</span>
         <GlassButton variant="primary" disabled={busy || selectedCount < 2 || !selectedIds.has(startSchoolId)} onClick={() => void calculate()}>
-          {busy ? <><Icon name="refresh" className="is-spinning" />계산 중…</> : <><Icon name="sparkles" />가까운 순서 계산</>}
+          {busy ? <><OnnuriLoader size="small" tone="inherit" decorative />계산 중…</> : <><Icon name="sparkles" />가까운 순서 계산</>}
         </GlassButton>
       </BottomSheetActions>
     </div>

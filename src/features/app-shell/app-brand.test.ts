@@ -8,7 +8,8 @@ describe("company brand signature", () => {
   it("pairs the company name with the original transparent wave, not a padded install icon", () => {
     const markup = renderToStaticMarkup(createElement(AppBrand));
     expect(markup).toContain("app-brand--signature");
-    expect(markup).toContain("<strong>온누리종합식품</strong>");
+    expect(markup).toContain("data-company-wordmark");
+    expect(markup.replace(/<[^>]+>/g, "")).toContain("온누리종합식품");
     expect(markup).toContain("<small>급식길</small>");
     expect(markup).toContain('viewBox="0 0 1200 446"');
     expect(markup).toContain('href="/brand/onnuri-food-logo.png"');

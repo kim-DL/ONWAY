@@ -21,6 +21,7 @@ const iconNames = Object.keys({
   copy: true,
   download: true,
   home: true,
+  key: true,
   location: true,
   logout: true,
   phone: true,

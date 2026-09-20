@@ -23,6 +23,16 @@ const keywordDocumentSchema = z.object({
 
 const addressResponseSchema = z.object({ documents: z.array(addressDocumentSchema).max(30) });
 const keywordResponseSchema = z.object({ documents: z.array(keywordDocumentSchema).max(30) });
+const regionResponseSchema = z.object({ documents: z.array(z.object({
+  region_type: z.string(),
+  region_2depth_name: z.string().max(120),
+  region_3depth_name: z.string().max(120),
+  address_name: z.string().max(500),
+})).max(10) });
+const reverseAddressResponseSchema = z.object({ documents: z.array(z.object({
+  address: z.object({ address_name: z.string().trim().max(500) }).nullable(),
+  road_address: z.object({ address_name: z.string().trim().max(500) }).nullable(),
+})).max(1) });
 
 export interface KakaoAddressResult {
   addressName: string;
@@ -166,5 +176,30 @@ export class KakaoLocalClient {
       longitude: document.x,
       placeUrl: document.place_url,
     }));
+  }
+
+  async reverseAddress(point: { latitude: number; longitude: number }) {
+    const payload = await this.request("geo/coord2address.json", new URLSearchParams({
+      x: String(point.longitude), y: String(point.latitude), input_coord: "WGS84",
+    }));
+    const parsed = reverseAddressResponseSchema.safeParse(payload);
+    if (!parsed.success) throw new KakaoLocalClientError("INVALID_RESPONSE", "Kakao reverse address response is invalid.");
+    const first = parsed.data.documents[0];
+    return { addressName: first?.address?.address_name ?? "", roadAddress: first?.road_address?.address_name ?? "" };
+  }
+
+  async reverseAdministrativeRegion(point: { latitude: number; longitude: number }) {
+    const payload = await this.request("geo/coord2regioncode.json", new URLSearchParams({
+      x: String(point.longitude), y: String(point.latitude), input_coord: "WGS84",
+    }));
+    const parsed = regionResponseSchema.safeParse(payload);
+    if (!parsed.success) throw new KakaoLocalClientError("INVALID_RESPONSE", "Kakao region response is invalid.");
+    // B is a legal dong, not an administrative dong. Never silently substitute it.
+    const administrative = parsed.data.documents.find((region) => region.region_type === "H");
+    return administrative ? {
+      district: administrative.region_2depth_name,
+      administrativeDong: administrative.region_3depth_name,
+      address: administrative.address_name,
+    } : { district: "", administrativeDong: "", address: "" };
   }
 }

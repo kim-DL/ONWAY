@@ -5,6 +5,30 @@
 **기준:** 전체 문서 정합성 검토서 v1.0 반영  
 **관련 문서:** MVP 기획서 v1.3 / 인증·권한·보안 설계서 v1.3 / 화면·UX 상세 명세서 v1.2 / 검색·캐시·성능 설계서 v1.1 / 외부 API·데이터 동기화 설계서 / 구현 명세서 v1.1 / 테스트·인수 기준서 v1.1
 
+## 현재 데이터 구조 증분 — 2026-09-20
+
+아래 구조는 이 문서의 초기 학교·영업 모델에 추가된 현재 구현이다. 필드 전체 계약은 공유 Zod 스키마와 서버 Service를 기준으로 하며, 운영 데이터나 비밀값은 문서에 복제하지 않는다.
+
+```text
+companies/onnuri/customers/{customerId}
+companies/onnuri/inventoryProducts/{productId}
+  ├─ lots/{lotId}
+  └─ events/{requestId}
+companies/onnuri/inventorySettings/current
+companies/onnuri/inventoryCountCycles/{cycleId}
+  └─ entries/{productId}-{locationId}
+companies/onnuri/inventoryRequests/{requestId}
+auditLogs/{logId}
+requestLocks/{requestId}
+```
+
+- 거래처 문서는 공식 주소와 실제 납품 주소, 납품 좌표, 연락처, 출입 정보, 상태, 사진 metadata, revision과 감사 주체를 보존한다. 거래처 사진 Object는 `companies/onnuri/customerPhotos/{photoId}/{variant}.webp`에 두고 Callable로만 읽고 쓴다.
+- 재고 상품은 제품 metadata와 장소별 수량 요약, 가장 가까운 유통기한, 실사 요약, `lotSummary`, 사진 metadata, metadata revision과 stock revision을 가진다. 실제 유통기한별 수량은 `lots`에, 불변 작업 이력은 `events`에 둔다.
+- 재고 장소는 냉장·냉동1·냉동2·샘플 네 종류다. D-100 기본 임박 기준과 지정 실사 요일은 `inventorySettings/current`에서 관리한다.
+- 모든 재고 수량 작업은 서버가 활성 lot 집합을 읽고 Transaction으로 상품 요약·lot·event·실사 entry·감사 로그·요청 영수증을 함께 갱신한다. `includeSummary`는 신버전 응답에서만 `lotSummary`를 포함해 구버전 호환성을 유지한다.
+- 거래처·재고의 비공개 응답은 `private, no-store`이며, Firestore/Storage Rules는 Client 직접 접근을 기본 거부한다. 사진 원본 또는 업무정보를 공개 URL이나 Service Worker Cache에 넣지 않는다.
+- Phase 45~49에서 추가된 migration/호환 배포와 운영 보강 내역은 `docs/phase-45-firebase-hosting-and-inventory-plan.md` 및 `docs/phase-49-inventory-count-mode.md`를 참고한다.
+
 ---
 
 # 1. 문서 목적

@@ -11,13 +11,19 @@ import {
   useState,
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
+  type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 import { FirebaseError } from "firebase/app";
 
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { usePhotoMorph } from "@/components/ui/photo-morph";
+import morphStyles from "@/components/ui/photo-morph.module.css";
+import viewerStyles from "./school-photo-viewer.module.css";
+import galleryStyles from "./school-photo-gallery.module.css";
 import { useToast } from "@/components/ui/toast";
 import {
   PHOTO_SLOT_IDS,
@@ -68,14 +74,14 @@ function PhotoImage({
   variant: "thumbnail" | "preview";
   enabled: boolean;
   onReady: (() => void) | undefined;
-  onOpen: () => void;
+  onOpen: (origin: HTMLElement) => void;
 }) {
   const state = useSchoolPhoto(photo, sessionNamespace, variant, enabled);
   useEffect(() => {
     if (state.status === "ready") onReady?.();
   }, [onReady, state.status]);
   return (
-    <button className="photo-card__image" type="button" onClick={onOpen} aria-label={`${photo.caption ?? SLOT_LABELS[photo.slotId]} 크게 보기`}>
+    <button className={`photo-card__image ${galleryStyles.image}`} data-school-photo-origin type="button" onClick={(event) => onOpen(event.currentTarget)} aria-label={`${photo.caption ?? SLOT_LABELS[photo.slotId]} 크게 보기`}>
       {state.status === "ready" ? (
         <img
           src={state.url}
@@ -87,9 +93,8 @@ function PhotoImage({
           decoding="async"
         />
       ) : null}
-      {state.status === "idle" || state.status === "loading" ? <span className="photo-card__loading"><i />사진 불러오는 중</span> : null}
-      {state.status === "error" ? <span className="photo-card__loading"><Icon name="camera" />사진을 불러오지 못했어요</span> : null}
-      <span className="photo-card__zoom"><Icon name="zoom-in" size={17} />크게 보기</span>
+      {state.status === "idle" || state.status === "loading" ? <span className={galleryStyles.loading}><OnnuriLoader size="small" tone="delivery" label="사진 불러오는 중" decorative />사진 불러오는 중</span> : null}
+      {state.status === "error" ? <span className={galleryStyles.loading}><Icon name="camera" />사진을 불러오지 못했어요</span> : null}
     </button>
   );
 }
@@ -221,11 +226,13 @@ function PhotoViewer({
   initialIndex,
   sessionNamespace,
   onClose,
+  origin,
 }: {
   photos: SchoolPhoto[];
   initialIndex: number;
   sessionNamespace: string;
   onClose: () => void;
+  origin: HTMLElement | null;
 }) {
   const [index, setIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
@@ -233,34 +240,37 @@ function PhotoViewer({
   const preview = useSchoolPhoto(photo, sessionNamespace, "preview");
   const original = useSchoolPhoto(photo, sessionNamespace, "original", scale > 1);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gestureStart = useRef<{ x: number; y: number; distance: number | null } | null>(null);
+  const gestureStart = useRef<{ x: number; y: number; distance: number | null; pinching: boolean } | null>(null);
   const imageUrl = original.status === "ready" ? original.url : preview.status === "ready" ? preview.url : null;
+  const { stageRef, requestClose, beforeClose } = usePhotoMorph({
+    origin: index === initialIndex && imageUrl ? origin : null,
+    identity: imageUrl ? `${photo?.slotId}:${photo?.currentVersionId}` : "loading",
+    onClose,
+    canReturn: scale === 1 && index === initialIndex,
+  });
 
   const navigate = useCallback((direction: -1 | 1) => {
     setScale(1);
     setIndex((value) => (value + direction + photos.length) % photos.length);
-  }, [photos.length]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-      if (event.key === "ArrowLeft" && photos.length > 1) { setScale(1); setIndex((value) => (value - 1 + photos.length) % photos.length); }
-      if (event.key === "ArrowRight" && photos.length > 1) { setScale(1); setIndex((value) => (value + 1) % photos.length); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate, onClose, photos.length]);
+    stageRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [photos.length, stageRef]);
 
   if (!photo) return null;
 
   const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest("button")) return;
+    // Start gestures only on the fitted image. Once zoomed, the browser owns
+    // panning/pinch zoom; do not compete with its native scroll gesture.
+    if (scale > 1 && pointers.current.size === 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    gestureStart.current ??= { x: event.clientX, y: event.clientY, distance: null };
+    gestureStart.current ??= { x: event.clientX, y: event.clientY, distance: null, pinching: false };
     if (pointers.current.size === 2) {
       const [first, second] = [...pointers.current.values()];
-      if (first && second && gestureStart.current) gestureStart.current.distance = Math.hypot(first.x - second.x, first.y - second.y);
+      if (first && second && gestureStart.current) {
+        gestureStart.current.distance = Math.hypot(first.x - second.x, first.y - second.y);
+        gestureStart.current.pinching = true;
+      }
     }
   };
   const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -275,26 +285,31 @@ function PhotoViewer({
     if (event.target instanceof Element && event.target.closest("button")) return;
     const start = gestureStart.current;
     pointers.current.delete(event.pointerId);
-    if (start && scale === 1) {
+    if (start && !start.pinching && scale === 1 && pointers.current.size === 0) {
       const deltaX = event.clientX - start.x;
       const deltaY = event.clientY - start.y;
       if (Math.abs(deltaX) > 60 && Math.abs(deltaX) > Math.abs(deltaY) && photos.length > 1) {
         navigate(deltaX < 0 ? 1 : -1);
-      } else if (deltaY > 90 && Math.abs(deltaY) > Math.abs(deltaX)) onClose();
+      } else if (deltaY > 90 && Math.abs(deltaY) > Math.abs(deltaX)) requestClose();
     }
     if (pointers.current.size === 0) gestureStart.current = null;
   };
 
-  return (
-    <div className="photo-viewer" role="dialog" aria-modal="true" aria-label="현장 사진 크게 보기">
-      <header><button type="button" onClick={onClose} aria-label="사진 닫기"><Icon name="close" /></button><span>{index + 1} / {photos.length}</span></header>
-      <div className="photo-viewer__stage" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onDoubleClick={() => setScale((value) => value > 1 ? 1 : 2.5)}>
-        {imageUrl ? <img src={imageUrl} alt={photo.caption ?? SLOT_LABELS[photo.slotId]} width={800} height={1_200} decoding="async" style={{ transform: `scale(${scale})` }} draggable={false} /> : <span className="photo-viewer__loading"><i />사진을 불러오는 중</span>}
-        {photos.length > 1 && scale === 1 ? <><button className="photo-viewer__previous" type="button" onClick={() => navigate(-1)} aria-label="이전 사진"><Icon name="arrow-left" /></button><button className="photo-viewer__next" type="button" onClick={() => navigate(1)} aria-label="다음 사진"><Icon name="chevron-right" /></button></> : null}
-      </div>
-      <footer><div><span>{SLOT_LABELS[photo.slotId]}</span><strong>{photo.caption ?? "설명 없는 현장 사진"}</strong><small>두 번 탭하거나 손가락으로 확대 · 아래로 밀어 닫기</small></div><button type="button" onClick={() => setScale((value) => value > 1 ? 1 : 2.5)}><Icon name="zoom-in" />{scale > 1 ? "크기 복귀" : "원본 확대"}</button></footer>
+  return createPortal(<div onKeyDown={(event) => {
+    event.stopPropagation();
+    if (event.defaultPrevented || photos.length < 2 || scale > 1) return;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      navigate(event.key === "ArrowLeft" ? -1 : 1);
+    }
+  }}><BottomSheet open title="현장 사진 크게 보기" onClose={requestClose} beforeClose={beforeClose}>
+    <div ref={stageRef} className={`${morphStyles.stage} ${viewerStyles.schoolStage}`} data-photo-morph-stage data-photo-morph-state="open" data-zoomed={scale > 1} style={{ "--photo-scale": scale } as CSSProperties} tabIndex={scale > 1 ? 0 : -1} aria-label="현장사진 보기" role="region" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { pointers.current.clear(); gestureStart.current = null; }} onDoubleClick={() => setScale((value) => value > 1 ? 1 : 2.5)}>
+      {imageUrl ? <img src={imageUrl} alt={photo.caption ?? SLOT_LABELS[photo.slotId]} width={800} height={1_200} decoding="async" draggable={false} /> : preview.status === "error" ? <span className={viewerStyles.schoolLoading}><Icon name="camera" /><span>사진을 불러오지 못했어요. 닫고 다시 열어주세요.</span></span> : <span className={viewerStyles.schoolLoading}><OnnuriLoader size="medium" tone="delivery" label="사진을 불러오는 중" decorative /><span role="status">사진을 불러오는 중</span></span>}
+      {photos.length > 1 && scale === 1 ? <><button className={viewerStyles.schoolNavigation} data-direction="previous" type="button" onClick={() => navigate(-1)} aria-label="이전 사진"><Icon name="arrow-left" /></button><button className={viewerStyles.schoolNavigation} data-direction="next" type="button" onClick={() => navigate(1)} aria-label="다음 사진"><Icon name="chevron-right" /></button></> : null}
     </div>
-  );
+    <p className={viewerStyles.schoolCaption}><strong>{photo.caption ?? SLOT_LABELS[photo.slotId]}</strong><small>{scale > 1 ? "사진을 밀어 좌우와 위아래를 살펴보세요." : "두 번 탭하거나 확대 버튼으로 출입구를 확인하세요."}</small></p>
+    <BottomSheetActions className={viewerStyles.schoolActions ?? ""}><span>{index + 1} / {photos.length}</span><button type="button" aria-pressed={scale > 1} onClick={() => { setScale((value) => value > 1 ? 1 : 2.5); stageRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" }); }}><Icon name="zoom-in" />{scale > 1 ? "크기 복귀" : "원본 확대"}</button></BottomSheetActions>
+  </BottomSheet></div>, document.body);
 }
 
 export function SchoolPhotoGallery({
@@ -313,6 +328,7 @@ export function SchoolPhotoGallery({
   const { showToast } = useToast();
   const [editorSlot, setEditorSlot] = useState<PhotoSlotId | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewerOrigin, setViewerOrigin] = useState<HTMLElement | null>(null);
   const [workingSlot, setWorkingSlot] = useState<PhotoSlotId | null>(null);
   const [revealedPriorityPhotoKey, setRevealedPriorityPhotoKey] = useState<string | null>(null);
   const activePhotos = useMemo(() => photos.filter((photo) => photo.status === "active").sort((left, right) => left.slotId.localeCompare(right.slotId)), [photos]);
@@ -366,24 +382,34 @@ export function SchoolPhotoGallery({
   };
 
   return (
-    <section id="school-photo-summary" className="school-photo-gallery" aria-labelledby="detail-photo-title">
-      <div className="school-photo-gallery__heading"><div><h2 id="detail-photo-title">도착 전에 보는 현장</h2></div><StatusBadge tone={activePhotos.length === 3 ? "success" : "attention"}>{activePhotos.length === 3 ? "사진 준비 완료" : `${3 - activePhotos.length}개 슬롯 비어 있음`}</StatusBadge></div>
-      <div className="photo-gallery-grid">
-        {PHOTO_SLOT_IDS.map((slotId, slotIndex) => {
+    <section id="school-photo-summary" className={`school-photo-gallery ${galleryStyles.gallery}`} aria-labelledby="detail-photo-title">
+      <header className={galleryStyles.heading}><Icon name="camera" size={20} /><h2 id="detail-photo-title">현장 사진</h2></header>
+      <div className={galleryStyles.grid}>
+        {PHOTO_SLOT_IDS.map((slotId) => {
           const photo = photoBySlot.get(slotId) ?? null;
           const photoIndex = photo ? activePhotos.findIndex((candidate) => candidate.slotId === slotId) : -1;
           const isPriorityPhoto = photoIndex === 0;
+          const caption = photo?.caption?.trim();
+          const openPhoto = (origin: HTMLElement) => { setViewerOrigin(origin); setViewerIndex(photoIndex); };
           return (
-            <article className="photo-card" data-primary={slotIndex === 0} data-empty={!photo} key={slotId}>
-              {photo ? <PhotoImage photo={photo} sessionNamespace={sessionNamespace} variant={isPriorityPhoto ? "preview" : "thumbnail"} enabled={isPriorityPhoto || secondaryPhotosEnabled} onReady={isPriorityPhoto ? enableSecondaryPhotos : undefined} onOpen={() => setViewerIndex(photoIndex)} /> : <button className="photo-card__empty" type="button" disabled={!canEdit} onClick={() => setEditorSlot(slotId)}><Icon name="camera" /><strong>{SLOT_LABELS[slotId]}</strong><small>{canEdit ? "첫 사진 추가" : "등록된 사진이 없습니다."}</small></button>}
-              <div className="photo-card__meta"><span>{slotId} · {SLOT_LABELS[slotId]}</span><strong>{photo?.caption ?? "아직 등록되지 않았어요."}</strong></div>
-              {canEdit && photo ? <div className="photo-card__actions"><button type="button" onClick={() => setEditorSlot(slotId)}><Icon name="upload" size={16} />교체</button><button type="button" disabled={workingSlot === slotId} onClick={() => void deletePhoto(photo)}><Icon name="trash" size={16} />삭제</button></div> : null}
+            <article className={`photo-card ${galleryStyles.card}`} data-empty={!photo} key={slotId}>
+              {photo ? <PhotoImage photo={photo} sessionNamespace={sessionNamespace} variant={isPriorityPhoto ? "preview" : "thumbnail"} enabled={isPriorityPhoto || secondaryPhotosEnabled} onReady={isPriorityPhoto ? enableSecondaryPhotos : undefined} onOpen={openPhoto} /> : <button className={galleryStyles.empty} type="button" disabled={!canEdit} onClick={() => setEditorSlot(slotId)} aria-label={`${SLOT_LABELS[slotId]} 사진 ${canEdit ? "추가" : "없음"}`}><Icon name="camera" size={24} /><span>{canEdit ? "사진 추가" : "등록된 사진 없음"}</span></button>}
+              <div className={galleryStyles.footer}>
+                <div className={galleryStyles.meta}><h3>{SLOT_LABELS[slotId]}</h3>{caption && caption !== SLOT_LABELS[slotId] ? <p>{caption}</p> : null}</div>
+                {photo ? <div className={`photo-card__actions ${galleryStyles.actions}`}>
+                  <button type="button" onClick={(event) => { const origin = event.currentTarget.closest("article")?.querySelector<HTMLElement>("[data-school-photo-origin]"); if (origin) openPhoto(origin); }} aria-label={`${SLOT_LABELS[slotId]} 크게 보기`}><Icon name="zoom-in" size={16} />크게 보기</button>
+                  {canEdit ? <>
+                    <button type="button" disabled={workingSlot === slotId} onClick={() => setEditorSlot(slotId)} aria-label={`${SLOT_LABELS[slotId]} 사진 교체`}><Icon name="upload" size={16} />교체</button>
+                    <button type="button" disabled={workingSlot === slotId} onClick={() => void deletePhoto(photo)} aria-label={`${SLOT_LABELS[slotId]} 사진 삭제`}><Icon name="trash" size={16} />삭제</button>
+                  </> : null}
+                </div> : null}
+              </div>
             </article>
           );
         })}
       </div>
       {editorSlot ? <BottomSheet open title={`${SLOT_LABELS[editorSlot]} 사진 ${photoBySlot.has(editorSlot) ? "교체" : "추가"}`} onClose={() => setEditorSlot(null)}><PhotoUploader key={`${editorSlot}:${photoBySlot.get(editorSlot)?.photoRevision ?? 0}`} schoolId={schoolId} slotId={editorSlot} photo={photoBySlot.get(editorSlot) ?? null} onDone={() => { setEditorSlot(null); onRefresh(); }} /></BottomSheet> : null}
-      {viewerIndex !== null ? <PhotoViewer photos={activePhotos} initialIndex={viewerIndex} sessionNamespace={sessionNamespace} onClose={() => setViewerIndex(null)} /> : null}
+      {viewerIndex !== null ? <PhotoViewer photos={activePhotos} initialIndex={viewerIndex} sessionNamespace={sessionNamespace} origin={viewerOrigin} onClose={() => { setViewerIndex(null); setViewerOrigin(null); }} /> : null}
     </section>
   );
 }

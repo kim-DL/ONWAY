@@ -29,9 +29,17 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  // The app uses Firebase callables for private data; no Next server is required.
+  output: "export",
   devIndicators: false,
   poweredByHeader: false,
   reactStrictMode: true,
+  webpack(config) {
+    // Shared Functions contracts use NodeNext's .js specifiers; resolve their
+    // TypeScript sources when bundling the browser, without changing Node output.
+    config.resolve.extensionAlias = { ...config.resolve.extensionAlias, ".js": [".js", ".ts"] };
+    return config;
+  },
 };
 
 export default withSerwist(nextConfig);

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
@@ -144,7 +145,7 @@ export function SalesExportWorkspace({ session }: { session: AuthenticatedSessio
   };
 
   if (loadStatus === "loading") {
-    return <section className="shell-page export-page" aria-busy="true"><div className="export-loading"><span className="search-pulse" /><strong>안전한 내보내기 기준을 확인하고 있어요.</strong><p>파일이 아니라 기간과 권한 정보만 먼저 불러옵니다.</p></div></section>;
+    return <section className="shell-page export-page" aria-busy="true"><div className="export-loading" role="status"><OnnuriLoader decorative /><strong>안전한 내보내기 기준을 확인하고 있어요.</strong><p>파일이 아니라 기간과 권한 정보만 먼저 불러옵니다.</p></div></section>;
   }
   if (loadStatus === "error" || !options) {
     return <section className="shell-page export-page"><div className="export-error" role="alert"><Icon name="clipboard" size={28} /><h1>내보내기 센터를 열지 못했어요.</h1><p>연결을 확인한 뒤 페이지를 다시 열어주세요.</p><GlassButton variant="primary" onClick={() => window.location.reload()}>다시 시도</GlassButton></div></section>;

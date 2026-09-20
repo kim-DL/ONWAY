@@ -14,7 +14,7 @@ if (verifyProductionUx) {
 }
 const nextServer = spawn(
   process.execPath,
-  [nextCli, ...(verifyProductionUx ? ["start"] : ["dev", "--webpack"]), "--hostname", "127.0.0.1", "--port", "3103"],
+  [...(verifyProductionUx ? [join(process.cwd(), "scripts", "serve-hosting-local.mjs")] : [nextCli, "dev", "--webpack"]), "--hostname", "127.0.0.1", "--port", "3103"],
   { cwd: process.cwd(), env: process.env, stdio: "inherit" },
 );
 
@@ -39,7 +39,9 @@ try {
   const result = spawnSync(
     process.execPath,
     [playwrightCli, "test", ...(process.env.ONNURIWAY_E2E_UX === "true"
-      ? process.env.ONNURIWAY_E2E_UX_SUITE === "optimization"
+      ? process.env.ONNURIWAY_E2E_UX_SUITE === "customers"
+        ? ["tests/e2e-auth/phase32-customer-api.spec.ts", "tests/e2e-auth/phase32-customer-flow.spec.ts", "tests/e2e-auth/phase32-customer-admin.spec.ts", "tests/e2e-auth/phase6-search.spec.ts"]
+      : process.env.ONNURIWAY_E2E_UX_SUITE === "optimization"
         ? ["tests/e2e-auth/phase31-lazy-sales-tools.spec.ts", "tests/e2e-auth/phase24-route-flow.spec.ts", "tests/e2e-auth/phase9-sales-cycle.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts", "tests/e2e-auth/phase22-action-reach.spec.ts", "tests/e2e-auth/phase22-form-actions.spec.ts", "tests/e2e-auth/phase3-auth.spec.ts", "tests/e2e-auth/phase22-login-recovery.spec.ts", "tests/e2e-auth/phase10-sales-visit.spec.ts"]
       : process.env.ONNURIWAY_E2E_UX_SUITE === "route-upgrade"
         ? ["tests/e2e-auth/phase24-route-flow.spec.ts", "tests/e2e-auth/phase9-sales-cycle.spec.ts", "tests/e2e-auth/phase9-brand.spec.ts", "tests/e2e-auth/phase22-action-reach.spec.ts"]

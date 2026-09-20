@@ -34,6 +34,10 @@
 }
 
 .accent { display: block; }
+/* Reuse the selected mode's text token, not its underline or generic CTA hue. */
+:global(.workspace-shell) .greeting .title .accent { color: var(--mode-delivery-text); }
+:global(.workspace-shell[data-mode="customer"]) .greeting .title .accent { color: var(--mode-customer-text); }
+:global(.workspace-shell[data-mode="sales"]) .greeting .title .accent { color: var(--mode-sales-text); }
 
 .mascot {
   position: relative;
@@ -47,7 +51,7 @@
 
 .mascot > span {
   position: absolute;
-  inset: calc(50% - 4px) auto auto 50%;
+  inset: calc(50% - 10px) auto auto 50%;
   transform: translate(-50%, -50%) scale(.9);
 }
 
@@ -65,4 +69,5 @@
 
 @media (forced-colors: active) {
   .mascot { visibility: hidden; }
+  :global(.workspace-shell[data-mode]) .greeting .title .accent { color: CanvasText; }
 }

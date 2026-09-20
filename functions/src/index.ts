@@ -10,6 +10,14 @@ export {
 import { setGlobalOptions } from "firebase-functions/v2/options";
 
 export { employeeLogin, employeeLogout } from "./auth/callables.js";
+export { listCustomers, saveCustomer, searchCustomerLocations, reverseCustomerLocation } from "./customer/callables.js";
+export { uploadCustomerPhoto, getCustomerPhoto, expireCustomerPhotos } from "./customer/customer-photo-callables.js";
+export {
+  getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct,
+  recordInventoryMovement, recordInventoryCount, updateInventoryLot,
+  setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings,
+  listInventoryHistory, uploadInventoryPhoto, getInventoryPhoto, expireInventoryPhotos,
+} from "./inventory/callables.js";
 export {
   activateAdminSession,
   createEmployee,

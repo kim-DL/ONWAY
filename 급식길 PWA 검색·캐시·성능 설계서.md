@@ -4,6 +4,26 @@
 **대상:** 급식길 PWA MVP  
 **관련 문서:** MVP 기획서 v1.3 / 데이터베이스 상세 설계서 v1.3 / 인증·권한·보안 설계서 v1.3 / 디자인 시스템 v1.0 / 화면·UX 상세 명세서 v1.2
 
+## 현재 캐시·성능 기준 — 2026-09-20
+
+초기 설계 이후의 실제 구현 경계는 다음과 같다. 캐시를 추가하거나 확장할 때에는 민감도와 로그아웃 정리를 먼저 검토한다.
+
+| 영역 | 현재 저장 위치와 정책 |
+| --- | --- |
+| Firebase SDK | Firestore `memoryLocalCache()`만 사용한다. SDK 영속 캐시는 사용하지 않는다. |
+| 학교 검색 | `onnuriway-search-v1` IndexedDB에 세션·권한·Catalog version namespace로 Catalog와 최근 학교 최대 8개를 저장한다. 타이핑 중 네트워크 요청은 없다. |
+| 학교 상세 | Memory 우선, `onnuriway-school-detail-v1` IndexedDB 다음, 서버 최신화 순이다. IndexedDB에는 공용 학교·현장·사진 metadata만 저장하고 영업 데이터는 `null`로 기록한다. |
+| 학교 사진 | Thumbnail/Preview는 Memory와 `onnuriway-photo-cache-v1` IndexedDB에 최대 24개/36MiB로 보관한다. Original은 Memory 전용이다. |
+| 영업 Workspace | 활성 탭의 Memory에만 최대 18개 Cycle을 유지한다. IndexedDB store는 구버전 잔여 데이터를 지우기 위해서만 열며 새 영업 데이터를 기록하지 않는다. |
+| 거래처 | 전체 업무정보와 사진은 Memory 전용이다. 보이는 동안 최대 60초 주기·focus·online 복귀 시 Callable로 재검증하고 offline/auth 변경 시 제거한다. 최근 거래처는 권한 namespace가 포함된 localStorage에 ID 최대 5개만 저장한다. |
+| 재고 | 목록·상세·사진·수정 결과는 인증된 Component Memory 전용이고 durable cache나 offline queue가 없다. 개인 실사 모드만 같은 세션·한국 날짜 범위의 sessionStorage preference로 저장한다. |
+| Service Worker | Serwist `phase35` cache 이름을 사용한다. App Shell navigation은 NetworkFirst 3초, 명시적 public asset과 학교 thumbnail만 CacheFirst다. Firebase/Callable/Storage/API/업무 응답은 Runtime Cache 대상이 아니다. |
+
+- 로그아웃·권한/세션 무효화 시 `onnuriway:private:` local/sessionStorage, 등록된 Blob URL, 검색·학교 상세·사진 IndexedDB 및 영업 Memory를 지운다.
+- 새 Service Worker는 자동 `skipWaiting`하지 않는다. 사용자가 업데이트를 선택했을 때만 교체·reload한다.
+- 재고 목록은 100개 단위 페이지를 끝까지 읽되 5,000개에서 방어적으로 중단한다. 저장 중 시작된 조회와의 race만 `InventoryListReconciler`가 Memory에서 병합하고 다음 새 조회를 다시 권위 있는 값으로 취급한다.
+- 현재 번들 예산과 마지막 검증 수치는 `docs/phase-49-inventory-count-mode.md`, 현재 재검증 필요 항목은 `docs/HANDOFF.md`를 기준으로 한다.
+
 ---
 
 # 1. 문서 목적

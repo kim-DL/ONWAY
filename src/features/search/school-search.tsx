@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { lockBodyScroll } from "@/components/ui/body-scroll-lock";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { searchInputProps } from "@/components/ui/search-input-props";
 import { useToast } from "@/components/ui/toast";
 import type { SchoolSearchItem } from "@/domain/catalog";
 import type { School } from "@/domain/school";
@@ -54,11 +57,15 @@ function ResultButton({
   item,
   matchType,
   active,
+  pending,
+  unavailable,
   onSelect,
 }: {
   item: SchoolSearchItem;
   matchType?: SchoolSearchResult["matchType"] | undefined;
   active: boolean;
+  pending: boolean;
+  unavailable: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -68,6 +75,8 @@ function ResultButton({
       type="button"
       role="option"
       aria-selected={active}
+      aria-busy={pending || undefined}
+      aria-disabled={unavailable || undefined}
       onClick={onSelect}
     >
       <span className="school-search-result__mark"><Icon name="building" /></span>
@@ -85,7 +94,7 @@ function ResultButton({
           <span data-active={item.photoCount > 0}>사진 {item.photoCount}</span>
         </span>
       </span>
-      <Icon name="chevron-right" size={20} />
+      <span className="school-search-result__action">{pending ? <OnnuriLoader size="small" decorative /> : <Icon name="chevron-right" size={20} />}</span>
     </button>
   );
 }
@@ -110,6 +119,8 @@ export function SchoolSearch({
   const [activeIndex, setActiveIndex] = useState(0);
   const [resolvingSchoolId, setResolvingSchoolId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+  const resolvingRef = useRef(false);
   const catalog = catalogState.status === "ready" ? catalogState.catalog : null;
   const index = useMemo(() => new MemorySearchIndex(catalog?.items ?? []), [catalog]);
   const displayedItems = query.trim().length > 0
@@ -124,12 +135,11 @@ export function SchoolSearch({
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 20);
     return () => {
       window.clearTimeout(focusTimer);
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
     };
   }, [open]);
 
@@ -142,9 +152,31 @@ export function SchoolSearch({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [closeSearch, open]);
 
+  useEffect(() => {
+    const layer = layerRef.current;
+    const viewport = window.visualViewport;
+    if (!open || !layer || !viewport) return;
+    const fitViewport = () => {
+      // Fit above the software keyboard without intercepting pinch zoom.
+      if (viewport.scale !== 1) return;
+      layer.style.setProperty("--search-viewport-height", `${viewport.height}px`);
+      layer.style.setProperty("--search-viewport-top", `${viewport.offsetTop}px`);
+      layer.dataset.compact = String(viewport.height < 540);
+    };
+    fitViewport();
+    viewport.addEventListener("resize", fitViewport);
+    viewport.addEventListener("scroll", fitViewport);
+    return () => {
+      viewport.removeEventListener("resize", fitViewport);
+      viewport.removeEventListener("scroll", fitViewport);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const selectItem = async (item: SchoolSearchItem) => {
+    if (resolvingRef.current) return;
+    resolvingRef.current = true;
     setResolvingSchoolId(item.schoolId);
     try {
       void catalogState.addRecentSchool(item);
@@ -164,11 +196,13 @@ export function SchoolSearch({
         ? "학교 검색 결과는 저장되어 있지만 상세정보를 불러오지 못했습니다."
         : "오프라인에서는 이전에 열어본 학교의 상세정보만 볼 수 있습니다.");
     } finally {
+      resolvingRef.current = false;
       setResolvingSchoolId(null);
     }
   };
 
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === "ArrowDown" && displayedItems.length > 0) {
       event.preventDefault();
       setActiveIndex((current) => (current + 1) % displayedItems.length);
@@ -185,12 +219,12 @@ export function SchoolSearch({
   };
 
   const activeItem = displayedItems[activeIndex]?.item;
-  const resultMessage = query.trim().length > 0
+  const resultMessage = resolvingSchoolId !== null ? "학교 상세정보를 열고 있어요." : query.trim().length > 0
     ? `${searchResults.length}개의 학교 검색 결과`
     : `${catalogState.recentSchools.length}개의 최근 학교`;
 
   return (
-    <div className="school-search-layer" role="dialog" aria-modal="true" aria-labelledby="school-search-title">
+    <div ref={layerRef} className="school-search-layer" role="dialog" aria-modal="true" aria-labelledby="school-search-title">
       <button className="school-search-backdrop" type="button" aria-label="학교 검색 닫기" onClick={closeSearch} />
       <section className="school-search-panel">
         <header className="school-search-header">
@@ -206,6 +240,8 @@ export function SchoolSearch({
         <div className="school-search-field">
           <Icon name="search" size={23} />
           <input
+            {...searchInputProps}
+            name="school-query"
             ref={inputRef}
             role="combobox"
             aria-label="학교명 검색"
@@ -213,7 +249,6 @@ export function SchoolSearch({
             aria-expanded="true"
             aria-controls="school-search-results"
             aria-activedescendant={activeItem ? `school-search-option-${activeItem.schoolId}` : undefined}
-            autoComplete="off"
             disabled={catalogState.status === "loading"}
             placeholder="학교명 · 축약명 · 초성"
             value={query}
@@ -253,7 +288,7 @@ export function SchoolSearch({
         <div id="school-search-results" className="school-search-results" role="listbox" aria-label="학교 검색 결과">
           {catalogState.status === "loading" ? (
             <div className="school-search-state" aria-label="검색 카탈로그 불러오는 중">
-              <span className="search-pulse" aria-hidden="true" />
+              <OnnuriLoader size="large" decorative />
               <strong>이 기기의 학교 지도를 준비하고 있어요.</strong>
               <p>저장된 카탈로그를 먼저 확인한 뒤 최신 버전을 살펴봅니다.</p>
             </div>
@@ -270,6 +305,8 @@ export function SchoolSearch({
               item={item}
               matchType={matchType}
               active={activeIndex === itemIndex}
+              pending={resolvingSchoolId === item.schoolId}
+              unavailable={resolvingSchoolId !== null}
               onSelect={() => {
                 if (resolvingSchoolId === null) void selectItem(item);
               }}

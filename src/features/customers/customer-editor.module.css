@@ -1,0 +1,52 @@
+.deliveryAddress { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: start; gap: 8px 10px; padding: 14px; border: 1px solid #c7d9d7; border-radius: 14px; background: #f2f9f7; }
+.addressIcon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d8e7e3; border-radius: 10px; background: #fff; color: #217363; box-shadow: 0 2px 4px rgb(28 75 64 / 4%); }
+.addressLabel { color: #526660; font-size: .75rem; font-weight: 650; }
+.deliveryAddress p { margin: 4px 0 0; color: #263c35; font-size: .875rem; font-weight: 650; line-height: 1.6; overflow-wrap: anywhere; }
+.deliveryAddress[data-pending="true"] { border-color: #cfd6dd; background: #f7f8fa; }
+.confirmed { display: inline-flex; align-items: center; gap: 4px; grid-column: 2; color: #286957; font-size: .75rem; font-weight: 650; }
+.confirmPoint { grid-column: 2; justify-self: start; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 9px 13px; border: 1px solid #a9c9be; border-radius: 10px; background: #fff; color: #205e4e; font: inherit; font-size: .8125rem; font-weight: 750; cursor: pointer; box-shadow: 0 2px 5px rgb(28 75 64 / 6%); transition: background-color 150ms ease, transform 150ms ease; }
+.confirmPoint:hover { background: #e9f5ef; }
+.confirmPoint:active { transform: translateY(1px); }
+.confirmPoint:disabled { cursor: progress; opacity: .65; }
+.confirmPoint:focus-visible, .advanced summary:focus-visible { outline: 2px solid #26775f; outline-offset: 3px; }
+.advanced { min-width: 0; border-top: 1px solid var(--customer-line, #e5e8eb); }
+.advanced summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; gap: 8px; color: var(--customer-muted, #4e5968); font-size: .75rem; font-weight: 650; cursor: pointer; list-style: none; }
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary svg { transform: rotate(90deg); }
+.advanced[open] summary svg { transform: rotate(270deg); }
+.advanced > :not(summary) { margin-top: 8px; }
+.passwordChoice { margin: 0; padding: 0; border: 0; min-width: 0; }
+.passwordChoice legend { margin-bottom: 8px; padding: 0; color: var(--customer-ink, #191f28); font-size: .8125rem; font-weight: 650; }
+.passwordChoice > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.passwordChoice label { position: relative; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 9px 7px; border: 1px solid #d0dadd; border-radius: 11px; color: #53616b; background: #fff; font-size: .8125rem; font-weight: 700; cursor: pointer; }
+.passwordChoice label[data-selected="true"] { border-color: #79b9a9; color: #175d4d; background: #edf7f3; box-shadow: inset 0 1px 0 #fff; }
+.passwordChoice input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.passwordChoice label:has(input:focus-visible) { outline: 2px solid #26775f; outline-offset: 3px; }
+.passwordChoice p { margin-top: 8px; }
+.photoPicker { min-width: 0; margin-top: 2px; }
+.photoHeading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.photoHeading h4 { margin: 0; color: var(--customer-ink, #191f28); font-size: .8125rem; font-weight: 650; }
+.photoHeading > span, .photoHint { color: #53616b; font-size: .75rem; line-height: 1.5; }
+.selectedPhoto, .existingPhoto { display: block; width: 100%; height: 180px; margin: 0 0 8px; overflow: hidden; border: 1px solid #d7e1e4; border-radius: 13px; background: #f4f7f7; }
+.selectedPhoto img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.selectedPhoto img[hidden] { display: none; }
+.selectedPhoto p { margin: 0; padding: 20px; color: #53616b; font-size: .8125rem; line-height: 1.6; }
+.photoPreparation { display: grid; height: 100%; place-content: center; justify-items: center; color: #53616b; }
+.photoPreparation p { padding: 8px 16px; text-align: center; }
+.photoPreparation button { min-height: 44px; padding: 8px 14px; border: 1px solid #bdd8d0; border-radius: 8px; color: #08685f; background: #fff; font: inherit; font-size: .8125rem; cursor: pointer; }
+.fileInput { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.photoActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.photoSource { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 9px; min-width: 0; min-height: 90px; padding: 13px; border: 1px solid #d3e1dd; border-radius: 12px; background: linear-gradient(145deg, #fff, #f4f9f7); color: #264d42; font: inherit; font-size: .8125rem; font-weight: 700; text-align: left; cursor: pointer; box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgb(32 70 60 / 3%); transition: background-color 160ms, border-color 160ms, transform 160ms; }
+.photoSourceIcon { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #d7e7e1; border-radius: 9px; color: #337c66; background: #edf5f1; }
+.photoSource:nth-child(2) { border-color: #d9e1e6; background: linear-gradient(145deg, #fff, #f5f7fa); color: #3f5264; }
+.photoSource:nth-child(2) .photoSourceIcon { border-color: #dce4ec; color: #526d83; background: #eef2f7; }
+.photoSource:hover { border-color: #8fb6a9; }
+.photoSource:active { transform: translateY(1px); }
+.photoSelectionRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.photoSelectionRow > span { color: #596b65; font-size: .6875rem; line-height: 1.5; }
+.photoRemove { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 5px; min-height: 44px; padding: 8px 2px 8px 8px; border: 0; background: transparent; color: #67746f; font: inherit; font-size: .75rem; cursor: pointer; }
+.photoSource:focus-visible, .photoRemove:focus-visible { outline: 2px solid #26775f; outline-offset: 3px; }
+.photoSource:disabled, .photoRemove:disabled { cursor: default; opacity: .6; }
+.photoError { margin: 8px 0 0; color: var(--danger, #b63f29); font-size: .75rem; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { .confirmPoint, .photoSource { transition: none; } }
+@media (forced-colors: active) { .deliveryAddress, .addressIcon, .confirmPoint, .passwordChoice label, .photoSource, .photoSourceIcon { border-color: CanvasText; } .passwordChoice label[data-selected="true"] { outline: 2px solid Highlight; } }

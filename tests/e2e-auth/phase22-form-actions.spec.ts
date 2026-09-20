@@ -51,7 +51,7 @@ async function openSchool(page: Page, mode: "delivery" | "sales", schoolName = S
     await page.locator(".assignment-card", { hasText: schoolName }).click();
   }
   await expect(page.getByRole("heading", { name: schoolName, exact: true })).toBeVisible();
-  await expect(page.locator(mode === "delivery" ? ".field-priority" : ".sales-school-brief"))
+  await expect(page.locator(mode === "delivery" ? "[data-delivery-brief]" : ".sales-school-brief"))
     .toBeVisible({ timeout: 15_000 });
 }
 
@@ -155,12 +155,18 @@ test("full field editor keeps save outside its long scroll and submits to the re
   await page.setViewportSize({ width: 320, height: 640 });
   await openSchool(page, "delivery");
   const fieldRef = database.doc(`schoolFieldProfiles/${SCHOOL_ID}`);
-  const originalNotes = (await fieldRef.get()).get("fieldNotes") as string | null;
-  await page.getByRole("button", { name: "전체 편집", exact: true }).click();
+  const originalProfile = await fieldRef.get();
+  const originalNotes = originalProfile.get("fieldNotes") as string | null;
+  const originalVehicle = originalProfile.get("vehicle");
+  const originalStairs = originalProfile.get("equipment.stairsRequired");
+  const brief = page.locator("[data-delivery-brief]");
+  await brief.getByRole("button", { name: "정보 수정", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "현장정보 한 번에 입력", exact: true });
   const save = sheet.getByRole("button", { name: "변경사항 저장", exact: true });
   await expectReachableAction(sheet, save);
   await expectNativeFormAssociation(sheet, save, "field-editor");
+  await expect(sheet.getByLabel("하역 위치")).toHaveCount(0);
+  await expect(sheet.getByLabel(/계단/)).toHaveCount(0);
   const fieldNotes = sheet.getByRole("textbox", { name: "현장 특이사항", exact: true });
   const savedNotes = "Phase 22 고정 저장 버튼으로 현장정보 저장 확인";
   await fieldNotes.fill(savedNotes, { timeout: 15_000 });
@@ -171,13 +177,23 @@ test("full field editor keeps save outside its long scroll and submits to the re
     candidate.request().method() === "POST" && candidate.url().includes("/updateSchoolFieldProfile"),
   );
   await save.click();
-  expect((await response).ok()).toBe(true);
+  const saveResponse = await response;
+  expect(saveResponse.ok()).toBe(true);
+  const submitted = saveResponse.request().postDataJSON() as {
+    data: { patch: { equipment: { stairsRequired: unknown }; fieldNotes: string } };
+  };
+  expect(submitted.data.patch).not.toHaveProperty("vehicle");
+  expect(submitted.data.patch.equipment.stairsRequired).toBe(originalStairs);
+  expect(submitted.data.patch.fieldNotes).toBe(savedNotes);
   await expect(sheet).not.toBeVisible();
   await expect.poll(async () => (await fieldRef.get()).get("fieldNotes")).toBe(savedNotes);
-  await expect(page.locator(".field-section--notes")).toContainText(savedNotes);
+  const savedProfile = await fieldRef.get();
+  expect(savedProfile.get("vehicle")).toEqual(originalVehicle);
+  expect(savedProfile.get("equipment.stairsRequired")).toBe(originalStairs);
+  await expect(brief).toContainText(savedNotes);
 
   // Restore the shared seed's content through the same UI; never rewind its revision.
-  await page.getByRole("button", { name: "전체 편집", exact: true }).click();
+  await brief.getByRole("button", { name: "정보 수정", exact: true }).click();
   await sheet.getByRole("textbox", { name: "현장 특이사항", exact: true }).fill(originalNotes ?? "", { timeout: 15_000 });
   await save.click();
   await expect(sheet).not.toBeVisible();
@@ -225,7 +241,7 @@ test("contact editor preserves telephone fields and exposes save failures inside
 
 test("photo footer stays reachable before selection and retains the selected file and caption", async ({ page }) => {
   await openSchool(page, "delivery");
-  await page.locator(".photo-card").first().getByRole("button", { name: "교체", exact: true }).click();
+  await page.locator(".photo-card").first().getByRole("button", { name: "학교 · 접근 사진 교체", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "학교 · 접근 사진 교체", exact: true });
   const save = sheet.getByRole("button", { name: "새 사진으로 교체", exact: true });
   await expectReachableAction(sheet, save);

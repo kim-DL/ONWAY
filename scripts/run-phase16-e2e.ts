@@ -12,7 +12,7 @@ const buildResult = spawnSync(process.execPath, [nextCli, "build", "--webpack"],
 if (buildResult.error) console.error(buildResult.error.message);
 if (buildResult.status !== 0) process.exit(buildResult.status ?? 1);
 
-const nextServer = spawn(process.execPath, [nextCli, "start", "--hostname", "127.0.0.1", "--port", "3103"], {
+const nextServer = spawn(process.execPath, [join(process.cwd(), "scripts", "serve-hosting-local.mjs"), "--hostname", "127.0.0.1", "--port", "3103"], {
   cwd: process.cwd(),
   env: process.env,
   stdio: "inherit",
@@ -29,7 +29,7 @@ async function waitForServer() {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Next.js Phase 16 test server did not become ready in time.");
+  throw new Error("Firebase Hosting Phase 16 test server did not become ready in time.");
 }
 
 const playwrightCli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");

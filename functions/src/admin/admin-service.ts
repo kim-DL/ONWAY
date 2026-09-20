@@ -8,6 +8,7 @@ import {
 } from "firebase-admin/firestore";
 
 import { createPinLookupKey, generateRandomPin, hashPin } from "../auth/pin-crypto.js";
+import { inventoryAuditSummary } from "./inventory-audit-summary.js";
 import type { VerifiedAdminActor } from "./admin-authorization.js";
 import type {
   CreateEmployeeInput,
@@ -734,7 +735,7 @@ export class AdminService {
       targetType: typeof data.targetType === "string" ? data.targetType : "session",
       targetId: typeof data.targetId === "string" ? data.targetId : null,
       changedFields: Array.isArray(data.changedFields) ? data.changedFields.filter((value): value is string => typeof value === "string") : [],
-      changeReason: typeof data.changeReason === "string" ? data.changeReason : typeof data.reason === "string" ? data.reason : null,
+      changeReason: inventoryAuditSummary(data, typeof data.changeReason === "string" ? data.changeReason : typeof data.reason === "string" ? data.reason : null),
       createdAt: dateValue(data.createdAt ?? data.occurredAt),
     };
   }

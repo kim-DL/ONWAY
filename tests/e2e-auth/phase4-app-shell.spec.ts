@@ -43,7 +43,7 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
   expect(navigationBox?.height).toBeLessThanOrEqual(68);
   await expect(navigation.getByRole("button", { name: "학교" })).toHaveCSS("flex-direction", "column");
   await expect(navigation).toHaveCSS("border-radius", "0px");
-  await expect(navigation).toHaveCSS("background-color", "rgba(255, 255, 255, 0.9)");
+  await expect(navigation).toHaveCSS("background-color", "rgba(255, 255, 255, 0.94)");
   const activeIndicator = await navigation.getByRole("button", { name: "학교" }).evaluate((element) => ({
     shadow: getComputedStyle(element).boxShadow,
     indicatorOpacity: getComputedStyle(element, "::after").opacity,
@@ -57,8 +57,8 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
   await page.getByRole("combobox", { name: "학교명 검색" }).fill("온누리고");
   await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
-  await expect(page.getByRole("region", { name: "현장 핵심 요약" })).toContainText("검수시간");
-  await expect(page.getByRole("region", { name: "현장 핵심 요약" })).toContainText("엘리베이터");
+  await expect(page.getByRole("region", { name: "납품 현장정보" })).toContainText("검수시간");
+  await expect(page.getByRole("region", { name: "납품 현장정보" })).toContainText("엘리베이터");
   await expect(navigation).toBeHidden();
   await expect(page.getByLabel("학교 빠른 작업")).toBeVisible();
   await page.screenshot({ path: "output/playwright/phase4-visuals/02-school-detail-mobile.png", fullPage: true });

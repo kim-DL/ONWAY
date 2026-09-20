@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useId, useMemo, useR
 import { createPortal } from "react-dom";
 
 import { Icon } from "./icon";
+import { lockBodyScroll } from "./body-scroll-lock";
+import { customHistoryState } from "@/lib/browser-history";
 
 interface BottomSheetProps {
   open: boolean;
@@ -12,18 +14,26 @@ interface BottomSheetProps {
   children: ReactNode;
   onClose: () => void;
   dismissible?: boolean;
+  beforeClose?: () => boolean;
 }
 
 const ActionsContext = createContext<{
   host: HTMLDivElement | null;
   setBusy: (id: string, busy: boolean) => void;
+  requestClose: () => void;
 } | null>(null);
+
+/** Child actions share the same guarded dismissal as Escape and the close button. */
+export function useBottomSheetClose(): (() => void) | null {
+  return useContext(ActionsContext)?.requestClose ?? null;
+}
 
 interface SheetHistoryEntry {
   id: string;
   active: boolean;
   ownsEntry: boolean;
   generation: number;
+  ancestorIds: string[];
   state: Record<string, unknown>;
 }
 
@@ -40,17 +50,21 @@ function acquireSheetHistory(entry: SheetHistoryEntry) {
   if (current === entry && entry.ownsEntry) return;
   const previousState = window.history.state;
   entry.state = {
-    ...(typeof previousState === "object" && previousState ? previousState : {}),
+    ...customHistoryState(previousState),
     onnuriwaySheet: entry.id,
   };
   if (current && !current.active && current.ownsEntry) {
     // A lazy placeholder or another sheet just unmounted. Reuse its slot rather
     // than leave a duplicate page behind or traverse past the replacement sheet.
+    entry.ancestorIds = [...current.ancestorIds];
     current.ownsEntry = false;
     sheetHistoryEntries.delete(current.id);
-    window.history.replaceState(entry.state, "", window.location.href);
+    window.history.replaceState(customHistoryState(entry.state), "");
   } else {
-    window.history.pushState(entry.state, "", window.location.href);
+    entry.ancestorIds = current?.active ? [...current.ancestorIds, current.id] : [];
+    // This changes overlay state, not the URL. Passing even the unchanged URL
+    // makes Next restore/refetch the route and can retire an open sheet's state.
+    window.history.pushState(customHistoryState(entry.state), "");
   }
   entry.ownsEntry = true;
   sheetHistoryEntries.set(entry.id, entry);
@@ -121,13 +135,14 @@ export function BottomSheetActions({ children, className = "", busy = false }: {
   return context.host ? createPortal(actions, context.host) : null;
 }
 
-export function BottomSheet({ open, title, description, children, onClose, dismissible = true }: BottomSheetProps) {
+export function BottomSheet({ open, title, description, children, onClose, dismissible = true, beforeClose }: BottomSheetProps) {
   const titleId = useId();
   const descriptionId = useId();
   const historyId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
+  const beforeCloseRef = useRef(beforeClose);
   const dismissibleRef = useRef(dismissible);
   const busyActionsRef = useRef(new Set<string>());
   const historyEntryRef = useRef<SheetHistoryEntry | null>(null);
@@ -139,13 +154,14 @@ export function BottomSheet({ open, title, description, children, onClose, dismi
     else busyActionsRef.current.delete(id);
     setActionsBusy(busyActionsRef.current.size > 0);
   }, []);
-  const context = useMemo(() => ({ host: actionsHost, setBusy }), [actionsHost, setBusy]);
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => { beforeCloseRef.current = beforeClose; }, [beforeClose]);
   useEffect(() => { dismissibleRef.current = dismissible; }, [dismissible]);
 
   const requestClose = useCallback(() => {
     if (!dismissibleRef.current || busyActionsRef.current.size || closingRef.current) return;
+    if (beforeCloseRef.current && !beforeCloseRef.current()) return;
     if (historyEntryRef.current?.ownsEntry && window.history.state?.onnuriwaySheet === historyId) {
       closingRef.current = true;
       traverseSheetHistory(historyEntryRef.current);
@@ -153,20 +169,20 @@ export function BottomSheet({ open, title, description, children, onClose, dismi
     }
     onCloseRef.current();
   }, [historyId]);
+  const context = useMemo(() => ({ host: actionsHost, setBusy, requestClose }), [actionsHost, setBusy, requestClose]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!open || !dialog) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
+    const releaseScroll = lockBodyScroll();
     const entry = historyEntryRef.current ?? {
-      id: historyId, active: false, ownsEntry: false, generation: 0, state: {},
+      id: historyId, active: false, ownsEntry: false, generation: 0, ancestorIds: [], state: {},
     };
     const generation = activateSheetHistory(entry);
     historyEntryRef.current = entry;
     const isCurrent = () => entry.active && entry.generation === generation;
     closingRef.current = false;
-    document.body.style.overflow = "hidden";
     dialog.showModal();
     closeRef.current?.focus({ preventScroll: true });
     const attachHistory = () => { if (isCurrent()) acquireSheetHistory(entry); };
@@ -177,10 +193,18 @@ export function BottomSheet({ open, title, description, children, onClose, dismi
 
     const closeFromHistory = (event: PopStateEvent) => {
       if (!isCurrent() || !entry.ownsEntry || event.state?.onnuriwaySheet === historyId) return;
+      const destinationId = event.state?.onnuriwaySheet;
+      const destination = typeof destinationId === "string" ? sheetHistoryEntries.get(destinationId) : undefined;
+      // Back from a third-level photo viewer to its detail sheet must retain
+      // the directory underneath. Only sheets above the destination close.
+      if (destination?.active && destination.ancestorIds.includes(entry.id)) return;
+      const alreadyConfirmed = closingRef.current;
       closingRef.current = false;
-      if (!dismissibleRef.current || busyActionsRef.current.size) {
-        // Retain a Back entry while saving; the next Back must still close only this sheet.
-        window.history.pushState(entry.state, "", window.location.href);
+      if (!dismissibleRef.current || busyActionsRef.current.size
+        || (!alreadyConfirmed && beforeCloseRef.current && !beforeCloseRef.current())) {
+        // Retain a Back entry while saving or keeping an unsaved draft; the next
+        // Back must still close only this sheet, not the page underneath it.
+        window.history.pushState(customHistoryState(entry.state), "");
         return;
       }
       entry.ownsEntry = false;
@@ -207,7 +231,7 @@ export function BottomSheet({ open, title, description, children, onClose, dismi
       window.removeEventListener("resize", fitViewport);
       window.removeEventListener("popstate", closeFromHistory);
       dialog.close();
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
       // StrictMode immediately re-runs this effect; a lazy replacement may also
       // mount in this commit. Give either one a chance to reuse the owned slot.
@@ -225,7 +249,7 @@ export function BottomSheet({ open, title, description, children, onClose, dismi
       className="bottom-sheet-layer"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      onCancel={(event) => { event.preventDefault(); requestClose(); }}
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); requestClose(); }}
       onKeyDown={(event) => {
         if (event.key !== "Tab" || event.defaultPrevented) return;
         const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>(

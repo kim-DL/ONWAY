@@ -59,7 +59,7 @@ test("meets the Phase 16 perceived-performance gates on a throttled CPU", async 
 
   await input.fill("온누리고");
   await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
-  await expect(page.locator(".field-priority")).toBeVisible();
+  await expect(page.locator("[data-delivery-brief]")).toBeVisible();
   await expect(page.getByText("최신 정보 확인 중")).toHaveCount(0);
   const imageMetric = await waitForMetric(page, "imagePreviewDuration");
   expect(imageMetric?.source).toMatch(/memory|indexeddb|network/u);
@@ -68,7 +68,7 @@ test("meets the Phase 16 perceived-performance gates on a throttled CPU", async 
   await page.evaluate(() => window.__ONNURIWAY_PERFORMANCE__?.clear());
   await openSearch(page);
   await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
-  await expect(page.locator(".field-priority")).toBeVisible();
+  await expect(page.locator("[data-delivery-brief]")).toBeVisible();
   const detailMetric = await waitForMetric(page, "schoolDetailDuration");
   expect(detailMetric?.source).toMatch(/memory|indexeddb/u);
   expect(detailMetric?.durationMs).toBeLessThan(200);

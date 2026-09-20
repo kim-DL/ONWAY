@@ -1,0 +1,110 @@
+.content {
+  --admin-ink: #191f28;
+  --admin-muted: #596573;
+  --admin-accent: #1b64da;
+  --admin-border: #e5e8eb;
+  min-width: 0;
+  color: var(--admin-ink);
+}
+
+/* The local descendant scopes every override to this modal, never staff sheets. */
+:global(dialog.bottom-sheet-layer[open]):has(.content) {
+  align-items: center;
+  padding: 20px;
+}
+:global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) {
+  width: min(100%, 540px);
+  max-height: 100%;
+  border: 1px solid #e5e8eb;
+  border-radius: 20px;
+  color: #191f28;
+  background: #fff;
+  box-shadow: 0 24px 80px #191f2829;
+}
+:global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) > :global(.bottom-sheet__header) {
+  flex: 0 0 auto;
+  padding: 20px 76px 18px 24px;
+  border-bottom: 1px solid #edf0f3;
+  background: #fff;
+}
+:global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__handle) { display: none; }
+:global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__header) h2 {
+  color: #191f28;
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 750;
+  letter-spacing: -.035em;
+}
+:global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__header) p {
+  color: #6b7684;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: .04em;
+}
+:global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__close) {
+  top: 18px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  color: #4e5968;
+  background: #f2f4f6;
+  border-radius: 12px;
+}
+:global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) > :global(.bottom-sheet__body) {
+  margin: 0;
+  padding: 0;
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: contain;
+}
+.content > :global(.admin-dialog-body) { gap: 16px; padding: 20px 24px; }
+.content :global(.admin-dialog-body) > footer {
+  position: sticky;
+  z-index: 2;
+  bottom: -20px;
+  gap: 10px;
+  margin: 4px -24px -20px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid #edf0f3;
+  background: #fff;
+  box-shadow: 0 -8px 20px #ffffffed;
+}
+.content :global(.admin-dialog-body) > footer > button { min-height: 48px; }
+.content :is(button, input, select, textarea, a):focus-visible,
+:global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__close):focus-visible {
+  outline: 2px solid #1b64da;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  :global(dialog.bottom-sheet-layer[open]):has(.content) {
+    align-items: flex-end;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 0 0;
+  }
+  :global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) {
+    width: 100%;
+    border-bottom: 0;
+    border-radius: 20px 20px 0 0;
+  }
+  :global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) > :global(.bottom-sheet__header) {
+    padding: 18px 72px 16px 20px;
+  }
+  :global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__close) { top: 15px; right: 16px; }
+  .content > :global(.admin-dialog-body) { padding: 20px; }
+  .content :global(.admin-dialog-body) > footer {
+    margin-inline: -20px;
+    padding-inline: 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  }
+  .content :global(.admin-dialog-body) > footer > button { flex: 1; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) { animation: none; }
+}
+@media (forced-colors: active) {
+  :global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet),
+  :global(.bottom-sheet-layer):has(.content) > :global(.bottom-sheet) > :global(.bottom-sheet__header),
+  .content :global(.admin-dialog-body) > footer { border-color: CanvasText; background: Canvas; box-shadow: none; }
+  .content :is(button, input, select, textarea, a):focus-visible,
+  :global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__close):focus-visible { outline-color: Highlight; }
+}

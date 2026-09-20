@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import {
   useCallback,
   useEffect,
@@ -11,9 +13,10 @@ import {
 } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
-import { AppIconMark } from "@/components/ui/app-icon-mark";
 import { Icon, type IconName } from "@/components/ui/icon";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { searchInputProps } from "@/components/ui/search-input-props";
 import { useToast } from "@/components/ui/toast";
 import { SchoolAssignmentPicker } from "@/components/assignment/school-assignment-picker";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
@@ -32,41 +35,16 @@ import {
   type PinReservation,
 } from "./admin-contract";
 import { adminErrorMessage, adminRepository } from "./admin-repository";
-
-type AdminView =
-  | "overview"
-  | "schools"
-  | "employees"
-  | "cycles"
-  | "sync"
-  | "export"
-  | "audit"
-  | "settings";
-
-const NAVIGATION: readonly {
-  id: AdminView;
-  label: string;
-  hint: string;
-  icon: IconName;
-}[] = [
-  { id: "overview", label: "운영 개요", hint: "오늘의 상태", icon: "home" },
-  {
-    id: "schools",
-    label: "학교 관리",
-    hint: "기준정보·위치",
-    icon: "building",
-  },
-  { id: "employees", label: "직원 관리", hint: "PIN·권한·세션", icon: "user" },
-  { id: "cycles", label: "학교 배정", hint: "월별 담당·복사", icon: "calendar" },
-  { id: "sync", label: "데이터 동기화", hint: "NEIS·Kakao", icon: "refresh" },
-  { id: "export", label: "CSV", hint: "안전한 내보내기", icon: "download" },
-  { id: "audit", label: "감사 기록", hint: "변경 추적", icon: "clipboard" },
-  { id: "settings", label: "설정", hint: "앱 운영 정책", icon: "settings" },
-] as const;
+import { AdminNavigation, type AdminView } from "./admin-navigation";
+import { INVENTORY_ENABLED } from "@/features/inventory/inventory-feature";
+import navigationStyles from "./admin-navigation.module.css";
+import styles from "./admin-workspace.module.css";
+import { AdminDialog } from "./admin-dialog";
+import { AdminInteractionProvider, useAdminInteraction } from "./admin-interaction";
 
 const ROLE_LABELS: Record<AdminRole, string> = {
-  delivery: "납품",
-  sales: "영업",
+  delivery: "학교납품",
+  sales: "영업/홍보",
   viewer: "조회",
   admin: "관리자",
 };
@@ -128,6 +106,19 @@ const KAKAO_STATUS_LABELS: Record<string, string> = {
 };
 
 const AUDIT_EVENT_LABELS: Record<string, string> = {
+  INVENTORY_PRODUCT_CREATED: "재고 품목 등록",
+  INVENTORY_PRODUCT_UPDATED: "재고 품목 정보 수정",
+  INVENTORY_PRODUCT_STATUS_CHANGED: "재고 품목 활성 상태 변경",
+  INVENTORY_PRODUCT_DELETED: "재고 품목 삭제",
+  INVENTORY_RECEIVE: "재고 입고",
+  INVENTORY_ISSUE: "재고 출고",
+  INVENTORY_ADJUST: "재고 수량 조정",
+  INVENTORY_COUNT_MATCH: "재고 수량 일치 확인",
+  INVENTORY_COUNT_ADJUST: "재고 실사 수량 수정",
+  INVENTORY_LOT_UPDATE: "재고 유통기한 수정",
+  INVENTORY_SETTINGS_UPDATED: "재고조사 설정 변경",
+  CUSTOMER_CREATED: "거래처 등록",
+  CUSTOMER_UPDATED: "거래처 정보 변경",
   ADMIN_SESSION_ACTIVATED: "관리자 세션 승인",
   APP_SETTINGS_UPDATED: "앱 운영 설정 변경",
   ACTIVITY_TAGS_UPDATED: "영업 활동 태그 변경",
@@ -235,12 +226,10 @@ function suggestedCycleId(cycles: readonly { cycleId: string }[]) {
 }
 
 function PageHeading({
-  kicker,
   title,
   description,
   action,
 }: {
-  kicker: string;
   title: string;
   description: string;
   action?: ReactNode;
@@ -248,7 +237,6 @@ function PageHeading({
   return (
     <header className="admin-page-heading">
       <div>
-        <p>{kicker}</p>
         <h1 id={PAGE_HEADING_IDS[title]}>{title}</h1>
         <span>{description}</span>
       </div>
@@ -279,57 +267,9 @@ function EmptyState({
   );
 }
 
-function AdminDialog({
-  title,
-  eyebrow,
-  onClose,
-  busy = false,
-  children,
-}: {
-  title: string;
-  eyebrow: string;
-  onClose: () => void;
-  busy?: boolean;
-  children: ReactNode;
-}) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      if (!busy) onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [busy, onClose]);
-
-  return (
-    <div
-      className="admin-dialog-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (!busy && event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
-        className="admin-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-busy={busy}
-        aria-labelledby="admin-dialog-title"
-      >
-        <header>
-          <div>
-            <p>{eyebrow}</p>
-            <h2 id="admin-dialog-title">{title}</h2>
-          </div>
-          <button type="button" aria-label="닫기" disabled={busy} onClick={onClose}>
-            <Icon name="close" />
-          </button>
-        </header>
-        {children}
-      </section>
-    </div>
-  );
+function schoolNeedsReview(school: AdminSchool) {
+  return school.possibleRelocation ||
+    (school.locationStatus !== "confirmed" && school.locationStatus !== "autoMatched");
 }
 
 function OverviewPage({
@@ -339,195 +279,94 @@ function OverviewPage({
   data: AdminWorkspaceData;
   onNavigate: (view: AdminView) => void;
 }) {
-  const activeEmployees = data.employees.filter(
-    (employee) => employee.status === "active",
-  ).length;
-  const needsLocationReview = data.schools.filter(
-    (school) =>
-      (school.locationStatus !== "confirmed" &&
-        school.locationStatus !== "autoMatched") ||
-      school.possibleRelocation,
-  ).length;
-  const activeCycle = data.cycles.find((cycle) => cycle.status === "active");
-  const latestSync = data.syncRuns[0] ?? null;
-  const completed = data.assignments.filter(
-    (assignment) => assignment.monthlyStatus === "completed",
-  ).length;
-  const completionRate =
-    data.assignments.length === 0
-      ? 0
-      : Math.round((completed / data.assignments.length) * 100);
+  const activeEmployees = data.employees.filter((employee) => employee.status === "active").length;
+  const locationReview = data.schools.filter(schoolNeedsReview).length;
+  const selectedCycle = data.cycles.find((cycle) => cycle.cycleId === data.selectedCycleId);
+  const completed = data.assignments.filter((assignment) => assignment.monthlyStatus === "completed").length;
+  const completionRate = data.assignments.length ? Math.round(completed / data.assignments.length * 100) : 0;
+  const latestSync = data.syncRuns[0];
+  const employeeNames = new Map(data.employees.map((employee) => [employee.employeeId, employee.displayName]));
 
   return (
-    <section
-      className="admin-page admin-overview"
-      aria-labelledby="overview-title"
-    >
-      <header className="admin-overview-hero">
+    <section className="admin-page" aria-labelledby="overview-title">
+      <header className="admin-page-heading">
         <div>
-          <p>OPERATIONS CONTROL</p>
-          <h1 id="overview-title">
-            운영의 흐름을
-            <br />
-            <em>한눈에.</em>
-          </h1>
-          <span>
-            권한, 배정, 학교 데이터의 현재 상태를 안전하게 관리합니다.
-          </span>
+          <h1 id="overview-title">운영 개요</h1>
+          <span>학교와 직원, 거래처 운영의 현재 상태를 확인하세요.</span>
         </div>
-        <div className="admin-overview-hero__signal">
-          <span>
-            <i />
-            SYSTEM READY
-          </span>
-          <strong>{formatDate(data.generatedAt)}</strong>
-          <small>마지막 서버 확인</small>
-        </div>
+        <StatusBadge tone={data.settings.maintenanceMode ? "attention" : "neutral"}>
+          {data.settings.maintenanceMode ? "앱 점검 모드" : "현장 앱 운영 중"}
+        </StatusBadge>
       </header>
+
+      <section className="admin-overview-hero" aria-labelledby="overview-cycle-title">
+        <div>
+          <span className="admin-overview-eyebrow"><Icon name="calendar" size={18} />학교 배정 현황</span>
+          <h2 id="overview-cycle-title">{data.selectedCycleId ? cycleDisplayLabel(data.selectedCycleId) : "새로운 월을 준비해요."}</h2>
+          <p>{selectedCycle ? `${CYCLE_STATUS_LABELS[selectedCycle.status] ?? selectedCycle.status} · 배정된 ${data.assignments.length}개 학교 기준` : "월을 시작하면 직원별 담당 학교를 배정할 수 있어요."}</p>
+          <button type="button" onClick={() => onNavigate("cycles")}>
+            {selectedCycle ? "배정 관리" : "학교 배정 시작"}<Icon name="chevron-right" size={17} />
+          </button>
+        </div>
+        <div className="admin-overview-progress">
+          <div><span>방문 완료</span><strong>{completed}<small> / {data.assignments.length}곳</small></strong></div>
+          <div className="admin-progress" role="progressbar" aria-label="선택한 월 방문 완료율" aria-valuenow={completionRate} aria-valuemin={0} aria-valuemax={100}>
+            <span><i style={{ width: `${completionRate}%` }} /></span><strong>{completionRate}%</strong>
+          </div>
+          <dl>
+            {(["before", "followUp", "revisit", "onHold"] as const).map((status) => (
+              <div key={status}><dt>{MONTHLY_STATUS_LABELS[status]}</dt><dd>{data.assignments.filter((assignment) => assignment.monthlyStatus === status).length}</dd></div>
+            ))}
+          </dl>
+        </div>
+      </section>
 
       <div className="admin-metric-grid">
         <button type="button" onClick={() => onNavigate("employees")}>
-          <span>
-            <Icon name="user" />
-          </span>
-          <small>활성 직원</small>
-          <strong>
-            {activeEmployees}
-            <em>명</em>
-          </strong>
-          <p>전체 {data.employees.length}명 · 권한 관리</p>
+          <span><Icon name="user" size={20} /></span><small>활성 직원</small>
+          <strong>{activeEmployees}<em>명</em></strong><p>전체 직원 {data.employees.length}명</p>
         </button>
-        <button type="button" onClick={() => onNavigate("cycles")}>
-          <span>
-            <Icon name="calendar" />
-          </span>
-          <small>{activeCycle?.cycleId ?? "활성 월 없음"}</small>
-          <strong>
-            {completionRate}
-            <em>%</em>
-          </strong>
-          <p>
-            {completed}/{data.assignments.length}개 학교 방문 완료
-          </p>
+        <button type="button" onClick={() => onNavigate("schools")}>
+          <span><Icon name="building" size={20} /></span><small>등록 학교</small>
+          <strong>{data.schools.length}<em>곳</em></strong><p>기준정보·주소 확인</p>
         </button>
-        <button
-          type="button"
-          onClick={() => onNavigate("sync")}
-          data-alert={needsLocationReview > 0}
-        >
-          <span>
-            <Icon name="location" />
-          </span>
-          <small>위치 검토</small>
-          <strong>
-            {needsLocationReview}
-            <em>곳</em>
-          </strong>
-          <p>후보 확인 또는 직접 위치 입력</p>
+        <button type="button" data-alert={locationReview > 0} onClick={() => onNavigate("sync")}>
+          <span><Icon name="location" size={20} /></span><small>위치 검토</small>
+          <strong>{locationReview}<em>곳</em></strong><p>{locationReview ? "주소와 위치 확인 필요" : "모든 학교 위치 확인됨"}</p>
         </button>
         <button type="button" onClick={() => onNavigate("sync")}>
-          <span>
-            <Icon name="refresh" />
-          </span>
-          <small>최근 NEIS</small>
-          <strong className="admin-metric-grid__status">
-            {latestSync?.status ?? "기록 없음"}
-          </strong>
-          <p>
-            {latestSync
-              ? `${latestSync.appliedCount}건 적용 · ${formatDate(latestSync.completedAt ?? latestSync.startedAt, false)}`
-              : "첫 미리보기를 실행해주세요."}
-          </p>
+          <span><Icon name="refresh" size={20} /></span><small>학교 정보 동기화</small>
+          <strong className="admin-metric-grid__status">{latestSync ? (SYNC_STATUS_LABELS[latestSync.status] ?? latestSync.status) : "실행 전"}</strong>
+          <p>{latestSync ? formatDate(latestSync.startedAt, false) : "NEIS 기준정보 비교"}</p>
         </button>
       </div>
 
       <div className="admin-overview-grid">
-        <article className="admin-panel admin-cycle-snapshot">
-          <header>
-            <div>
-              <p>MONTHLY CYCLE</p>
-              <h2>이번 달 배정</h2>
-            </div>
-            <button type="button" onClick={() => onNavigate("cycles")}>
-              전체 관리 <Icon name="chevron-right" size={16} />
+        <section className="admin-panel admin-quick-actions" aria-labelledby="admin-quick-title">
+          <header><h2 id="admin-quick-title">자주 쓰는 업무</h2></header>
+          {([
+            ["customers", "location", "거래처 관리", "거래처·납품 위치·연락처"],
+            ["employees", "user", "직원 관리", "직원 등록·업무 권한·PIN"],
+            ["cycles", "calendar", "월별 학교 배정", "담당 학교·이번 달 홍보 제품"],
+          ] as const).map(([view, icon, title, description]) => (
+            <button type="button" key={view} onClick={() => onNavigate(view)}>
+              <span><Icon name={icon} size={20} /></span>
+              <span><strong>{title}</strong><small>{description}</small></span>
+              <Icon name="chevron-right" size={18} />
             </button>
-          </header>
-          <div className="admin-progress">
-            <span>
-              <i style={{ width: `${completionRate}%` }} />
-            </span>
-            <strong>{completionRate}%</strong>
-          </div>
-          <dl>
-            <div>
-              <dt>방문 전</dt>
-              <dd>
-                {
-                  data.assignments.filter(
-                    (item) => item.monthlyStatus === "before",
-                  ).length
-                }
-              </dd>
-            </div>
-            <div>
-              <dt>후속 필요</dt>
-              <dd>
-                {
-                  data.assignments.filter(
-                    (item) => item.monthlyStatus === "followUp",
-                  ).length
-                }
-              </dd>
-            </div>
-            <div>
-              <dt>재방문</dt>
-              <dd>
-                {
-                  data.assignments.filter(
-                    (item) => item.monthlyStatus === "revisit",
-                  ).length
-                }
-              </dd>
-            </div>
-            <div>
-              <dt>보류</dt>
-              <dd>
-                {
-                  data.assignments.filter(
-                    (item) => item.monthlyStatus === "onHold",
-                  ).length
-                }
-              </dd>
-            </div>
-          </dl>
-        </article>
-        <article className="admin-panel admin-audit-snapshot">
-          <header>
-            <div>
-              <p>RECENT ACTIVITY</p>
-              <h2>최근 감사 기록</h2>
-            </div>
-            <button type="button" onClick={() => onNavigate("audit")}>
-              전체 보기 <Icon name="chevron-right" size={16} />
-            </button>
-          </header>
-          <ul>
-            {data.audits.slice(0, 5).map((log) => (
+          ))}
+        </section>
+        <section className="admin-panel admin-audit-snapshot" aria-labelledby="admin-recent-title">
+          <header><h2 id="admin-recent-title">최근 변경</h2><button type="button" onClick={() => onNavigate("audit")}>전체 보기<Icon name="chevron-right" size={15} /></button></header>
+          {data.audits.length ? (
+            <ul>{data.audits.slice(0, 4).map((log) => (
               <li key={log.logId}>
-                <span>
-                  <Icon name="check" size={14} />
-                </span>
-                <div>
-                  <strong>{auditEventLabel(log.eventType)}</strong>
-                  <small>
-                    {log.actorEmployeeId ?? "SYSTEM"} ·{" "}
-                    {formatDate(log.createdAt)}
-                  </small>
-                </div>
+                <span><Icon name="clipboard" size={16} /></span>
+                <div><strong>{auditEventLabel(log.eventType)}</strong><small>{log.actorEmployeeId ? (employeeNames.get(log.actorEmployeeId) ?? log.actorEmployeeId) : "시스템"} · {formatDate(log.createdAt)}</small></div>
               </li>
-            ))}
-          </ul>
-        </article>
+            ))}</ul>
+          ) : <EmptyState icon="clipboard" title="아직 변경 기록이 없어요." description="등록·수정한 내역이 이곳에 표시됩니다." />}
+        </section>
       </div>
     </section>
   );
@@ -548,17 +387,13 @@ function SchoolsPage({
         const matchesQuery = `${school.name} ${school.roadAddress ?? ""}`
           .toLowerCase()
           .includes(query.trim().toLowerCase());
-        const needsReview =
-          school.locationStatus === "needsReview" ||
-          school.locationStatus === "failed" ||
-          school.possibleRelocation;
+        const needsReview = schoolNeedsReview(school);
         return (
           matchesQuery &&
           (filter === "all" ||
             (filter === "review"
               ? needsReview
-              : school.locationStatus === "confirmed" &&
-                !school.possibleRelocation))
+              : !needsReview))
         );
       }),
     [data.schools, filter, query],
@@ -567,7 +402,6 @@ function SchoolsPage({
   return (
     <section className="admin-page" aria-labelledby="schools-title">
       <PageHeading
-        kicker="SCHOOL DIRECTORY"
         title="학교 관리"
         description="NEIS 기준정보와 Kakao 위치 확인 상태를 함께 봅니다."
         action={
@@ -580,6 +414,8 @@ function SchoolsPage({
         <label className="admin-search">
           <Icon name="search" size={17} />
           <input
+            {...searchInputProps}
+            name="admin-school-query"
             aria-label="학교 검색"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -590,6 +426,7 @@ function SchoolsPage({
           <button
             type="button"
             data-active={filter === "all"}
+            aria-pressed={filter === "all"}
             onClick={() => setFilter("all")}
           >
             전체 {data.schools.length}
@@ -597,36 +434,35 @@ function SchoolsPage({
           <button
             type="button"
             data-active={filter === "review"}
+            aria-pressed={filter === "review"}
             onClick={() => setFilter("review")}
           >
-            검토 필요
+            검토 필요 {data.schools.filter(schoolNeedsReview).length}
           </button>
           <button
             type="button"
             data-active={filter === "confirmed"}
+            aria-pressed={filter === "confirmed"}
             onClick={() => setFilter("confirmed")}
           >
-            확정
+            확인 완료
           </button>
         </div>
       </div>
       <div className="admin-table-wrap">
-        <table className="admin-table">
+        <table className="admin-table admin-school-table">
           <thead>
             <tr>
               <th>학교</th>
               <th>행정구·학교급</th>
               <th>NEIS 주소</th>
               <th>위치 상태</th>
-              <th>Revision</th>
+              <th>정보 버전</th>
             </tr>
           </thead>
           <tbody>
             {schools.map((school) => {
-              const review =
-                school.locationStatus === "needsReview" ||
-                school.locationStatus === "failed" ||
-                school.possibleRelocation;
+              const review = schoolNeedsReview(school);
               return (
                 <tr key={school.schoolId}>
                   <td>
@@ -648,11 +484,7 @@ function SchoolsPage({
                             : "info"
                       }
                     >
-                      {review
-                        ? "검토 필요"
-                        : school.locationStatus === "confirmed"
-                          ? "관리자 확정"
-                          : "자동 확인"}
+                      {school.possibleRelocation ? "이전 검토 필요" : (KAKAO_STATUS_LABELS[school.locationStatus] ?? "위치 확인 필요")}
                     </StatusBadge>
                   </td>
                   <td>r{school.schoolBaseRevision}</td>
@@ -748,6 +580,7 @@ function NewEmployeeDialog({
   onCreated: () => Promise<void>;
 }) {
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [displayName, setDisplayName] = useState("");
   const [roles, setRoles] = useState<AdminRole[]>(["delivery"]);
   const [exportTeam, setExportTeam] = useState(false);
@@ -774,6 +607,8 @@ function NewEmployeeDialog({
     event.preventDefault();
     if (creationPending.current || !reservation || displayName.trim().length < 2 || roles.length === 0)
       return;
+    const release = interaction.begin();
+    if (!release) return;
     creationPending.current = true;
     setStatus("saving");
     try {
@@ -791,13 +626,14 @@ function NewEmployeeDialog({
       setStatus("idle");
     } finally {
       creationPending.current = false;
+      release();
     }
   };
 
   return (
     <AdminDialog
       title={status === "done" ? "직원 등록 완료" : "새 직원 등록"}
-      eyebrow="EMPLOYEE · CREATE"
+      eyebrow=""
       onClose={close}
       busy={status === "saving"}
     >
@@ -891,6 +727,7 @@ function EmployeeDetail({
   onReload: () => Promise<void>;
 }) {
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [displayName, setDisplayName] = useState(employee.displayName);
   const [roles, setRoles] = useState<AdminRole[]>(employee.roleScopes);
   const [exportTeam, setExportTeam] = useState(employee.exportTeam);
@@ -899,8 +736,52 @@ function EmployeeDetail({
   const [revokeOnSave, setRevokeOnSave] = useState(false);
   const [working, setWorking] = useState(false);
   const [rotatedPin, setRotatedPin] = useState<string | null>(null);
+  const pinRelease = useRef<(() => void) | null>(null);
+  const employeePending = useRef(false);
+  const [securityAction, setSecurityAction] = useState<"pin" | "sessions" | null>(null);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      pinRelease.current?.();
+      pinRelease.current = null;
+    };
+  }, []);
+
+  const closeSecurity = async () => {
+    if (!mounted.current || employeePending.current) return;
+    const release = pinRelease.current;
+    if (!release) {
+      setRotatedPin(null);
+      setSecurityAction(null);
+      return;
+    }
+    // Refresh only after the user has acknowledged the one-time PIN. A renamed
+    // employee can disappear from the current search results during this load.
+    employeePending.current = true;
+    setWorking(true);
+    try {
+      await onReload();
+    } catch (error) {
+      if (mounted.current) showToast(adminErrorMessage(error));
+    } finally {
+      pinRelease.current = null;
+      employeePending.current = false;
+      if (mounted.current) {
+        setRotatedPin(null);
+        setSecurityAction(null);
+        setWorking(false);
+      }
+      release();
+    }
+  };
 
   const perform = async (action: () => Promise<unknown>, success: string) => {
+    const release = interaction.begin();
+    if (!release) return;
+    employeePending.current = true;
     setWorking(true);
     try {
       await action();
@@ -910,6 +791,8 @@ function EmployeeDetail({
       showToast(adminErrorMessage(error));
     } finally {
       setWorking(false);
+      employeePending.current = false;
+      release();
     }
   };
 
@@ -928,6 +811,10 @@ function EmployeeDetail({
       "직원 정보와 권한을 반영했습니다.",
     );
   const rotate = async () => {
+    const release = interaction.begin();
+    if (!release) return;
+    pinRelease.current = release;
+    employeePending.current = true;
     setWorking(true);
     try {
       const result = await adminRepository.rotatePin({
@@ -935,13 +822,16 @@ function EmployeeDetail({
         revokeSessions: true,
         reason: reason || "관리자 PIN 재발급",
       });
+      if (!mounted.current) return;
       setRotatedPin(result.pin);
-      await onReload();
       showToast("새 PIN을 발급하고 기존 세션을 종료했습니다.");
     } catch (error) {
-      showToast(adminErrorMessage(error));
+      release();
+      pinRelease.current = null;
+      if (mounted.current) showToast(adminErrorMessage(error));
     } finally {
-      setWorking(false);
+      if (mounted.current) setWorking(false);
+      employeePending.current = false;
     }
   };
 
@@ -967,8 +857,25 @@ function EmployeeDetail({
           <p>{employee.employeeId}</p>
         </div>
       </header>
-      {rotatedPin ? <PinReveal pin={rotatedPin} title="새 PIN" /> : null}
-      <div className="employee-detail__form">
+      {securityAction ? (
+        <AdminDialog title={securityAction === "pin" ? (rotatedPin ? "새 PIN을 확인해주세요." : "PIN을 재발급할까요?") : "기존 로그인을 종료할까요?"} eyebrow="" busy={working} onClose={() => void closeSecurity()}>
+          <div className="admin-dialog-body">
+            {rotatedPin ? <PinReveal pin={rotatedPin} title={`${employee.displayName} 직원 PIN`} /> :
+              <p>{employee.displayName} 직원의 {securityAction === "pin" ? "기존 PIN과 모든 로그인 세션이 종료됩니다. 새 PIN은 이 창에서 한 번만 표시됩니다." : "모든 기존 로그인 세션을 종료합니다. 다시 로그인하면 업무를 이어갈 수 있습니다."}</p>}
+            <footer>
+              <GlassButton variant="quiet" disabled={working} onClick={() => void closeSecurity()}>{rotatedPin ? "확인하고 닫기" : "취소"}</GlassButton>
+              {!rotatedPin ? <GlassButton variant="primary" disabled={working} onClick={() => {
+                if (securityAction === "pin") void rotate();
+                else void perform(() => adminRepository.revokeSessions({
+                  employeeId: employee.employeeId,
+                  reason: reason || "관리자 세션 종료",
+                }), "모든 기존 세션을 종료했습니다.").then(() => setSecurityAction(null));
+              }}>{working ? "처리 중…" : securityAction === "pin" ? "PIN 재발급" : "세션 종료"}</GlassButton> : null}
+            </footer>
+          </div>
+        </AdminDialog>
+      ) : null}
+      <fieldset className="employee-detail__form" disabled={working} aria-label="직원 정보 수정">
         <label>
           <span>직원 이름</span>
           <input
@@ -1036,7 +943,7 @@ function EmployeeDetail({
         >
           {working ? "반영 중…" : "변경사항 저장"}
         </GlassButton>
-      </div>
+      </fieldset>
       <div className="employee-security-actions">
         <h3>인증 보안</h3>
         <p>
@@ -1045,7 +952,7 @@ function EmployeeDetail({
         <button
           type="button"
           disabled={working || isAdmin}
-          onClick={() => void rotate()}
+          onClick={() => { if (interaction.canNavigate()) setSecurityAction("pin"); }}
         >
           <Icon name="refresh" size={17} />
           <span>
@@ -1061,16 +968,7 @@ function EmployeeDetail({
         <button
           type="button"
           disabled={working || isSelf}
-          onClick={() =>
-            void perform(
-              () =>
-                adminRepository.revokeSessions({
-                  employeeId: employee.employeeId,
-                  reason: reason || "관리자 세션 종료",
-                }),
-              "모든 기존 세션을 종료했습니다.",
-            )
-          }
+          onClick={() => { if (interaction.canNavigate()) setSecurityAction("sessions"); }}
         >
           <Icon name="logout" size={17} />
           <span>
@@ -1097,6 +995,7 @@ function EmployeesPage({
   currentEmployeeId: string;
   onReload: () => Promise<void>;
 }) {
+  const interaction = useAdminInteraction();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(
     data.employees[0]?.employeeId ?? "",
@@ -1112,20 +1011,19 @@ function EmployeesPage({
     [data.employees, query],
   );
   const selected =
-    data.employees.find((employee) => employee.employeeId === selectedId) ??
+    employees.find((employee) => employee.employeeId === selectedId) ??
     employees[0] ??
     null;
   return (
     <section className="admin-page" aria-labelledby="employees-title">
       <PageHeading
-        kicker="IDENTITY · ACCESS"
         title="직원 관리"
         description="직원 역할, 일회성 PIN, 계정 상태와 세션을 한곳에서 관리합니다."
         action={
           <GlassButton
             variant="primary"
             compact
-            onClick={() => setCreating(true)}
+            onClick={() => { if (interaction.canNavigate()) setCreating(true); }}
           >
             <Icon name="user" size={17} /> 새 직원
           </GlassButton>
@@ -1137,22 +1035,23 @@ function EmployeesPage({
             <label className="admin-search">
               <Icon name="search" size={17} />
               <input
+                {...searchInputProps}
+                name="employee-query"
                 aria-label="직원 검색"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => { if (interaction.canNavigate()) setQuery(event.target.value); }}
                 placeholder="이름 또는 직원 ID"
               />
             </label>
           </div>
-          <div className="employee-list" role="listbox" aria-label="직원 목록">
+          <div className="employee-list" role="group" aria-label="직원 목록">
             {employees.map((employee) => (
               <button
                 type="button"
-                role="option"
-                aria-selected={selected?.employeeId === employee.employeeId}
+                aria-pressed={selected?.employeeId === employee.employeeId}
                 data-active={selected?.employeeId === employee.employeeId}
                 key={employee.employeeId}
-                onClick={() => setSelectedId(employee.employeeId)}
+                onClick={() => { if (interaction.canNavigate()) setSelectedId(employee.employeeId); }}
               >
                 <span className="employee-list__avatar">
                   {initials(employee.displayName)}
@@ -1218,10 +1117,13 @@ function AssignmentRow({
   onSelect: (schoolId: string, selected: boolean) => void;
 }) {
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [assigneeId, setAssigneeId] = useState(assignment.primaryAssigneeId);
   const [saving, setSaving] = useState(false);
   const dirty = assigneeId !== assignment.primaryAssigneeId;
   const save = async () => {
+    const release = interaction.begin();
+    if (!release) return;
     setSaving(true);
     try {
       await adminRepository.changeAssignment({
@@ -1237,6 +1139,7 @@ function AssignmentRow({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setSaving(false);
     }
   };
@@ -1247,7 +1150,7 @@ function AssignmentRow({
           <input
             type="checkbox"
             checked={selected}
-            disabled={assignment.monthlyStatus !== "before"}
+            disabled={saving || assignment.monthlyStatus !== "before"}
             onChange={(event) => onSelect(assignment.schoolId, event.target.checked)}
             aria-label={`${school?.name ?? assignment.schoolId} 배정 제외 선택`}
           />
@@ -1262,6 +1165,7 @@ function AssignmentRow({
         <select
           aria-label={`${school?.name ?? assignment.schoolId} 담당자`}
           value={assigneeId}
+          disabled={saving}
           onChange={(event) => setAssigneeId(event.target.value)}
         >
           {employees
@@ -1320,6 +1224,7 @@ function CyclesPage({
   onLoadCycle: (cycleId: string | null) => Promise<void>;
 }) {
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [cycleId, setCycleId] = useState(() => suggestedCycleId(data.cycles));
   const [copyFrom, setCopyFrom] = useState(data.selectedCycleId ?? "");
   const [activate, setActivate] = useState(true);
@@ -1369,6 +1274,8 @@ function CyclesPage({
       showToast("같은 제품명이 두 번 들어가 있습니다. 중복 항목을 정리해주세요.");
       return;
     }
+    const release = interaction.begin();
+    if (!release) return;
     setSavingProducts(true);
     try {
       await adminRepository.updateCycleProducts({
@@ -1381,11 +1288,14 @@ function CyclesPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setSavingProducts(false);
     }
   };
 
   const createCycle = async () => {
+    const release = interaction.begin();
+    if (!release) return;
     setCreating(true);
     try {
       await adminRepository.createCycle({
@@ -1398,6 +1308,7 @@ function CyclesPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setCreating(false);
     }
   };
@@ -1414,6 +1325,8 @@ function CyclesPage({
       showToast("배정할 학교를 한 곳 이상 선택해주세요.");
       return false;
     }
+    const release = interaction.begin();
+    if (!release) return false;
     setCreating(true);
     try {
       await adminRepository.createAssignments({
@@ -1429,11 +1342,14 @@ function CyclesPage({
       await onLoadCycle(data.selectedCycleId);
       return false;
     } finally {
+      release();
       setCreating(false);
     }
   };
   const removeAssignments = async () => {
     if (!data.selectedCycleId || selectedAssignments.size === 0) return;
+    const release = interaction.begin();
+    if (!release) return;
     setCreating(true);
     try {
       const schoolIds = [...selectedAssignments];
@@ -1449,6 +1365,7 @@ function CyclesPage({
       showToast(adminErrorMessage(error));
       await onLoadCycle(data.selectedCycleId);
     } finally {
+      release();
       setCreating(false);
     }
   };
@@ -1466,18 +1383,16 @@ function CyclesPage({
   return (
     <section className="admin-page" aria-labelledby="cycles-title">
       <PageHeading
-        kicker="MONTHLY SALES CYCLE"
         title="월별 학교 배정"
         description="전월 담당 학교를 복사한 뒤 필요한 학교만 더하고 빼며 직원별 담당을 확정합니다."
       />
+      <fieldset className="admin-controls" disabled={creating || savingProducts} aria-label="월별 배정 설정">
       <div className="cycle-command-grid">
         <article className="admin-panel">
           <header>
             <div>
-              <p>CREATE CYCLE</p>
               <h2>새 월 시작</h2>
             </div>
-            <span className="admin-step">01</span>
           </header>
           <div className="cycle-create-form">
             <label>
@@ -1511,21 +1426,20 @@ function CyclesPage({
               <span aria-hidden="true">
                 <Icon name="check" size={14} />
               </span>
-              <strong>생성 즉시 활성 Cycle로 전환</strong>
+              <strong>생성 후 운영 월로 적용</strong>
             </label>
             <GlassButton
               variant="primary"
               disabled={!/^\d{4}-\d{2}$/u.test(cycleId) || creating}
               onClick={() => void createCycle()}
             >
-              {creating ? "생성 중…" : "Cycle 생성"}
+              {creating ? "생성 중…" : "새 월 만들기"}
             </GlassButton>
           </div>
         </article>
         <article className="admin-panel cycle-summary">
           <header>
             <div>
-              <p>ACTIVE SNAPSHOT</p>
               <h2>{data.selectedCycleId ?? "선택된 Cycle 없음"}</h2>
             </div>
             <StatusBadge
@@ -1554,8 +1468,7 @@ function CyclesPage({
       <article className="admin-panel campaign-product-admin" aria-labelledby="campaign-products-title">
         <header>
           <div>
-            <p>MONTHLY PRODUCT SHORTLIST</p>
-            <h2 id="campaign-products-title">이번 달 홍보 제품</h2>
+            <h2 id="campaign-products-title">홍보 제품 목록</h2>
           </div>
           <StatusBadge tone={promotedProductNames.length >= 5 ? "success" : "neutral"}>
             {promotedProductNames.length} / 12
@@ -1566,7 +1479,7 @@ function CyclesPage({
         </p>
         <div className="campaign-product-admin__list" aria-live="polite">
           {promotedProductNames.map((name, index) => (
-            <div key={`${name}-${index}`}>
+            <div key={index}>
               <span>{String(index + 1).padStart(2, "0")}</span>
               <input
                 aria-label={`${index + 1}번째 홍보 제품명`}
@@ -1610,13 +1523,12 @@ function CyclesPage({
       <div className="admin-panel assignment-panel">
         <header>
           <div>
-            <p>ASSIGNMENTS</p>
             <h2>학교별 배정</h2>
           </div>
           <select
             aria-label="조회 Cycle"
             value={data.selectedCycleId ?? ""}
-            onChange={(event) => void onLoadCycle(event.target.value || null)}
+            onChange={(event) => { if (interaction.canNavigate()) void onLoadCycle(event.target.value || null); }}
           >
             {data.cycles.length === 0 ? <option value="">아직 시작된 월이 없습니다</option> : null}
             {data.cycles.map((cycle) => (
@@ -1630,7 +1542,6 @@ function CyclesPage({
         <div className="assignment-bulk-command">
           <div className="assignment-bulk-command__heading">
             <div>
-              <p>BULK ASSIGN</p>
               <h3>미배정 학교를 한 번에 연결</h3>
               <span>검색 결과 전체 선택과 선택 바구니로 300개 이상도 한 번에 처리합니다.</span>
             </div>
@@ -1736,6 +1647,7 @@ function CyclesPage({
           ) : null}
         </div>
       </div>
+      </fieldset>
     </section>
   );
 }
@@ -1756,6 +1668,7 @@ function KakaoReviewCard({
   onReload: () => Promise<void>;
 }) {
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [candidateId, setCandidateId] = useState(
     review.candidates[0]?.candidateId ?? "",
   );
@@ -1765,6 +1678,8 @@ function KakaoReviewCard({
   const [roadAddress, setRoadAddress] = useState(review.neisRoadAddress ?? "");
   const [working, setWorking] = useState(false);
   const confirm = async () => {
+    const release = interaction.begin();
+    if (!release) return;
     setWorking(true);
     try {
       await adminRepository.confirmKakao({
@@ -1785,6 +1700,7 @@ function KakaoReviewCard({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setWorking(false);
     }
   };
@@ -1795,11 +1711,12 @@ function KakaoReviewCard({
           <StatusBadge tone={review.status === "failed" ? "attention" : "info"}>
             {KAKAO_STATUS_LABELS[review.status] ?? review.status}
           </StatusBadge>
-          <h3>{review.neisName}</h3>
+          <h2>{review.neisName}</h2>
           <p>{review.neisRoadAddress ?? "NEIS 주소 없음"}</p>
         </div>
         <small>r{review.schoolBaseRevision}</small>
       </header>
+      <fieldset className="admin-controls" disabled={working} aria-label="위치 확인 정보">
       {review.candidates.length > 0 ? (
         <div className="kakao-candidates">
           {review.candidates.map((candidate, index) => (
@@ -1869,6 +1786,7 @@ function KakaoReviewCard({
           </label>
         </div>
       ) : null}
+      </fieldset>
       <footer>
         <GlassButton
           variant="primary"
@@ -1894,16 +1812,20 @@ function SyncPage({
   onReload: () => Promise<void>;
 }) {
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [tab, setTab] = useState<"neis" | "kakao">("neis");
   const [preview, setPreview] = useState<NeisPreview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [working, setWorking] = useState(false);
   const runPreview = async () => {
+    const release = interaction.begin();
+    if (!release) return;
     setWorking(true);
     try {
       const result = await adminRepository.previewNeis();
       setPreview(result);
+      setRiskAcknowledged(false);
       setSelected(
         new Set(
           result.changes
@@ -1915,6 +1837,7 @@ function SyncPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setWorking(false);
     }
   };
@@ -1924,8 +1847,10 @@ function SyncPage({
     RISKY_CHANGE_TYPES.has(change.type),
   );
   const apply = async () => {
-    if (!preview || selected.size === 0 || (hasRisky && !riskAcknowledged))
+    if (!preview || preview.status === "SUSPICIOUS_RESULT" || selected.size === 0 || (hasRisky && !riskAcknowledged))
       return;
+    const release = interaction.begin();
+    if (!release) return;
     setWorking(true);
     try {
       await adminRepository.applyNeis({
@@ -1941,15 +1866,14 @@ function SyncPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setWorking(false);
     }
   };
-  const needsLocation = data.schools.filter(
-    (school) =>
-      school.locationStatus !== "confirmed" &&
-      school.locationStatus !== "autoMatched",
-  );
+  const needsLocation = data.schools.filter(schoolNeedsReview);
   const refreshKakao = async (schoolId: string) => {
+    const release = interaction.begin();
+    if (!release) return;
     setWorking(true);
     try {
       await adminRepository.matchKakao(schoolId);
@@ -1958,20 +1882,31 @@ function SyncPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setWorking(false);
     }
   };
   return (
     <section className="admin-page" aria-labelledby="sync-title">
       <PageHeading
-        kicker="EXTERNAL DATA CONTROL"
         title="데이터 동기화"
         description="원천 데이터는 반드시 미리보고, 승인한 항목만 서버에서 반영합니다."
       />
-      <div className="admin-sync-tabs" role="tablist">
+      <fieldset className="admin-controls" disabled={working} aria-label="데이터 동기화 설정">
+      <div className="admin-sync-tabs" role="tablist" aria-label="데이터 종류" onKeyDown={(event) => {
+        if (working || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === "Home" ? "neis" : event.key === "End" ? "kakao" : tab === "neis" ? "kakao" : "neis";
+        setTab(next);
+        event.currentTarget.querySelector<HTMLButtonElement>(`[id="admin-tab-${next}"]`)?.focus();
+      }}>
         <button
           type="button"
+          disabled={working}
           role="tab"
+          id="admin-tab-neis"
+          aria-controls={tab === "neis" ? "admin-panel-neis" : undefined}
+          tabIndex={tab === "neis" ? 0 : -1}
           aria-selected={tab === "neis"}
           onClick={() => setTab("neis")}
         >
@@ -1981,6 +1916,9 @@ function SyncPage({
         <button
           type="button"
           role="tab"
+          id="admin-tab-kakao"
+          aria-controls={tab === "kakao" ? "admin-panel-kakao" : undefined}
+          tabIndex={tab === "kakao" ? 0 : -1}
           aria-selected={tab === "kakao"}
           onClick={() => setTab("kakao")}
         >
@@ -1989,12 +1927,11 @@ function SyncPage({
         </button>
       </div>
       {tab === "neis" ? (
-        <div className="sync-layout">
+        <div className="sync-layout" role="tabpanel" id="admin-panel-neis" aria-labelledby="admin-tab-neis">
           <article className="admin-panel sync-command">
             <header>
               <div>
-                <p>NEIS SCHOOL INFO</p>
-                <h2>학교 기준정보 미리보기</h2>
+                  <h2>학교 기준정보 미리보기</h2>
               </div>
               <StatusBadge
                 tone={
@@ -2040,8 +1977,7 @@ function SyncPage({
             <article className="admin-panel sync-preview">
               <header>
                 <div>
-                  <p>DIFF PREVIEW</p>
-                  <h2>적용 항목 선택</h2>
+                      <h2>적용 항목 선택</h2>
                 </div>
                 <StatusBadge
                   tone={
@@ -2084,7 +2020,8 @@ function SyncPage({
               <div className="sync-select-actions">
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setRiskAcknowledged(false);
                     setSelected(
                       new Set(
                         preview.changes
@@ -2093,22 +2030,23 @@ function SyncPage({
                           )
                           .map((change) => change.changeId),
                       ),
-                    )
-                  }
+                    );
+                  }}
                 >
                   낮은 위험만 선택
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setRiskAcknowledged(false);
                     setSelected(
                       new Set(preview.changes.map((change) => change.changeId)),
-                    )
-                  }
+                    );
+                  }}
                 >
                   전체 선택
                 </button>
-                <button type="button" onClick={() => setSelected(new Set())}>
+                <button type="button" onClick={() => { setRiskAcknowledged(false); setSelected(new Set()); }}>
                   선택 해제
                 </button>
               </div>
@@ -2121,14 +2059,15 @@ function SyncPage({
                     <input
                       type="checkbox"
                       checked={selected.has(change.changeId)}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setRiskAcknowledged(false);
                         setSelected((current) => {
                           const next = new Set(current);
                           if (event.target.checked) next.add(change.changeId);
                           else next.delete(change.changeId);
                           return next;
-                        })
-                      }
+                        });
+                      }}
                     />
                     <span aria-hidden="true">
                       <Icon name="check" size={14} />
@@ -2188,8 +2127,7 @@ function SyncPage({
             <article className="admin-panel sync-history">
               <header>
                 <div>
-                  <p>SYNC HISTORY</p>
-                  <h2>최근 실행 기록</h2>
+                      <h2>최근 실행 기록</h2>
                 </div>
               </header>
               {data.syncRuns.length ? (
@@ -2230,7 +2168,7 @@ function SyncPage({
           )}
         </div>
       ) : (
-        <div className="kakao-workspace">
+        <div className="kakao-workspace" role="tabpanel" id="admin-panel-kakao" aria-labelledby="admin-tab-kakao">
           <div className="kakao-summary">
             <span>
               <small>관리자 확정</small>
@@ -2284,8 +2222,7 @@ function SyncPage({
             <article className="admin-panel kakao-unmatched">
               <header>
                 <div>
-                  <p>NO CANDIDATE YET</p>
-                  <h2>후보 조회가 필요한 학교</h2>
+                      <h2>후보 조회가 필요한 학교</h2>
                 </div>
               </header>
               {needsLocation
@@ -2324,23 +2261,25 @@ function SyncPage({
           ) : null}
         </div>
       )}
+      </fieldset>
     </section>
   );
 }
 
-function AuditPage({ initialLogs }: { initialLogs: AdminAudit[] }) {
+function AuditPage({ initialLogs, employees }: { initialLogs: AdminAudit[]; employees: AdminEmployee[] }) {
   const { showToast } = useToast();
   const [logs, setLogs] = useState(initialLogs);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const employeeNames = useMemo(() => new Map(employees.map((employee) => [employee.employeeId, employee.displayName])), [employees]);
   const visible = useMemo(
     () =>
       logs.filter((log) =>
-        `${log.eventType} ${log.actorEmployeeId ?? ""} ${log.targetId ?? ""} ${log.changeReason ?? ""}`
+        `${auditEventLabel(log.eventType)} ${log.eventType} ${log.actorEmployeeId ?? ""} ${employeeNames.get(log.actorEmployeeId ?? "") ?? ""} ${log.targetId ?? ""} ${log.changeReason ?? ""}`
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
-    [logs, query],
+    [logs, query, employeeNames],
   );
   const loadMore = async () => {
     setLoading(true);
@@ -2355,7 +2294,6 @@ function AuditPage({ initialLogs }: { initialLogs: AdminAudit[] }) {
   return (
     <section className="admin-page" aria-labelledby="audit-title">
       <PageHeading
-        kicker="IMMUTABLE TRACE"
         title="감사 기록"
         description="누가, 무엇을, 왜 변경했는지 서버 기록으로 추적합니다."
         action={
@@ -2374,6 +2312,8 @@ function AuditPage({ initialLogs }: { initialLogs: AdminAudit[] }) {
         <label className="admin-search">
           <Icon name="search" size={17} />
           <input
+            {...searchInputProps}
+            name="audit-query"
             aria-label="감사 기록 검색"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -2403,7 +2343,7 @@ function AuditPage({ initialLogs }: { initialLogs: AdminAudit[] }) {
                 <time>{formatDate(log.createdAt)}</time>
               </header>
               <strong>
-                {log.actorEmployeeId ?? "SYSTEM"} → {log.targetType}
+                {log.actorEmployeeId ? employeeNames.get(log.actorEmployeeId) ?? log.actorEmployeeId : "시스템"} → {log.targetType === "inventory" ? "재고" : log.targetType}
                 {log.targetId ? ` / ${log.targetId}` : ""}
               </strong>
               <p>
@@ -2441,6 +2381,7 @@ function SettingsPage({
 }) {
   const { logout } = useAuth();
   const { showToast } = useToast();
+  const interaction = useAdminInteraction();
   const [minimumVersion, setMinimumVersion] = useState(
     data.settings.minimumAppVersion ?? "",
   );
@@ -2450,6 +2391,8 @@ function SettingsPage({
   const [savingTags, setSavingTags] = useState(false);
   const tagsSavePending = useRef(false);
   const save = async () => {
+    const release = interaction.begin();
+    if (!release) return;
     setSaving(true);
     try {
       await adminRepository.updateSettings({
@@ -2461,6 +2404,7 @@ function SettingsPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       setSaving(false);
     }
   };
@@ -2502,6 +2446,8 @@ function SettingsPage({
       showToast("같은 이름의 활동 태그는 한 번만 등록할 수 있습니다.");
       return;
     }
+    const release = interaction.begin();
+    if (!release) return;
     tagsSavePending.current = true;
     setSavingTags(true);
     try {
@@ -2518,6 +2464,7 @@ function SettingsPage({
     } catch (error) {
       showToast(adminErrorMessage(error));
     } finally {
+      release();
       tagsSavePending.current = false;
       setSavingTags(false);
     }
@@ -2525,7 +2472,6 @@ function SettingsPage({
   return (
     <section className="admin-page" aria-labelledby="admin-settings-title">
       <PageHeading
-        kicker="APPLICATION POLICY"
         title="설정"
         description="현장 앱에 적용할 공개 운영 정책과 현재 관리자 세션을 관리합니다."
       />
@@ -2533,18 +2479,18 @@ function SettingsPage({
         <article className="admin-panel">
           <header>
             <div>
-              <p>PUBLIC APP SETTINGS</p>
               <h2>현장 앱 운영 정책</h2>
             </div>
             <StatusBadge tone={maintenance ? "attention" : "success"}>
               {maintenance ? "점검 모드" : "정상 운영"}
             </StatusBadge>
           </header>
-          <div className="admin-form">
+          <fieldset className="admin-form admin-controls" disabled={saving} aria-label="현장 앱 운영 정책">
             <label>
               <span>최소 지원 앱 버전</span>
               <input
                 value={minimumVersion}
+                disabled={saving}
                 onChange={(event) => setMinimumVersion(event.target.value)}
                 placeholder="비워두면 제한 없음"
               />
@@ -2563,6 +2509,7 @@ function SettingsPage({
               <input
                 type="checkbox"
                 checked={maintenance}
+                disabled={saving}
                 onChange={(event) => setMaintenance(event.target.checked)}
               />
             </label>
@@ -2587,12 +2534,11 @@ function SettingsPage({
             >
               {saving ? "정책 반영 중…" : "운영 설정 저장"}
             </GlassButton>
-          </div>
+          </fieldset>
         </article>
         <article className="admin-panel activity-tag-admin" aria-busy={savingTags}>
           <header>
             <div>
-              <p>SALES ACTIVITY TAXONOMY</p>
               <h2>영업 활동 태그</h2>
             </div>
             <StatusBadge tone={activityTags.some((tag) => tag.active) ? "success" : "attention"}>
@@ -2653,7 +2599,6 @@ function SettingsPage({
         <article className="admin-panel admin-session-card">
           <header>
             <div>
-              <p>ADMIN SESSION</p>
               <h2>관리자 계정</h2>
             </div>
             <span className="admin-session-card__avatar">
@@ -2681,7 +2626,7 @@ function SettingsPage({
               활성 admin 역할 확인
             </li>
           </ul>
-          <GlassButton variant="quiet" onClick={() => void logout()}>
+          <GlassButton variant="quiet" onClick={() => { if (interaction.canNavigate()) void logout(); }}>
             <Icon name="logout" />
             안전하게 로그아웃
           </GlassButton>
@@ -2691,6 +2636,16 @@ function SettingsPage({
   );
 }
 
+const CustomerAdmin = dynamic(
+  () => import("@/features/customers/customer-admin").then((module) => module.CustomerAdmin),
+  { loading: () => <div className="admin-loading" role="status">거래처 관리를 준비하고 있습니다.</div> },
+);
+
+const InventoryWorkspace = dynamic(
+  () => import("@/features/inventory/inventory-workspace").then((module) => module.InventoryWorkspace),
+  { loading: () => <div className="admin-loading" role="status">재고 관리를 준비하고 있습니다.</div> },
+);
+
 function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
   const { showToast } = useToast();
   const [view, setView] = useState<AdminView>("overview");
@@ -2699,53 +2654,67 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
     "loading",
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
+  const loadGeneration = useRef(0);
+  const interaction = useAdminInteraction();
 
   const load = useCallback(
     async (cycleId: string | null = null, silent = false) => {
+      const generation = ++loadGeneration.current;
       if (!silent) setStatus("loading");
       else setRefreshing(true);
+      setRefreshError(false);
       try {
         const result = await adminRepository.load(cycleId);
+        if (generation !== loadGeneration.current) return;
         setData(result);
         setStatus("ready");
       } catch (error) {
+        if (generation !== loadGeneration.current) return;
         if (!silent) setStatus("error");
+        else setRefreshError(true);
         showToast(adminErrorMessage(error));
       } finally {
-        setRefreshing(false);
+        if (generation === loadGeneration.current) setRefreshing(false);
       }
     },
     [showToast],
   );
 
   useEffect(() => {
-    let active = true;
-    adminRepository
-      .load()
-      .then((result) => {
-        if (!active) return;
-        setData(result);
-        setStatus("ready");
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setStatus("error");
-        showToast(adminErrorMessage(error));
-      });
-    return () => {
-      active = false;
-    };
+    const generation = ++loadGeneration.current;
+    adminRepository.load().then((result) => {
+      if (generation !== loadGeneration.current) return;
+      setData(result);
+      setStatus("ready");
+    }).catch((error: unknown) => {
+      if (generation !== loadGeneration.current) return;
+      setStatus("error");
+      showToast(adminErrorMessage(error));
+    });
+    const requests = loadGeneration;
+    return () => { ++requests.current; };
   }, [showToast]);
+
+  const navigate = (next: AdminView) => {
+    if (next === view || !interaction.canNavigate()) return;
+    setView(next);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
 
   const reload = useCallback(async () => {
     await load(data?.selectedCycleId ?? null, true);
   }, [data?.selectedCycleId, load]);
 
   let content: ReactNode;
-  if (status === "loading")
+  if (view === "customers")
+    content = <CustomerAdmin key={`${session.uid}:${session.claims.sessionVersion}`} session={session} />;
+  else if (INVENTORY_ENABLED && view === "inventory")
+    content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} admin />;
+  else if (status === "loading")
     content = (
       <div className="admin-loading" role="status">
-        <span className="auth-spinner" />
+        <OnnuriLoader size="large" decorative />
         <strong>운영 데이터를 안전하게 불러오는 중</strong>
         <p>권한과 최신 버전을 서버에서 함께 확인합니다.</p>
       </div>
@@ -2762,9 +2731,9 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
       </div>
     );
   else if (view === "overview")
-    content = <OverviewPage data={data} onNavigate={setView} />;
+    content = <OverviewPage data={data} onNavigate={navigate} />;
   else if (view === "schools")
-    content = <SchoolsPage data={data} onOpenSync={() => setView("sync")} />;
+    content = <SchoolsPage data={data} onOpenSync={() => navigate("sync")} />;
   else if (view === "employees")
     content = (
       <EmployeesPage
@@ -2785,92 +2754,37 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
     content = <SyncPage data={data} onReload={reload} />;
   else if (view === "export")
     content = <SalesExportWorkspace session={session} />;
-  else if (view === "audit") content = <AuditPage initialLogs={data.audits} />;
+  else if (view === "audit") content = <AuditPage initialLogs={data.audits} employees={data.employees} />;
   else
     content = <SettingsPage data={data} session={session} onReload={reload} />;
 
   return (
-    <main className="admin-shell">
-      <aside className="admin-sidebar">
-        <div className="admin-brand">
-          <span>
-            <AppIconMark />
-          </span>
-          <div>
-            <strong>급식길</strong>
-            <small>온누리종합식품</small>
-          </div>
-        </div>
-        <nav aria-label="관리자 주요 메뉴">
-          {NAVIGATION.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              data-active={view === item.id}
-              aria-label={`${item.label} · ${item.hint}`}
-              aria-current={view === item.id ? "page" : undefined}
-              onClick={() => setView(item.id)}
-            >
-              <Icon name={item.icon} />
-              <span>
-                <strong>{item.label}</strong>
-                <small>{item.hint}</small>
-              </span>
-              {item.id === "sync" &&
-              data &&
-              data.schools.some(
-                (school) =>
-                  (school.locationStatus !== "confirmed" &&
-                    school.locationStatus !== "autoMatched") ||
-                  school.possibleRelocation,
-              ) ? (
-                <i aria-label="검토 필요" />
-              ) : null}
-            </button>
-          ))}
-        </nav>
-        <div className="admin-sidebar__account">
-          <span>{initials(session.displayName)}</span>
-          <div>
-            <strong>{session.displayName}</strong>
-            <small>승인된 관리자</small>
-          </div>
-        </div>
-      </aside>
+    <main className={`admin-shell ${navigationStyles.layout} ${styles.workspace}`}>
+      <AdminNavigation view={view} onNavigate={navigate} displayName={session.displayName}
+        needsSyncReview={data?.schools.some(schoolNeedsReview) ?? false} />
       <div className="admin-main">
         <header className="admin-topbar">
           <div>
-            <span className="admin-topbar__live">
-              <i />
-              LIVE ADMIN
-            </span>
-            <span>{data?.settings.currentSalesCycleId ?? "Cycle 확인 중"}</span>
+            <span className="admin-topbar__identity"><Icon name="settings" size={18} />관리자</span>
+            <span className="admin-topbar__date">{new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", weekday: "short" }).format(new Date())}</span>
           </div>
-          <div>
-            <button
-              type="button"
-              disabled={refreshing}
-              onClick={() => void reload()}
-            >
-              <Icon name="refresh" size={17} />
-              {refreshing ? "새로 고치는 중" : "최신 상태"}
-            </button>
-            <span className="admin-topbar__date">
-              {new Intl.DateTimeFormat("ko-KR", {
-                timeZone: "Asia/Seoul",
-                month: "long",
-                day: "numeric",
-                weekday: "short",
-              }).format(new Date())}
-            </span>
-          </div>
+          <button type="button" disabled={refreshing || status === "loading"} onClick={() => {
+            if (interaction.canNavigate()) void reload();
+          }}>
+            <Icon name="refresh" size={16} />
+            {refreshing ? "새로 고치는 중" : "새로고침"}
+          </button>
         </header>
-        <div className="admin-content">{content}</div>
+        <div className="admin-content" aria-busy={refreshing}>
+          {refreshError ? <div className="admin-refresh-note" role="alert"><Icon name="bell" size={17} /><span>최신 정보를 가져오지 못했습니다. 이전에 확인한 정보를 표시하고 있어요. 다시 새로고침해주세요.</span></div> : null}
+          {content}
+          {data && view !== "customers" && view !== "inventory" ? <small className="admin-data-time">마지막 서버 확인 · {formatDate(data.generatedAt)}</small> : null}
+        </div>
       </div>
     </main>
   );
 }
 
 export function AdminWorkspace({ session }: { session: AuthenticatedSession }) {
-  return <AdminWorkspaceContent session={session} />;
+  return <AdminInteractionProvider><AdminWorkspaceContent session={session} /></AdminInteractionProvider>;
 }

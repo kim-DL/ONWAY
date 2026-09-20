@@ -1,4 +1,8 @@
 .cloud {
+  --cloud-first: #659ddd;
+  --cloud-second: #58a9b5;
+  --cloud-third: #b2bedd;
+  --cloud-fourth: #d7bb96;
   position: relative;
   isolation: isolate;
   display: block;
@@ -7,6 +11,22 @@
   flex: 0 0 auto;
   pointer-events: none;
   user-select: none;
+}
+
+/* The shell already supplies the current work mode. CSS palettes keep all
+   four orbits continuous across mode changes without extra state or timers. */
+:global(.workspace-shell[data-mode="customer"]) .cloud {
+  --cloud-first: #66ae98;
+  --cloud-second: #529cae;
+  --cloud-third: #c8bc91;
+  --cloud-fourth: #9aafd0;
+}
+
+:global(.workspace-shell[data-mode="sales"]) .cloud {
+  --cloud-first: #e58c75;
+  --cloud-second: #bf9faf;
+  --cloud-third: #e6bd89;
+  --cloud-fourth: #88b9b3;
 }
 
 .particle {
@@ -27,25 +47,32 @@
   height: 100%;
   border-radius: 50%;
   background-color: currentColor;
+  /* Independent, staggered size cycles feel organic without random timers,
+     layout reflow or synchronised pulsing. Pausing freezes both motion layers. */
+  animation: cloud-breathe var(--breath-duration) cubic-bezier(.37, 0, .63, 1) var(--breath-delay) infinite;
+  animation-play-state: paused;
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 38%),
     inset -1px -1px 0 rgb(35 57 73 / 8%),
-    0 2px 5px var(--particle-shadow),
-    0 0 13px var(--particle-glow);
+    0 2px 5px color-mix(in srgb, currentColor 17%, transparent),
+    0 0 13px color-mix(in srgb, currentColor 28%, transparent);
 }
 
-.cloud[data-motion="running"] .particle {
+.cloud[data-motion="running"] .particle,
+.cloud[data-motion="running"] .core {
   animation-play-state: running;
   will-change: transform, opacity;
 }
 
 .coral {
   --particle-size: 12px;
-  --particle-shadow: rgb(189 92 67 / 12%);
-  --particle-glow: rgb(238 153 128 / 36%);
+  --breath-duration: 7.3s;
+  --breath-delay: -2.1s;
+  --breath-small: .76;
+  --breath-large: 1.3;
   z-index: 3;
-  color: #ee9980;
-  transform: translate3d(-31px, 5px, 0) scale(.72);
+  color: var(--cloud-first);
+  transform: translate3d(-39px, 8px, 0) scale(.82);
   opacity: .55;
   animation-name: coral-orbit;
   animation-duration: 4.2s;
@@ -53,11 +80,13 @@
 
 .blue {
   --particle-size: 18px;
-  --particle-shadow: rgb(50 105 170 / 14%);
-  --particle-glow: rgb(62 149 232 / 32%);
+  --breath-duration: 9.1s;
+  --breath-delay: -5.4s;
+  --breath-small: .78;
+  --breath-large: 1.18;
   z-index: 1;
-  color: #3e95e8;
-  transform: translate3d(26px, -3px, 0) scale(1);
+  color: var(--cloud-second);
+  transform: translate3d(32px, -7px, 0) scale(1);
   opacity: .96;
   animation-name: blue-orbit;
   animation-duration: 6.8s;
@@ -65,11 +94,13 @@
 
 .champagne {
   --particle-size: 14px;
-  --particle-shadow: rgb(146 113 48 / 12%);
-  --particle-glow: rgb(214 181 119 / 35%);
+  --breath-duration: 11.7s;
+  --breath-delay: -7.8s;
+  --breath-small: .7;
+  --breath-large: 1.27;
   z-index: 4;
-  color: #d6b577;
-  transform: translate3d(-18px, 1px, 0) scale(.82);
+  color: var(--cloud-third);
+  transform: translate3d(-24px, 2px, 0) scale(.88);
   opacity: .75;
   animation-name: champagne-orbit;
   animation-duration: 3.6s;
@@ -77,11 +108,13 @@
 
 .sage {
   --particle-size: 10px;
-  --particle-shadow: rgb(61 120 103 / 12%);
-  --particle-glow: rgb(111 187 165 / 34%);
+  --breath-duration: 13.3s;
+  --breath-delay: -3.6s;
+  --breath-small: .84;
+  --breath-large: 1.4;
   z-index: 0;
-  color: #6fbba5;
-  transform: translate3d(43px, 4px, 0) scale(.58);
+  color: var(--cloud-fourth);
+  transform: translate3d(46px, 6px, 0) scale(.7);
   opacity: .4;
   animation-name: sage-orbit;
   animation-duration: 8.6s;
@@ -91,38 +124,45 @@
 /* Only transform and opacity move; solid cores and small glows remain static.
    Closed orbits share exact endpoints. The wide sage sweep reverses smoothly. */
 @keyframes coral-orbit {
-  0%, 100% { transform: translate3d(-31px, 5px, 0) scale(.72); opacity: .55; }
-  25% { transform: translate3d(-16px, -5px, 0) scale(.95); opacity: .82; }
-  50% { transform: translate3d(31px, 0, 0) scale(1.18); opacity: 1; }
-  75% { transform: translate3d(16px, 5px, 0) scale(.95); opacity: .82; }
+  0%, 100% { transform: translate3d(-39px, 8px, 0) scale(.82); opacity: .65; }
+  25% { transform: translate3d(-16px, -11px, 0) scale(.95); opacity: .88; }
+  50% { transform: translate3d(39px, 0, 0) scale(1.12); opacity: 1; }
+  75% { transform: translate3d(16px, 11px, 0) scale(.95); opacity: .88; }
 }
 
 @keyframes blue-orbit {
-  0%, 100% { transform: translate3d(26px, -3px, 0) scale(1); opacity: .96; }
-  25% { transform: translate3d(13px, 6px, 0) scale(.88); opacity: .78; }
-  50% { transform: translate3d(-26px, 2px, 0) scale(.68); opacity: .52; }
-  75% { transform: translate3d(-13px, -6px, 0) scale(.88); opacity: .78; }
+  0%, 100% { transform: translate3d(32px, -7px, 0) scale(1); opacity: .96; }
+  25% { transform: translate3d(13px, 12px, 0) scale(.9); opacity: .82; }
+  50% { transform: translate3d(-32px, 3px, 0) scale(.76); opacity: .65; }
+  75% { transform: translate3d(-13px, -12px, 0) scale(.9); opacity: .82; }
 }
 
 @keyframes champagne-orbit {
-  0%, 100% { transform: translate3d(-18px, 1px, 0) scale(.82); opacity: .75; }
-  20% { transform: translate3d(-11px, -4px, 0) scale(.94); opacity: .88; }
-  50% { transform: translate3d(18px, 0, 0) scale(1.08); opacity: 1; }
-  80% { transform: translate3d(11px, 4px, 0) scale(.94); opacity: .88; }
+  0%, 100% { transform: translate3d(-24px, 2px, 0) scale(.88); opacity: .8; }
+  20% { transform: translate3d(-11px, -10px, 0) scale(.94); opacity: .9; }
+  50% { transform: translate3d(24px, 0, 0) scale(1.08); opacity: 1; }
+  80% { transform: translate3d(11px, 10px, 0) scale(.94); opacity: .9; }
 }
 
 @keyframes sage-orbit {
-  0% { transform: translate3d(43px, 4px, 0) scale(.58); opacity: .4; }
-  20% { transform: translate3d(29px, -4px, 0) scale(.72); opacity: .6; }
-  50% { transform: translate3d(0, 2px, 0) scale(1); opacity: .9; }
-  80% { transform: translate3d(-29px, -4px, 0) scale(.72); opacity: .6; }
-  100% { transform: translate3d(-43px, 4px, 0) scale(.58); opacity: .4; }
+  0% { transform: translate3d(46px, 6px, 0) scale(.7); opacity: .6; }
+  20% { transform: translate3d(30px, -9px, 0) scale(.82); opacity: .75; }
+  50% { transform: translate3d(0, 6px, 0) scale(1); opacity: .94; }
+  80% { transform: translate3d(-30px, -9px, 0) scale(.82); opacity: .75; }
+  100% { transform: translate3d(-46px, 6px, 0) scale(.7); opacity: .6; }
+}
+
+@keyframes cloud-breathe {
+  0%, 100% { transform: scale(1); }
+  23% { transform: scale(var(--breath-small)); }
+  61% { transform: scale(var(--breath-large)); }
+  84% { transform: scale(.94); }
 }
 
 /* Keep the separated poses (or the current frame) instead of collapsing all
    particles at the center, including before hydration and when motion is off. */
 @media (prefers-reduced-motion: reduce) {
-  .cloud .particle {
+  .cloud .particle, .cloud .core {
     animation-play-state: paused !important;
     will-change: auto;
   }
@@ -130,5 +170,5 @@
 
 @media (forced-colors: active) {
   .cloud { visibility: hidden; }
-  .cloud .particle { animation-play-state: paused !important; will-change: auto; }
+  .cloud .particle, .cloud .core { animation-play-state: paused !important; will-change: auto; }
 }

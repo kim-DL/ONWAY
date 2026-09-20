@@ -5,6 +5,7 @@ import { FirebaseError } from "firebase/app";
 
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import { SmartChip } from "@/components/ui/smart-chip";
 import type { Product, TagDefinition } from "@/domain/catalog";
 import type { EmployeeDirectory } from "@/domain/identity";
@@ -406,7 +407,7 @@ export function SalesVisitSheet({
         <BottomSheetActions className="sales-visit-form__submit" busy={saving}>
           {saveError ? <div className="sheet-action-error" role="alert"><strong>저장하지 못했어요.</strong> {saveError}</div> : null}
           <p><Icon name="check" size={16} />한 번의 저장으로 방문·학교 상태·통계가 함께 반영됩니다.</p>
-          <button type="submit" form={formId} disabled={saving}>{saving ? "안전하게 저장 중…" : editing ? "수정 내용 저장" : "방문 기록 저장"}</button>
+          <button type="submit" form={formId} disabled={saving}>{saving ? <OnnuriLoader size="small" tone="inherit" decorative /> : null}{saving ? "안전하게 저장 중…" : editing ? "수정 내용 저장" : "방문 기록 저장"}</button>
         </BottomSheetActions>
       </form>
     </BottomSheet>

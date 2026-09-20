@@ -25,6 +25,10 @@ output/playwright/
 output/security/
 output/acceptance/
 output/pilot/
+output/customer-ui-review.tsx
+output/serve-customer-ui-review.mjs
+output/customer-security-analysis.md
+output/phase32-kakao-sdk-mobile.png
 pilot/*.local.json
 .playwright-cli/
 .playwright-mcp/

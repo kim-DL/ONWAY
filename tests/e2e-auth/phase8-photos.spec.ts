@@ -57,7 +57,7 @@ async function openCompleteSchool(page: Page) {
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
   await page.getByRole("combobox", { name: "학교명 검색" }).fill("온누리고");
   await page.getByRole("option", { name: /대전온누리고등학교/ }).click();
-  await expect(page.getByRole("heading", { name: "도착 전에 보는 현장" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "현장 사진", exact: true })).toBeVisible();
 }
 
 test("gallery loads preview/thumbnail only and produces the desktop checkpoint", async ({ page }) => {
@@ -67,7 +67,7 @@ test("gallery loads preview/thumbnail only and produces the desktop checkpoint",
   });
   await openCompleteSchool(page);
   await expect(page.locator(".photo-card img")).toHaveCount(3);
-  await expect(page.getByText("사진 준비 완료")).toBeVisible();
+  await expect(page.getByText(/사진 준비 완료|슬롯 비어 있음/)).toHaveCount(0);
   expect(photoRequests.some((body) => body.includes('"variant":"original"'))).toBe(false);
 
   const scan = await new AxeBuilder({ page }).include(".school-photo-gallery").analyze();
@@ -98,10 +98,10 @@ test("viewer supports navigation and requests Original only after explicit zoom"
   await viewer.getByRole("button", { name: "크기 복귀" }).click();
   await viewer.getByRole("button", { name: "다음 사진" }).click();
   await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
-  const viewerScan = await new AxeBuilder({ page }).include(".photo-viewer").analyze();
+  const viewerScan = await new AxeBuilder({ page }).include("dialog[open]:has([data-photo-morph-stage])").analyze();
   expect(viewerScan.violations).toEqual([]);
   await viewer.screenshot({ path: `${VISUALS}/02-photo-viewer.png` });
-  await viewer.getByRole("button", { name: "사진 닫기" }).click();
+  await viewer.getByRole("button", { name: "닫기", exact: true }).click();
   await expect(page.getByRole("heading", { name: "대전온누리고등학교" })).toBeVisible();
 });
 

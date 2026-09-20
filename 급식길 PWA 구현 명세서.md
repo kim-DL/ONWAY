@@ -6,6 +6,18 @@
 **주요 개발 도구:** Codex  
 **작성 기준일:** 2026-08-18
 
+## 현재 구현 기준 — 2026-09-20
+
+이 문서의 Phase 0~18 본문은 초기 설계와 의사결정 이력으로 유지한다. 현재 구현·운영 상태가 본문과 충돌하면 `docs/HANDOFF.md`, 최신 Phase 문서, 현재 코드 순으로 확인한다.
+
+- Runtime은 Node.js 22, Next.js 16.3.2 App Router, React 19.2.8이다. `next.config.ts`의 `output: "export"`로 정적 `out`을 만들고 Firebase Hosting site `onnuriway`에서 서비스한다. Vercel은 운영 기본 경로가 아니다.
+- 운영 주소는 `https://onnuriway.com`, 기본 Firebase 주소는 `https://onnuriway.web.app`이다. Functions는 `asia-northeast3`, Firestore는 Standard/Native 서울 리전을 사용한다.
+- App Shell은 거래처·학교납품·영업/홍보·재고 네 모드를 권한과 기능 플래그에 따라 노출하고, 각 Workspace는 동적 import 경계로 분리한다.
+- 일반적인 쓰기 흐름은 `UI → Client Repository → 인증된 Callable → Service/Transaction → Firestore·Storage → Zod 응답 검증 → 화면의 메모리 상태 갱신`이다. 민감 데이터의 Client 직접 쓰기와 오프라인 쓰기 Queue는 제공하지 않는다.
+- 거래처는 Callable 페이지 조회·저장·좌표 검색/역지오코딩·비공개 사진 흐름을 사용한다. 목록은 온라인/가시 상태에서 갱신하고 연결 또는 인증이 끊기면 메모리에서 제거한다.
+- 재고는 `companies/onnuri` 아래의 별도 상품·lot·event·실사 주기·요청 영수증을 사용한다. 입고·출고·조정·유통기한 수정·수량 일치·상태 변경은 서버 Transaction, revision, request ID와 감사 이력으로 보호한다.
+- 자세한 현재 상태, 검증 결과와 미확인 사항은 `docs/HANDOFF.md`를 단일 인수인계 기준으로 사용한다.
+
 **관련 문서**
 
 1. 급식길 PWA MVP 기획서

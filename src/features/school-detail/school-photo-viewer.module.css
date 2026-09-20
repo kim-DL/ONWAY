@@ -1,0 +1,16 @@
+.schoolStage { position: relative; display: grid; place-items: center; height: min(55dvh, 620px); min-height: 160px; overflow: auto; overscroll-behavior: contain; border: 1px solid #dce5e6; border-radius: 14px; background: #102529; touch-action: none; }
+.schoolStage > img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+.schoolStage[data-zoomed="true"] { display: block; touch-action: pan-x pan-y pinch-zoom; }
+.schoolStage[data-zoomed="true"] > img { width: calc(100% * var(--photo-scale, 2.5)); height: auto; min-height: 100%; max-width: none; }
+.schoolStage:focus-visible { outline: 3px solid #23857a; outline-offset: 3px; }
+.schoolNavigation { position: absolute; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 48px; border: 1px solid #d1dcdd; border-radius: 12px; background: #fffffff0; color: #254c52; cursor: pointer; }
+.schoolNavigation[data-direction="previous"] { left: 10px; }
+.schoolNavigation[data-direction="next"] { right: 10px; }
+.schoolNavigation:focus-visible, .schoolActions button:focus-visible { outline: 3px solid #23857a; outline-offset: 3px; }
+.schoolCaption { display: grid; gap: 5px; margin: 12px 0 0; color: #354f56; font-size: .875rem; line-height: 1.5; }
+.schoolCaption > small { color: #637980; font-size: .75rem; }
+.schoolActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.schoolActions > span { color: #526970; font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.schoolActions > button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border: 1px solid #d1dfdb; border-radius: 12px; background: #f0f6f4; color: #285e53; font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; }
+.schoolLoading { display: grid; justify-items: center; gap: 12px; color: #e4eeef; font-size: .8125rem; }
+@media (forced-colors: active) { .schoolStage, .schoolNavigation, .schoolActions > button { border-color: CanvasText; } }

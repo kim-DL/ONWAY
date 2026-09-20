@@ -1,0 +1,13 @@
+.stage { --photo-morph-ui: 1; position: relative; z-index: 1; transform-origin: top left; }
+.stage[data-photo-morph-state="opening"],
+.stage[data-photo-morph-state="closing"] { will-change: transform, clip-path; pointer-events: none; }
+:global(.bottom-sheet-layer):has(.stage) :global(.bottom-sheet) { animation: none; border-radius: 20px; }
+:global(.bottom-sheet-layer):has(.stage:is([data-photo-morph-state="opening"], [data-photo-morph-state="closing"])) :is(:global(.bottom-sheet), :global(.bottom-sheet__body)) { overflow: visible; }
+:global(.bottom-sheet-layer):has(.stage) :global(.bottom-sheet__header) { padding-bottom: 14px; }
+:global(.bottom-sheet-layer):has(.stage[data-photo-morph-state="closing"]) { pointer-events: none; }
+:global(.bottom-sheet-layer):has(.stage[data-photo-morph-state="closing"])::backdrop { animation: photo-backdrop-out 260ms cubic-bezier(.4,0,.2,1) both; }
+@keyframes photo-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media (min-width: 768px) {
+  :global(.bottom-sheet-layer):has(.stage) { align-items: center; }
+  :global(.bottom-sheet-layer):has(.stage) :global(.bottom-sheet) { width: min(860px, calc(100vw - 48px)); }
+}

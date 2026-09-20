@@ -119,6 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: "resolving" });
   const invalidReasonRef = useRef<string | null>(null);
   const adminActivationRef = useRef(false);
+  const authGenerationRef = useRef(0);
+  const sessionEndingRef = useRef(false);
+  const dismissAfterCleanupRef = useRef(false);
 
   useEffect(() => {
     if (!services) {
@@ -129,21 +132,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let authUnsubscribe: Unsubscribe | undefined;
     let authzUnsubscribe: Unsubscribe | undefined;
     let onlineTokenRefreshCleanup: (() => void) | undefined;
-    let authGeneration = 0;
-
     const invalidate = async (message: string) => {
-      if (!active || invalidReasonRef.current) {
+      if (!active || invalidReasonRef.current || sessionEndingRef.current) {
         return;
       }
       invalidReasonRef.current = message;
+      sessionEndingRef.current = true;
+      authGenerationRef.current += 1;
       authzUnsubscribe?.();
       authzUnsubscribe = undefined;
       onlineTokenRefreshCleanup?.();
       onlineTokenRefreshCleanup = undefined;
+      // Hide private screens before potentially slow IndexedDB cleanup. The
+      // generation barrier prevents queued token/authz work from restoring them.
+      setState({ status: "invalid", message });
       await clearPrivateClientState();
       await signOut(services.auth).catch(() => undefined);
-      if (active) {
-        setState({ status: "invalid", message });
+      sessionEndingRef.current = false;
+      if (active && dismissAfterCleanupRef.current) {
+        dismissAfterCleanupRef.current = false;
+        invalidReasonRef.current = null;
+        setState({ status: "unauthenticated" });
       }
     };
 
@@ -153,11 +162,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       authUnsubscribe = onIdTokenChanged(services.auth, (user) => {
         if (!active) return;
-        const generation = ++authGeneration;
+        const generation = ++authGenerationRef.current;
         authzUnsubscribe?.();
         authzUnsubscribe = undefined;
         onlineTokenRefreshCleanup?.();
         onlineTokenRefreshCleanup = undefined;
+        if (sessionEndingRef.current || invalidReasonRef.current) return;
 
         if (!user) {
           setState(
@@ -179,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           onlineTokenRefreshCleanup?.();
           onlineTokenRefreshCleanup = subscribeToNetworkRecovery(() => {
             onlineTokenRefreshCleanup = undefined;
-            if (active && generation === authGeneration) verifyWhenOnline();
+            if (active && generation === authGenerationRef.current) verifyWhenOnline();
           });
           return true;
         };
@@ -188,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           void user
             .getIdTokenResult(forceRefresh)
             .then((token) => {
-              if (!active || generation !== authGeneration) {
+              if (!active || generation !== authGenerationRef.current) {
                 return;
               }
               const firebaseClaim = token.claims.firebase as { sign_in_provider?: unknown } | undefined;
@@ -220,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 authzUnsubscribe?.();
                 authzUnsubscribe = undefined;
                 void probeNetworkReachability().then((reachable) => {
-                  if (!active || generation !== authGeneration) return;
+                  if (!active || generation !== authGenerationRef.current) return;
                   if (!reachable) {
                     restoreCachedSessionOffline();
                     return;
@@ -229,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   authzUnsubscribe = onSnapshot(
                     doc(services.firestore, "authz", user.uid),
                     (snapshot) => {
-                      if (!active || generation !== authGeneration) return;
+                      if (!active || generation !== authGenerationRef.current) return;
                       // Authorization is confirmed only by a server snapshot. A
                       // previously cached missing/stale document must never sign a
                       // freshly authenticated user out before Firestore reconnects.
@@ -251,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     },
                     () => {
                       void probeNetworkReachability().then((stillReachable) => {
-                        if (!active || generation !== authGeneration) return;
+                        if (!active || generation !== authGenerationRef.current) return;
                         if (!stillReachable) {
                           restoreCachedSessionOffline();
                           return;
@@ -266,7 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             })
             .catch(() => {
               void probeNetworkReachability().then((reachable) => {
-                if (!active || generation !== authGeneration) return;
+                if (!active || generation !== authGenerationRef.current) return;
                 if (!reachable && restoreVerifiedSessionOffline(
                   () => resolveRemoteSession(true),
                 )) return;
@@ -283,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ? current
           : { status: "resolving" });
         void probeNetworkReachability().then((reachable) => {
-          if (!active || generation !== authGeneration) return;
+          if (!active || generation !== authGenerationRef.current) return;
           if (!reachable) {
             if (!restoreVerifiedSessionOffline(() => resolveRemoteSession(true))) {
               setState({
@@ -311,7 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
-      authGeneration += 1;
+      authGenerationRef.current += 1;
       authUnsubscribe?.();
       authzUnsubscribe?.();
       onlineTokenRefreshCleanup?.();
@@ -407,22 +417,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [services]);
 
   const logout = useCallback(async () => {
-    if (!services) {
+    if (!services || sessionEndingRef.current) {
       return;
     }
 
+    sessionEndingRef.current = true;
+    authGenerationRef.current += 1;
+    invalidReasonRef.current = null;
+    // Do not leave private content visible during the server logout timeout.
+    setState({ status: "resolving" });
     const employeeLogout = httpsCallable<void, { ok: boolean }>(
       services.functions,
       "employeeLogout",
     );
     await settleWithin(employeeLogout(), 2_000);
-    invalidReasonRef.current = null;
     await clearPrivateClientState();
-    await signOut(services.auth);
-    setState({ status: "unauthenticated" });
+    try {
+      await signOut(services.auth);
+      setState({ status: "unauthenticated" });
+    } catch (error) {
+      const message = "로그아웃을 완료하지 못했습니다. 앱을 다시 열어 로그인해주세요.";
+      invalidReasonRef.current = message;
+      setState({ status: "invalid", message });
+      throw error;
+    } finally {
+      sessionEndingRef.current = false;
+    }
   }, [services]);
 
   const dismissInvalidSession = useCallback(() => {
+    if (sessionEndingRef.current) {
+      // A new login must not race a previous session's still-pending signOut.
+      dismissAfterCleanupRef.current = true;
+      setState({ status: "resolving" });
+      return;
+    }
     invalidReasonRef.current = null;
     setState({ status: "unauthenticated" });
   }, []);

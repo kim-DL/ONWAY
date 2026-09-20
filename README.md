@@ -2,6 +2,14 @@
 
 대전 학교 급식실 납품·홍보 현장 운영을 위한 PWA 프로젝트다. Phase 17 Full Acceptance Test를 통과했고 Phase 18 HTTPS Staging 배포와 실제 직원 Pilot 준비를 완료했다. 모바일 우선 현장 앱, 로컬 학교 검색, Cache-first 현장정보, 월별 영업 운영, 서버 Filter 기반 임시 CSV, NEIS Preview/Diff/선택 Apply, 검토형 Kakao 위치 매칭, 버전형 현장 사진과 PC 우선 운영 콘솔을 제공한다.
 
+## 현재 배포·개발 상태 (2026-09-10)
+
+Firebase Hosting용 정적 내보내기(`out`)와 `https://onnuriway.web.app` 배포를 검증했다. `onnuriway.com`은 무중단 전환을 위해 인증서와 DNS 확인을 진행 중이며, 최종 전환 여부는 [Hosting 이전 상태](docs/phase-45-hosting-migration-status.md)를 기준으로 확인한다. 기존 Vercel 배포는 복구용으로 유지한다. 아래 Phase 18 설명은 당시의 이력이다.
+
+재고 관리는 [설계·구현 계획](docs/phase-45-firebase-hosting-and-inventory-plan.md)에 따라 기존 영업 상품과 분리해 개발 중이다. `NEXT_PUBLIC_ENABLE_INVENTORY=false`가 기본값이며, 재고 서버 기능과 별도 수용 검증이 완료되기 전에는 공개하지 않는다.
+
+정적 배포본의 로컬 실행은 `npm run build` 후 `npm start`를 사용한다. `next start`는 사용하지 않는다. `npm run verify:hosting:build`로 Hosting 설정과 공개 파일을 검증한다.
+
 ## 개발 기준
 
 - Node.js 22 LTS

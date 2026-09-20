@@ -1,5 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
+import { isValidPhoneNumber } from "../shared/phone-number.js";
 
 const documentIdSchema = z.string().trim().min(1).max(128).refine((value) => !value.includes("/"));
 const nullableShortTextSchema = z.string().trim().max(200).nullable();
@@ -16,6 +17,13 @@ const nullablePhoneNumberSchema = z.string().trim().min(3).max(30)
 export const schoolContactSchema = z.object({
   dietitianPhone: nullablePhoneNumberSchema,
   cafeteriaPhone: nullablePhoneNumberSchema,
+}).strict();
+
+// Keep legacy reads tolerant, but reject malformed new contact edits.
+const phoneNumberInputSchema = z.string().trim().refine(isValidPhoneNumber, "연락처를 확인해주세요.").nullable();
+export const schoolContactInputSchema = z.object({
+  dietitianPhone: phoneNumberInputSchema,
+  cafeteriaPhone: phoneNumberInputSchema,
 }).strict();
 
 export const cafeteriaSchema = z.object({
@@ -50,7 +58,7 @@ export const vehicleSchema = z.object({
 }).strict();
 
 export const fieldProfilePatchSchema = z.object({
-  contacts: schoolContactSchema.optional(),
+  contacts: schoolContactInputSchema.optional(),
   cafeteria: cafeteriaSchema.optional(),
   inspection: inspectionSchema.optional(),
   equipment: equipmentSchema.optional(),

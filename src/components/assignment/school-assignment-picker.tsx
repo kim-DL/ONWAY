@@ -5,6 +5,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type ChangeEven
 import { GlassButton } from "@/components/ui/glass-button";
 import { BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
+import { searchInputProps } from "@/components/ui/search-input-props";
 
 export const MAX_BULK_ASSIGNMENT_COUNT = 400;
 
@@ -195,10 +196,10 @@ export function SchoolAssignmentPicker({
           <div>
             <Icon name="search" size={18} />
             <input
-              type="search"
+              {...searchInputProps}
+              name="assignment-query"
               value={query}
               placeholder="학교명 또는 주소"
-              autoComplete="off"
               disabled={processing}
               onChange={(event) => setQuery(event.target.value)}
             />

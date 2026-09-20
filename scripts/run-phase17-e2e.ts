@@ -18,7 +18,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 const nextServer = spawn(
   process.execPath,
-  [nextCli, "start", "--hostname", "127.0.0.1", "--port", "3103"],
+  [join(process.cwd(), "scripts", "serve-hosting-local.mjs"), "--hostname", "127.0.0.1", "--port", "3103"],
   { cwd: process.cwd(), env: environment, stdio: "inherit" },
 );
 
@@ -33,7 +33,7 @@ async function waitForServer() {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Next.js Phase 17 production test server did not become ready in time.");
+  throw new Error("Firebase Hosting Phase 17 production test server did not become ready in time.");
 }
 
 const playwrightCli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");

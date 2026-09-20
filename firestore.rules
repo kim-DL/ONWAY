@@ -17,6 +17,8 @@ service cloud.firestore {
     // authCredentials and pinIndexes: server-only authentication material.
     // authz: employeeId/active/sessionVersion/permissionsVersion/updatedAt.
     // zones/products/tags: sales definitions. Catalogs are split by scope.
+    // companies/onnuri/customers: sensitive customer delivery/contacts/password
+    // data, read by active company employees; all writes are verified Functions.
     // exportJobs/auditLogs/neisSyncRuns/settings: system documents.
     //
     // Field roles may read school/field/photo metadata. Sales roles may also
@@ -118,6 +120,17 @@ service cloud.firestore {
           || (tokenHasScope('admin') && hasVerifiedAdminClaims()));
     }
 
+    function canReadCustomers() {
+      let employee = get(/databases/$(database)/documents/employees/$(request.auth.token.employeeId)).data;
+      return canReadField()
+        && employee is map
+        && employee.status == 'active'
+        && employee.employeeId == request.auth.token.employeeId
+        && employee.firebaseUid == request.auth.uid
+        && employee.roleScopes is list
+        && employee.roleScopes.hasAny(['delivery', 'sales', 'viewer', 'admin']);
+    }
+
     function isPhotoSlot(slotId) {
       return slotId in ['01', '02', '03'];
     }
@@ -144,6 +157,13 @@ service cloud.firestore {
 
     match /schoolFieldProfiles/{schoolId} {
       allow read: if canReadField();
+    }
+
+    // This deployment is the existing single-company Onnuri Firebase project.
+    // No caller-controlled company claim/path grants access to other tenants.
+    match /companies/onnuri/customers/{customerId} {
+      allow read: if canReadCustomers();
+      allow create, update, delete: if false;
     }
 
     // =============================================================

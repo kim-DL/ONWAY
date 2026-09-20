@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { WelcomeGreeting } from "./welcome-greeting";
@@ -33,5 +34,32 @@ describe("welcome quantum artwork", () => {
       expect(html).toContain(`data-quantum-particle="${particle}"`);
     }
     expect(renderToString(createElement(QuantumCloudLoader, { paused: false }))).toContain('data-motion="running"');
+  });
+
+  it("shares headline text tokens with the selected mode buttons", () => {
+    const globals = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
+    const header = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
+    const greeting = readFileSync(new URL("./welcome-greeting.module.css", import.meta.url), "utf8");
+    for (const [mode, color] of [["delivery", "#1b64da"], ["customer", "#247647"], ["sales", "#FA6F42"]]) {
+      expect(globals).toContain(`--mode-${mode}-text: ${color}`);
+      expect(header).toContain(`color: var(--mode-${mode}-text)`);
+      expect(greeting).toContain(`color: var(--mode-${mode}-text)`);
+    }
+    expect(greeting).toMatch(/@media \(forced-colors: active\)[\s\S]*color: CanvasText/);
+  });
+
+  it("varies orb size on independent bounded rhythms without random rendering or layout animation", () => {
+    const css = readFileSync(new URL("../../components/ui/quantum-cloud-loader.module.css", import.meta.url), "utf8");
+    const component = readFileSync(new URL("../../components/ui/quantum-cloud-loader.tsx", import.meta.url), "utf8");
+    const durations = [...css.matchAll(/--breath-duration: ([\d.]+)s/g)].map((match) => Number(match[1]));
+    expect(new Set(durations).size).toBe(4);
+    expect(durations.every((duration) => duration >= 7 && duration <= 14)).toBe(true);
+    const scales = [...css.matchAll(/--breath-(?:small|large): ([\d.]+)/g)].map((match) => Number(match[1]));
+    expect(scales).toHaveLength(8);
+    expect(scales.every((scale) => scale >= .7 && scale <= 1.4)).toBe(true);
+    expect(css).toContain('animation: cloud-breathe');
+    expect(css).toContain('.cloud .particle, .cloud .core');
+    expect(component).not.toMatch(/Math\.random|setInterval|requestAnimationFrame/);
+    expect(css.slice(css.indexOf('@keyframes coral-orbit'))).not.toMatch(/(?:width|height|box-shadow|filter):/);
   });
 });

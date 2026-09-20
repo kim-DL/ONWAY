@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryStatusChangeSchema } from "@/domain/inventory";
 
 import {
   cycleIdSchema,
@@ -70,7 +71,9 @@ export const auditLogSchema = z
     schoolId: documentIdSchema.nullable(),
     cycleId: cycleIdSchema.nullable(),
     changedFields: z.array(z.string().trim().min(1).max(200)).max(100),
-    changeReason: nullableShortTextSchema.optional(),
+    changeReason: inventoryAuditReasonSchema.nullable().optional(),
+    inventoryStatusChange: inventoryStatusChangeSchema.optional(),
+    inventoryLotChange: inventoryLotChangeSchema.optional(),
     requestId: documentIdSchema.nullable(),
     appVersion: nullableShortTextSchema,
     createdAt: firestoreDateSchema,

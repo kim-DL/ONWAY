@@ -8,8 +8,8 @@ import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { FloatingContextBar } from "@/components/ui/floating-context-bar";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { SkeletonCard } from "@/components/ui/skeleton-card";
-import { SoftCard } from "@/components/ui/soft-card";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { SchoolTypeMark } from "@/components/school/school-type-mark";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import type {
@@ -19,23 +19,26 @@ import type {
 } from "@/domain/school";
 import type { SalesVisit } from "@/domain/sales";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
-import type { WorkMode } from "@/features/app-shell/shell-policy";
+import type { SchoolWorkMode } from "@/features/app-shell/shell-policy";
 import {
   INTEREST_META,
   interestHearts,
 } from "@/features/sales-visit/heart-interest-selector";
 import type { RecordedVisitSummary } from "@/features/sales-visit/sales-visit-sheet";
 import { APP_METADATA } from "@/lib/app-metadata";
+import { formatNullablePhoneNumber } from "@/lib/phone-number";
 import { schoolDetailRepository } from "./school-detail-repository";
 import { buildKakaoDirectionsUrl } from "./kakao-directions";
 import { useSchoolDetail } from "./use-school-detail";
+import { DeliveryFieldBrief, SchoolLocationBrief } from "./delivery-field-brief";
+import styles from "./delivery-field-brief.module.css";
 
 const SchoolPhotoGallery = dynamic(
   () => import("./school-photo-gallery").then((module) => module.SchoolPhotoGallery),
   {
     loading: () => (
-      <section className="school-photo-gallery school-photo-gallery--loading" role="status" aria-label="현장 사진 준비 중">
-        <div><span className="search-pulse" aria-hidden="true" /><strong>저장된 현장 사진을 준비하고 있어요.</strong></div>
+      <section className={styles.photoLoading} role="status" aria-label="현장 사진 준비 중">
+        <div><OnnuriLoader decorative /><strong>저장된 현장 사진을 준비하고 있어요.</strong></div>
       </section>
     ),
   },
@@ -62,22 +65,6 @@ const SalesVisitSheet = dynamic(
   },
 );
 
-const DISTRICT_LABELS: Record<School["district"], string> = {
-  dong: "동구",
-  jung: "중구",
-  seo: "서구",
-  yuseong: "유성구",
-  daedeok: "대덕구",
-};
-
-const SCHOOL_TYPE_LABELS: Record<School["schoolType"], string> = {
-  elementary: "초등학교",
-  middle: "중학교",
-  high: "고등학교",
-  special: "특수학교",
-  other: "기타",
-};
-
 const EMPTY_PROFILE = {
   contacts: { dietitianPhone: null, cafeteriaPhone: null },
   cafeteria: {
@@ -89,22 +76,21 @@ const EMPTY_PROFILE = {
   },
   inspection: { startTime: null, endTime: null, note: null },
   equipment: { cartRequired: "unknown", elevator: "unknown", stairsRequired: "unknown" },
-  vehicle: { access: "unknown", unloadingLocation: null, parking: "unknown", note: null },
   fieldNotes: null,
 } as const satisfies Pick<
   SchoolFieldProfile,
-  "contacts" | "cafeteria" | "inspection" | "equipment" | "vehicle" | "fieldNotes"
+  "contacts" | "cafeteria" | "inspection" | "equipment" | "fieldNotes"
 >;
 
-type EditorSection = "all" | "contacts" | "cafeteria" | "inspection" | "equipment" | "vehicle" | "fieldNotes";
+type EditorSection = "all" | "contacts" | "cafeteria" | "salesLocation" | "inspection" | "equipment" | "fieldNotes";
 
 const EDITOR_TITLES: Record<EditorSection, string> = {
   all: "현장정보 한 번에 입력",
   contacts: "학교 연락처 수정",
   cafeteria: "급식실 위치 수정",
+  salesLocation: "급식실 위치 수정",
   inspection: "검수시간 수정",
   equipment: "이동 장비 수정",
-  vehicle: "차량·하역 수정",
   fieldNotes: "현장 특이사항 수정",
 };
 
@@ -120,31 +106,16 @@ function phoneHref(value: string) {
   return `tel:${value.replace(/(?!^)\+|[^\d+]/gu, "")}`;
 }
 
-function requirementLabel(value: SchoolFieldProfile["equipment"]["cartRequired"]) {
-  return ({ required: "필요", notRequired: "불필요", unknown: "확인 안 됨" })[value];
-}
-
-function availabilityLabel(value: SchoolFieldProfile["equipment"]["elevator"]) {
-  return ({ available: "있음", unavailable: "없음", unknown: "확인 안 됨" })[value];
-}
-
-function accessLabel(value: SchoolFieldProfile["vehicle"]["access"]) {
-  return ({ available: "가능", limited: "제한적", unavailable: "불가", unknown: "확인 안 됨" })[value];
-}
-
-function display(value: string | null) {
-  return value ?? "확인 안 됨";
-}
-
 function profileSection(profile: SchoolFieldProfile | null, section: EditorSection) {
   const source = profile ?? EMPTY_PROFILE;
+  // Preserve cart/stair values when sales changes only the visible elevator.
+  if (section === "salesLocation") return { cafeteria: { ...source.cafeteria }, equipment: { ...source.equipment } } satisfies SchoolFieldProfilePatch;
   if (section === "all") {
     return {
       contacts: { ...source.contacts },
       cafeteria: { ...source.cafeteria },
       inspection: { ...source.inspection },
       equipment: { ...source.equipment },
-      vehicle: { ...source.vehicle },
       fieldNotes: source.fieldNotes,
     } satisfies SchoolFieldProfilePatch;
   }
@@ -177,15 +148,15 @@ function FieldProfileEditor({
     <form id={formId} className="field-editor" data-full={section === "all"} onSubmit={submit}>
       {(section === "all" || section === "contacts") && draft.contacts ? (
         <div className="field-form-grid field-form-grid--contacts">
-          {section === "all" ? <div className="field-editor-section-title"><span>01</span><div><strong>학교 연락처</strong><small>영양사 선생님과 급식실에 바로 연결되는 번호</small></div></div> : null}
-          <label><span>영양사 선생님 전화</span><input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={text(draft.contacts.dietitianPhone)} onChange={(event) => setDraft({ ...draft, contacts: { ...draft.contacts!, dietitianPhone: nullable(event.target.value) } })} placeholder="예: 010-1234-5678" /></label>
-          <label><span>급식실 전화</span><input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={text(draft.contacts.cafeteriaPhone)} onChange={(event) => setDraft({ ...draft, contacts: { ...draft.contacts!, cafeteriaPhone: nullable(event.target.value) } })} placeholder="예: 042-123-4567" /></label>
+          {section === "all" ? <div className="field-editor-section-title"><div><strong>학교 연락처</strong><small>영양사 선생님과 급식실에 바로 연결되는 번호</small></div></div> : null}
+          <label><span>영양사 선생님 전화</span><input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={text(draft.contacts.dietitianPhone)} onChange={(event) => setDraft({ ...draft, contacts: { ...draft.contacts!, dietitianPhone: nullable(event.target.value) } })} onBlur={() => setDraft((current) => ({ ...current, contacts: { ...current.contacts!, dietitianPhone: formatNullablePhoneNumber(current.contacts!.dietitianPhone) } }))} placeholder="예: 010-1234-5678" /></label>
+          <label><span>급식실 전화</span><input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} value={text(draft.contacts.cafeteriaPhone)} onChange={(event) => setDraft({ ...draft, contacts: { ...draft.contacts!, cafeteriaPhone: nullable(event.target.value) } })} onBlur={() => setDraft((current) => ({ ...current, contacts: { ...current.contacts!, cafeteriaPhone: formatNullablePhoneNumber(current.contacts!.cafeteriaPhone) } }))} placeholder="예: 042-123-4567" /></label>
         </div>
       ) : null}
 
-      {(section === "all" || section === "cafeteria") && draft.cafeteria ? (
+      {(section === "all" || section === "cafeteria" || section === "salesLocation") && draft.cafeteria ? (
         <div className="field-form-grid">
-          {section === "all" ? <div className="field-editor-section-title"><span>02</span><div><strong>급식실과 동선</strong><small>도착 후 바로 찾아갈 수 있는 위치 정보</small></div></div> : null}
+          {section === "all" ? <div className="field-editor-section-title"><div><strong>급식실과 동선</strong><small>도착 후 바로 찾아갈 수 있는 위치 정보</small></div></div> : null}
           <label><span>건물</span><input value={text(draft.cafeteria.building)} onChange={(event) => setDraft({ ...draft, cafeteria: { ...draft.cafeteria!, building: nullable(event.target.value) } })} placeholder="예: 본관" /></label>
           <label><span>층</span><input value={text(draft.cafeteria.floor)} onChange={(event) => setDraft({ ...draft, cafeteria: { ...draft.cafeteria!, floor: nullable(event.target.value) } })} placeholder="예: 1층" /></label>
           <label className="field-form-grid__wide"><span>급식실 위치</span><textarea value={text(draft.cafeteria.locationDescription)} onChange={(event) => setDraft({ ...draft, cafeteria: { ...draft.cafeteria!, locationDescription: nullable(event.target.value) } })} placeholder="정문에서 급식실까지 위치를 적어주세요." /></label>
@@ -196,35 +167,24 @@ function FieldProfileEditor({
 
       {(section === "all" || section === "inspection") && draft.inspection ? (
         <div className="field-form-grid">
-          {section === "all" ? <div className="field-editor-section-title"><span>03</span><div><strong>검수시간</strong><small>납품 일정과 혼잡 시간 안내</small></div></div> : null}
+          {section === "all" ? <div className="field-editor-section-title"><div><strong>검수시간</strong><small>납품 일정과 혼잡 시간 안내</small></div></div> : null}
           <label><span>검수 시작</span><input type="time" value={text(draft.inspection.startTime)} onChange={(event) => setDraft({ ...draft, inspection: { ...draft.inspection!, startTime: nullable(event.target.value) } })} /></label>
           <label><span>검수 종료</span><input type="time" value={text(draft.inspection.endTime)} onChange={(event) => setDraft({ ...draft, inspection: { ...draft.inspection!, endTime: nullable(event.target.value) } })} /></label>
           <label className="field-form-grid__wide"><span>추가 설명</span><textarea value={text(draft.inspection.note)} onChange={(event) => setDraft({ ...draft, inspection: { ...draft.inspection!, note: nullable(event.target.value) } })} placeholder="혼잡 시간이나 주의사항을 적어주세요." /></label>
         </div>
       ) : null}
 
-      {(section === "all" || section === "equipment") && draft.equipment ? (
+      {(section === "all" || section === "equipment" || section === "salesLocation") && draft.equipment ? (
         <div className="field-form-grid">
-          {section === "all" ? <div className="field-editor-section-title"><span>04</span><div><strong>이동 장비</strong><small>대차·엘리베이터·계단 사용 여부</small></div></div> : null}
-          <label><span>대차 필요</span><select value={draft.equipment.cartRequired} onChange={(event) => setDraft({ ...draft, equipment: { ...draft.equipment!, cartRequired: event.target.value as SchoolFieldProfile["equipment"]["cartRequired"] } })}><option value="required">필요</option><option value="notRequired">불필요</option><option value="unknown">확인 안 됨</option></select></label>
+          {section === "all" ? <div className="field-editor-section-title"><div><strong>이동 장비</strong><small>대차와 엘리베이터 사용 여부</small></div></div> : null}
+          {section !== "salesLocation" ? <label><span>대차 필요</span><select value={draft.equipment.cartRequired} onChange={(event) => setDraft({ ...draft, equipment: { ...draft.equipment!, cartRequired: event.target.value as SchoolFieldProfile["equipment"]["cartRequired"] } })}><option value="required">필요</option><option value="notRequired">불필요</option><option value="unknown">확인 안 됨</option></select></label> : null}
           <label><span>엘리베이터</span><select value={draft.equipment.elevator} onChange={(event) => setDraft({ ...draft, equipment: { ...draft.equipment!, elevator: event.target.value as SchoolFieldProfile["equipment"]["elevator"] } })}><option value="available">있음</option><option value="unavailable">없음</option><option value="unknown">확인 안 됨</option></select></label>
-          <label className="field-form-grid__wide"><span>계단 이동</span><select value={draft.equipment.stairsRequired} onChange={(event) => setDraft({ ...draft, equipment: { ...draft.equipment!, stairsRequired: event.target.value as SchoolFieldProfile["equipment"]["stairsRequired"] } })}><option value="required">필요</option><option value="notRequired">불필요</option><option value="unknown">확인 안 됨</option></select></label>
-        </div>
-      ) : null}
-
-      {(section === "all" || section === "vehicle") && draft.vehicle ? (
-        <div className="field-form-grid">
-          {section === "all" ? <div className="field-editor-section-title"><span>05</span><div><strong>차량과 하역</strong><small>진입·주차·하역 지점 정보</small></div></div> : null}
-          <label><span>차량 진입</span><select value={draft.vehicle.access} onChange={(event) => setDraft({ ...draft, vehicle: { ...draft.vehicle!, access: event.target.value as SchoolFieldProfile["vehicle"]["access"] } })}><option value="available">가능</option><option value="limited">제한적</option><option value="unavailable">불가</option><option value="unknown">확인 안 됨</option></select></label>
-          <label><span>주차</span><select value={draft.vehicle.parking} onChange={(event) => setDraft({ ...draft, vehicle: { ...draft.vehicle!, parking: event.target.value as SchoolFieldProfile["vehicle"]["parking"] } })}><option value="available">가능</option><option value="limited">제한적</option><option value="unavailable">불가</option><option value="unknown">확인 안 됨</option></select></label>
-          <label className="field-form-grid__wide"><span>하역 위치</span><textarea value={text(draft.vehicle.unloadingLocation)} onChange={(event) => setDraft({ ...draft, vehicle: { ...draft.vehicle!, unloadingLocation: nullable(event.target.value) } })} placeholder="차량을 세우고 하역할 위치를 적어주세요." /></label>
-          <label className="field-form-grid__wide"><span>차량 참고</span><textarea value={text(draft.vehicle.note)} onChange={(event) => setDraft({ ...draft, vehicle: { ...draft.vehicle!, note: nullable(event.target.value) } })} placeholder="진입 시간이나 회차 주의사항을 적어주세요." /></label>
         </div>
       ) : null}
 
       {section === "all" || section === "fieldNotes" ? (
         <div className="field-form-grid">
-          {section === "all" ? <div className="field-editor-section-title"><span>06</span><div><strong>공동 현장 메모</strong><small>다음 직원에게 꼭 필요한 주의사항</small></div></div> : null}
+          {section === "all" ? <div className="field-editor-section-title"><div><strong>공동 현장 메모</strong><small>다음 직원에게 꼭 필요한 주의사항</small></div></div> : null}
           <label className="field-form-grid__wide"><span>현장 특이사항</span><textarea value={text(draft.fieldNotes ?? null)} onChange={(event) => setDraft({ ...draft, fieldNotes: nullable(event.target.value) })} placeholder="다음 직원이 꼭 알아야 할 내용을 적어주세요." /></label>
         </div>
       ) : null}
@@ -234,54 +194,6 @@ function FieldProfileEditor({
         <GlassButton variant="primary" type="submit" form={formId} disabled={saving}>{saving ? "저장 중…" : "변경사항 저장"}</GlassButton>
       </BottomSheetActions>
     </form>
-  );
-}
-
-function FieldInfoContent({
-  profile,
-  onEdit,
-  canEdit,
-}: {
-  profile: SchoolFieldProfile;
-  onEdit: (section: EditorSection) => void;
-  canEdit: boolean;
-}) {
-  const location = [profile.cafeteria.building, profile.cafeteria.floor, profile.cafeteria.locationDescription]
-    .filter(Boolean)
-    .join(" · ");
-  const inspection = profile.inspection.startTime && profile.inspection.endTime
-    ? `${profile.inspection.startTime} ~ ${profile.inspection.endTime}`
-    : profile.inspection.startTime ?? profile.inspection.endTime ?? "확인 안 됨";
-
-  return (
-    <>
-      <section className="field-priority" aria-label="현장 핵심 요약">
-        <div><span><Icon name="clock" />검수시간</span><strong>{inspection}</strong><small>{profile.inspection.note ?? "추가 안내 없음"}</small></div>
-        <div><span><Icon name="clipboard" />대차</span><strong>{requirementLabel(profile.equipment.cartRequired)}</strong><small>계단 이동 {requirementLabel(profile.equipment.stairsRequired)}</small></div>
-        <div><span><Icon name="building" />엘리베이터</span><strong>{availabilityLabel(profile.equipment.elevator)}</strong><small>공동 현장정보</small></div>
-        <div><span><Icon name="location" />급식실</span><strong>{location || "확인 안 됨"}</strong><small>{profile.cafeteria.entranceDescription ?? "출입구 확인 필요"}</small></div>
-      </section>
-
-      <div className="field-section-grid">
-        <SoftCard className="field-section">
-          <div className="field-section__heading"><div><span>01 · LOCATION</span><h2>급식실과 동선</h2></div>{canEdit ? <button type="button" onClick={() => onEdit("cafeteria")}>수정</button> : null}</div>
-          <dl><div><dt>출입구</dt><dd>{display(profile.cafeteria.entranceDescription)}</dd></div><div><dt>이동 동선</dt><dd>{display(profile.cafeteria.routeDescription)}</dd></div></dl>
-        </SoftCard>
-        <SoftCard className="field-section">
-          <div className="field-section__heading"><div><span>02 · EQUIPMENT</span><h2>계단과 엘리베이터</h2></div>{canEdit ? <button type="button" onClick={() => onEdit("equipment")}>수정</button> : null}</div>
-          <dl><div><dt>엘리베이터</dt><dd>{availabilityLabel(profile.equipment.elevator)}</dd></div><div><dt>계단 이동</dt><dd>{requirementLabel(profile.equipment.stairsRequired)}</dd></div></dl>
-        </SoftCard>
-        <SoftCard className="field-section">
-          <div className="field-section__heading"><div><span>03 · VEHICLE</span><h2>차량과 하역</h2></div>{canEdit ? <button type="button" onClick={() => onEdit("vehicle")}>수정</button> : null}</div>
-          <dl><div><dt>차량 진입</dt><dd>{accessLabel(profile.vehicle.access)}</dd></div><div><dt>하역 위치</dt><dd>{display(profile.vehicle.unloadingLocation)}</dd></div><div><dt>주차</dt><dd>{accessLabel(profile.vehicle.parking)}</dd></div><div><dt>차량 참고</dt><dd>{display(profile.vehicle.note)}</dd></div></dl>
-        </SoftCard>
-        <SoftCard className="field-section field-section--notes">
-          <div className="field-section__heading"><div><span>04 · FIELD NOTE</span><h2>현장 특이사항</h2></div>{canEdit ? <button type="button" onClick={() => onEdit("fieldNotes")}>수정</button> : null}</div>
-          <p>{display(profile.fieldNotes)}</p>
-        </SoftCard>
-      </div>
-      {canEdit ? <button className="inspection-edit-link" type="button" onClick={() => onEdit("inspection")}><Icon name="clock" />검수시간 상세 수정<Icon name="chevron-right" /></button> : null}
-    </>
   );
 }
 
@@ -396,7 +308,7 @@ export function SchoolDetail({
 }: {
   school: School;
   session: AuthenticatedSession;
-  mode: WorkMode;
+  mode: SchoolWorkMode;
 }) {
   const { showToast } = useToast();
   const detailState = useSchoolDetail(initialSchool, session, mode);
@@ -498,17 +410,13 @@ export function SchoolDetail({
         : null;
 
   return (
-    <section className="shell-page school-detail" aria-labelledby="school-detail-title">
-      <div className="detail-hero">
-        <div className="detail-hero__mark"><Icon name="building" size={30} /></div>
+    <section className={`shell-page school-detail ${mode === "delivery" ? styles.page : ""}`} aria-labelledby="school-detail-title">
+      <div className={mode === "delivery" ? styles.hero : "detail-hero"}>
+        <SchoolTypeMark schoolType={school.schoolType} className={mode === "delivery" ? (styles.schoolMark ?? "") : ""} />
         <div>
-          <div className="detail-hero__status">
-            {mode === "delivery" ? <StatusBadge tone={profile && !profile.reviewRequired ? "success" : "attention"}>{profile ? `현장정보 ${profile.completeness}%` : "현장정보 미등록"}</StatusBadge> : <StatusBadge tone="info">영업 학교</StatusBadge>}
-            {detailState.status === "ready" && detailState.refreshing ? <StatusBadge>최신 정보 확인 중</StatusBadge> : null}
-          </div>
           <h1 id="school-detail-title">{school.name}</h1>
-          <p><Icon name="location" size={17} />{address ?? "주소 정보 확인 필요"}</p>
-          <small>{DISTRICT_LABELS[school.district]} · {SCHOOL_TYPE_LABELS[school.schoolType]}</small>
+          <p><Icon name="location" size={16} />{address ?? "주소 정보 확인 필요"}</p>
+          {detailState.status === "ready" && detailState.refreshing ? <StatusBadge>최신 정보 확인 중</StatusBadge> : null}
         </div>
       </div>
 
@@ -536,18 +444,18 @@ export function SchoolDetail({
         />
       ) : null}
 
-      {mode === "delivery" ? <section className="field-workspace" aria-labelledby="field-workspace-title">
-        <div className="field-workspace__heading"><div><p>{mode === "delivery" ? "DELIVERY FIELD BRIEF" : "SHARED FIELD BRIEF"}</p><h2 id="field-workspace-title">도착 전에, 필요한 것만.</h2></div><div className="field-workspace__actions">{profile ? <StatusBadge tone={profile.reviewRequired ? "attention" : "success"}>{profile.reviewRequired ? "보완 필요" : "현장 준비 완료"}</StatusBadge> : null}{profile && canEdit ? <button type="button" onClick={() => openFieldEditor("all")}><Icon name="clipboard" size={16} />전체 편집</button> : null}</div></div>
+      {mode === "delivery" ? (
+        profile ? <DeliveryFieldBrief profile={profile} schoolPhone={school.phone} canEdit={canEdit} onEdit={() => openFieldEditor("all")} /> :
+        <section className={styles.state} aria-labelledby="field-workspace-title" role={detailState.status === "error" ? "alert" : undefined}>
+          <h2 id="field-workspace-title">납품 현장정보</h2>
+          {detailState.status === "loading" ? <div role="status"><OnnuriLoader label="현장정보를 불러오는 중" /></div> :
+            detailState.status === "error" ? <><p>현장정보를 불러오지 못했어요. 인터넷 연결을 확인해주세요.</p><GlassButton compact onClick={detailState.refresh}>다시 불러오기</GlassButton></> :
+              <><p>검수시간과 급식실 위치를 아직 등록하지 않았어요.</p>{canEdit ? <GlassButton compact onClick={() => openFieldEditor("all")}>현장정보 등록</GlassButton> : null}</>}
+          {school.phone ? <a href={phoneHref(school.phone)}>학교 대표 전화 · {school.phone}</a> : null}
+        </section>
+      ) : null}
 
-        {detailState.status === "loading" ? <div className="field-loading"><SkeletonCard /><SkeletonCard /></div> : null}
-        {detailState.status === "error" ? (
-          <SoftCard className="field-empty-state" role="alert"><span><Icon name="building" /></span><h2>현장정보를 불러오지 못했어요.</h2><p>처음 보는 학교는 온라인 연결이 필요합니다.</p><GlassButton compact onClick={detailState.refresh}>다시 불러오기</GlassButton></SoftCard>
-        ) : null}
-        {detailState.status === "ready" && !profile ? (
-          <SoftCard className="field-empty-state"><span><Icon name="sparkles" /></span><h2>아직 현장정보가 없습니다.</h2><p>검수시간, 대차, 엘리베이터, 급식실 동선과 하역 위치를 한 번에 남겨 공동자산으로 만드세요.</p>{canEdit ? <GlassButton variant="primary" onClick={() => openFieldEditor("all")}>전체 현장정보 등록</GlassButton> : null}</SoftCard>
-        ) : null}
-        {profile ? <FieldInfoContent profile={profile} onEdit={openFieldEditor} canEdit={canEdit} /> : null}
-      </section> : null}
+      {mode === "sales" && detailState.status === "ready" ? <SchoolLocationBrief profile={profile} canEdit={canEdit} onEdit={() => openFieldEditor("salesLocation")} /> : null}
 
       {detailState.status === "ready" ? (
         <SchoolPhotoGallery
@@ -558,8 +466,8 @@ export function SchoolDetail({
           onRefresh={detailState.refresh}
         />
       ) : (
-        <section className="school-photo-gallery school-photo-gallery--loading" role="status" aria-label="현장 사진 정보 불러오는 중">
-          <div><span className="search-pulse" aria-hidden="true" /><strong>현장 사진 정보를 확인하고 있어요.</strong></div>
+        <section className={styles.photoLoading} role="status" aria-label="현장 사진 정보 불러오는 중">
+          <div><OnnuriLoader decorative /><strong>현장 사진 정보를 확인하고 있어요.</strong></div>
         </section>
       )}
 
@@ -577,10 +485,6 @@ export function SchoolDetail({
         />
       ) : null}
 
-      {mode === "delivery" ? <SoftCard className="detail-information">
-        <div className="detail-card-heading"><div><p className="shell-kicker">SCHOOL INFO</p><h2>학교 기본 정보</h2></div><StatusBadge>{SCHOOL_TYPE_LABELS[school.schoolType]}</StatusBadge></div>
-        <dl><div><dt>지역</dt><dd>대전광역시 {DISTRICT_LABELS[school.district]}</dd></div><div><dt>대표 전화</dt><dd>{school.phone ?? "확인 필요"}</dd></div><div><dt>학교 코드</dt><dd>{school.source.schoolCode}</dd></div></dl>
-      </SoftCard> : null}
 
       <FloatingContextBar label="학교 빠른 작업">
         <a href={directionsUrl} target="_blank" rel="noreferrer"><Icon name="route" /><span>길안내</span></a>

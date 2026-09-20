@@ -13,12 +13,14 @@
 }
 
 .header .controls {
-  flex: 1 1 240px;
+  flex: 1 1 280px;
   min-width: 0;
-  max-width: 240px;
+  max-width: 320px;
   justify-content: flex-end;
   margin-left: auto;
 }
+
+.header[data-mode-count="4"] .controls { max-width: 380px; }
 
 .modeFrame {
   position: relative;
@@ -42,15 +44,20 @@
 
 .modeFrame::before {
   inset: -240%;
-  /* Two brand families, separated by a pearl highlight, not a rainbow. */
+  /* Blue and jade meet through aqua on both sides of the closed orbit.
+     Matching endpoints avoid a seam as the highlight completes each turn. */
   background: conic-gradient(
-    #bfd9fa 0deg,
-    #3182f6 65deg,
-    #1b64da 110deg,
-    #e8f3ff 165deg,
-    #269653 240deg,
-    #62bd8b 285deg,
-    #bfd9fa 360deg
+    from 18deg,
+    #83b5ee 0deg,
+    #4d93e5 48deg,
+    #67b3d5 96deg,
+    #86c7c5 140deg,
+    #66bca6 184deg,
+    #49a48c 225deg,
+    #8fcdb9 268deg,
+    #c6e6e3 306deg,
+    #a1cdea 338deg,
+    #83b5ee 360deg
   );
 }
 
@@ -60,10 +67,9 @@
   background: #f2f4f6;
 }
 
-.header .modeFrame .modeControl {
+.modeControl {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 3px;
   width: 100%;
   padding: 3px;
@@ -73,10 +79,10 @@
   box-shadow: none;
 }
 
-.header .modeFrame .modeControl .modeButton {
+.modeButton {
   min-width: 44px;
   min-height: 44px;
-  padding: 9px 12px;
+  padding: 9px 6px;
   border: 0;
   border-radius: 11px;
   background: transparent;
@@ -90,20 +96,20 @@
   transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
 }
 
-.header .modeFrame .modeControl .modeButton[aria-pressed="true"] {
+.modeButton[aria-pressed="true"] {
   background: #fff;
-  color: #1b64da;
+  color: var(--mode-delivery-text);
   box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #3182f6;
 }
 
-.header .modeFrame .modeControl .modeButton[data-mode="sales"][aria-pressed="true"] {
-  color: #247647;
+.modeButton[data-mode="customer"][aria-pressed="true"] {
+  color: var(--mode-customer-text);
   box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #269653;
 }
 
-.header .modeFrame .modeControl .modeButton:focus-visible {
-  outline: 2px solid #1b64da;
-  outline-offset: -3px;
+.modeButton[data-mode="sales"][aria-pressed="true"] {
+  color: var(--mode-sales-text);
+  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #FAAA9D;
 }
 
 .header .singleMode {
@@ -116,43 +122,205 @@
 }
 
 .header .singleMode i { background: #3182f6; }
-.header .singleMode[data-mode="sales"] i { background: #269653; }
+.header .singleMode[data-mode="customer"] i { background: #269653; }
+.header .singleMode[data-mode="sales"] i { background: #FAAA9D; }
+
+.compactFrame { display: none; }
+
+.modeTrigger,
+.pickerOption {
+  --option-ink: var(--mode-delivery-text);
+  --option-tint: #edf4fd;
+  --option-line: #3182f6;
+}
+
+.modeTrigger[data-mode="customer"],
+.pickerOption[data-mode="customer"] {
+  --option-ink: var(--mode-customer-text);
+  --option-tint: #edf6f0;
+  --option-line: #269653;
+}
+
+.modeTrigger[data-mode="sales"],
+.pickerOption[data-mode="sales"] {
+  --option-ink: var(--mode-sales-text);
+  --option-tint: #fff2ed;
+  --option-line: #faaa9d;
+}
+
+.header .modeTrigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 11px 7px 8px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--option-ink);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: inset 0 -2px 0 var(--option-line);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.triggerIcon {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  flex: none;
+  border-radius: 9px;
+  background: var(--option-tint);
+}
+
+.triggerChevron { flex: none; transform: rotate(90deg); color: #687583; }
+.modeTrigger[aria-expanded="true"] .triggerChevron { transform: rotate(-90deg); }
+.triggerCopy { display: grid; gap: 1px; text-align: left; }
+.triggerCopy small { color: #687583; font-size: 10px; font-weight: 650; line-height: 1.35; }
+.currentLabel { display: block; }
+
+.modeButton:focus-visible,
+.header .modeTrigger:focus-visible,
+.pickerOption:focus-visible {
+  outline: 2px solid #1b64da;
+  outline-offset: -3px;
+}
+
+.pickerList { display: grid; gap: 9px; }
+
+.pickerList .pickerOption {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 78px;
+  padding: 13px 15px;
+  border: 1px solid #e1e7ed;
+  border-radius: 13px;
+  background: #fff;
+  color: #263342;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.pickerList .pickerOption[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--option-line) 55%, #e1e7ed);
+  background: color-mix(in srgb, var(--option-tint) 62%, white);
+  box-shadow: inset 3px 0 0 var(--option-line);
+}
+
+.optionIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 41px;
+  height: 41px;
+  border: 1px solid color-mix(in srgb, var(--option-line) 12%, transparent);
+  border-radius: 12px;
+  background: var(--option-tint);
+  color: var(--option-ink);
+}
+
+.optionCopy { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.optionCopy strong { color: #263342; font-size: 16px; font-weight: 750; line-height: 1.35; }
+.optionCopy > span { color: #626f7c; font-size: 12px; line-height: 1.4; }
+.currentMarker { display: inline-flex; align-items: center; gap: 3px; flex: none; color: #426457; font-size: 11px; font-weight: 700; }
+.optionChevron { flex: none; color: #7b8895; }
+.pickerOption:disabled { cursor: wait; }
+
+/* Keep the brand and the current mode on one line. The complete, comfortably
+   sized choice list is disclosed instead of shrinking four labels to fit. */
+@media (max-width: 900px) {
+  .header .controls,
+  .header[data-mode-count="4"] .controls { flex: 0 1 auto; width: auto; max-width: 200px; }
+  .segmentedFrame { display: none; }
+  .compactFrame { display: block; }
+}
 
 @media (max-width: 760px) {
-  .header .controls { max-width: 220px; }
+  .header:has(:global(.app-brand--signature)) .controls { flex-shrink: 1; }
+  .header { column-gap: 8px; }
+}
+
+@media (max-width: 359px) {
+  .header :global(.workspace-header__back) { padding-inline: 8px; gap: 4px; font-size: 12px; }
+  .header :global(.workspace-header__back) svg { width: 16px; height: 16px; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .modeFrame::before { animation: mode-border-orbit 8s linear infinite; }
-  .modeFrame[data-motion="paused"]::before,
-  .modeFrame:focus-within::before { animation-play-state: paused; }
+  .triggerChevron { transition: transform 220ms cubic-bezier(.2, .8, .2, 1); }
+  .header .modeTrigger { transition: transform 160ms ease, background-color 160ms ease; }
+  .header .modeTrigger:active { transform: scale(.98); }
+  .currentLabel { animation: current-mode-arrive 200ms ease-out; }
+  .pickerOption { animation: mode-option-arrive 280ms cubic-bezier(.2, .8, .2, 1) both; }
+  .pickerOption:nth-child(2) { animation-delay: 35ms; }
+  .pickerOption:nth-child(3) { animation-delay: 70ms; }
+  .pickerOption:nth-child(4) { animation-delay: 105ms; }
+  .pickerList .pickerOption:active { transform: scale(.99); }
+  /* Focus remains on a mode button after a tap. Only an explicit preference or
+     hidden page pauses this decoration; focus/hover must not freeze the loop. */
+  .modeFrame[data-motion="paused"]::before { animation-play-state: paused; }
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .modeFrame:hover::before { animation-play-state: paused; }
-  .header .modeFrame .modeControl .modeButton[aria-pressed="false"]:hover { background: #e7ecf1; }
+  .modeButton[aria-pressed="false"]:hover { background: #e7ecf1; }
+  .header .modeTrigger:hover,
+  .pickerList .pickerOption:hover { background: var(--option-tint); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .modeFrame::before { animation: none; }
-  .header .modeFrame .modeControl .modeButton { transition: none; }
+  .modeButton,
+  .header .modeTrigger,
+  .pickerList .pickerOption { transition: none; }
 }
 
 @media (forced-colors: active) {
   .modeFrame { border: 1px solid ButtonText; }
   .modeFrame::before,
   .modeFrame::after { display: none; animation: none; }
-  .header .modeFrame .modeControl .modeButton { color: ButtonText; }
-  .header .modeFrame .modeControl .modeButton[aria-pressed="true"],
-  .header .modeFrame .modeControl .modeButton[data-mode="sales"][aria-pressed="true"] {
+  .modeButton { color: ButtonText; }
+  .modeButton[aria-pressed="true"],
+  .modeButton[data-mode="customer"][aria-pressed="true"],
+  .modeButton[data-mode="sales"][aria-pressed="true"] {
     color: HighlightText;
     background: Highlight;
     forced-color-adjust: none;
     box-shadow: none;
   }
-  .header .modeFrame .modeControl .modeButton:focus-visible { outline-color: ButtonText; }
+  .modeButton:focus-visible { outline-color: ButtonText; }
+  .header .modeTrigger,
+  .pickerList .pickerOption { color: ButtonText; background: ButtonFace; border: 1px solid ButtonText; box-shadow: none; }
+  .pickerList .pickerOption[aria-pressed="true"] { border: 2px solid Highlight; box-shadow: none; }
+  .triggerIcon,
+  .optionIcon,
+  .currentMarker,
+  .optionCopy strong,
+  .optionCopy > span,
+  .triggerCopy small,
+  .triggerChevron,
+  .optionChevron { color: ButtonText; }
 }
 
 @keyframes mode-border-orbit {
   to { transform: rotate(360deg); }
+}
+
+@keyframes current-mode-arrive {
+  from { opacity: .35; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mode-option-arrive {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
 }

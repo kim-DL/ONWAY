@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 
 import { AppIconMark } from "@/components/ui/app-icon-mark";
+import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 
 function ApplicationBootFallback() {
   return (
@@ -13,7 +14,7 @@ function ApplicationBootFallback() {
           <span className="auth-brand__mark" aria-hidden="true"><AppIconMark /></span>
           <span><strong>급식길</strong><small>온누리종합식품</small></span>
         </div>
-        <span className="auth-spinner" aria-hidden="true" />
+        <OnnuriLoader size="large" decorative />
         <p>현장 앱을 빠르게 준비하고 있어요.</p>
       </div>
     </main>

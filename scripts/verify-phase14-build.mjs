@@ -6,7 +6,7 @@ const serviceWorkerPath = join(projectRoot, "public", "sw.js");
 const serviceWorker = await readFile(serviceWorkerPath, "utf8");
 
 for (const required of [
-  "phase31",
+  "phase35",
   "app-shell-",
   "public-assets-",
   "school-thumbnails-",
@@ -26,6 +26,9 @@ for (const forbidden of [
   "googleapis",
   "employeeLogin",
   "exportCsv",
+  "listCustomers",
+  "saveCustomer",
+  "dapi.kakao.com",
   "bloub-welcome",
 ]) {
   if (serviceWorker.toLowerCase().includes(forbidden.toLowerCase())) {
