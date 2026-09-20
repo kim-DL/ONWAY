@@ -7,12 +7,16 @@ import { defaultInventorySettings, inventoryCycle, inventoryToday, nextInventory
 import {
   INVENTORY_COMPANY_ID, INVENTORY_CYCLE_PATH, INVENTORY_LOCATIONS, INVENTORY_MAX_LOTS,
   INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryEventSchema, inventoryInitialStockSchema, inventoryLocationMap, inventoryLotSchema,
-  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryMutationResultSchema, inventoryProductSchema, inventoryQuantitySchema, inventorySettingsSchema, inventoryStatusChangeSchema,
+  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryMutationResultSchema, inventoryQuantitySchema, inventorySettingsSchema, inventoryStatusChangeSchema,
   type DeleteInventoryProductInput, type InventoryCountInput, type InventoryEvent, type InventoryLocation,
   type InventoryLot, type InventoryLotChange, type InventoryMovementInput, type InventoryMutationResult, type InventoryProduct, type InventoryStatusChange,
-  type InventorySettings, type SaveInventoryProductInput, type SetInventoryProductStatusInput,
+  type InventorySettings, type SetInventoryProductStatusInput,
   type UpdateInventoryLotInput, type UpdateInventorySettingsInput,
 } from "./inventory-contract.js";
+import {
+  INVENTORY_MANUFACTURER_PATH, inventoryManufacturerSchema, inventoryProductWithManufacturerSchema,
+  type SaveInventoryProductWithManufacturerInput,
+} from "./inventory-manufacturer-contract.js";
 import { resolveInventoryPhotoChange } from "./inventory-photo-store.js";
 import { inventoryProductRecord, inventoryProductWire, summarizeInventoryLotGroups,
   type InventoryLotChecks, type InventoryProductRecord } from "./inventory-stock-summary.js";
@@ -88,12 +92,12 @@ export class InventoryService {
     return inventoryProductWire(product);
   }
   private async mutation<T>(operation: string,
-    input: { requestId: string; includeDetail?: boolean | undefined; refreshOnReplay?: boolean | undefined; includeSummary?: boolean | undefined },
+    input: { requestId: string; includeDetail?: boolean | undefined; refreshOnReplay?: boolean | undefined; includeSummary?: boolean | undefined; includeManufacturerReference?: boolean | undefined },
     actor: InventoryActor, access: InventoryAccess, action: (transaction: Transaction, now: Date) => Promise<T>,
     replay?: (transaction: Transaction) => Promise<T>): Promise<T> {
     // Response expansion is not part of a stock command's identity. A delayed
     // request made by an older client remains the same command after an update.
-    const command = Object.fromEntries(Object.entries(input).filter(([key]) => !["includeDetail", "refreshOnReplay", "includeSummary"].includes(key)));
+    const command = Object.fromEntries(Object.entries(input).filter(([key]) => !["includeDetail", "refreshOnReplay", "includeSummary", "includeManufacturerReference"].includes(key)));
     const fingerprint = createHash("sha256").update(JSON.stringify(command)).digest("hex");
     const receiptRef = this.db.doc(`${REQUEST_PATH}/${input.requestId}`);
     return this.db.runTransaction(async (transaction) => {
@@ -159,7 +163,7 @@ export class InventoryService {
       return { product: { ...inventoryProductWire(product), lotSummary: summarizeInventoryLotGroups(lots) }, lots };
     });
   }
-  async save(input: SaveInventoryProductInput, actor: InventoryActor): Promise<InventoryProduct> {
+  async save(input: SaveInventoryProductWithManufacturerInput, actor: InventoryActor): Promise<InventoryProduct> {
     return this.mutation("saveInventoryProduct", input, actor, "write", async (transaction, now) => {
       const productId = input.productId ?? input.requestId;
       const snapshot = await transaction.get(this.productRef(productId));
@@ -178,8 +182,22 @@ export class InventoryService {
       if (current?.hasHistory && unitChanged) {
         throw new HttpsError("failed-precondition", "이력이 있는 상품은 재고 단위를 바꿀 수 없습니다. 규격이 달라졌다면 새 상품으로 등록해주세요.", { reason: "inventory-unit-locked" });
       }
+      const manufacturerId = input.draft.manufacturerId ?? current?.manufacturerId;
+      let draft = input.draft;
+      if (manufacturerId) {
+        const manufacturerSnapshot = await transaction.get(this.db.doc(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`));
+        if (!manufacturerSnapshot.exists) throw new HttpsError("failed-precondition", "선택한 제조사를 찾을 수 없습니다.", { reason: "inventory-manufacturer-missing" });
+        const data = manufacturerSnapshot.data()!;
+        const date = (value: unknown) => value instanceof Timestamp ? value.toDate().toISOString() : value;
+        const manufacturer = inventoryManufacturerSchema.parse({ ...data, createdAt: date(data.createdAt), updatedAt: date(data.updatedAt) });
+        const newlyLinked = current?.manufacturerId !== manufacturerId;
+        if (newlyLinked && !manufacturer.active) {
+          throw new HttpsError("failed-precondition", "비활성 제조사는 새 상품에 연결할 수 없습니다.", { reason: "inventory-manufacturer-inactive" });
+        }
+        draft = { ...input.draft, manufacturerId, manufacturer: newlyLinked ? manufacturer.name : current!.manufacturer };
+      }
       const photo = await resolveInventoryPhotoChange(this.db, transaction, input, current, actor, Timestamp.fromDate(now));
-      const updated = inventoryProductSchema.parse({ ...input.draft,
+      const updated = inventoryProductWithManufacturerSchema.parse({ ...draft,
         productId, companyId: INVENTORY_COMPANY_ID, status: current?.status ?? "active", revision: (current?.revision ?? 0) + 1,
         // A first-receipt form may already have converted boxes using the old
         // unit definition. Invalidate that stock snapshot when units change.
@@ -190,7 +208,7 @@ export class InventoryService {
         ...(current?.lotSummary ? { lotSummary: current.lotSummary } : !current ? { lotSummary: summarizeInventoryLotGroups([]) } : {}),
         createdAt: current?.createdAt ?? now.toISOString(), updatedAt: now.toISOString(),
         createdBy: current?.createdBy ?? actor.employeeId, updatedBy: actor.employeeId });
-      const changedFields = [...Object.keys(input.draft), ...(input.photoChange ? ["photo"] : [])];
+      const changedFields = [...Object.keys(draft), ...(input.photoChange ? ["photo"] : [])];
       if (input.initialStock) {
         const locationId = input.draft.defaultLocationId;
         const lot = inventoryLotSchema.parse({ ...input.initialStock.lot,
@@ -253,7 +271,7 @@ export class InventoryService {
     // confirmation map does not accumulate one entry per historical batch.
     const positiveIds = new Set(lots.filter((lot) => lot.quantity > 0).map((lot) => lot.lotId));
     for (const id of Object.keys(inspectionByLot)) if (!positiveIds.has(id)) delete inspectionByLot[id];
-    const next = inventoryProductSchema.parse({ ...inventoryProductWire(product), ...summarizeInventoryLots(lots), stockRevision,
+    const next = inventoryProductWithManufacturerSchema.parse({ ...inventoryProductWire(product), ...summarizeInventoryLots(lots), stockRevision,
       lotSummary: summarizeInventoryLotGroups(lots),
       hasHistory: true, updatedAt: now.toISOString(), updatedBy: actor.employeeId,
       lastCountByLocation });
@@ -401,7 +419,7 @@ export class InventoryService {
       // lots, history and the private photo reference on the tombstone. Deleted
       // products/photos are hidden by their read APIs; no zeroing or file expiry
       // may silently erase the evidence needed to audit this employee action.
-      const next = inventoryProductSchema.parse({ ...inventoryProductWire(product), status,
+      const next = inventoryProductWithManufacturerSchema.parse({ ...inventoryProductWire(product), status,
         revision: product.revision + 1, updatedAt: now.toISOString(), updatedBy: actor.employeeId });
       transaction.set(this.productRef(input.productId), persisted({ ...next, ...(product.inspectionByLot ? { inspectionByLot: product.inspectionByLot } : {}) }));
       this.audit(transaction, input, actor, now, deleted ? "INVENTORY_PRODUCT_DELETED" : "INVENTORY_PRODUCT_STATUS_CHANGED", input.productId, ["status"], input.reason,

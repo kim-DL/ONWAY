@@ -334,6 +334,14 @@ Functions는 전체 무차별 배포를 피하고 변경된 Callable 목록과 �
 - 기존 last-success 60초 TTL과 인증 namespace별 Memory-only 경계는 유지한다. 8명 동시 사용의 실제 read 비용은 아직 미측정이다.
 - 현 시점에서는 inventory detail cache나 제한적 JS prefetch를 추가할 필요성이 확인되지 않았다. **P2 완료 — checkpoint/운영 배포/실기기 체감 검증 완료**
 
+### 2026-09-21 재고 제조사 Master M1 — 완료/미배포
+
+- `companies/onnuri/inventoryManufacturers/{manufacturerId}`에 `manufacturerId`, `name`, `normalizedName`, `active`, `revision`, `createdAt`, `createdBy`, `updatedAt`만 저장한다. NFC·trim·공백 정리 뒤 기존 거래처명 규칙과 같은 소문자/문장부호/공백 제거로 exact normalized name을 만들고, SHA-256 결정적 ID의 `companies/onnuri/inventoryManufacturerNames/{hash}` reservation을 같은 transaction에서 점유해 동시 중복 생성을 차단한다. fuzzy 자동 차단·병합과 hard delete는 없다.
+- `listInventoryManufacturers`는 최대 500개 master를 bounded read한 뒤 active만 반환한다. `createInventoryManufacturer`는 delivery/sales/admin, `updateInventoryManufacturer`의 rename/deactivate는 admin만 허용하며 모든 mutation은 기존 active employee/session/permission transaction 재검증, 영구 request receipt/idempotency, revision conflict, append-only audit를 사용한다. viewer는 read-only다. 기존 default-deny Rules가 master와 reservation의 client read/write를 모두 막으며 새 Rules·복합 index는 추가하지 않았다.
+- 상품의 기존 `manufacturer` string은 legacy fallback이자 선택 시점 canonical name snapshot으로 유지하고 `manufacturerId`만 optional로 저장한다. 신규/변경 연결은 active master를 요구하고 canonical name을 snapshot하며, 비활성화된 기존 연결은 ID와 snapshot을 보존한 채 다른 상품 수정/표시가 가능하다. rename/deactivate는 기존 상품을 rewrite하지 않으며 legacy string-only 상품도 그대로 동작한다. migration/backfill은 없다.
+- 구형 strict client 보호를 위해 서버 전용 확장 Zod contract와 `includeManufacturerReference` opt-in을 사용한다. opt-in하지 않은 기존 list/detail/mutation 응답에서는 `manufacturerId`를 재귀적으로 제거하고 기존 `includeSummary`와 독립적으로 처리한다. 현재 frontend repository/form은 opt-in하지 않으며 제조사 picker·검색·최근 사용 UI는 M2로 남겼다.
+- PASS: inventory gate 374/374, 전체 unit 1,425/1,439(14 skip), production inventory E2E 10/10, 격리 Emulator transaction/Rules 11/11, 전체 Rules 41/41, app/Functions typecheck, lint, Functions build, production static build, PWA/performance/Hosting gate, `git diff --check`. frontend 코드를 추가하지 않아 inventory lazy JS gzip 25,595B/25KiB와 inventory CSS raw 29,184B 예산 수치는 그대로다. deploy, commit/push, 운영 데이터 접근은 실행하지 않았다. **M2 dynamic picker 진행 가능**이다.
+
 ### P3 — 디자인 디테일
 
 1. 실기기에서 재고 카드 밀도, 토글/checkbox alignment, 사진 확대 affordance와 고정 action의 safe-area/키보드 겹침을 점검한다.

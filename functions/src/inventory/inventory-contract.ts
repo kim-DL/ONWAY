@@ -186,8 +186,12 @@ export const getInventoryPhotoInputSchema = z.object({ productId: inventoryIdSch
 export const inventoryPhotoDownloadSchema = z.object({ contentType: z.literal("image/webp"), byteSize: z.number().int().positive().max(INVENTORY_PHOTO_MAX_BYTES), fileBase64: z.string().min(4).max(Math.ceil(INVENTORY_PHOTO_MAX_BYTES * 4 / 3) + 8) }).strict();
 
 export type InventoryLocation = z.infer<typeof inventoryLocationSchema>;
-export type InventoryProductDraft = z.infer<typeof inventoryProductDraftSchema>;
-export type InventoryProduct = z.infer<typeof inventoryProductSchema>;
+// The current browser runtime keeps validating the legacy strict schemas above.
+// M1 server contracts may add this optional reference while preserving the
+// manufacturer snapshot and stripping the reference for clients that do not
+// explicitly opt in.
+export type InventoryProductDraft = z.infer<typeof inventoryProductDraftSchema> & { manufacturerId?: string | undefined };
+export type InventoryProduct = z.infer<typeof inventoryProductSchema> & { manufacturerId?: string | undefined };
 export type InventoryLotSummary = z.infer<typeof inventoryLotSummarySchema>;
 export type InventoryStatusChange = z.infer<typeof inventoryStatusChangeSchema>;
 export type InventoryLotChange = z.infer<typeof inventoryLotChangeSchema>;
@@ -196,8 +200,10 @@ export type InventoryLotDraft = z.infer<typeof inventoryLotDraftSchema>;
 export type InventorySettings = z.infer<typeof inventorySettingsSchema>;
 export type InventoryCycle = z.infer<typeof inventoryCycleSchema>;
 export type InventoryContext = z.infer<typeof inventoryContextSchema>;
-export type InventoryProductDetail = z.infer<typeof inventoryProductDetailSchema>;
-export type SaveInventoryProductInput = z.infer<typeof saveInventoryProductInputSchema>;
+export type InventoryProductDetail = Omit<z.infer<typeof inventoryProductDetailSchema>, "product"> & { product: InventoryProduct };
+export type SaveInventoryProductInput = Omit<z.infer<typeof saveInventoryProductInputSchema>, "draft"> & {
+  draft: InventoryProductDraft; includeManufacturerReference?: boolean | undefined;
+};
 export type InventoryMovementInput = z.infer<typeof inventoryMovementInputSchema>;
 export type InventoryCountInput = z.infer<typeof inventoryCountInputSchema>;
 export type UpdateInventoryLotInput = z.infer<typeof updateInventoryLotInputSchema>;
@@ -205,7 +211,9 @@ export type SetInventoryProductStatusInput = z.infer<typeof setInventoryProductS
 export type DeleteInventoryProductInput = z.infer<typeof deleteInventoryProductInputSchema>;
 export type UpdateInventorySettingsInput = z.infer<typeof updateInventorySettingsInputSchema>;
 export type InventoryEvent = z.infer<typeof inventoryEventSchema>;
-export type InventoryMutationResult = z.infer<typeof inventoryMutationResultSchema>;
+export type InventoryMutationResult = Omit<z.infer<typeof inventoryMutationResultSchema>, "product" | "detail"> & {
+  product: InventoryProduct; detail?: InventoryProductDetail | undefined;
+};
 
 export function inventoryLocationMap<T>(value: T): Record<InventoryLocation, T> {
   return { refrigerated: value, freezer1: value, freezer2: value, sample: value };

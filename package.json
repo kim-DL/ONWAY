@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit && npm run typecheck --workspace functions",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "test:inventory": "vitest run src/features/inventory functions/tests/inventory-authorization.test.ts functions/tests/inventory-calendar.test.ts functions/tests/inventory-photo.test.ts functions/tests/inventory-service.test.ts functions/tests/inventory-e2e-safety.test.ts",
+    "test:inventory": "vitest run src/features/inventory functions/tests/inventory-authorization.test.ts functions/tests/inventory-calendar.test.ts functions/tests/inventory-callables.test.ts functions/tests/inventory-manufacturer-service.test.ts functions/tests/inventory-photo.test.ts functions/tests/inventory-service.test.ts functions/tests/inventory-stock-summary.test.ts functions/tests/inventory-e2e-safety.test.ts",
     "test:e2e:inventory": "node scripts/run-inventory-e2e.mjs",
     "test:neis": "vitest run functions/tests/neis-initial-import.test.ts",
     "test:neis:emulator": "node scripts/firebase-emulators.mjs phase5",

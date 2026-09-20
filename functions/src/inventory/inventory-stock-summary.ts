@@ -1,28 +1,29 @@
 import { z } from "zod";
 import {
   INVENTORY_LOCATIONS, INVENTORY_MAX_LOTS, inventoryIdSchema, inventoryLocationMap,
-  inventoryLotSummarySchema, inventoryProductSchema, inventoryQuantitySchema,
+  inventoryLotSummarySchema, inventoryQuantitySchema,
   type InventoryLot, type InventoryLotSummary, type InventoryProduct,
 } from "./inventory-contract.js";
+import { inventoryProductWithManufacturerSchema } from "./inventory-manufacturer-contract.js";
 
 export const inventoryLotChecksSchema = z.record(inventoryIdSchema, z.object({
   cycleId: inventoryIdSchema, quantity: inventoryQuantitySchema,
   checkedAt: z.iso.datetime(), checkedBy: inventoryIdSchema, changed: z.boolean(),
 }).strict()).refine((value) => Object.keys(value).length <= INVENTORY_MAX_LOTS);
 export type InventoryLotChecks = z.infer<typeof inventoryLotChecksSchema>;
-export type InventoryProductRecord = InventoryProduct & { inspectionByLot?: InventoryLotChecks };
+export type InventoryProductRecord = InventoryProduct & { inspectionByLot?: InventoryLotChecks | undefined };
 
 // The internal inspection ledger is not a public product field. Explicitly
 // separate it before strict wire validation; never forward arbitrary DB fields.
 export function inventoryProductRecord(data: Record<string, unknown>): InventoryProductRecord {
   const { inspectionByLot, ...wire } = data;
-  return { ...inventoryProductSchema.parse(wire),
+  return { ...inventoryProductWithManufacturerSchema.parse(wire),
     ...(inspectionByLot === undefined ? {} : { inspectionByLot: inventoryLotChecksSchema.parse(inspectionByLot) }) };
 }
 export function inventoryProductWire(record: InventoryProductRecord): InventoryProduct {
   const { inspectionByLot: _privateChecks, ...wire } = record;
   void _privateChecks;
-  return inventoryProductSchema.parse(wire);
+  return inventoryProductWithManufacturerSchema.parse(wire);
 }
 
 export function summarizeInventoryLotGroups(lots: InventoryLot[]): InventoryLotSummary {
@@ -36,9 +37,22 @@ export function summarizeInventoryLotGroups(lots: InventoryLot[]): InventoryLotS
 
 // Older installed clients validate strict objects, so new fields must be sent
 // only when requested. Do not strip unrelated fields or change stored receipts.
-export function inventorySummaryResponse(value: unknown, includeSummary: boolean): unknown {
-  if (includeSummary || value === null || typeof value !== "object") return value;
-  if (Array.isArray(value)) return value.map((item) => inventorySummaryResponse(item, false));
-  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "lotSummary")
-    .map(([key, item]) => [key, inventorySummaryResponse(item, false)]));
+export function inventorySummaryResponse(value: unknown, includeSummary: boolean, includeManufacturerReference = false): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    const filtered = value.map((item) => inventorySummaryResponse(item, includeSummary, includeManufacturerReference));
+    return filtered.some((item, index) => item !== value[index]) ? filtered : value;
+  }
+  let changed = false;
+  const entries: Array<[string, unknown]> = [];
+  for (const [key, item] of Object.entries(value)) {
+    if ((!includeSummary && key === "lotSummary") || (!includeManufacturerReference && key === "manufacturerId")) {
+      changed = true;
+      continue;
+    }
+    const filtered = inventorySummaryResponse(item, includeSummary, includeManufacturerReference);
+    if (filtered !== item) changed = true;
+    entries.push([key, filtered]);
+  }
+  return changed ? Object.fromEntries(entries) : value;
 }

@@ -7,6 +7,10 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { InventoryActor } from "../src/inventory/inventory-authorization.js";
 import { INVENTORY_PRODUCT_PATH, inventoryProductDraftSchema, type InventoryMovementInput, type SaveInventoryProductInput } from "../src/inventory/inventory-contract.js";
+import {
+  INVENTORY_MANUFACTURER_NAME_PATH, INVENTORY_MANUFACTURER_PATH, type SaveInventoryProductWithManufacturerInput,
+} from "../src/inventory/inventory-manufacturer-contract.js";
+import { InventoryManufacturerService } from "../src/inventory/inventory-manufacturer-service.js";
 import { InventoryService } from "../src/inventory/inventory-service.js";
 import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lot-summary.js";
 
@@ -21,6 +25,7 @@ let app: App;
 let db: Firestore;
 let environment: RulesTestEnvironment;
 let service: InventoryService;
+let manufacturerService: InventoryManufacturerService;
 
 describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", () => {
   beforeAll(async () => {
@@ -31,6 +36,7 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     app = initializeApp({ projectId }, projectId);
     db = getFirestore(app);
     service = new InventoryService(db, () => new Date("2026-09-11T01:00:00Z"));
+    manufacturerService = new InventoryManufacturerService(db, () => new Date("2026-09-11T01:00:00Z"));
     const [hostname, port] = host.split(":");
     environment = await initializeTestEnvironment({ projectId, firestore: { host: hostname!, port: Number(port), rules: readFileSync("firestore.rules", "utf8") } });
     for (const actor of [member, admin, viewer]) {
@@ -188,6 +194,40 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     await db.doc(`authz/${member.uid}`).update({ sessionVersion: 1 });
   }, 40_000);
 
+  it("serializes exact manufacturer duplicates and preserves canonical snapshots after deactivation", async () => {
+    const firstInput = { requestId: randomUUID(), name: "온누리 식품(주)" };
+    const secondInput = { requestId: randomUUID(), name: "온누리-식품 주" };
+    const results = await Promise.allSettled([
+      manufacturerService.create(firstInput, member), manufacturerService.create(secondInput, member),
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    const successful = results.find((result) => result.status === "fulfilled");
+    if (!successful || successful.status !== "fulfilled") throw new Error("One manufacturer create must succeed.");
+    const manufacturer = successful.value;
+    const listed = await manufacturerService.list();
+    expect(listed).toEqual([manufacturer]);
+    expect((await db.doc(`auditLogs/inventory-${manufacturer.manufacturerId}`).get()).data()).toMatchObject({
+      eventType: "INVENTORY_MANUFACTURER_CREATED", targetType: "inventoryManufacturer", targetId: manufacturer.manufacturerId,
+    });
+
+    const productInput: SaveInventoryProductWithManufacturerInput = { requestId: randomUUID(), productId: null, expectedRevision: null,
+      draft: { ...inventoryProductDraftSchema.parse({ name: "제조사 연결 통합검증", unitLabel: "봉", unitsPerBox: 8,
+        defaultLocationId: "freezer1", manufacturer: "직원 오타", specification: "1kg", origin: "대한민국", note: "", urgent: false }),
+        manufacturerId: manufacturer.manufacturerId } };
+    const product = await service.save(productInput, member);
+    expect(product).toMatchObject({ manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name });
+    const inactive = await manufacturerService.update({ requestId: randomUUID(), manufacturerId: manufacturer.manufacturerId,
+      expectedRevision: manufacturer.revision, active: false }, admin);
+    expect(inactive.active).toBe(false);
+    const preserved = await service.save({ requestId: randomUUID(), productId: product.productId, expectedRevision: product.revision,
+      draft: { ...productInput.draft, manufacturerId: undefined, name: "비활성 기존 연결 표시" } }, member);
+    expect(preserved).toMatchObject({ manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name });
+    const rejectedId = randomUUID();
+    await expect(service.save({ ...productInput, requestId: rejectedId, draft: { ...productInput.draft, name: "비활성 신규 연결" } }, member))
+      .rejects.toMatchObject({ code: "failed-precondition", details: { reason: "inventory-manufacturer-inactive" } });
+    expect((await db.doc(`${INVENTORY_PRODUCT_PATH}/${rejectedId}`).get()).exists).toBe(false);
+  }, 40_000);
+
   it("keeps all inventory documents behind Callables for both anonymous and authenticated clients", async () => {
     const unauthenticated = environment.unauthenticatedContext().firestore();
     const authenticated = environment.authenticatedContext(member.uid, { employeeId: member.employeeId, roleScopes: member.roleScopes,
@@ -195,6 +235,10 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     for (const client of [unauthenticated, authenticated]) {
       await assertFails(getDoc(doc(client, `${INVENTORY_PRODUCT_PATH}/arbitrary`)));
       await assertFails(setDoc(doc(client, `${INVENTORY_PRODUCT_PATH}/arbitrary`), { quantity: 1 }));
+      await assertFails(getDoc(doc(client, `${INVENTORY_MANUFACTURER_PATH}/arbitrary`)));
+      await assertFails(setDoc(doc(client, `${INVENTORY_MANUFACTURER_PATH}/arbitrary`), { name: "직접 쓰기" }));
+      await assertFails(getDoc(doc(client, `${INVENTORY_MANUFACTURER_NAME_PATH}/arbitrary`)));
+      await assertFails(setDoc(doc(client, `${INVENTORY_MANUFACTURER_NAME_PATH}/arbitrary`), { active: true }));
       await assertFails(getDoc(doc(client, "companies/onnuri/inventoryRequests/arbitrary")));
       await assertFails(getDoc(doc(client, "inventoryPhotoUploads/arbitrary")));
     }

@@ -16,7 +16,8 @@ export {
   getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct,
   recordInventoryMovement, recordInventoryCount, updateInventoryLot,
   setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings,
-  listInventoryHistory, uploadInventoryPhoto, getInventoryPhoto, expireInventoryPhotos,
+  listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer,
+  uploadInventoryPhoto, getInventoryPhoto, expireInventoryPhotos,
 } from "./inventory/callables.js";
 export {
   activateAdminSession,

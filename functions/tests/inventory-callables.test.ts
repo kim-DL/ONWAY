@@ -4,7 +4,8 @@ import { inventoryLocationMap, inventoryProductSchema } from "../src/inventory/i
 import { defaultInventorySettings } from "../src/inventory/inventory-calendar.js";
 import { summarizeInventoryLotGroups } from "../src/inventory/inventory-stock-summary.js";
 
-const fixture = vi.hoisted(() => ({ authorize: vi.fn(), save: vi.fn(), count: vi.fn(), status: vi.fn(), settings: vi.fn(), trace: [] as string[] }));
+const fixture = vi.hoisted(() => ({ authorize: vi.fn(), save: vi.fn(), count: vi.fn(), status: vi.fn(), settings: vi.fn(),
+  manufacturerList: vi.fn(), manufacturerCreate: vi.fn(), manufacturerUpdate: vi.fn(), trace: [] as string[] }));
 vi.mock("../src/inventory/inventory-authorization.js", () => ({
   requireInventoryActor: fixture.authorize, inventoryActorCanWrite: () => true,
 }));
@@ -14,7 +15,15 @@ vi.mock("../src/inventory/inventory-service.js", () => ({ InventoryService: clas
   status = fixture.status;
   updateSettings = fixture.settings;
 } }));
-import { deleteInventoryProduct, recordInventoryCount, saveInventoryProduct, setInventoryProductStatus, updateInventorySettings } from "../src/inventory/callables.js";
+vi.mock("../src/inventory/inventory-manufacturer-service.js", () => ({ InventoryManufacturerService: class {
+  list = fixture.manufacturerList;
+  create = fixture.manufacturerCreate;
+  update = fixture.manufacturerUpdate;
+} }));
+import {
+  createInventoryManufacturer, deleteInventoryProduct, listInventoryManufacturers, recordInventoryCount,
+  saveInventoryProduct, setInventoryProductStatus, updateInventoryManufacturer, updateInventorySettings,
+} from "../src/inventory/callables.js";
 
 const actor = { uid: "uid-stock", employeeId: "EMP-STOCK", roleScopes: ["delivery"], isAdmin: false,
   sessionVersion: 1, permissionsVersion: 1 };
@@ -39,14 +48,31 @@ beforeEach(() => {
 });
 
 describe("inventory callable confirmation and privacy boundaries", () => {
-  it.each([false, true])("adds a validated lot summary only for opted-in strict clients (includeSummary=%s)", async (includeSummary) => {
-    const expanded = { ...product, lotSummary: summarizeInventoryLotGroups([]) };
+  it.each([[false, false], [true, false], [false, true], [true, true]])(
+    "adds product fields only for opted-in strict clients (summary=%s, manufacturer=%s)",
+    async (includeSummary, includeManufacturerReference) => {
+    const expanded = { ...product, manufacturerId: "manufacturer-one", lotSummary: summarizeInventoryLotGroups([]) };
     fixture.save.mockResolvedValueOnce(expanded);
-    const result = await saveInventoryProduct.run(request({ ...input, ...(includeSummary ? { includeSummary } : {}) }).value);
-    expect(result).toEqual(includeSummary ? expanded : product);
-    if (!includeSummary) expect(inventoryProductSchema.omit({ lotSummary: true }).strict().parse(result)).toEqual(product);
-    expect(expanded).toHaveProperty("lotSummary");
+    const result = await saveInventoryProduct.run(request({ ...input, ...(includeSummary ? { includeSummary } : {}),
+      ...(includeManufacturerReference ? { includeManufacturerReference } : {}) }).value);
+    expect(result).toEqual({ ...product, ...(includeSummary ? { lotSummary: expanded.lotSummary } : {}),
+      ...(includeManufacturerReference ? { manufacturerId: expanded.manufacturerId } : {}) });
+    if (!includeSummary && !includeManufacturerReference) expect(inventoryProductSchema.strict().parse(result)).toEqual(product);
     expect(fixture.authorize.mock.calls.map((call) => call[1])).toEqual(["write", "write"]);
+  });
+
+  it("keeps master identifiers intact and applies read/write/admin callable access", async () => {
+    const manufacturer = { manufacturerId: "manufacturer-one", name: "온누리 식품", normalizedName: "온누리식품",
+      active: true, revision: 1, createdAt: "2026-09-21T01:00:00.000Z", createdBy: actor.employeeId,
+      updatedAt: "2026-09-21T01:00:00.000Z" };
+    fixture.manufacturerList.mockResolvedValueOnce([manufacturer]);
+    fixture.manufacturerCreate.mockResolvedValueOnce(manufacturer);
+    fixture.manufacturerUpdate.mockResolvedValueOnce({ ...manufacturer, active: false, revision: 2 });
+    expect(await listInventoryManufacturers.run(request({}).value)).toEqual([manufacturer]);
+    expect(await createInventoryManufacturer.run(request({ requestId, name: manufacturer.name }).value)).toEqual(manufacturer);
+    expect(await updateInventoryManufacturer.run(request({ requestId, manufacturerId: manufacturer.manufacturerId,
+      expectedRevision: 1, active: false }).value)).toEqual({ ...manufacturer, active: false, revision: 2 });
+    expect(fixture.authorize.mock.calls.map((call) => call[1])).toEqual(["read", "read", "write", "write", "admin", "admin"]);
   });
   it.each([false, true])("authorizes both lifecycle mutation boundaries as write, not admin (delete=%s)", async (deleted) => {
     const result = { ...product, status: deleted ? "deleted" : "inactive" };

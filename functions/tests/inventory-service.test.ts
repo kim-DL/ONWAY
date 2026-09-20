@@ -11,6 +11,9 @@ import {
   type InventoryCountInput, type InventoryMovementInput, type InventoryProduct, type SaveInventoryProductInput,
 } from "../src/inventory/inventory-contract.js";
 import { InventoryService } from "../src/inventory/inventory-service.js";
+import {
+  INVENTORY_MANUFACTURER_PATH, type SaveInventoryProductWithManufacturerInput,
+} from "../src/inventory/inventory-manufacturer-contract.js";
 import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lot-summary.js";
 
 const actor: InventoryActor = { uid: "uid-staff", employeeId: "EMP-STAFF", roleScopes: ["delivery"], sessionVersion: 1, permissionsVersion: 1, isAdmin: false };
@@ -183,6 +186,54 @@ describe("inventory wire boundaries and calendar", () => {
 });
 
 describe("inventory transactions", () => {
+  it("keeps legacy manufacturer strings compatible and snapshots a selected active master without rewriting inactive links", async () => {
+    const state = fixture(); const manufacturerId = randomUUID();
+    state.values.set(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`, {
+      manufacturerId, name: "온누리 식품", normalizedName: "온누리식품", active: true, revision: 1,
+      createdAt: Timestamp.fromDate(initialNow), createdBy: admin.employeeId, updatedAt: Timestamp.fromDate(initialNow),
+    });
+    const requestId = randomUUID();
+    const linkedInput: SaveInventoryProductWithManufacturerInput = { requestId, productId: null, expectedRevision: null,
+      draft: { ...draft, name: "Master 연결 상품", manufacturer: "직원 입력 오타", manufacturerId } };
+    const linked = await state.service.save(linkedInput, actor);
+    expect(linked).toMatchObject({ productId: requestId, manufacturerId, manufacturer: "온누리 식품" });
+    expect(state.values.get(`${INVENTORY_PRODUCT_PATH}/${requestId}`)).toMatchObject({ manufacturerId, manufacturer: "온누리 식품" });
+    expect(state.values.get(`auditLogs/inventory-${requestId}`)).toMatchObject({
+      eventType: "INVENTORY_PRODUCT_CREATED", changedFields: expect.arrayContaining(["manufacturer", "manufacturerId"]),
+    });
+
+    state.values.set(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`, {
+      ...state.values.get(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`), active: false, revision: 2,
+    });
+    const rejectedId = randomUUID();
+    await expect(state.service.save({ ...linkedInput, requestId: rejectedId,
+      draft: { ...linkedInput.draft, name: "비활성 신규 연결" } }, actor)).rejects.toMatchObject({
+      code: "failed-precondition", details: { reason: "inventory-manufacturer-inactive" },
+    });
+    expect(state.values.has(`${INVENTORY_PRODUCT_PATH}/${rejectedId}`)).toBe(false);
+    expect(state.values.has(`companies/onnuri/inventoryRequests/${rejectedId}`)).toBe(false);
+
+    const preserved = await state.service.save({ requestId: randomUUID(), productId: linked.productId,
+      expectedRevision: linked.revision, draft: { ...draft, name: "기존 연결 상품 수정", manufacturer: linked.manufacturer } }, actor);
+    expect(preserved).toMatchObject({ manufacturerId, manufacturer: "온누리 식품", revision: 2 });
+    expect((await state.service.detail(linked.productId, actor)).product).toMatchObject({ manufacturerId, manufacturer: "온누리 식품" });
+
+    const legacy = await state.service.save({ requestId: randomUUID(), productId: null, expectedRevision: null,
+      draft: { ...draft, name: "Legacy 문자열 상품", manufacturer: "문자열 제조사" } }, actor);
+    expect(legacy).toMatchObject({ manufacturer: "문자열 제조사" });
+    expect(legacy).not.toHaveProperty("manufacturerId");
+  });
+
+  it("rejects a missing manufacturer master atomically", async () => {
+    const state = fixture(); const requestId = randomUUID();
+    await expect(state.service.save({ requestId, productId: null, expectedRevision: null,
+      draft: { ...draft, manufacturerId: randomUUID() } }, actor)).rejects.toMatchObject({
+      code: "failed-precondition", details: { reason: "inventory-manufacturer-missing" },
+    });
+    expect(state.values.has(`${INVENTORY_PRODUCT_PATH}/${requestId}`)).toBe(false);
+    expect(state.values.has(`companies/onnuri/inventoryRequests/${requestId}`)).toBe(false);
+  });
+
   it("backfills only a missing summary with dry-run and per-product transaction protection", async () => {
     const state = await stocked(); const path = `${INVENTORY_PRODUCT_PATH}/${state.product.productId}`;
     const stored = state.values.get(path)!; delete stored.lotSummary;
