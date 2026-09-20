@@ -1,6 +1,5 @@
 .productForm { gap: 10px; }
 .productSection { display: grid; gap: 10px; min-width: 0; padding: 12px; border: 1px solid #d9e1e8b3; border-radius: 9px; background: #ffffffa8; }
-.fieldsPair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .divider { height: 1px; margin: 2px 0; border: 0; background: linear-gradient(90deg, #c4d2df1a, #b6c8dcb3 18%, #b6c8dcb3 82%, #c4d2df1a); }
 .expiryFields { display: grid; gap: 8px; }
 .expiryStatus { margin: 0; padding: 0; border: 0; min-width: 0; }
@@ -11,6 +10,7 @@
 .expiryStatus input { margin: 0; width: 16px; height: 16px; accent-color: #3975a8; }
 .expiryStatus label:has(input:focus-visible) { outline: 3px solid #3182f6; outline-offset: 2px; }
 .expiryStatus:disabled label { opacity: .55; cursor: default; }
+.presetChoices:has(label:nth-child(5)) > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .confirmQuestion { margin: 0; font-size: 16px; line-height: 1.65; font-weight: 650; color: #304257; }
 .countList { list-style: none; margin: 0; padding: 0; border: 1px solid #dce5ed; border-radius: 8px; overflow: hidden; background: #f7fafdc9; }
 .countList li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 12px; }

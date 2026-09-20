@@ -28,11 +28,19 @@ function changeField(tree: ReactNode, label: string, value: string, type = "inpu
   const input = find(field.props.children, (nodeType) => nodeType === type)!;
   (input.props.onChange as (event: { target: { value: string; valueAsNumber: number } }) => void)({ target: { value, valueAsNumber: Number(value) } });
 }
+function choosePreset(tree: ReactNode, label: string, value: string | null) {
+  const choices = find(tree, (type, props) => typeof type === "function" && type.name === "PresetChoices" && props.label === label)!;
+  (choices.props.onSelect as (value: string | null) => void)(value);
+}
+function openSpecification(tree: ReactNode) {
+  const trigger = find(tree, (_type, props) => props["aria-haspopup"] === "dialog")!;
+  (trigger.props.onClick as () => void)();
+}
 function quantity(tree: ReactNode, value: number) { (named(tree, "QuantityFields").props.onChange as (value: number) => void)(value); }
 function expiry(tree: ReactNode, expiryState: InventoryLotDraft["expiryState"], expiryDate: string | null) { (named(tree, "LotFields").props.onChange as (lot: InventoryLotDraft) => void)({ label: "", expiryState, expiryDate }); }
 function submit(tree: ReactNode) { return (find(tree, (type) => type === "form")!.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({ preventDefault: noop }); }
 function filled() {
-  let tree = render(); changeField(tree, "품목명", product.name); changeField(tree, "기준 단위", "봉");
+  let tree = render(); changeField(tree, "품목명", product.name); choosePreset(tree, "기준 단위 (필수)", "봉");
   tree = render(); quantity(tree, 29); expiry(tree, "dated", "2026-12-01"); return render();
 }
 async function settle() { for (let index = 0; index < 6; index += 1) await Promise.resolve(); }
@@ -50,7 +58,7 @@ describe("single-submit inventory registration", () => {
   });
 
   it("changes a new product unit label without multiplying its entered quantity", async () => {
-    let tree = filled(); changeField(tree, "기준 단위", "팩"); tree = render();
+    let tree = filled(); choosePreset(tree, "기준 단위 (필수)", "팩"); tree = render();
     expect(named(tree, "QuantityFields").props).toMatchObject({ value: 29, product: { unitLabel: "팩", unitsPerBox: 1 } });
     await submit(tree); expect(harness.save.mock.calls[0]![0].initialStock.quantity).toBe(29);
   });
@@ -86,6 +94,79 @@ describe("single-submit inventory registration", () => {
     expect(harness.save.mock.calls[0]![0]).toMatchObject({ productId: product.productId, expectedRevision: 3 });
     expect(harness.save.mock.calls[0]![0].draft.unitsPerBox).toBe(12);
     expect(harness.save.mock.calls[0]![0]).not.toHaveProperty("initialStock");
+  });
+
+  it.each(["국내산", "수입산", "미확인"])("stores the origin preset %s as the existing string field", async (origin) => {
+    const tree = filled(); choosePreset(tree, "원산지", origin); await submit(render());
+    expect(harness.save.mock.calls[0]![0].draft.origin).toBe(origin);
+    expect(find(render(), (type, props) => type === "label" && String(props.children).includes("원산지 직접입력"))).toBeNull();
+  });
+
+  it("shows and focuses origin text entry only after choosing custom", async () => {
+    let tree = filled(); choosePreset(tree, "원산지", null); tree = render();
+    const custom = find(tree, (type, props) => type === "label" && (Array.isArray(props.children) ? props.children : [props.children]).includes("원산지 직접입력"))!;
+    const input = find(custom.props.children, (type) => type === "input")!;
+    expect(input.props.autoFocus).toBe(true);
+    changeField(tree, "원산지 직접입력", "프랑스산"); await submit(render());
+    expect(harness.save.mock.calls[0]![0].draft.origin).toBe("프랑스산");
+  });
+
+  it("preserves a non-preset existing origin as custom without canonicalizing it", async () => {
+    const legacy = { ...product, origin: "대한민국" }; const tree = render(legacy);
+    const custom = find(tree, (type, props) => type === "label" && (Array.isArray(props.children) ? props.children : [props.children]).includes("원산지 직접입력"))!;
+    expect(find(custom.props.children, (type) => type === "input")!.props.value).toBe("대한민국");
+    await submit(tree); expect(harness.save.mock.calls[0]![0].draft.origin).toBe("대한민국");
+  });
+
+  it("selects a specification preset from the picker without mounting a text input", async () => {
+    let tree = filled(); openSpecification(tree); tree = render(); choosePreset(tree, "규격", "1000g"); tree = render();
+    expect(find(tree, (type, props) => type === "label" && (Array.isArray(props.children) ? props.children : [props.children]).includes("규격 직접입력"))).toBeNull();
+    await submit(tree); expect(harness.save.mock.calls[0]![0].draft.specification).toBe("1000g");
+  });
+
+  it("uses specification text entry only after choosing custom", async () => {
+    let tree = filled(); openSpecification(tree); tree = render(); choosePreset(tree, "규격", null); tree = render();
+    changeField(tree, "규격 직접입력", "2.5kg"); await submit(render());
+    expect(harness.save.mock.calls[0]![0].draft.specification).toBe("2.5kg");
+  });
+
+  it("preserves an existing 1kg specification as a custom value", async () => {
+    const legacy = { ...product, specification: "1kg" }; const tree = render(legacy);
+    const custom = find(tree, (type, props) => type === "label" && (Array.isArray(props.children) ? props.children : [props.children]).includes("규격 직접입력"))!;
+    expect(find(custom.props.children, (type) => type === "input")!.props.value).toBe("1kg");
+    await submit(tree); expect(harness.save.mock.calls[0]![0].draft.specification).toBe("1kg");
+  });
+
+  it.each(["개", "봉", "팩", "병", "낱개"])("stores the unit preset %s without changing package conversion", async (unitLabel) => {
+    const tree = filled(); choosePreset(tree, "기준 단위 (필수)", unitLabel); await submit(render());
+    expect(harness.save.mock.calls[0]![0].draft).toMatchObject({ unitLabel, unitsPerBox: 1 });
+  });
+
+  it("keeps the new-product unit default at 개", () => {
+    expect(named(render(), "PresetChoices").props).toBeDefined();
+    expect((named(render(), "QuantityFields").props.product as { unitLabel: string }).unitLabel).toBe("개");
+  });
+
+  it("stores a custom unit but drops it when a preset is selected again", async () => {
+    let tree = filled(); choosePreset(tree, "기준 단위 (필수)", null); tree = render(); changeField(tree, "기준 단위 직접입력", "상자");
+    tree = render(); choosePreset(tree, "기준 단위 (필수)", "병"); tree = render();
+    expect(find(tree, (type, props) => type === "label" && (Array.isArray(props.children) ? props.children : [props.children]).some((child) => typeof child === "string" && child.startsWith("기준 단위 직접입력")))).toBeNull();
+    await submit(tree); expect(harness.save.mock.calls[0]![0].draft.unitLabel).toBe("병");
+  });
+
+  it("keeps every unit choice locked when an existing product has stock history", () => {
+    const tree = render(product);
+    const units = find(tree, (type, props) => typeof type === "function" && type.name === "PresetChoices" && props.label === "기준 단위 (필수)")!;
+    expect(units.props).toMatchObject({ selected: "봉", disabled: true });
+  });
+
+  it("preserves and locks a non-preset unit on a product with stock history", async () => {
+    const legacy = { ...product, unitLabel: "상자" }; const tree = render(legacy);
+    const units = find(tree, (type, props) => typeof type === "function" && type.name === "PresetChoices" && props.label === "기준 단위 (필수)")!;
+    expect(units.props).toMatchObject({ selected: null, disabled: true });
+    const custom = find(tree, (type, props) => type === "label" && (Array.isArray(props.children) ? props.children : [props.children]).some((child) => typeof child === "string" && child.startsWith("기준 단위 직접입력")))!;
+    expect(find(custom.props.children, (type) => type === "input")!.props).toMatchObject({ value: "상자", disabled: true });
+    await submit(tree); expect(harness.save.mock.calls[0]![0].draft.unitLabel).toBe("상자");
   });
 
   it("preserves the draft offline and saves only on an explicit online retry", async () => {
