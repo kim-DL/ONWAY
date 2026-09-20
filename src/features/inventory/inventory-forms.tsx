@@ -1,18 +1,20 @@
 "use client";
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, inventoryLotDraftSchema, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryLotDraft, type InventoryProduct, type InventoryProductDetail, type InventoryProductDraft, type InventoryMovementInput, type SaveInventoryProductInput } from "@/domain/inventory";
+import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, inventoryLotDraftSchema, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryLotDraft, type InventoryProduct, type InventoryProductDetail, type InventoryMovementInput } from "@/domain/inventory";
 import { inventoryLotDateLabel, inventoryTransferPreview } from "./inventory-model";
-import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo";
 import { inventoryRepository, inventoryErrorMessage } from "./inventory-repository";
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
 import { InventoryDateField, isInventoryInputDate } from "./inventory-date-field";
 import styles from "./inventory.module.css";
 import formStyles from "./inventory-form-design.module.css";
 
-function useInventoryAction() {
+const InventoryProductEditorImpl = lazy(() => import("./inventory-product-editor")
+  .then((module) => ({ default: module.InventoryProductEditorImpl })));
+
+export function useInventoryAction() {
   const online = useInventoryConnection();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,89 +44,27 @@ function useInventoryAction() {
   return { busy, error, run, online };
 }
 
-function FormFooter({ id, busy, disabled = false, label, onClose, children }: { id: string; busy: boolean; disabled?: boolean; label: string; onClose: () => void; children?: ReactNode }) {
+export function FormFooter({ id, busy, disabled = false, label, onClose, children }: { id: string; busy: boolean; disabled?: boolean; label: string; onClose: () => void; children?: ReactNode }) {
   const online = useInventoryConnection();
   return <BottomSheetActions busy={busy} className={styles.formActions ?? ""}>{!online ? <p role="alert">{INVENTORY_OFFLINE_DRAFT_MESSAGE}</p> : null}{children}<GlassButton disabled={busy} onClick={onClose}>취소</GlassButton><GlassButton variant="primary" type="submit" form={id} disabled={busy || disabled || !online}>{busy ? "저장 중…" : label}</GlassButton></BottomSheetActions>;
 }
-const ORIGIN_PRESETS = ["국내산", "수입산", "미확인"];
-const SPECIFICATION_PRESETS = ["100g", "200g", "300g", "500g", "700g", "1000g", "1200g", "1500g", "2000g", "5000g"];
-const UNIT_PRESETS = ["개", "봉", "팩", "병", "낱개"];
-function PresetChoices({ label, presets, selected, disabled, onSelect }: { label: string; presets: readonly string[]; selected: string | null; disabled: boolean; onSelect: (value: string | null) => void }) {
-  return <fieldset className={`${formStyles.expiryStatus} ${formStyles.presetChoices}`} disabled={disabled}><legend>{label}</legend><div>{[...presets, null].map((option) => <label key={option ?? label}><input type="radio" name={label} checked={option === selected} onChange={() => onSelect(option)} />{option ?? "직접입력"}</label>)}</div></fieldset>;
-}
-const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "개", unitsPerBox: 1, defaultLocationId: location, urgent: false });
-function validLotDraft(draft: InventoryLotDraft, allowLegacy = false) { return (allowLegacy || draft.expiryState !== "not_applicable") && inventoryLotDraftSchema.safeParse(draft).success && (draft.expiryState !== "dated" || isInventoryInputDate(draft.expiryDate ?? "")); }
-export function InventoryProductEditor({ product, location, onClose, onSaved }: { product: InventoryProduct | null; location: InventoryLocation; onClose: () => void; onSaved: (product: InventoryProduct) => void }) {
-  const id = useId();
-  const [draft, setDraft] = useState<InventoryProductDraft>(() => product ? { name: product.name, manufacturer: product.manufacturer, specification: product.specification, origin: product.origin, note: product.note, unitLabel: product.unitLabel, unitsPerBox: product.unitsPerBox, defaultLocationId: product.defaultLocationId, urgent: product.urgent } : newDraft(location));
-  const [file, setFile] = useState<File | null>(null);
-  const [removed, setRemoved] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const [initialQuantity, setInitialQuantity] = useState<number>(Number.NaN);
-  const [initialLot, setInitialLot] = useState<InventoryLotDraft>(blankLot);
-  const [validationError, setValidationError] = useState("");
-  const [specificationPicker, setSpecificationPicker] = useState(false);
-  const [focusCustom, setFocusCustom] = useState<keyof Pick<InventoryProductDraft, "origin" | "specification" | "unitLabel"> | null>(null);
-  const upload = useRef<{ file: File; id: string; ready: boolean } | null>(null);
-  const action = useInventoryAction();
-  const busy = action.busy || photoBusy;
-  const set = <K extends keyof InventoryProductDraft>(key: K, value: InventoryProductDraft[K]) => setDraft((old) => ({ ...old, [key]: value }));
-  const isCustom = (key: "origin" | "specification" | "unitLabel", presets: string[]) => focusCustom === key || !!draft[key] && !presets.includes(draft[key]);
-  function selectPreset(key: "origin" | "specification" | "unitLabel", value: string | null) {
-    setFocusCustom(value === null ? key : null);
-    set(key, value ?? "");
-  }
-  const customInput = (label: string, key: "origin" | "specification" | "unitLabel", maxLength = 200, required = false) => <label className={styles.field}>{label}<input autoFocus={focusCustom === key} required={required} maxLength={maxLength} value={draft[key]} onChange={(event) => set(key, event.target.value)} disabled={busy || key === "unitLabel" && !!product?.hasHistory} /></label>;
-  async function submit(event: FormEvent) {
-    event.preventDefault(); if (busy) return;
-    setValidationError("");
-    if (!product && (!Number.isSafeInteger(initialQuantity) || initialQuantity < 1 || initialQuantity > INVENTORY_MAX_QUANTITY)) { setValidationError("초기 수량을 1 이상의 정수로 입력해주세요."); return; }
-    if (!product && !validLotDraft(initialLot)) { setValidationError(initialLot.expiryState === "dated" ? "첫 유통기한에 실제 날짜를 YYYY-MM-DD로 입력해주세요." : "유통기한 정보를 확인해주세요."); return; }
-    if (file && upload.current?.file !== file) upload.current = { file, id: crypto.randomUUID(), ready: false };
-    const staged = file ? upload.current : null;
-    const photoChange: SaveInventoryProductInput["photoChange"] = staged ? { action: "replace", uploadId: staged.id } : removed ? { action: "remove" } : undefined;
-    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(!product ? { initialStock: { quantity: initialQuantity, lot: initialLot } } : {}), ...(photoChange ? { photoChange } : {}) };
-    await action.run(input, async (requestId) => {
-      if (staged && !staged.ready) { await inventoryRepository.uploadPhoto({ uploadId: staged.id, contentType: staged.file.type as "image/webp", fileBase64: await inventoryPhotoBase64(staged.file) }); staged.ready = true; }
-      return inventoryRepository.save({ ...input, requestId });
-    }, onSaved);
-  }
-  return <BottomSheet open title={product ? "품목 정보 수정" : "새 품목 등록"} onClose={onClose} dismissible={!busy}>
-    <form id={id} onSubmit={submit} className={`${styles.sheet} ${formStyles.productForm}`} aria-busy={busy}>
-      <InventoryPhotoPicker product={product} file={file} removed={removed} disabled={action.busy} onBusyChange={setPhotoBusy} onChange={(next, remove) => { setFile(next); setRemoved(remove); }} />
-      <div className={formStyles.productSection}>
-      <label className={styles.field}>품목명 <span className={styles.required}>필수</span><input required maxLength={200} value={draft.name} onChange={(event) => set("name", event.target.value)} disabled={busy} autoComplete="off" /></label>
-      <label className={styles.field}>기본 보관 장소<select value={draft.defaultLocationId} onChange={(event) => set("defaultLocationId", event.target.value as InventoryLocation)} disabled={busy}>{INVENTORY_LOCATIONS.map((item) => <option key={item} value={item}>{INVENTORY_LOCATION_LABELS[item]}</option>)}</select></label>
-      <hr className={formStyles.divider} />
-      <label className={styles.field}>제조사<input maxLength={200} value={draft.manufacturer} onChange={(event) => set("manufacturer", event.target.value)} disabled={busy} /></label>
-      <PresetChoices label="원산지" presets={ORIGIN_PRESETS} selected={isCustom("origin", ORIGIN_PRESETS) ? null : draft.origin} disabled={busy} onSelect={(value) => selectPreset("origin", value)} />
-      {isCustom("origin", ORIGIN_PRESETS) ? customInput("원산지 직접입력", "origin") : null}
-      <GlassButton aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>규격 · {draft.specification || "선택"}</GlassButton>
-      {isCustom("specification", SPECIFICATION_PRESETS) ? customInput("규격 직접입력", "specification") : null}
-      <PresetChoices label="기준 단위 (필수)" presets={UNIT_PRESETS} selected={isCustom("unitLabel", UNIT_PRESETS) ? null : draft.unitLabel} disabled={busy || !!product?.hasHistory} onSelect={(value) => selectPreset("unitLabel", value)} />
-      {isCustom("unitLabel", UNIT_PRESETS) ? customInput("기준 단위 직접입력", "unitLabel", 20, true) : null}
-      {product?.hasHistory ? <p className={styles.muted}>입출고 기록이 있는 품목은 기준 단위를 바꿀 수 없어요.</p> : null}
-      {!product ? <><LotFields draft={initialLot} onChange={setInitialLot} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} value={initialQuantity} onChange={setInitialQuantity} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
-      <details><summary className={styles.label}>참고 메모 (선택)</summary><label className={styles.field}>메모<textarea maxLength={2000} rows={2} value={draft.note} onChange={(event) => set("note", event.target.value)} disabled={busy} /></label></details>
-      </div>
-      {validationError ? <p role="alert" className={styles.error}>{validationError}</p> : null}
-      {action.error ? <p role="alert" className={styles.error}>{action.error}</p> : null}
-    </form><FormFooter id={id} busy={busy} onClose={onClose} label={product ? "변경 저장" : "품목 등록"} />
-    {specificationPicker ? <BottomSheet open title="규격 선택" onClose={() => setSpecificationPicker(false)}><PresetChoices label="규격" presets={SPECIFICATION_PRESETS} selected={isCustom("specification", SPECIFICATION_PRESETS) ? null : draft.specification} disabled={busy} onSelect={(value) => { selectPreset("specification", value); setSpecificationPicker(false); }} /></BottomSheet> : null}
-  </BottomSheet>;
+export function validLotDraft(draft: InventoryLotDraft, allowLegacy = false) { return (allowLegacy || draft.expiryState !== "not_applicable") && inventoryLotDraftSchema.safeParse(draft).success && (draft.expiryState !== "dated" || isInventoryInputDate(draft.expiryDate ?? "")); }
+export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void };
+export function InventoryProductEditor(props: InventoryProductEditorProps) {
+  return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면을 준비하고 있어요.</p></BottomSheet>}><InventoryProductEditorImpl {...props} /></Suspense>;
 }
 
-function QuantityFields({ product, value, onChange, disabled, minimum = 0, label = "수량" }: { product: Pick<InventoryProduct, "unitLabel">; value: number; onChange: (value: number) => void; disabled: boolean; minimum?: number; label?: string }) {
+export function QuantityFields({ product, value, onChange, disabled, minimum = 0, label = "수량" }: { product: Pick<InventoryProduct, "unitLabel">; value: number; onChange: (value: number) => void; disabled: boolean; minimum?: number; label?: string }) {
   const id = useId();
   const invalid = Number.isFinite(value) && (!Number.isSafeInteger(value) || value < minimum || value > INVENTORY_MAX_QUANTITY);
   const fieldLabel = `${label} (${product.unitLabel || "개"})`;
   return <label className={styles.field}>{fieldLabel}<input type="number" inputMode="numeric" placeholder="예: 10" required min={minimum} max={INVENTORY_MAX_QUANTITY} step={1} value={Number.isFinite(value) ? value : ""} aria-label={fieldLabel} aria-invalid={invalid} aria-describedby={invalid ? `${id}-quantity-error` : undefined} onChange={(event) => onChange(event.target.valueAsNumber)} disabled={disabled} />{invalid ? <span id={`${id}-quantity-error`} className={styles.error}>{value > INVENTORY_MAX_QUANTITY ? "입력 가능한 수량을 초과했어요." : minimum === 0 ? "0 이상의 정수를 입력해주세요." : "1 이상의 정수를 입력해주세요."}</span> : null}</label>;
 }
-function LotFields({ draft, onChange, disabled, dateLabel = "유통기한 날짜", compact = false }: { draft: InventoryLotDraft; onChange: (draft: InventoryLotDraft) => void; disabled: boolean; dateLabel?: string; compact?: boolean }) {
+export function LotFields({ draft, onChange, disabled, dateLabel = "유통기한 날짜", compact = false }: { draft: InventoryLotDraft; onChange: (draft: InventoryLotDraft) => void; disabled: boolean; dateLabel?: string; compact?: boolean }) {
   const id = useId();
   return <><div className={formStyles.expiryFields}><fieldset className={formStyles.expiryStatus} disabled={disabled}><legend>유통기한 상태</legend><div>{(["dated", "unknown"] as const).map((state) => <label key={state}><input type="radio" name={`${id}-expiry-state`} value={state} checked={draft.expiryState === state} onChange={() => onChange({ ...draft, expiryState: state, expiryDate: state === "dated" ? draft.expiryDate ?? "" : null })} /><span>{state === "dated" ? "날짜 입력" : "미확인"}</span></label>)}</div></fieldset>{draft.expiryState === "not_applicable" ? <p className={styles.muted}>기존 ‘해당 없음’ 기록을 유지하고 있어요. 바꾸려면 위에서 상태를 선택해주세요.</p> : null}{draft.expiryState === "dated" ? <InventoryDateField label={dateLabel} value={draft.expiryDate ?? ""} onChange={(value) => onChange({ ...draft, expiryDate: value })} disabled={disabled} /> : null}</div>{!compact ? <details><summary className={styles.label}>추가 구분명 (선택)</summary><label className={styles.field}>재고 구분명<input maxLength={200} placeholder="예: 9월 첫 입고" value={draft.label} onChange={(event) => onChange({ ...draft, label: event.target.value })} disabled={disabled} /></label></details> : null}</>;
 }
-const blankLot: InventoryLotDraft = { label: "", expiryState: "dated", expiryDate: "" };
+export const blankLot: InventoryLotDraft = { label: "", expiryState: "dated", expiryDate: "" };
 const lotOption = (lot: InventoryLot, product: InventoryProduct) => `${inventoryLotDateLabel(lot)} · ${lot.quantity.toLocaleString("ko-KR")} ${product.unitLabel}${lot.label ? ` · ${lot.label}` : ""}`;
 
 export function InventoryMovementForm({ detail, location, kind, initialLotId, inspectionCycleId, onClose, onSaved }: { detail: InventoryProductDetail; location: InventoryLocation; kind: InventoryMovementInput["kind"]; initialLotId?: string; inspectionCycleId?: string; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void }) {

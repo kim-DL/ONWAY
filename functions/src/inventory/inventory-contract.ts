@@ -202,7 +202,7 @@ export type InventoryCycle = z.infer<typeof inventoryCycleSchema>;
 export type InventoryContext = z.infer<typeof inventoryContextSchema>;
 export type InventoryProductDetail = Omit<z.infer<typeof inventoryProductDetailSchema>, "product"> & { product: InventoryProduct };
 export type SaveInventoryProductInput = Omit<z.infer<typeof saveInventoryProductInputSchema>, "draft"> & {
-  draft: InventoryProductDraft; includeManufacturerReference?: boolean | undefined;
+  draft: InventoryProductDraft; includeManufacturerReference?: boolean | undefined; clearManufacturerReference?: boolean | undefined;
 };
 export type InventoryMovementInput = z.infer<typeof inventoryMovementInputSchema>;
 export type InventoryCountInput = z.infer<typeof inventoryCountInputSchema>;

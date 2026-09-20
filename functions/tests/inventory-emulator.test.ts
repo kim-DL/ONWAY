@@ -226,6 +226,19 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     await expect(service.save({ ...productInput, requestId: rejectedId, draft: { ...productInput.draft, name: "비활성 신규 연결" } }, member))
       .rejects.toMatchObject({ code: "failed-precondition", details: { reason: "inventory-manufacturer-inactive" } });
     expect((await db.doc(`${INVENTORY_PRODUCT_PATH}/${rejectedId}`).get()).exists).toBe(false);
+    const clearDraft = { ...productInput.draft, manufacturer: "지워질 snapshot", name: "비활성 연결 해제" };
+    delete clearDraft.manufacturerId;
+    const clearInput: SaveInventoryProductWithManufacturerInput = { requestId: randomUUID(), productId: product.productId,
+      expectedRevision: preserved.revision, clearManufacturerReference: true,
+      draft: clearDraft };
+    const cleared = await service.save(clearInput, member);
+    expect(cleared.manufacturer).toBe("");
+    expect(cleared).not.toHaveProperty("manufacturerId");
+    expect((await db.doc(`${INVENTORY_PRODUCT_PATH}/${product.productId}`).get()).data()).not.toHaveProperty("manufacturerId");
+    expect((await db.doc(`auditLogs/inventory-${clearInput.requestId}`).get()).data()).toMatchObject({
+      eventType: "INVENTORY_PRODUCT_UPDATED", changedFields: expect.arrayContaining(["manufacturer", "manufacturerId"]),
+    });
+    await expect(service.save(clearInput, member)).resolves.toEqual(cleared);
   }, 40_000);
 
   it("keeps all inventory documents behind Callables for both anonymous and authenticated clients", async () => {

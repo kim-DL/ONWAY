@@ -12,7 +12,7 @@ import {
 } from "../src/inventory/inventory-contract.js";
 import { InventoryService } from "../src/inventory/inventory-service.js";
 import {
-  INVENTORY_MANUFACTURER_PATH, type SaveInventoryProductWithManufacturerInput,
+  INVENTORY_MANUFACTURER_PATH, saveInventoryProductWithManufacturerInputSchema, type SaveInventoryProductWithManufacturerInput,
 } from "../src/inventory/inventory-manufacturer-contract.js";
 import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lot-summary.js";
 
@@ -194,7 +194,8 @@ describe("inventory transactions", () => {
     });
     const requestId = randomUUID();
     const linkedInput: SaveInventoryProductWithManufacturerInput = { requestId, productId: null, expectedRevision: null,
-      draft: { ...draft, name: "Master 연결 상품", manufacturer: "직원 입력 오타", manufacturerId } };
+      draft: { ...draft, name: "Master 연결 상품", manufacturer: "직원 입력 오타", manufacturerId },
+      initialStock: { quantity: 1, lot: { label: "", expiryState: "unknown", expiryDate: null } } };
     const linked = await state.service.save(linkedInput, actor);
     expect(linked).toMatchObject({ productId: requestId, manufacturerId, manufacturer: "온누리 식품" });
     expect(state.values.get(`${INVENTORY_PRODUCT_PATH}/${requestId}`)).toMatchObject({ manufacturerId, manufacturer: "온누리 식품" });
@@ -222,6 +223,52 @@ describe("inventory transactions", () => {
       draft: { ...draft, name: "Legacy 문자열 상품", manufacturer: "문자열 제조사" } }, actor);
     expect(legacy).toMatchObject({ manufacturer: "문자열 제조사" });
     expect(legacy).not.toHaveProperty("manufacturerId");
+  });
+
+  it("clears manufacturer references only with explicit write intent while preserving legacy updates", async () => {
+    const state = fixture(); const manufacturerId = randomUUID();
+    state.values.set(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`, {
+      manufacturerId, name: "연결 제조사", normalizedName: "연결제조사", active: true, revision: 1,
+      createdAt: Timestamp.fromDate(initialNow), createdBy: admin.employeeId, updatedAt: Timestamp.fromDate(initialNow),
+    });
+    const linked = await state.service.save({ requestId: randomUUID(), productId: null, expectedRevision: null,
+      draft: { ...draft, manufacturerId, manufacturer: "무시할 입력" } }, actor);
+    const legacyUpdate = await state.service.save({ requestId: randomUUID(), productId: linked.productId,
+      expectedRevision: linked.revision, draft: { ...draft, name: "구형 client 수정", manufacturer: linked.manufacturer } }, actor);
+    expect(legacyUpdate).toMatchObject({ manufacturerId, manufacturer: "연결 제조사" });
+
+    state.values.set(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`, {
+      ...state.values.get(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`), active: false, revision: 2,
+    });
+    const requestId = randomUUID();
+    const clearInput: SaveInventoryProductWithManufacturerInput = { requestId, productId: linked.productId,
+      expectedRevision: legacyUpdate.revision, clearManufacturerReference: true,
+      draft: { ...draft, name: "연결 해제", manufacturer: "남으면 안 되는 값" } };
+    const cleared = await state.service.save(clearInput, actor);
+    expect(cleared).toMatchObject({ manufacturer: "", revision: legacyUpdate.revision + 1 });
+    expect(cleared).not.toHaveProperty("manufacturerId");
+    expect(state.values.get(`${INVENTORY_PRODUCT_PATH}/${linked.productId}`)).not.toHaveProperty("manufacturerId");
+    expect(state.values.get(`auditLogs/inventory-${requestId}`)).toMatchObject({
+      eventType: "INVENTORY_PRODUCT_UPDATED", changedFields: expect.arrayContaining(["manufacturer", "manufacturerId"]),
+    });
+    await expect(state.service.save(clearInput, actor)).resolves.toEqual(cleared);
+    await expect(state.service.save({ ...clearInput, clearManufacturerReference: false }, actor)).rejects.toMatchObject({
+      code: "already-exists", details: { reason: "inventory-request-collision" },
+    });
+    await expect(state.service.save({ ...clearInput, requestId: randomUUID() }, actor)).rejects.toMatchObject({ code: "aborted" });
+
+    const legacy = await state.service.save({ requestId: randomUUID(), productId: null, expectedRevision: null,
+      draft: { ...draft, manufacturer: "문자열 제조사" } }, actor);
+    const clearedLegacy = await state.service.save({ requestId: randomUUID(), productId: legacy.productId,
+      expectedRevision: legacy.revision, clearManufacturerReference: true, draft: { ...draft, manufacturer: "문자열 제조사" } }, actor);
+    expect(clearedLegacy.manufacturer).toBe("");
+    expect(clearedLegacy).not.toHaveProperty("manufacturerId");
+  });
+
+  it("rejects simultaneous manufacturer selection and clear intent at the contract boundary", () => {
+    expect(saveInventoryProductWithManufacturerInputSchema.safeParse({ ...createInput(), clearManufacturerReference: true,
+      draft: { ...draft, manufacturerId: randomUUID() } }).success).toBe(false);
+    expect(saveInventoryProductWithManufacturerInputSchema.safeParse(createInput()).success).toBe(true);
   });
 
   it("rejects a missing manufacturer master atomically", async () => {

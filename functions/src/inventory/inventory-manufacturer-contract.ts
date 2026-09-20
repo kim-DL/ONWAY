@@ -41,7 +41,9 @@ const includeManufacturerReference = z.boolean().optional();
 export const inventoryListWithManufacturerInputSchema = inventoryListInputSchema.extend({ includeManufacturerReference });
 export const getInventoryProductWithManufacturerInputSchema = getInventoryProductInputSchema.extend({ includeManufacturerReference });
 export const saveInventoryProductWithManufacturerInputSchema = saveInventoryProductInputSchema.safeExtend({
-  includeManufacturerReference, draft: inventoryProductDraftWithManufacturerSchema,
+  includeManufacturerReference, clearManufacturerReference: z.boolean().optional(), draft: inventoryProductDraftWithManufacturerSchema,
+}).refine((value) => !(value.clearManufacturerReference && value.draft.manufacturerId), {
+  message: "제조사 선택과 제조사 연결 해제를 동시에 요청할 수 없습니다.", path: ["clearManufacturerReference"],
 });
 export const inventoryMovementWithManufacturerInputSchema = inventoryMovementInputSchema.extend({ includeManufacturerReference });
 export const inventoryCountWithManufacturerInputSchema = inventoryCountInputSchema.extend({ includeManufacturerReference });

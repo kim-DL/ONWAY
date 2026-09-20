@@ -11,7 +11,8 @@ vi.mock("react", async (original) => ({ ...await original<typeof import("react")
 vi.mock("client-only", () => ({}));
 vi.mock("./use-inventory-connection", () => ({ useInventoryConnection: () => harness.online, INVENTORY_OFFLINE_DRAFT_MESSAGE: "연결 후 다시 저장해주세요." }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { save: harness.save, uploadPhoto: harness.upload, movement: harness.movement }, inventoryErrorMessage: () => "다시 확인해주세요." }));
-import { InventoryProductEditor } from "./inventory-forms";
+vi.mock("./inventory-manufacturer-repository", () => ({ inventoryManufacturerRepository: { saveProduct: harness.save } }));
+import { InventoryProductEditorImpl as InventoryProductEditor } from "./inventory-product-editor";
 
 const product = inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "검증용 만두", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 12, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 3, stockRevision: 1, hasHistory: true, quantityByLocation: { ...inventoryLocationMap(0), refrigerated: 29 }, nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1" });
 type Props = Record<string, unknown> & { children?: ReactNode };
@@ -33,9 +34,10 @@ function choosePreset(tree: ReactNode, label: string, value: string | null) {
   (choices.props.onSelect as (value: string | null) => void)(value);
 }
 function openSpecification(tree: ReactNode) {
-  const trigger = find(tree, (_type, props) => props["aria-haspopup"] === "dialog")!;
+  const trigger = find(tree, (_type, props) => props["aria-haspopup"] === "dialog" && String(props.children).includes("규격"))!;
   (trigger.props.onClick as () => void)();
 }
+const manufacturerField = (tree: ReactNode) => find(tree, (_type, props) => typeof props.onSelect === "function" && typeof props.onClear === "function")!;
 function quantity(tree: ReactNode, value: number) { (named(tree, "QuantityFields").props.onChange as (value: number) => void)(value); }
 function expiry(tree: ReactNode, expiryState: InventoryLotDraft["expiryState"], expiryDate: string | null) { (named(tree, "LotFields").props.onChange as (lot: InventoryLotDraft) => void)({ label: "", expiryState, expiryDate }); }
 function submit(tree: ReactNode) { return (find(tree, (type) => type === "form")!.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({ preventDefault: noop }); }
@@ -94,6 +96,33 @@ describe("single-submit inventory registration", () => {
     expect(harness.save.mock.calls[0]![0]).toMatchObject({ productId: product.productId, expectedRevision: 3 });
     expect(harness.save.mock.calls[0]![0].draft.unitsPerBox).toBe(12);
     expect(harness.save.mock.calls[0]![0]).not.toHaveProperty("initialStock");
+  });
+
+  it("stores the canonical reference selected by the deferred manufacturer field", async () => {
+    let tree = filled();
+    (manufacturerField(tree).props.onSelect as (value: { manufacturerId: string; name: string }, save: typeof harness.save) => void)({ manufacturerId: "manufacturer-one", name: "정식 제조사" }, harness.save);
+    tree = render(); await submit(tree);
+    expect(harness.save.mock.calls[0]![0]).toMatchObject({ draft: { manufacturerId: "manufacturer-one", manufacturer: "정식 제조사" } });
+    expect(harness.save.mock.calls[0]![0]).not.toHaveProperty("clearManufacturerReference");
+  });
+
+  it("uses explicit clear intent for 제조사 없음 and removes a linked id from the draft", async () => {
+    const linked = { ...product, manufacturer: "기존 제조사", manufacturerId: "manufacturer-one" };
+    let tree = render(linked); const field = manufacturerField(tree);
+    expect(field.props).toMatchObject({ productId: product.productId, name: "기존 제조사" });
+    expect(field.props).not.toHaveProperty("manufacturerId");
+    (field.props.onClear as (save: typeof harness.save) => void)(harness.save); tree = render(linked); await submit(tree);
+    expect(harness.save.mock.calls[0]![0]).toMatchObject({ clearManufacturerReference: true, draft: { manufacturer: "" } });
+    expect(harness.save.mock.calls[0]![0].draft).not.toHaveProperty("manufacturerId");
+  });
+
+  it("preserves legacy manufacturer text while the deferred field is left unchanged", async () => {
+    const legacy = { ...product, manufacturer: "레거시 제조사" };
+    const tree = render(legacy);
+    expect(manufacturerField(tree).props).toMatchObject({ name: "레거시 제조사" });
+    await submit(tree);
+    expect(harness.save.mock.calls[0]![0].draft).toMatchObject({ manufacturer: "레거시 제조사" });
+    expect(harness.save.mock.calls[0]![0].draft).not.toHaveProperty("manufacturerId");
   });
 
   it.each(["국내산", "수입산", "미확인"])("stores the origin preset %s as the existing string field", async (origin) => {

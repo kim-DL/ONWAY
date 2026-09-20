@@ -61,6 +61,13 @@ describe("inventory callable confirmation and privacy boundaries", () => {
     expect(fixture.authorize.mock.calls.map((call) => call[1])).toEqual(["write", "write"]);
   });
 
+  it("passes explicit manufacturer clear intent without changing strict legacy responses", async () => {
+    fixture.save.mockResolvedValueOnce(product);
+    const result = await saveInventoryProduct.run(request({ ...input, clearManufacturerReference: true }).value);
+    expect(fixture.save.mock.calls[0]![0]).toMatchObject({ clearManufacturerReference: true });
+    expect(inventoryProductSchema.strict().parse(result)).toEqual(product);
+  });
+
   it("keeps master identifiers intact and applies read/write/admin callable access", async () => {
     const manufacturer = { manufacturerId: "manufacturer-one", name: "온누리 식품", normalizedName: "온누리식품",
       active: true, revision: 1, createdAt: "2026-09-21T01:00:00.000Z", createdBy: actor.employeeId,

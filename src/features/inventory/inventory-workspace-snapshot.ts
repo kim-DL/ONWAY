@@ -24,9 +24,13 @@ type InventorySessionEntry = {
 };
 
 let entry: InventorySessionEntry | null = null;
+let clearInventorySessionMemory: (() => void) | null = null;
+
+export function registerInventorySessionMemoryClear(clear: () => void) { clearInventorySessionMemory = clear; }
 
 export function getInventoryWorkspaceSession(namespace: string) {
   if (entry?.namespace !== namespace) {
+    clearInventorySessionMemory?.();
     entry?.coordinator.invalidate();
     entry?.reconciler.dispose();
     entry = {
@@ -90,6 +94,7 @@ export function updateInventorySnapshotContext(namespace: string, context: Inven
 
 export function clearInventoryWorkspaceSnapshot(namespace?: string) {
   if (!entry || namespace && entry.namespace !== namespace) return;
+  clearInventorySessionMemory?.();
   entry.coordinator.invalidate();
   entry.reconciler.dispose();
   entry = null;

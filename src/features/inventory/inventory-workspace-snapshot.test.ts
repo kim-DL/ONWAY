@@ -3,9 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { inventoryLocationMap, type InventoryContext, type InventoryProduct } from "@/domain/inventory";
 
 import {
-  clearInventoryWorkspaceSnapshot, commitInventoryCatalog, discardInventoryWorkspaceCatalog, getInventoryWorkspaceSession, subscribeInventoryCatalog,
-  updateInventorySnapshotProduct, updateInventoryWorkspaceUi,
+  clearInventoryWorkspaceSnapshot, commitInventoryCatalog, discardInventoryWorkspaceCatalog, getInventoryWorkspaceSession,
+  subscribeInventoryCatalog, updateInventorySnapshotProduct, updateInventoryWorkspaceUi,
 } from "./inventory-workspace-snapshot";
+import { readRecentInventoryManufacturers, rememberInventoryManufacturer } from "./inventory-manufacturer-session";
 
 const context = { today: "2026-09-20", settings: { urgentDays: 7 } } as InventoryContext;
 const product = (revision = 1) => ({
@@ -16,6 +17,19 @@ const product = (revision = 1) => ({
 afterEach(() => clearInventoryWorkspaceSnapshot());
 
 describe("inventory workspace memory snapshot", () => {
+  it("keeps five deduplicated recent manufacturers only inside the current session namespace", () => {
+    getInventoryWorkspaceSession("session-a");
+    for (let index = 1; index <= 6; index += 1) rememberInventoryManufacturer("session-a", { manufacturerId: `m-${index}`, name: `제조사 ${index}` });
+    rememberInventoryManufacturer("session-a", { manufacturerId: "m-4", name: "제조사 4 최신" });
+    expect(readRecentInventoryManufacturers("session-a").map((item) => item.manufacturerId)).toEqual(["m-4", "m-6", "m-5", "m-3", "m-2"]);
+    expect(readRecentInventoryManufacturers("session-b")).toEqual([]);
+    getInventoryWorkspaceSession("session-b");
+    expect(readRecentInventoryManufacturers("session-a")).toEqual([]);
+    expect(readRecentInventoryManufacturers("session-b")).toEqual([]);
+    rememberInventoryManufacturer("session-b", { manufacturerId: "m-b", name: "다른 세션" });
+    clearInventoryWorkspaceSnapshot();
+    expect(readRecentInventoryManufacturers("session-b")).toEqual([]);
+  });
   it("stores only catalog and list UI for one namespace", () => {
     getInventoryWorkspaceSession("A:1:1");
     commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", lastSuccessAt: 1_000 });

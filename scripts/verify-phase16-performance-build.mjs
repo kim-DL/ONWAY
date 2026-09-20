@@ -94,14 +94,19 @@ const adminInterfaceGzipBytes = adminInterfaceStylesheets.reduce((sum, asset) =>
 // Account for its new UI separately, never by relaxing existing app budgets.
 const inventoryWorkspaceEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-workspace"));
 const inventoryPhotoEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-photo-viewer"));
+const inventoryManufacturerEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-picker"));
+const inventoryManufacturerFieldEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-field"));
 const inventoryEntries = [...inventoryWorkspaceEntries, ...inventoryPhotoEntries];
 const inventoryWorkspaceAssetNames = new Set(inventoryWorkspaceEntries.flatMap((entry) => entry.files));
 const inventoryAssetNames = new Set(inventoryEntries.flatMap((entry) => entry.files));
+const inventoryManufacturerAssetNames = new Set(inventoryManufacturerEntries.flatMap((entry) => entry.files));
+const inventoryManufacturerFieldAssetNames = new Set(inventoryManufacturerFieldEntries.flatMap((entry) => entry.files));
 // The workspace owns its form/detail styles; the lazy viewer can reuse those
 // already-loaded styles. Its shared morph/gallery CSS is a separate existing
 // envelope. Use file sets rather than sums of per-boundary lists (staff/admin
 // and multiple viewers refer to the same physical files).
 const inventoryStylesheets = stylesheets.filter((asset) => inventoryAssetNames.has(asset.asset) && !photoMorphAssets.has(asset.asset));
+const inventoryManufacturerStylesheets = stylesheets.filter((asset) => inventoryManufacturerAssetNames.has(asset.asset));
 const inventoryStylesheetRawBytes = inventoryStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryStylesheetGzipBytes = inventoryStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryJavascriptGzipBytes = [...inventoryAssetNames].filter((asset) => asset.endsWith(".js"))
@@ -116,7 +121,13 @@ const inventorySharedPhotoStylesheetRawBytes = inventorySharedPhotoStylesheets.r
 const inventorySharedPhotoStylesheetGzipBytes = inventorySharedPhotoStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryWithPhotoStylesheetRawBytes = inventoryStylesheetRawBytes + inventorySharedPhotoStylesheetRawBytes;
 const inventoryWithPhotoStylesheetGzipBytes = inventoryStylesheetGzipBytes + inventorySharedPhotoStylesheetGzipBytes;
-const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset));
+const inventoryManufacturerJavascriptGzipBytes = [...inventoryManufacturerAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const inventoryManufacturerFieldJavascriptGzipBytes = [...inventoryManufacturerFieldAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const inventoryManufacturerStylesheetRawBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
+const inventoryManufacturerStylesheetGzipBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -127,6 +138,16 @@ const initialStylesheets = new Set(readInitialHtmlAssets("css"));
 const legacyDynamicAssets = new Set(dynamicEntries.filter((entry) => !customerEntries.includes(entry)).flatMap((entry) => entry.files));
 assertBudget(inventoryWorkspaceEntries.length === 2 && inventoryPhotoEntries.length === 1,
   "inventory must retain two staff/admin workspace entries and one deferred photo viewer");
+assertBudget(inventoryManufacturerEntries.length === 1, "inventory manufacturer picker must retain one deferred boundary");
+assertBudget(inventoryManufacturerFieldEntries.length === 1, "inventory manufacturer trigger must retain one deferred boundary");
+for (const asset of inventoryManufacturerFieldAssetNames) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `manufacturer trigger asset ${asset} must stay deferred`);
+}
+for (const asset of inventoryManufacturerAssetNames) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `manufacturer picker asset ${asset} must stay deferred`);
+  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryManufacturerEntries.includes(entry)),
+    `manufacturer picker asset ${asset} must not merge into the inventory base or unrelated modes`);
+}
 for (const asset of inventoryStylesheets) {
   assertBudget(!initialStylesheets.has(asset.asset), "inventory CSS must not load on the login page");
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset.asset)).every((entry) => inventoryEntries.includes(entry)),
@@ -138,7 +159,7 @@ for (const asset of inventoryAssetNames) {
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryEntries.includes(entry)),
     `inventory asset ${asset} must not leak into unrelated work modes`);
 }
-for (const asset of stylesheets.filter((item) => !inventoryStylesheets.includes(item))) {
+for (const asset of stylesheets.filter((item) => !inventoryStylesheets.includes(item) && !inventoryManufacturerStylesheets.includes(item))) {
   assertBudget(!/\.inventory(?:-[\w-]+)?_[\w-]+__/u.test(readFileSync(join(nextRoot, asset.asset), "utf8")),
     `inventory scoped CSS must not be merged into unrelated/shared asset ${asset.asset}`);
 }
@@ -151,7 +172,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 3 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the three approved photo viewers");
 }
-const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets];
+const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -311,6 +332,10 @@ const report = {
     inventoryJavascriptGzipBytes,
     inventoryWorkspaceJavascriptGzipBytes,
     inventoryViewerJavascriptGzipBytes,
+    inventoryManufacturerJavascriptGzipBytes,
+    inventoryManufacturerFieldJavascriptGzipBytes,
+    inventoryManufacturerStylesheetRawBytes,
+    inventoryManufacturerStylesheetGzipBytes,
     inventorySharedPhotoStylesheetRawBytes,
     inventorySharedPhotoStylesheetGzipBytes,
     inventoryWithPhotoStylesheetRawBytes,
@@ -321,6 +346,8 @@ const report = {
     viewerAdditionalAssets: inventoryViewerAdditionalAssets,
     exclusiveStylesheets: inventoryStylesheets,
     sharedPhotoStylesheets: inventorySharedPhotoStylesheets,
+    manufacturerPickerAssets: [...inventoryManufacturerAssetNames].map(sizeAsset),
+    manufacturerFieldAssets: [...inventoryManufacturerFieldAssetNames].map(sizeAsset),
     note: "Shared photo styles count once in global totals; inventoryWithPhoto measurements describe the complete visited flow, not an additional budget charge.",
   },
   initial,

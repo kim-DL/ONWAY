@@ -7,14 +7,15 @@ import { defaultInventorySettings, inventoryCycle, inventoryToday, nextInventory
 import {
   INVENTORY_COMPANY_ID, INVENTORY_CYCLE_PATH, INVENTORY_LOCATIONS, INVENTORY_MAX_LOTS,
   INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryEventSchema, inventoryInitialStockSchema, inventoryLocationMap, inventoryLotSchema,
-  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryMutationResultSchema, inventoryQuantitySchema, inventorySettingsSchema, inventoryStatusChangeSchema,
+  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryQuantitySchema, inventorySettingsSchema, inventoryStatusChangeSchema,
   type DeleteInventoryProductInput, type InventoryCountInput, type InventoryEvent, type InventoryLocation,
   type InventoryLot, type InventoryLotChange, type InventoryMovementInput, type InventoryMutationResult, type InventoryProduct, type InventoryStatusChange,
   type InventorySettings, type SetInventoryProductStatusInput,
   type UpdateInventoryLotInput, type UpdateInventorySettingsInput,
 } from "./inventory-contract.js";
 import {
-  INVENTORY_MANUFACTURER_PATH, inventoryManufacturerSchema, inventoryProductWithManufacturerSchema,
+  INVENTORY_MANUFACTURER_PATH, inventoryManufacturerSchema, inventoryMutationResultWithManufacturerSchema,
+  inventoryProductWithManufacturerSchema,
   type SaveInventoryProductWithManufacturerInput,
 } from "./inventory-manufacturer-contract.js";
 import { resolveInventoryPhotoChange } from "./inventory-photo-store.js";
@@ -182,8 +183,10 @@ export class InventoryService {
       if (current?.hasHistory && unitChanged) {
         throw new HttpsError("failed-precondition", "이력이 있는 상품은 재고 단위를 바꿀 수 없습니다. 규격이 달라졌다면 새 상품으로 등록해주세요.", { reason: "inventory-unit-locked" });
       }
-      const manufacturerId = input.draft.manufacturerId ?? current?.manufacturerId;
-      let draft = input.draft;
+      const clearManufacturerReference = input.clearManufacturerReference === true;
+      const manufacturerId = clearManufacturerReference ? undefined : input.draft.manufacturerId ?? current?.manufacturerId;
+      let draft = clearManufacturerReference ? { ...input.draft, manufacturer: "" } : input.draft;
+      if (clearManufacturerReference) delete draft.manufacturerId;
       if (manufacturerId) {
         const manufacturerSnapshot = await transaction.get(this.db.doc(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`));
         if (!manufacturerSnapshot.exists) throw new HttpsError("failed-precondition", "선택한 제조사를 찾을 수 없습니다.", { reason: "inventory-manufacturer-missing" });
@@ -208,7 +211,8 @@ export class InventoryService {
         ...(current?.lotSummary ? { lotSummary: current.lotSummary } : !current ? { lotSummary: summarizeInventoryLotGroups([]) } : {}),
         createdAt: current?.createdAt ?? now.toISOString(), updatedAt: now.toISOString(),
         createdBy: current?.createdBy ?? actor.employeeId, updatedBy: actor.employeeId });
-      const changedFields = [...Object.keys(draft), ...(input.photoChange ? ["photo"] : [])];
+      const changedFields = [...Object.keys(draft), ...(clearManufacturerReference && current?.manufacturerId ? ["manufacturerId"] : []),
+        ...(input.photoChange ? ["photo"] : [])];
       if (input.initialStock) {
         const locationId = input.draft.defaultLocationId;
         const lot = inventoryLotSchema.parse({ ...input.initialStock.lot,
@@ -289,7 +293,7 @@ export class InventoryService {
     this.audit(transaction, input, actor, now, auditOverride?.eventType ?? `INVENTORY_${kind.toUpperCase()}`, input.productId,
       auditOverride?.changedFields ?? (kind.startsWith("count_") ? ["count", ...(quantityChanged ? ["quantity"] : [])] : [kind === "lot_update" ? "lot" : "quantity"]), input.reason,
       lotMetadataChange ? { inventoryLotChange: inventoryLotChangeSchema.parse({ productName: product.name, unitLabel: product.unitLabel, ...lotMetadataChange }) } : undefined);
-    return inventoryMutationResultSchema.parse({ product: next, event, replayed: false,
+    return inventoryMutationResultWithManufacturerSchema.parse({ product: next, event, replayed: false,
       ...(input.includeDetail ? { detail: { product: next, lots: activeSortedLots(lots) } } : {}) });
   }
   async move(input: InventoryMovementInput, actor: InventoryActor): Promise<InventoryMutationResult> {

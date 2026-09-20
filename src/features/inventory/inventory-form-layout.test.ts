@@ -7,7 +7,8 @@ vi.mock("client-only", () => ({}));
 // Render the sheet contents without its client-only footer portal in this SSR layout test.
 vi.mock("@/components/ui/bottom-sheet", async (original) => ({ ...await original<typeof import("@/components/ui/bottom-sheet")>(), BottomSheet: ({ children }: { children: ReactNode }) => h("section", null, children) }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: {}, inventoryErrorMessage: () => "검증용 오류" }));
-import { InventoryCountForm, InventoryLotEditor, InventoryMovementForm, InventoryProductEditor, InventoryStatusForm } from "./inventory-forms";
+import { InventoryCountForm, InventoryLotEditor, InventoryMovementForm, InventoryStatusForm } from "./inventory-forms";
+import { InventoryProductEditorImpl as InventoryProductEditor } from "./inventory-product-editor";
 
 const product = inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "검증용 만두", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 12, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 3, stockRevision: 1, hasHistory: true, quantityByLocation: { ...inventoryLocationMap(0), refrigerated: 29 }, nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1" });
 const lot: InventoryLot = { lotId: "lot-1", productId: product.productId, originLotId: "lot-1", locationId: "refrigerated", label: "별도 구분용 이름", expiryState: "dated", expiryDate: "2026-12-01", quantity: 29, revision: 1, createdAt: product.createdAt, updatedAt: product.updatedAt };

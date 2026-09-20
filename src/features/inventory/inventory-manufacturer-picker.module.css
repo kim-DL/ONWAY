@@ -1,0 +1,21 @@
+.picker { --manufacturer-picker-ui: 1; display: grid; gap: 16px; min-width: 0; padding: 0 0 12px; color: #263449; }
+.status { margin: 0; color: #60758b; font-size: 13px; line-height: 1.6; }
+.error { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fff0ee; color: #9a3028; font-size: 13px; line-height: 1.55; }
+.section { display: grid; gap: 8px; min-width: 0; }
+.section h3 { margin: 0; color: #344154; font-size: 13px; font-weight: 650; }
+.recent { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.recent button { min-height: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid #c9d8e6; border-radius: 999px; background: #edf4fb; color: #345b7c; font: inherit; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; cursor: pointer; }
+.field { display: grid; gap: 6px; min-width: 0; color: #344154; font-size: 13px; font-weight: 650; }
+.field input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 48px; padding: 11px 12px; border: 1px solid #cfd9e5; border-radius: 9px; background: #fff; color: #263449; font: inherit; font-size: 16px; }
+.list { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.option { display: flex; align-items: center; justify-content: space-between; gap: 10px; box-sizing: border-box; width: 100%; min-width: 0; min-height: 48px; padding: 10px 12px; border: 1px solid #d5dfe8; border-radius: 8px; background: #f7fafc; color: #33485d; font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.option > span { min-width: 0; overflow-wrap: anywhere; }
+.option[aria-selected="true"] { border-color: #95b9dc; background: #e5f1fc; color: #225887; }
+.option:focus-visible, .recent button:focus-visible, .field input:focus-visible { outline: 3px solid #3182f6; outline-offset: 2px; }
+.current { margin: 0; padding: 10px 12px; border: 1px dashed #cbd6e0; border-radius: 8px; background: #f5f7f9; color: #536579; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.current strong { display: block; color: #344154; }
+.add { width: 100%; justify-content: center; }
+.candidateHelp { margin: 0; color: #68788b; font-size: 12px; line-height: 1.55; }
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.actions :global(.glass-button) { min-width: 0; min-height: 48px; justify-content: center; }
+@media (max-width: 380px) { .picker { gap: 13px; } .option { padding-inline: 10px; } }
