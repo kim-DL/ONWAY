@@ -327,6 +327,13 @@ Functions는 전체 무차별 배포를 피하고 변경된 Callable 목록과 �
 - 남은 위험은 실제 Galaxy S20+·현장망 및 8명 동시 사용에서의 T2/T3/read 감소 미계측, 의도된 탭 Memory 수명, 60초 TTL 내 타 사용자 write 지연 가능성, customer lazy budget 잔여 52B와 inventory lazy 잔여 437B다. npm audit의 firebase-tools 계열 moderate 7건은 P1의 문서화된 일시 예외이며 dependency는 변경하지 않았다.
 - **P2 checkpoint 승인 요청 가능 — 아직 미커밋/미배포**
 
+### 2026-09-20 P2 운영 배포·Galaxy S20+ 체감 검증 — 완료
+
+- checkpoint `4f0407c10eacc2b219ab805c543148f8f63efa96`을 Firebase Hosting release `1789911750990000`, version `86903327ba3c41a4`로 배포했다. 두 production origin verifier와 worker SHA가 일치했고, PWA 업데이트 뒤 로그인 유지가 정상이며 console warning/error는 0건이었다. rollback은 필요하지 않다.
+- 실제 Galaxy S20+에서 모드 재진입 시 이전처럼 전체 loading을 다시 기다리는 느낌이 사라졌고, 방금 보던 목록 위치·scroll 위치·검색/필터 상태가 즉시 복원됐다. 사용자는 이전 버전보다 체감속도가 명확히 빨라졌다고 확인했다. 이는 사용자 체감 확인이며 ms 기반 T2/T3 현장 계측 결과는 아니다.
+- 기존 last-success 60초 TTL과 인증 namespace별 Memory-only 경계는 유지한다. 8명 동시 사용의 실제 read 비용은 아직 미측정이다.
+- 현 시점에서는 inventory detail cache나 제한적 JS prefetch를 추가할 필요성이 확인되지 않았다. **P2 완료 — checkpoint/운영 배포/실기기 체감 검증 완료**
+
 ### P3 — 디자인 디테일
 
 1. 실기기에서 재고 카드 밀도, 토글/checkbox alignment, 사진 확대 affordance와 고정 action의 safe-area/키보드 겹침을 점검한다.
