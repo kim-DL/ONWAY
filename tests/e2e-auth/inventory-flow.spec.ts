@@ -63,6 +63,16 @@ async function login(page: Page, pin: string) {
   await expect(page.getByRole("status").filter({ hasText: "재고를 불러오고" })).toHaveCount(0);
   return authorization!;
 }
+async function openListOptions(page: Page) {
+  await page.getByRole("button", { name: "목록 옵션", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "목록 옵션", exact: true });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+async function closeListOptions(sheet: Locator) {
+  await sheet.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+}
 async function capture(page: Page, info: TestInfo, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
@@ -107,32 +117,16 @@ async function captureInventoryList(page: Page, info: TestInfo, name: string) {
   if (geometry.writer) expect(geometry.paddingBottom, "sticky action must leave final rows reachable").toBeGreaterThanOrEqual(geometry.actionInset + 16);
   const controls = await workspace.evaluate((element) => {
     const search = element.querySelector('input[aria-label="품목 검색"]')!.closest("label")!.getBoundingClientRect();
-    const tools = element.querySelector('[class*="catalogTools"]')!;
-    const toolLabels = Array.from(tools.querySelectorAll(":scope > label"), (label) => label.getBoundingClientRect().toJSON());
-    const countLabel = element.querySelector('[aria-label="재고조사 ON"], [aria-label="재고조사 OFF"]')!;
-    const countState = countLabel.querySelector("small")!;
+    const options = element.querySelector('button[aria-label="목록 옵션"]')!.getBoundingClientRect();
     return {
-      search: search.toJSON(), tools: tools.getBoundingClientRect().toJSON(), toolLabels,
-      toolsDisplay: getComputedStyle(tools).display,
-      toolsColumns: getComputedStyle(tools).gridTemplateColumns.split(" ").length,
-      countLabel: { display: getComputedStyle(countLabel).display, rect: countLabel.getBoundingClientRect().toJSON() },
-      countState: countState.getBoundingClientRect().toJSON(),
+      search: search.toJSON(), options: options.toJSON(),
     };
   });
   expect(controls.search.height).toBeGreaterThanOrEqual(48);
-  expect(controls.toolsDisplay).toBe("grid");
-  expect(controls.toolsColumns).toBe(3);
-  expect(controls.toolLabels).toHaveLength(3);
-  expect(controls.search.bottom).toBeLessThanOrEqual(controls.tools.top);
-  for (const label of controls.toolLabels) expect(label.height).toBeGreaterThanOrEqual(44);
-  expect(controls.toolLabels[0]!.right).toBeLessThanOrEqual(controls.toolLabels[1]!.left + 1);
-  expect(controls.toolLabels[1]!.right).toBeLessThanOrEqual(controls.toolLabels[2]!.left + 1);
-  expect(controls.toolLabels[0]!.left).toBeGreaterThanOrEqual(geometry.contentLeft - 0.5);
-  expect(controls.toolLabels[2]!.right).toBeLessThanOrEqual(geometry.contentRight + 0.5);
-  // An inline-grid is blockified to grid as a flex item; the important
-  // regression boundary is that the label is no longer flexing both lines.
-  expect(controls.countLabel.display).toBe("grid");
-  expect(controls.countState.top).toBeGreaterThan(controls.countLabel.rect.top);
+  expect(controls.options.width).toBeGreaterThanOrEqual(48);
+  expect(controls.options.height).toBeGreaterThanOrEqual(48);
+  expect(controls.search.right).toBeLessThanOrEqual(controls.options.left);
+  expect(controls.options.right).toBeLessThanOrEqual(geometry.contentRight + 0.5);
   await capture(page, info, name);
 }
 async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, name: string) {
@@ -356,12 +350,72 @@ test.afterEach(async ({ page }, info) => {
   }
 });
 
+test("360px list options keep readable row toggles and a persistent count-mode segment", async ({ page }, info) => {
+  const consoleIssues: string[] = [];
+  page.on("console", (message) => { if (["warning", "error"].includes(message.type())) consoleIssues.push(message.text()); });
+  page.on("pageerror", (error) => consoleIssues.push(error.message));
+  await login(page, PHASE3_TEST_PINS.delivery);
+
+  let sheet = await openListOptions(page);
+  let inactive = sheet.getByRole("checkbox", { name: "비활성 품목 보기", exact: true });
+  let urgent = sheet.getByRole("checkbox", { name: "임박 상품만 보기 D-100일", exact: true });
+  let countMode = sheet.getByRole("switch", { name: "재고조사 모드", exact: true });
+  const geometry = await sheet.evaluate((dialog) => {
+    const inputs = [...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    const rows = inputs.map((input) => {
+      const row = input.closest("label")!;
+      const label = row.querySelector(":scope > span:not([aria-hidden])")!;
+      const rowRect = row.getBoundingClientRect();
+      const inputRect = input.getBoundingClientRect();
+      const labelRect = label.getBoundingClientRect();
+      return { height: rowRect.height, inputLeft: inputRect.left, labelLeft: labelRect.left, fontSize: parseFloat(getComputedStyle(label).fontSize) };
+    });
+    const control = inputs.find((input) => input.getAttribute("role") === "switch")!.closest("label")!.lastElementChild!;
+    return {
+      rows,
+      segmentWidth: control.getBoundingClientRect().width,
+      segmentTargets: [...control.children].map((child) => child.getBoundingClientRect().height),
+      sheetFits: dialog.scrollWidth <= dialog.clientWidth,
+      pageFits: document.documentElement.scrollWidth <= innerWidth,
+    };
+  });
+  expect(geometry.sheetFits).toBe(true);
+  expect(geometry.pageFits).toBe(true);
+  expect(geometry.rows.slice(0, 2).every((row) => row.height >= 56 && row.inputLeft < row.labelLeft && row.fontSize >= 16)).toBe(true);
+  expect(geometry.rows[2]!.height).toBeGreaterThanOrEqual(64);
+  expect(geometry.segmentWidth).toBeGreaterThanOrEqual(150);
+  expect(geometry.segmentTargets.every((height) => height >= 40)).toBe(true);
+
+  await inactive.locator("..").click(); await expect(inactive).toBeChecked();
+  await inactive.locator("..").click(); await expect(inactive).not.toBeChecked();
+  await urgent.locator("..").click(); await expect(urgent).toBeChecked();
+  await countMode.locator("..").click(); await expect(countMode).toBeChecked();
+  await capture(page, info, "inventory-list-options-360");
+  await closeListOptions(sheet);
+  await expect(page.getByRole("status").filter({ hasText: "재고조사 ON" })).toBeVisible();
+
+  sheet = await openListOptions(page);
+  inactive = sheet.getByRole("checkbox", { name: "비활성 품목 보기", exact: true });
+  urgent = sheet.getByRole("checkbox", { name: "임박 상품만 보기 D-100일", exact: true });
+  countMode = sheet.getByRole("switch", { name: "재고조사 모드", exact: true });
+  await expect(inactive).not.toBeChecked();
+  await expect(urgent).toBeChecked();
+  await expect(countMode).toBeChecked();
+  await urgent.uncheck();
+  await countMode.uncheck();
+  await closeListOptions(sheet);
+  await expect(page.getByRole("status").filter({ hasText: "재고조사 ON" })).toHaveCount(0);
+  expect(consoleIssues).toEqual([]);
+});
+
 test.describe("registered product and access controls", () => {
 test.describe.configure({ mode: "serial" });
 
 test("PIN user registers a photographed product, receives/counts/issues stock, and replaces/removes its private photo", async ({ page }, info) => {
   const token = await login(page, PHASE3_TEST_PINS.delivery);
-  await expect(page.getByRole("switch", { name: "재고조사 모드", exact: true })).not.toBeChecked();
+  let listOptions = await openListOptions(page);
+  await expect(listOptions.getByRole("switch", { name: "재고조사 모드", exact: true })).not.toBeChecked();
+  await closeListOptions(listOptions);
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(productName);
@@ -392,8 +446,17 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   const originChoices = editor.getByRole("group", { name: "원산지", exact: true });
   const unitChoices = editor.getByRole("group", { name: "기준 단위 (필수)", exact: true });
   await expect(originChoices.getByRole("radio")).toHaveCount(4);
-  await expect(unitChoices.getByRole("radio")).toHaveCount(6);
-  await expect(unitChoices.getByRole("radio", { name: "개", exact: true })).toBeChecked();
+  await expect(unitChoices.getByRole("radio")).toHaveCount(5);
+  await expect(unitChoices.getByRole("radio", { name: "낱개", exact: true })).toBeChecked();
+  await expect(unitChoices.getByRole("radio", { name: "봉", exact: true })).toBeVisible();
+  await expect(unitChoices.getByRole("radio", { name: "팩", exact: true })).toBeVisible();
+  const bottleUnit = unitChoices.getByRole("radio", { name: "병", exact: true });
+  const customUnit = unitChoices.getByRole("radio", { name: "직접입력", exact: true });
+  await expect(bottleUnit).toBeVisible();
+  await expect(customUnit).toBeVisible();
+  const unitLayout = await Promise.all([bottleUnit, customUnit].map((radio) => radio.evaluate((input) => input.closest("label")!.getBoundingClientRect().toJSON())));
+  expect(Math.abs(unitLayout[0]!.top - unitLayout[1]!.top)).toBeLessThanOrEqual(1);
+  expect(unitLayout[1]!.width).toBeGreaterThanOrEqual(unitLayout[0]!.width * 1.9);
   await originChoices.getByRole("radio", { name: "직접입력", exact: true }).check();
   const customOrigin = editor.getByLabel("원산지 직접입력", { exact: true });
   await expect(customOrigin).toBeFocused();
@@ -481,15 +544,19 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await page.setViewportSize({ width: 360, height: 800 });
   expect((await call("getInventoryPhoto", token, { productId, photoId: firstPhotoId, variant: "preview" })).cache).toContain("no-store");
   await detail.getByRole("button", { name: "닫기", exact: true }).click();
-  const urgentToggle = page.getByRole("checkbox", { name: /임박 상품만/ });
+  listOptions = await openListOptions(page);
+  const urgentToggle = listOptions.getByRole("checkbox", { name: /임박 상품만/ });
   await expect(urgentToggle).toHaveAccessibleName("임박 상품만 보기 D-100일");
   await urgentToggle.check();
+  await closeListOptions(listOptions);
   const registeredCard = page.getByRole("button", { name: new RegExp(`${productName}, .*상세 보기`) });
   await expect(registeredCard).toBeVisible();
   await expect(registeredCard.getByText(/유통기한별 수량/)).toHaveCount(0);
   await expect(registeredCard.locator('[data-inventory-photo="ready"] img')).toBeVisible();
   await captureInventoryList(page, info, "inventory-d100-filter-360");
-  await urgentToggle.uncheck();
+  listOptions = await openListOptions(page);
+  await listOptions.getByRole("checkbox", { name: /임박 상품만/ }).uncheck();
+  await closeListOptions(listOptions);
   detail = await openProduct(page);
 
   await detail.getByRole("button", { name: "입고", exact: true }).click();
@@ -505,7 +572,9 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await expect.poll(async () => (await storedProduct()).quantityByLocation.refrigerated).toBe(19);
   await detail.getByRole("button", { name: "닫기", exact: true }).click();
   await expect(registeredCard.getByText(/유통기한별 수량/)).toHaveText("유통기한별 수량 2");
-  await page.getByRole("switch", { name: "재고조사 모드", exact: true }).check();
+  listOptions = await openListOptions(page);
+  await listOptions.getByRole("switch", { name: "재고조사 모드", exact: true }).check();
+  await closeListOptions(listOptions);
   detail = await openProduct(page);
   await detail.getByRole("button", { name: "수량 일치 확인", exact: true }).click();
   const count = page.getByRole("dialog", { name: "실물 수량 확인", exact: true });
@@ -581,8 +650,8 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await detail.getByRole("button", { name: "품목 정보 수정", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "품목 정보 수정", exact: true });
   const lockedUnits = edit.getByRole("group", { name: "기준 단위 (필수)", exact: true }).getByRole("radio");
-  await expect(lockedUnits).toHaveCount(6);
-  for (let index = 0; index < 6; index += 1) await expect(lockedUnits.nth(index)).toBeDisabled();
+  await expect(lockedUnits).toHaveCount(5);
+  for (let index = 0; index < 5; index += 1) await expect(lockedUnits.nth(index)).toBeDisabled();
   await expect(edit.locator('input[type="file"]')).toHaveCount(1);
   await edit.getByLabel("제품 사진 직접 촬영").setInputFiles({ name: "inventory-demo-replacement.jpg", mimeType: "image/jpeg", buffer: replacementPhoto });
   await expect(edit.getByRole("img", { name: "저장할 제품 사진 미리보기" })).toBeVisible();
@@ -620,7 +689,7 @@ test("viewer uses the same PIN UI but all stock/photo/admin writes are denied by
   const token = await login(page, PHASE3_TEST_PINS.salesB);
   await expect(page.getByText(/개 품목 · 읽기 전용/)).toBeVisible();
   await expect(page.getByRole("button", { name: "새 품목 등록", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("switch", { name: "재고조사 모드", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "목록 옵션", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: new RegExp(`${productName}, .*상세 보기`) }).click();
   const detail = page.getByRole("dialog", { name: productName, exact: true });
   await expect(detail.getByRole("button", { name: "더보기", exact: true })).toBeVisible();
@@ -669,7 +738,7 @@ test("a staff member deactivates, reactivates and deletes stock with history whi
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(name);
-  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (개)", exact: true }).fill("20");
+  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (낱개)", exact: true }).fill("20");
   await editor.getByLabel("첫 유통기한 날짜", { exact: true }).fill(expiryAfter(30));
   await submitMutation(page, editor, "품목 등록", "saveInventoryProduct");
   const detail = page.getByRole("dialog", { name, exact: true });
@@ -689,7 +758,9 @@ test("a staff member deactivates, reactivates and deletes stock with history whi
   await detail.getByRole("button", { name: "닫기", exact: true }).click();
   const card = page.getByRole("button", { name: new RegExp(`${name}, .*상세 보기`) });
   await expect(card).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "비활성 품목 보기", exact: true }).check();
+  const listOptions = await openListOptions(page);
+  await listOptions.getByRole("checkbox", { name: "비활성 품목 보기", exact: true }).check();
+  await closeListOptions(listOptions);
   await expect(card).toBeVisible(); await card.click();
   await (await openMore(page, detail)).getByRole("button", { name: "다시 활성화", exact: true }).click();
   const reactivate = page.getByRole("dialog", { name: "품목 다시 활성화", exact: true });
@@ -727,7 +798,7 @@ test("an offline registration draft stays in memory and saves only after an expl
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(draftName);
-  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (개)", exact: true }).fill("1");
+  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (낱개)", exact: true }).fill("1");
   const expiryChoices = editor.getByRole("group", { name: "유통기한 상태", exact: true });
   await expiryChoices.getByRole("radio", { name: "미확인", exact: true }).check();
   await expect(expiryChoices.getByRole("radio")).toHaveCount(2);
@@ -829,8 +900,10 @@ test("all locations sum one product and require each location's count, with prog
     await expect(page.getByText("오늘은 재고조사일", { exact: true })).toBeVisible();
     const initialComplete = await progress.evaluate((element) => (element as HTMLProgressElement).value);
     await capture(page, info, "all-locations-before-count-360");
-    await expect(page.getByRole("switch", { name: "재고조사 모드", exact: true })).not.toBeChecked();
-    await page.getByRole("switch", { name: "재고조사 모드", exact: true }).check();
+    let listOptions = await openListOptions(page);
+    await expect(listOptions.getByRole("switch", { name: "재고조사 모드", exact: true })).not.toBeChecked();
+    await listOptions.getByRole("switch", { name: "재고조사 모드", exact: true }).check();
+    await closeListOptions(listOptions);
     await card.click();
     let detail = page.getByRole("dialog", { name: fixtureName, exact: true });
     await expect(detail.getByRole("combobox", { name: "상세 보관 장소", exact: true })).toHaveValue("refrigerated");
@@ -875,7 +948,9 @@ test("all locations sum one product and require each location's count, with prog
     // A warm remount must show the snapshot without a context/list request.
     // Then simulate a real reconnect to force the changed demo configuration.
     await settingsRef.set({ ...settings, weekday: (weekday + 1) % 7, revision: 1 });
-    await page.getByRole("switch", { name: "재고조사 모드", exact: true }).uncheck();
+    listOptions = await openListOptions(page);
+    await listOptions.getByRole("switch", { name: "재고조사 모드", exact: true }).uncheck();
+    await closeListOptions(listOptions);
     await chooseMode(page, "sales");
     let warmContextRequests = 0;
     const countWarmContext = (request: Request) => {
@@ -945,9 +1020,11 @@ for (const scenario of [
   await batch.commit();
   try {
     await login(page, PHASE3_TEST_PINS.salesA);
-    const mode = page.getByRole("switch", { name: "재고조사 모드", exact: true });
+    const listOptions = await openListOptions(page);
+    const mode = listOptions.getByRole("switch", { name: "재고조사 모드", exact: true });
     await expect(mode).not.toBeChecked();
     if (scenario.manual) await mode.check();
+    await closeListOptions(listOptions);
     expect((await settingsRef.get()).data(), "personal inspection mode must not alter the team's scheduled count day").toEqual(settings);
     const card = page.getByRole("button", { name: new RegExp(`^${name}, .*상세 보기$`) });
     const article = page.locator("article").filter({ has: card });

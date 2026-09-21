@@ -26,25 +26,23 @@
 .optionsTrigger[data-active] > span { opacity: 1; }
 .countModeStatus { display: inline-flex; align-items: center; justify-self: end; gap: 5px; margin: -3px 4px 0 0; color: #256952; font-size: 11px; font-weight: 700; }
 .countModeStatus > span { width: 7px; height: 7px; border-radius: 50%; background: #34876f; }
-.toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.toggle small { display: block; font-size: 10px; font-weight: 500; color: #657386; }
-.toggle input { width: 18px; height: 18px; accent-color: #3182f6; }
+.optionToggle { display: flex; align-items: center; gap: 11px; min-height: 56px; padding: 5px 11px; border: 1px solid #d8e1e8; border-radius: 8px; background: #f8fafb; color: #2b3b4c; font-size: 16px; font-weight: 700; line-height: 1.3; cursor: pointer; transition: background 160ms, border-color 160ms, box-shadow 160ms; }
+.optionToggle:has(input:checked) { border-color: #9fc9bb; background: #edf8f3; box-shadow: inset 3px 0 #34876f; color: #205f4c; }
+.optionToggle:has(input:disabled) { cursor: not-allowed; opacity: .55; }
+.optionToggle input { flex: 0 0 auto; width: 22px; height: 22px; margin: 0; accent-color: #3182f6; }
+.optionToggle > span { min-width: 0; }
+.optionToggle small { display: block; margin-top: 3px; color: #657386; font-size: 11px; font-weight: 550; }
 .resultCount { margin: 0; color: #4e5968; font-size: 13px; }
 .catalogMeta { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
-.countToggle { display: inline-flex; position: relative; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; font-size: 11px; font-weight: 650; color: #546273; }
-.countToggleLabel { display: inline-grid; justify-items: center; gap: 2px; line-height: 1.1; }
-.countToggleState { display: block; margin: 0; text-align: center; font-size: 9px; font-weight: 780; letter-spacing: 0.02em; line-height: 1; }
+.countToggle { display: grid; position: relative; grid-template-columns: minmax(0, 1fr) minmax(150px, 46%); align-items: center; gap: 12px; min-height: 64px; padding: 8px 10px; border: 1px solid #d8e1e8; border-radius: 8px; background: #f8fafb; cursor: pointer; }
+.countToggleLabel { color: #2b3b4c; font-size: 16px; font-weight: 720; line-height: 1.3; }
 .countToggle > input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.countToggle > span:last-child { align-items: center; gap: 4px; }
-.countToggle small { font-size: 9px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.countToggleTrack { display: flex; align-items: center; width: 34px; height: 21px; flex-shrink: 0; border-radius: 14px; background: #8798aa; box-shadow: inset 0 1px 3px #30455a24; transition: background 220ms ease; }
-.countToggleTrack > span { display: grid; place-items: center; width: 17px; height: 17px; margin-left: 2px; border-radius: 50%; color: #26725b; background: #fff; box-shadow: 0 1px 3px #233e5226; transition: transform 260ms cubic-bezier(.2,.8,.3,1.2); }
-.countToggleTrack svg { opacity: 0; transform: scale(.4) rotate(-35deg); transition: opacity 160ms, transform 220ms; }
-.countToggle[data-active] { color: #236a55; }
-.countToggle[data-active] .countToggleTrack { background: #34876f; }
-.countToggle[data-active] .countToggleTrack > span { transform: translateX(13px); }
-.countToggle[data-active] svg { opacity: 1; transform: scale(1) rotate(0); }
-.countToggle > input:focus-visible + span { outline: 3px solid #3182f6; outline-offset: 3px; }
+.countToggleControl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; padding: 3px; border: 1px solid #cbd6df; border-radius: 9px; background: #e7edf2; }
+.countToggleControl > span { display: grid; place-items: center; min-height: 40px; border-radius: 6px; color: #667689; font-size: 13px; font-weight: 780; letter-spacing: .03em; transition: background 160ms, box-shadow 160ms, color 160ms; }
+.countToggle:not([data-active]) .countToggleControl > span:first-child, .countToggle[data-active] .countToggleControl > span:last-child { background: #fff; box-shadow: 0 1px 4px #30455a24; color: #245a88; }
+.countToggle[data-active] { border-color: #9fc9bb; background: #edf8f3; }
+.countToggle[data-active] .countToggleLabel, .countToggle[data-active] .countToggleControl > span:last-child { color: #20654f; }
+.countToggle:has(input:focus-visible) { outline: 3px solid #3182f6; outline-offset: 3px; }
 .countToggle:has(input:disabled) { cursor: wait; opacity: .55; }
 .catalogMeta :global(.glass-button) { min-height: 44px; padding: 4px 8px; margin-block: -8px; color: #50667f; font-size: 12px; }
 .list { display: grid; gap: 5px; }
@@ -172,7 +170,6 @@
 .hiddenInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .lotCard { display: grid; gap: 8px; padding: 12px; border: 1px solid #e5e8eb; border-radius: 7px; background: #fff; }
 .lotCard > label { width: 100%; }
-.lotCard > .countToggle { flex-direction: row-reverse; }
 .lotCard strong { font-size: 14px; overflow-wrap: anywhere; }
 .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sectionHeading h3 { margin: 0; font-size: 16px; }
@@ -182,6 +179,6 @@
 @media (min-width: 761px) { .workspace, .workspace[data-admin] { --inventory-action-inset: 16px; } }
 @media (max-width: 480px) { .sheet .row { flex-wrap: wrap; } }
 @media (min-width: 900px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 359px) { .productButton { gap: 7px; padding: 8px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 20px; } .cardTitle { font-size: 14px; } .filters { gap: 6px; } .filters > .toggle { font-size: 11px; } }
-@media (prefers-reduced-motion: reduce) { .locations button, .countToggleTrack, .countToggleTrack > span, .countToggleTrack svg { transition: none; } }
-@media (forced-colors: active) { .product[data-count-highlight="done"], .product[data-count-highlight="pending"] { border-color: Highlight; } .countToggle > input { position: static; width: 20px; height: 20px; opacity: 1; appearance: auto; } .countToggleTrack { display: none; } }
+@media (max-width: 359px) { .productButton { gap: 7px; padding: 8px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 20px; } .cardTitle { font-size: 14px; } .filters { gap: 6px; } }
+@media (prefers-reduced-motion: reduce) { .locations button, .optionToggle, .countToggleControl > span { transition: none; } }
+@media (forced-colors: active) { .product[data-count-highlight="done"], .product[data-count-highlight="pending"] { border-color: Highlight; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }

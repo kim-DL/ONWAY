@@ -184,8 +184,10 @@ describe("inventory in-memory draft lifecycle", () => {
     (urgentInput.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
     const inactive = find(tree, (type, props) => type === "label" && textContent(props.children).includes("비활성 품목 보기"))!;
     const inactiveInput = find(inactive.children, (type) => type === "input")!;
+    expect(Array.isArray(inactive.children) && isValidElement(inactive.children[0]) && inactive.children[0].type).toBe("input");
     (inactiveInput.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
     const count = find(tree, (_type, props) => props.role === "switch" && props["aria-label"] === "재고조사 모드")!;
+    expect(textContent(find(tree, (type, props) => type === "label" && textContent(props.children).includes("재고조사OFFON"))?.children)).toContain("재고조사OFFON");
     (count.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
     tree = render();
     const sheet = find(tree, (_type, props) => props.title === "목록 옵션")!;
