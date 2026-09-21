@@ -9,13 +9,13 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- 현재 production 소스 checkpoint는 branch `codex/mobile-action-reach`의 `f815ded566b554cd4f8569244ce72fa92e960261` (`Improve inventory list options`)이다. 이 HANDOFF 마감 작업 전 local과 `origin/codex/mobile-action-reach` SHA는 일치했고 worktree는 clean이었다.
-- 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M2, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
+- 현재 production application commit은 branch `codex/mobile-action-reach`의 `194309b9a9266045688d17d624c8d202d3fdd5ad` (`Add inventory manufacturer management`)이다. 이 문서의 후속 documentation-only commit은 production application commit을 바꾸지 않는다.
+- 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 현재 앱 모드는 거래처, 학교납품, 영업/홍보, 재고 네 가지다. 재고는 운영 build에서 활성화된 상태로 마지막 문서에 기록돼 있다.
-- 2026-09-21 최종 Firebase Hosting live release는 `1789979180255000`, version은 `9f46329655f14f0b`, 배포 시각은 `2026-09-21 17:26:20 KST`다. `https://onnuriway.com`과 `https://onnuriway.web.app`의 worker SHA-256은 `6e244e6d3385ccd7c68de525ace457aad5c1311e2a93d25550d3580b6e4e776a`로 일치한다.
+- 2026-09-21 최종 Firebase Hosting live release는 `1789983232326000`, version은 `2c48893eab60f919`, 배포 시각은 `2026-09-21 18:33:52.326 KST`다. `https://onnuriway.com`과 `https://onnuriway.web.app`의 worker SHA-256은 `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`로 candidate 및 양 origin에서 일치한다.
 
 ### 미확인 또는 다시 확인할 사실
 
@@ -368,11 +368,19 @@ Functions는 전체 무차별 배포를 피하고 변경된 Callable 목록과 �
 - 배포는 Firebase project/site `onnuriway`의 Hosting만 대상으로 했다. Functions, Firestore Rules/Indexes, Storage Rules, Extensions 등은 배포하지 않았고, 품목 저장/수정·제조사 변경·입고/출고/조정·사진 업로드·테스트 데이터 생성을 수행하지 않아 production data write는 없다. release 회귀가 없어 rollback은 필요하지 않다.
 - 사용자가 최종 production UI의 목록 옵션과 변경된 inventory UX를 실제로 사용해 사용성에 문제가 없음을 확인했다. 이는 자동화 테스트 결과와 구분되는 정성적 실사용 확인이다. **inventory mobile UI 개선은 완료 상태**다.
 
-### 다음 별도 작업 후보 — 제조사 관리 M3
+### 2026-09-21 재고 제조사 Master M3 — 구현·production release 완료
 
-1. 제조사 이름 수정, 제조사 비활성화, 오타 제조사 관리 UX를 별도 작업으로 설계한다. 필요하면 long-press 또는 관리 메뉴 진입을 검토한다.
-2. hard delete를 바로 도입하는 것으로 확정하지 않는다. `manufacturerId`, canonical name snapshot, revision, audit, authorization 호환성을 먼저 검토한다.
-3. M3는 이번 완료된 inventory mobile UI release와 분리한 새 checkpoint로 진행한다.
+- commit `194309b9a9266045688d17d624c8d202d3fdd5ad` (`Add inventory manufacturer management`)에서 일반 manufacturer row tap은 기존 선택 동작을 유지하고, 관리자에게만 각 active row 오른쪽의 독립된 `⋯` 관리 버튼을 표시한다. 실제 touch target은 44×48px이며 row 선택과 관리 이벤트를 분리했다. long-press는 도입하지 않았고 기존 공용 BottomSheet 패턴에서 `이름 수정`·`비활성화`·`취소`를 제공한다.
+- rename/deactivate는 기존 production Callable `updateInventoryManufacturer`를 그대로 사용한다. Functions 제품 코드, Rules, indexes, schema는 변경하지 않았다. rename은 `expectedRevision`, 기존 request ID/idempotency, duplicate 처리와 revision conflict 시 최신 목록 refresh를 유지하고 성공 뒤 active 목록을 갱신한다. deactivate는 active picker에서만 제거하며 hard delete나 reactivate UI는 없다. 두 작업 모두 현재 product draft의 `manufacturerId`/이름을 자동 변경하거나 기존 상품에 write하지 않는다.
+- M1/M2 snapshot 호환 정책도 유지한다. 기존 상품의 `manufacturerId`와 `manufacturer` string snapshot, inactive reference, legacy string-only 상품을 보존하고 자동 master 연결, migration/backfill, 기존 상품 문자열 일괄 전파를 하지 않는다. 따라서 master rename 뒤 picker의 active master 이름은 새 이름이지만 이미 저장된 상품 화면은 선택 당시 snapshot 이름을 계속 표시할 수 있으며 이는 의도된 호환성 정책이다.
+- Frontend는 `context.canAdmin`을 필요한 inventory editor/field/picker까지 전달해 관리자에게만 관리 affordance를 노출한다. Backend 권한의 최종 기준은 기존 admin authorization이며 authenticated Callable, session/permission 재검증, transaction, revision, request receipt, audit 경계를 그대로 유지한다.
+- 구현 검증은 전체 unit 1,456 passed/14 skipped, Inventory/Functions 404 passed, M3 관리자 E2E 1 PASS, Firestore Emulator integration 11 PASS, 기존 Inventory browser scenarios 11 PASS다. app/Functions typecheck, 전체 lint, production build, PWA 17, performance 18, PWA/performance/Hosting gate, 360px overflow, keyboard/Escape/Back, reservation/audit 검증도 모두 통과했다. budget, dependency, config는 변경하지 않았다.
+- production application commit `194309b9a9266045688d17d624c8d202d3fdd5ad`를 Firebase Hosting release `1789983232326000`, version `2c48893eab60f919`로 `2026-09-21 18:33:52.326 KST`에 배포했다. worker SHA-256은 `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`다. `onnuriway.com`과 `onnuriway.web.app`에서 각각 25개 verifier가 통과했고 candidate/production assets, worker, 양 origin worker가 일치했다. worker는 `Cache-Control: no-store, max-age=0`, `Service-Worker-Allowed: /`를 유지한다. production/PWA/performance/Hosting build gate가 통과했으며 Hosting 산출물은 102개, precache 73개, initial asset 9개다.
+- 배포 범위는 Firebase project/site `onnuriway`의 Hosting뿐이다. Functions, Firestore Rules/indexes, Storage Rules, Extensions 및 기타 Firebase resource는 배포하지 않았다.
+- production read-only smoke에서 관리자 로그인/session 유지, inventory 진입, 관리자 `⋯` 노출, 일반 row 선택, `⋯` 클릭 시 선택 미발생, 관리 BottomSheet, rename 입력/취소, deactivate 안내/취소, Escape/Back, picker/draft 유지, 360×800 horizontal overflow 없음과 console warning/error 0건을 확인했다. 안전한 기존 production 비관리자 session이 없어 비관리자 `⋯` 미노출은 운영에서 별도로 재검증하지 않았고, 해당 권한 동작은 frontend/backend 자동 테스트와 Emulator 검증 범위에서 확인했다.
+- 운영 데이터 보호를 위해 production smoke에서는 manufacturer rename/deactivate/create, 품목 저장·수정, 입고·출고·조정, 사진 업로드, 테스트 데이터 생성을 실행하지 않았고 모든 form/confirm을 실행 전에 취소했다. 실제 production rename/deactivate write는 아직 수행하지 않았으며 해당 경로는 Emulator/Auth/Callable 자동 검증으로 확인한 상태다. 이는 실패가 아니라 의도된 read-only 검증 경계다.
+- 사용자가 최종 production M3 UI를 실제 기기에서 확인해 현재 사용성이 괜찮다고 판단했다. 이는 자동 검증과 구분되는 정성적 실사용 확인이며 rollback은 필요하지 않다. **Manufacturer M3는 완료 상태**다.
+- 현재 지원 범위는 create, rename, deactivate다. hard delete, reactivate, manufacturer merge, 기존 product snapshot 일괄 rename 전파는 지원하지 않으며 실제 사용에서 필요성이 확인되기 전에는 후속 작업으로 자동 지정하지 않는다. 기존 product snapshot과 master current name 불일치가 실제 업무 문제가 될 때만 read-time overlay 또는 별도 정리 정책을 검토한다.
 
 ### P3 — 디자인 디테일
 
