@@ -1,6 +1,6 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-20
+기준일: 2026-09-21
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
@@ -9,21 +9,18 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- 문서 정리 전 HEAD: `fb173f13d5f1e271b6a34674253d88a4d903bc31` (`Record optimization deployment and PWA upgrade verification`, 2026-09-06)
-- 초기 문서 정리 전 worktree 기록은 tracked modified 60개, untracked 109개, 총 169개였다. 2026-09-20 재확인에서도 대규모 dirty 상태가 유지되며 고객사·Firebase Hosting·재고 Phase 45~49와 최근 UI 수정이 아직 commit되지 않았다. `output/` 아래 검증 산출물이 untracked directory로 묶여 표시되므로 기본 `git status` 행 수를 실제 파일 수로 해석하지 않는다.
-- 초기 HANDOFF 정리 작업은 `AGENTS.md`, 세 개의 기존 설계서와 이 파일만 변경했다. 이후 아래 2026-09-20 P0 작업에서 재고 CSS·관련 테스트·이 문서를 최소 수정했으며 배포와 운영 데이터 쓰기는 하지 않았다.
+- 현재 production 소스 checkpoint는 branch `codex/mobile-action-reach`의 `f815ded566b554cd4f8569244ce72fa92e960261` (`Improve inventory list options`)이다. 이 HANDOFF 마감 작업 전 local과 `origin/codex/mobile-action-reach` SHA는 일치했고 worktree는 clean이었다.
+- 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M2, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
+- 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 현재 앱 모드는 거래처, 학교납품, 영업/홍보, 재고 네 가지다. 재고는 운영 build에서 활성화된 상태로 마지막 문서에 기록돼 있다.
-- 2026-09-20 읽기 전용 재확인 기준 Firebase Hosting live release는 `1789262169443000`, version은 `1274c8c40b063e3f`, release time은 `2026-09-13T01:16:09.443Z`다. 두 공개 origin의 worker SHA-256은 `35a673947f19f04005c71bcbb67400db6375e07a517055d078643de8bd3e9fcb`로 일치한다.
+- 2026-09-21 최종 Firebase Hosting live release는 `1789979180255000`, version은 `9f46329655f14f0b`, 배포 시각은 `2026-09-21 17:26:20 KST`다. `https://onnuriway.com`과 `https://onnuriway.web.app`의 worker SHA-256은 `6e244e6d3385ccd7c68de525ace457aad5c1311e2a93d25550d3580b6e4e776a`로 일치한다.
 
 ### 미확인 또는 다시 확인할 사실
 
-- 이번 P0 로컬 수정은 아직 Hosting에 배포하지 않았다. 운영 URL에는 수정 전 CSS가 남아 있어 `재고조사 off`가 가로로 보인다.
-- 마지막 Hosting 배포 뒤 전체 test suite 전체는 아직 재실행하지 않았다. 다만 2026-09-20 P0 범위의 재고 UI/Emulator suite와 두 origin의 공개 25개 리소스 검사는 다시 통과했다.
-- 현재 변경은 하나의 commit으로 정리되지 않았다. 다음 스레드는 먼저 `git status --short --branch`와 변경 범위를 확인하고 사용자 변경을 보존해야 한다.
-- 운영 데이터 schema migration의 필요 여부는 Phase 49의 `lotSummary` 보강 이후 새 migration이 추가되지 않았다는 문서 기록까지만 확인했다.
-- 실제 설치형 휴대폰 PWA의 카메라·키보드·safe-area 체감은 이번에도 확인하지 않았다. 데스크톱 Chrome의 360×800 viewport 검증과 구분한다.
+- 8명 동시 사용 환경의 실제 read 비용과 현장망 T2/T3는 아직 계측하지 않았다. 이는 이번 inventory mobile UI release의 배포·사용성 확인과는 별도의 운영 계측 항목이다.
+- 실제 설치형 휴대폰 PWA의 카메라·키보드·safe-area를 포함한 저장 flow는 이번 read-only smoke 범위가 아니다. 운영 데이터를 수정하는 검증은 수행하지 않았다.
 
 ## 2. 확정 요구사항과 현재 코드 대조
 
@@ -349,6 +346,33 @@ Functions는 전체 무차별 배포를 피하고 변경된 Callable 목록과 �
 - 기존 strict client와 M1 response 계약을 유지했다. 기본 inventory repository는 opt-in하지 않고, 별도 동적 manufacturer repository의 reference read와 manufacturer-aware save만 `includeManufacturerReference`를 사용한다. 명시적 `clearManufacturerReference: true` write intent를 추가해 `제조사 없음`에서 `manufacturer: ""`와 실제 document의 `manufacturerId` 제거를 같은 기존 revision/request ID/idempotency/audit transaction으로 처리한다. 필드가 없는 구형 client는 기존 ID를 보존하고, clear와 새 ID를 함께 보내면 contract가 거절한다. migration/backfill과 M1 master/reservation 재설계는 없다.
 - product editor를 별도 lazy boundary로 분리하고, 작은 manufacturer trigger와 실제 picker/repository/UI를 다시 분리해 picker는 사용자가 제조사 버튼을 누를 때만 로드한다. 360px에서 overflow가 없고 모든 picker target은 44px 이상이며 dialog/combobox/listbox/option semantics와 방향키 탐색을 제공한다. Back/취소는 form draft를 바꾸지 않고, local 검색 중 추가 network 요청은 0회다.
 - PASS: manufacturer/form/Functions 집중 159/159와 backend 집중 76/76, inventory unit/Functions 391/391, production inventory E2E 10/10, Emulator integration 11/11, app/Functions typecheck, lint, production build, performance unit 18/18, PWA/performance/Hosting build gate, `git diff --check`. 최종 bundle은 inventory base JS 24,834B gzip, workspace JS 22,603B gzip, manufacturer picker 3,727B gzip, trigger 802B gzip, inventory CSS 29,184B raw, manufacturer CSS 3,010B raw이며 기존 budget을 완화하지 않았다. admin rename/deactivate UI, dependency 변경, migration/backfill, deploy는 실행하지 않았다. **M2 완료**다.
+
+### 2026-09-21 inventory mobile controls checkpoint — 운영 배포 완료
+
+- commit `6c17f324dd041b7bd3fcc161d6040f0a139a094b` (`Refine inventory mobile controls`)에서 단위 preset을 `낱개 / 봉 / 팩 / 병 / 직접입력`으로 정리했다. 첫 행은 `낱개 / 봉 / 팩`, 둘째 행은 `병 / 직접입력` 2열이다. 기존 `개`는 사용자에게 `낱개`로 표시하되 신규 `낱개` preset의 canonical/storage value는 기존 `개`를 사용한다. 기존 literal `낱개` 데이터는 보존하고 migration/backfill은 없으며 unit lock과 재고 처리 계약을 유지한다.
+- 검색창 오른쪽에 sliders 계열 `목록 옵션` 버튼을 두고 BottomSheet에 `표시 옵션`(비활성 품목 보기, 임박 상품만 보기)과 `작업 모드`(재고조사 OFF/ON)를 구분했다. 기존 검색·filter·snapshot·revalidation 상태 로직은 변경하지 않았다.
+- 구역 선택 `전체 / 냉장 / 냉동1 / 냉동2 / 샘플`은 회청색 container, subtle raised surface, 선택 상태 inset 표현과 44px touch height를 사용하며 360px에서 가로 overflow가 없다.
+- Firebase Hosting release `1789974931146000`, version `03c10d3f79c62a9b`로 `2026-09-21 16:15:31 KST`에 Hosting만 배포했다. worker SHA-256은 `8b95bd550d8e3ee332126708d0991439ce69ed86b595a58c6f28ea8fbf4dc7ce`고 `https://onnuriway.com`·`https://onnuriway.web.app` verifier가 모두 통과했다. Functions, Rules, Indexes 등은 배포하지 않았다.
+
+### 2026-09-21 inventory 목록 옵션 시인성 checkpoint — 운영 배포 완료
+
+- commit `f815ded566b554cd4f8569244ce72fa92e960261` (`Improve inventory list options`)에서 checkbox/check indicator를 label 바로 옆에 배치하고 전체 56px row를 touch target으로 만들었다. label은 16px 수준으로 유지하고 선택 row에 subtle background/border를 적용했으며 `D-100일` secondary text를 보존했다. 재고조사는 `OFF | ON` segmented control이며 ON 시 sheet 밖에 compact `재고조사 ON`을 표시하고, 임의 목록 옵션이 활성화되면 trigger의 active dot를 유지한다.
+- legacy UI 기대값은 unit preset 6→5, 표시명 `개`→`낱개`, 초기 수량 접근성 이름 `(개)`→`(낱개)`, 직접입력 2열 geometry, BottomSheet 이동에 따른 selector로 현재 계약에 맞게 갱신했다. canonical `개`와 literal `낱개` 보존 테스트는 유지했다.
+- PASS: Legacy inventory E2E 11/11, Emulator integration 11/11, inventory 29 files/395 tests, typecheck, lint, production build, PWA, performance, Hosting gate, 360px horizontal overflow, console warning/error 0건. performance budget, dependency, 설정은 변경하지 않았다.
+
+### 2026-09-21 inventory mobile UI 최종 production 검증 — 완료
+
+- production commit은 `f815ded566b554cd4f8569244ce72fa92e960261`이고 Firebase Hosting release는 `1789979180255000`, version은 `9f46329655f14f0b`, 배포 시각은 `2026-09-21 17:26:20 KST`다. worker SHA-256은 `6e244e6d3385ccd7c68de525ace457aad5c1311e2a93d25550d3580b6e4e776a`다.
+- `onnuriway.com`과 `onnuriway.web.app`에서 각각 25개 public resource 검증이 통과했고 worker/assets는 두 origin과 candidate에서 일치했다. worker의 `Cache-Control: no-store`와 `Service-Worker-Allowed: /`를 유지했으며 production build, PWA, performance, Hosting gate가 모두 통과했다.
+- production read-only smoke에서 목록 옵션 버튼·active dot·BottomSheet, `표시 옵션`, 비활성/임박 옵션, label 인접 indicator, 56px 전체 row touch, 16px label, `D-100일`, `OFF | ON` segmented control, compact `재고조사 ON`, sheet 재개방 후 상태 유지를 확인했다. 360px horizontal overflow는 없었고 console warning/error는 0건이었다. 검증 후 비활성/임박/재고조사 상태는 OFF로 복원했다.
+- 배포는 Firebase project/site `onnuriway`의 Hosting만 대상으로 했다. Functions, Firestore Rules/Indexes, Storage Rules, Extensions 등은 배포하지 않았고, 품목 저장/수정·제조사 변경·입고/출고/조정·사진 업로드·테스트 데이터 생성을 수행하지 않아 production data write는 없다. release 회귀가 없어 rollback은 필요하지 않다.
+- 사용자가 최종 production UI의 목록 옵션과 변경된 inventory UX를 실제로 사용해 사용성에 문제가 없음을 확인했다. 이는 자동화 테스트 결과와 구분되는 정성적 실사용 확인이다. **inventory mobile UI 개선은 완료 상태**다.
+
+### 다음 별도 작업 후보 — 제조사 관리 M3
+
+1. 제조사 이름 수정, 제조사 비활성화, 오타 제조사 관리 UX를 별도 작업으로 설계한다. 필요하면 long-press 또는 관리 메뉴 진입을 검토한다.
+2. hard delete를 바로 도입하는 것으로 확정하지 않는다. `manufacturerId`, canonical name snapshot, revision, audit, authorization 호환성을 먼저 검토한다.
+3. M3는 이번 완료된 inventory mobile UI release와 분리한 새 checkpoint로 진행한다.
 
 ### P3 — 디자인 디테일
 
