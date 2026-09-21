@@ -19,6 +19,8 @@ describe("inventory manufacturer lazy boundary", () => {
     expect(css).toContain("min-height: 48px");
     expect(css).toMatch(/\.picker[^}]*min-width:\s*0/u);
     expect(css).toMatch(/\.option[^}]*width:\s*100%[^}]*min-width:\s*0/u);
+    expect(css).toMatch(/\.optionRow[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+44px/u);
+    expect(css).toMatch(/\.manage[^}]*width:\s*44px[^}]*min-width:\s*44px[^}]*min-height:\s*44px/u);
     expect(css).not.toMatch(/width:\s*[4-9]\d{2}px/u);
   });
 });

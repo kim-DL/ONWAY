@@ -31,6 +31,16 @@ describe("inventory manufacturer repository", () => {
     await expect(Promise.all([first, second])).resolves.toEqual([[], []]);
   });
 
+  it("uses the existing admin update callable with revision and request-id protection", async () => {
+    const updated = { manufacturerId: "manufacturer-one", name: "온누리 새 이름", normalizedName: "온누리새이름", active: true, revision: 2, createdAt: product.createdAt, createdBy: "EMP", updatedAt: product.updatedAt };
+    mock.invoke.mockResolvedValueOnce({ data: updated });
+    await expect(inventoryManufacturerRepository.update({ requestId: "41bd2065-a415-4e30-8b97-3dca1f8a66cc",
+      manufacturerId: "manufacturer-one", expectedRevision: 1, name: "  온누리  새 이름  " })).resolves.toEqual(updated);
+    expect(mock.invoke).toHaveBeenCalledWith("updateInventoryManufacturer", {
+      requestId: "41bd2065-a415-4e30-8b97-3dca1f8a66cc", manufacturerId: "manufacturer-one", expectedRevision: 1, name: "온누리 새 이름",
+    });
+  });
+
   it("opts in only for reference reads and manufacturer-aware saves, including explicit clear", async () => {
     mock.invoke.mockResolvedValueOnce({ data: { product, lots: [] } }).mockResolvedValueOnce({ data: product }).mockResolvedValueOnce({ data: { ...product, manufacturer: "", manufacturerId: undefined } });
     await expect(inventoryManufacturerRepository.reference(product.productId)).resolves.toMatchObject({ product: { manufacturerId: "manufacturer-one" } });

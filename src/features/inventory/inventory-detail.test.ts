@@ -49,6 +49,14 @@ describe("compact inventory detail actions", () => {
     expect(button(menu, "비활성화")).toBeNull(); expect(button(menu, "품목 삭제")).toBeNull();
   });
 
+  it("passes backend admin capability to the existing-product manufacturer field", async () => {
+    const adminContext = { ...context, canAdmin: true };
+    const tree = await load(detail, adminContext);
+    (button(tree, "품목 정보 수정")!.onClick as () => void)();
+    const editor = find(render(adminContext), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
+    expect(editor.canManageManufacturers).toBe(true);
+  });
+
   it("allows writing employees to manage products without hiding actions for stock or history", async () => {
     const tree = more(await load());
     expect(button(tree, "비활성화")?.disabled).toBe(false); expect(button(tree, "품목 삭제")?.disabled).toBe(false);

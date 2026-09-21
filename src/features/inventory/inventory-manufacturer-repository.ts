@@ -7,8 +7,8 @@ import {
   createInventoryManufacturerInputSchema, inventoryManufacturerListSchema, inventoryManufacturerSchema,
   inventoryProductDetailWithManufacturerSchema, inventoryProductWithManufacturerSchema,
   getInventoryProductWithManufacturerInputSchema, listInventoryManufacturersInputSchema,
-  saveInventoryProductWithManufacturerInputSchema,
-  type InventoryManufacturer,
+  saveInventoryProductWithManufacturerInputSchema, updateInventoryManufacturerInputSchema,
+  type InventoryManufacturer, type UpdateInventoryManufacturerInput,
 } from "@/domain/inventory-manufacturer";
 import type { SaveInventoryProductInput } from "@/domain/inventory";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
@@ -32,6 +32,7 @@ export const inventoryManufacturerRepository = {
     return activeManufacturerListRequest;
   },
   create: (input: { requestId: string; name: string }) => call("createInventoryManufacturer", createInventoryManufacturerInputSchema.parse(input), inventoryManufacturerSchema),
+  update: (input: UpdateInventoryManufacturerInput) => call("updateInventoryManufacturer", updateInventoryManufacturerInputSchema.parse(input), inventoryManufacturerSchema),
   reference: (productId: string) => call("getInventoryProduct", getInventoryProductWithManufacturerInputSchema.parse({ productId, includeManufacturerReference: true }), inventoryProductDetailWithManufacturerSchema),
   saveProduct: (input: SaveInventoryProductInput) => call("saveInventoryProduct", saveInventoryProductWithManufacturerInputSchema.parse({ ...input, includeSummary: true, includeManufacturerReference: true }), inventoryProductWithManufacturerSchema),
 };

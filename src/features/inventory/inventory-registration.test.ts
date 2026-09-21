@@ -23,7 +23,7 @@ function find(node: ReactNode, predicate: (type: unknown, props: Props) => boole
 }
 const named = (tree: ReactNode, name: string) => find(tree, (type) => typeof type === "function" && type.name === name)!;
 const noop = () => undefined;
-function render(edit: InventoryProduct | null = null) { harness.stateCursor = 0; harness.refCursor = 0; return InventoryProductEditor({ product: edit, location: "refrigerated", onClose: noop, onSaved: harness.saved }); }
+function render(edit: InventoryProduct | null = null, canManageManufacturers = false) { harness.stateCursor = 0; harness.refCursor = 0; return InventoryProductEditor({ product: edit, location: "refrigerated", canManageManufacturers, onClose: noop, onSaved: harness.saved }); }
 function changeField(tree: ReactNode, label: string, value: string, type = "input") {
   const field = find(tree, (nodeType, props) => nodeType === "label" && (Array.isArray(props.children) ? props.children : [props.children]).some((child) => typeof child === "string" && child.trim().startsWith(label)))!;
   const input = find(field.props.children, (nodeType) => nodeType === type)!;
@@ -104,6 +104,11 @@ describe("single-submit inventory registration", () => {
     tree = render(); await submit(tree);
     expect(harness.save.mock.calls[0]![0]).toMatchObject({ draft: { manufacturerId: "manufacturer-one", manufacturer: "정식 제조사" } });
     expect(harness.save.mock.calls[0]![0]).not.toHaveProperty("clearManufacturerReference");
+  });
+
+  it("passes manufacturer management permission only when the editor receives admin context", () => {
+    expect(manufacturerField(render()).props.canAdmin).toBe(false);
+    expect(manufacturerField(render(null, true)).props.canAdmin).toBe(true);
   });
 
   it("uses explicit clear intent for 제조사 없음 and removes a linked id from the draft", async () => {

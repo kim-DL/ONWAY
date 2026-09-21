@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { expect, test, type Locator, type Page, type Request, type TestInfo } from "@playwright/test";
+import { build } from "esbuild";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -8,18 +9,21 @@ import sharp from "sharp";
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 import { assertInventoryE2EEnvironment, groupInventoryE2EPageSequences, INVENTORY_E2E_ORIGIN, INVENTORY_E2E_PROJECT } from "../../scripts/inventory-e2e-safety";
 import { INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryListPageSchema, inventoryLocationMap, inventoryLotSchema, inventoryProductDetailSchema, inventoryProductSchema, inventorySettingsSchema, type InventoryProduct } from "../../src/domain/inventory";
+import { normalizeInventoryManufacturerName } from "../../src/domain/inventory-manufacturer";
 
 const productName = "에뮬레이터 검증 만두";
 let productId = "";
 let firstPhotoId = "";
 let firstPhoto: Buffer;
 let replacementPhoto: Buffer;
+let adminSdkLoginBundle = "";
 const allowedOrigins = new Set([INVENTORY_E2E_ORIGIN, "http://127.0.0.1:9099", "http://127.0.0.1:8080", "http://127.0.0.1:5001", "http://127.0.0.1:9199"]);
 const control = () => {
   assertInventoryE2EEnvironment();
   return getApps().find((app) => app.name === "inventory-ui-control") ?? initializeApp({ projectId: INVENTORY_E2E_PROJECT }, "inventory-ui-control");
 };
 const db = () => getFirestore(control());
+const manufacturerReservationId = (normalizedName: string) => createHash("sha256").update(normalizedName).digest("hex");
 async function storedProduct() {
   return (await db().doc(`${INVENTORY_PRODUCT_PATH}/${productId}`).get()).data() as InventoryProduct;
 }
@@ -62,6 +66,22 @@ async function login(page: Page, pin: string) {
   await expect(page.getByRole("region", { name: "재고 관리", exact: true })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "재고를 불러오고" })).toHaveCount(0);
   return authorization!;
+}
+async function loginAdmin(page: Page) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.context().grantPermissions(["local-network-access"], { origin: INVENTORY_E2E_ORIGIN });
+  await page.route("**/inventory-admin-auth", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><html><body>Local inventory admin sign-in fixture</body></html>" }));
+  await page.goto("/inventory-admin-auth");
+  await page.addScriptTag({ content: adminSdkLoginBundle });
+  const token = await page.evaluate(() => (window as unknown as { __inventoryAdminFixture: Promise<string> }).__inventoryAdminFixture);
+  await page.goto("/");
+  const navigation = page.getByRole("navigation", { name: "관리자 주요 메뉴" });
+  await expect(navigation).toBeVisible({ timeout: 20_000 });
+  const contextResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/getInventoryContext"));
+  await navigation.getByRole("button", { name: /^재고 관리/ }).click();
+  expect((await contextResponse).ok()).toBe(true);
+  await expect(page.getByRole("region", { name: "재고 관리", exact: true })).toBeVisible();
+  return `Bearer ${token}`;
 }
 async function openListOptions(page: Page) {
   await page.getByRole("button", { name: "목록 옵션", exact: true }).click();
@@ -274,6 +294,24 @@ test.beforeAll(async () => {
   assertInventoryE2EEnvironment();
   firstPhoto = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#9ecfc3" } }).jpeg().toBuffer();
   replacementPhoto = await sharp({ create: { width: 480, height: 640, channels: 3, background: "#e4b9ad" } }).jpeg().toBuffer();
+  const bundle = await build({
+    stdin: { resolveDir: process.cwd(), contents: `
+      import { initializeApp } from "firebase/app";
+      import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+      import { getFunctions, connectFunctionsEmulator, httpsCallable } from "firebase/functions";
+      if (location.origin !== "${INVENTORY_E2E_ORIGIN}") throw new Error("Inventory admin fixture is local only.");
+      window.__inventoryAdminFixture = (async () => {
+        const app = initializeApp({ apiKey:"demo-api-key", authDomain:"${INVENTORY_E2E_PROJECT}.firebaseapp.com", projectId:"${INVENTORY_E2E_PROJECT}", appId:"1:1234567890:web:${INVENTORY_E2E_PROJECT}" });
+        const auth = getAuth(app); connectAuthEmulator(auth,"http://127.0.0.1:9099",{disableWarnings:true});
+        const functions = getFunctions(app,"asia-northeast3"); connectFunctionsEmulator(functions,"127.0.0.1",5001);
+        await setPersistence(auth,browserLocalPersistence);
+        const credential = await signInWithCredential(auth,GoogleAuthProvider.credential(JSON.stringify({sub:"inventory-m3-admin",email:"admin@onnuriway.test",email_verified:true,name:"재고 M3 관리자"})));
+        await httpsCallable(functions,"activateAdminSession")({appVersion:"inventory-m3-e2e"});
+        return credential.user.getIdToken(true);
+      })();
+    ` }, bundle: true, write: false, platform: "browser", format: "iife", logLevel: "silent",
+  });
+  adminSdkLoginBundle = bundle.outputFiles[0]!.text;
 });
 test.beforeEach(async ({ context }) => {
   assertInventoryE2EEnvironment();
@@ -408,6 +446,111 @@ test("360px list options keep readable row toggles and a persistent count-mode s
   expect(consoleIssues).toEqual([]);
 });
 
+test("admin manages manufacturers through the real callable without changing the current draft", async ({ page }) => {
+  const token = await loginAdmin(page);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const suffix = randomUUID().slice(0, 8);
+  const originalName = `M3 관리 ${suffix}`;
+  const renamedName = `M3 변경 ${suffix}`;
+  const duplicateName = `M3 중복 ${suffix}`;
+  const createdResponse = await call("createInventoryManufacturer", token, { requestId: randomUUID(), name: originalName });
+  const duplicateResponse = await call("createInventoryManufacturer", token, { requestId: randomUUID(), name: duplicateName });
+  expect(createdResponse.status).toBe(200); expect(duplicateResponse.status).toBe(200);
+  const created = createdResponse.body.result as { manufacturerId: string; revision: number; normalizedName: string };
+
+  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
+  await editor.getByRole("button", { name: "제조사 선택", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
+  const search = picker.getByRole("combobox", { name: "제조사 검색", exact: true });
+  await search.fill(originalName);
+  let manage = picker.getByRole("button", { name: `${originalName} 관리`, exact: true });
+  await expect(manage).toBeVisible();
+  const geometry = await picker.evaluate((dialog) => ({
+    sheetFits: dialog.scrollWidth <= dialog.clientWidth,
+    pageFits: document.documentElement.scrollWidth <= innerWidth,
+  }));
+  expect(geometry).toEqual({ sheetFits: true, pageFits: true });
+  const manageGeometry = await manage.evaluate((button) => ({ tag: button.tagName, width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height }));
+  expect(manageGeometry.tag).toBe("BUTTON");
+  expect(manageGeometry.width).toBeGreaterThanOrEqual(44); expect(manageGeometry.height).toBeGreaterThanOrEqual(44);
+
+  await manage.click();
+  let management = page.getByRole("dialog", { name: "제조사 관리", exact: true });
+  await expect(management).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(management).toHaveCount(0); await expect(picker).toBeVisible();
+  await expect(editor.getByRole("button", { name: "제조사 선택", exact: true })).toBeVisible();
+
+  await manage.click(); management = page.getByRole("dialog", { name: "제조사 관리", exact: true });
+  await expect(management).toBeVisible();
+  await page.goBack();
+  await expect(management).toHaveCount(0); await expect(picker).toBeVisible();
+
+  await manage.click();
+  await page.getByRole("dialog", { name: "제조사 관리", exact: true }).getByRole("button", { name: "이름 수정", exact: true }).click();
+  let renameSheet = page.getByRole("dialog", { name: "제조사 이름 수정", exact: true });
+  await expect(renameSheet).toContainText("기존 품목에 저장된 제조사명은 변경되지 않습니다.");
+  const renameInput = renameSheet.getByLabel("수정할 제조사명", { exact: true });
+  await expect(renameInput).toBeFocused(); await renameInput.fill(renamedName);
+  let updateRequest: { requestId: string; manufacturerId: string; expectedRevision: number; name?: string; active?: false } | undefined;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/updateInventoryManufacturer")) {
+      updateRequest = (request.postDataJSON() as { data: typeof updateRequest }).data;
+    }
+  });
+  const renameResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/updateInventoryManufacturer"));
+  await renameSheet.getByRole("button", { name: "이름 수정", exact: true }).click();
+  expect((await renameResponse).ok()).toBe(true);
+  await expect(renameSheet).toHaveCount(0);
+  expect(updateRequest).toMatchObject({ manufacturerId: created.manufacturerId, expectedRevision: created.revision, name: renamedName });
+  const renameRequestId = updateRequest!.requestId;
+  await expect(picker.getByRole("status").filter({ hasText: "기존 품목의 제조사명은 그대로 유지됩니다." })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "제조사 선택", exact: true })).toBeVisible();
+
+  const oldReservation = await db().doc(`companies/onnuri/inventoryManufacturerNames/${manufacturerReservationId(created.normalizedName)}`).get();
+  const newNormalizedName = normalizeInventoryManufacturerName(renamedName);
+  const newReservation = await db().doc(`companies/onnuri/inventoryManufacturerNames/${manufacturerReservationId(newNormalizedName)}`).get();
+  expect(oldReservation.data()).toMatchObject({ manufacturerId: created.manufacturerId, active: false });
+  expect(newReservation.data()).toMatchObject({ manufacturerId: created.manufacturerId, active: true });
+  expect((await db().doc(`auditLogs/inventory-${renameRequestId}`).get()).data()).toMatchObject({
+    eventType: "INVENTORY_MANUFACTURER_UPDATED", targetId: created.manufacturerId, changedFields: ["name"],
+  });
+
+  await search.fill(renamedName);
+  manage = picker.getByRole("button", { name: `${renamedName} 관리`, exact: true });
+  await manage.click();
+  await page.getByRole("dialog", { name: "제조사 관리", exact: true }).getByRole("button", { name: "이름 수정", exact: true }).click();
+  renameSheet = page.getByRole("dialog", { name: "제조사 이름 수정", exact: true });
+  await renameSheet.getByLabel("수정할 제조사명", { exact: true }).fill(duplicateName);
+  await renameSheet.getByRole("button", { name: "이름 수정", exact: true }).click();
+  await expect(renameSheet.getByRole("alert")).toContainText("기존 제조사를 사용해주세요");
+  await expect(renameSheet.getByLabel("수정할 제조사명", { exact: true })).toHaveValue(duplicateName);
+  await page.keyboard.press("Escape"); await expect(renameSheet).toHaveCount(0); await expect(picker).toBeVisible();
+
+  await search.fill(renamedName); manage = picker.getByRole("button", { name: `${renamedName} 관리`, exact: true });
+  await manage.click();
+  management = page.getByRole("dialog", { name: "제조사 관리", exact: true });
+  await management.getByRole("button", { name: "비활성화", exact: true }).click();
+  const deactivateSheet = page.getByRole("dialog", { name: "제조사 비활성화", exact: true });
+  await expect(deactivateSheet).toContainText("기존 품목의 제조사명과 연결은 유지됩니다.");
+  await expect(deactivateSheet).toContainText("다시 활성화할 수 없어요");
+  updateRequest = undefined;
+  const deactivateResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/updateInventoryManufacturer"));
+  await deactivateSheet.getByRole("button", { name: "비활성화", exact: true }).click();
+  expect((await deactivateResponse).ok()).toBe(true);
+  expect(updateRequest).toMatchObject({ manufacturerId: created.manufacturerId, expectedRevision: 2, active: false });
+  await expect(deactivateSheet).toHaveCount(0);
+  await expect(picker.getByRole("button", { name: `${renamedName} 관리`, exact: true })).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "제조사 선택", exact: true })).toBeVisible();
+  expect((await db().doc(`companies/onnuri/inventoryManufacturers/${created.manufacturerId}`).get()).data()).toMatchObject({
+    name: renamedName, active: false, revision: 3,
+  });
+  expect((await db().doc(`auditLogs/inventory-${updateRequest!.requestId}`).get()).data()).toMatchObject({
+    eventType: "INVENTORY_MANUFACTURER_UPDATED", targetId: created.manufacturerId, changedFields: ["active"],
+  });
+});
+
 test.describe("registered product and access controls", () => {
 test.describe.configure({ mode: "serial" });
 
@@ -425,6 +568,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   let manufacturerPicker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
   const manufacturerSearch = manufacturerPicker.getByRole("combobox", { name: "제조사 검색", exact: true });
   await expect(manufacturerSearch).toBeVisible();
+  await expect(manufacturerPicker.getByRole("button", { name: / 관리$/ })).toHaveCount(0);
   await expect(manufacturerSearch).not.toBeFocused();
   await expect.poll(() => manufacturerListRequests).toBe(1);
   await manufacturerSearch.fill("테스트 제조사");

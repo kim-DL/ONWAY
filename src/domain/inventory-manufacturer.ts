@@ -2,6 +2,6 @@ export {
   canonicalInventoryManufacturerName, createInventoryManufacturerInputSchema, inventoryManufacturerListSchema,
   inventoryManufacturerSchema, inventoryProductDetailWithManufacturerSchema, inventoryProductWithManufacturerSchema,
   getInventoryProductWithManufacturerInputSchema, listInventoryManufacturersInputSchema, normalizeInventoryManufacturerName,
-  saveInventoryProductWithManufacturerInputSchema,
-  type InventoryManufacturer,
+  saveInventoryProductWithManufacturerInputSchema, updateInventoryManufacturerInputSchema,
+  type InventoryManufacturer, type UpdateInventoryManufacturerInput,
 } from "../../functions/src/inventory/inventory-manufacturer-contract";

@@ -105,7 +105,7 @@ export function InventoryDetail({ productId, initialLocation, context, calendarR
   </BottomSheet></div>
     {detail && (action === "receive" || action === "issue" || action === "adjust") ? <InventoryMovementForm detail={detail} location={location} kind={action} {...(movementLotId ? { initialLotId: movementLotId } : {})} {...(countMode && calendarReady ? { inspectionCycleId: context.cycle.cycleId } : {})} onClose={() => { setAction(null); setMovementLotId(undefined); }} onSaved={saved} /> : null}
     {detail && action === "count" ? <InventoryCountForm detail={detail} location={location} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setAction(null)} onSaved={saved} /> : null}
-    {product && action === "edit" ? <InventoryProductEditor product={product} location={location} canCreateManufacturer={context.canWrite} onClose={() => setAction(null)} onSaved={saved} /> : null}
+    {product && action === "edit" ? <InventoryProductEditor product={product} location={location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setAction(null)} onSaved={saved} /> : null}
     {detail && editingLot ? <InventoryLotEditor detail={detail} lot={editingLot} onMovement={openMovement} onClose={() => setEditingLot(null)} onSaved={saved} /> : null}
     {product && action === "more" ? <BottomSheet open title="품목 더보기" onClose={() => setAction(null)}><div className={styles.detailMoreActions}>
       <GlassButton onClick={() => setAction("history")}><Icon name="clock" size={18} /><span>입출고·실사 이력</span><Icon name="chevron-right" size={16} /></GlassButton>

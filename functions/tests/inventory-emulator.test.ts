@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { initializeApp, deleteApp, type App } from "firebase-admin/app";
 import { FieldValue, getFirestore, Timestamp, type Firestore } from "firebase-admin/firestore";
@@ -17,6 +17,7 @@ import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lo
 // Opt-in only. The hard host/project boundary below runs before creating any
 // client, so an accidentally inherited production credential cannot be used.
 const enabled = process.env.INVENTORY_EMULATOR_TESTS === "true";
+const manufacturerReservationId = (normalizedName: string) => createHash("sha256").update(normalizedName).digest("hex");
 const projectId = `demo-inventory-${randomUUID().slice(0, 8)}`;
 const member: InventoryActor = { uid: "inventory-emulator-staff", employeeId: "INV-STAFF", roleScopes: ["delivery"], isAdmin: false, sessionVersion: 1, permissionsVersion: 1 };
 const admin: InventoryActor = { ...member, uid: "inventory-emulator-admin", employeeId: "INV-ADMIN", roleScopes: ["admin"], isAdmin: true };
@@ -194,7 +195,7 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     await db.doc(`authz/${member.uid}`).update({ sessionVersion: 1 });
   }, 40_000);
 
-  it("serializes exact manufacturer duplicates and preserves canonical snapshots after deactivation", async () => {
+  it("serializes exact manufacturer duplicates and preserves canonical snapshots after rename and deactivation", async () => {
     const firstInput = { requestId: randomUUID(), name: "온누리 식품(주)" };
     const secondInput = { requestId: randomUUID(), name: "온누리-식품 주" };
     const results = await Promise.allSettled([
@@ -216,8 +217,21 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
         manufacturerId: manufacturer.manufacturerId } };
     const product = await service.save(productInput, member);
     expect(product).toMatchObject({ manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name });
+    const renameRequestId = randomUUID();
+    const renamed = await manufacturerService.update({ requestId: renameRequestId, manufacturerId: manufacturer.manufacturerId,
+      expectedRevision: manufacturer.revision, name: "온누리 식품 새 이름" }, admin);
+    expect((await service.detail(product.productId, member)).product).toMatchObject({
+      manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name,
+    });
+    expect((await db.doc(`${INVENTORY_MANUFACTURER_NAME_PATH}/${manufacturerReservationId(manufacturer.normalizedName)}`).get()).data()).toMatchObject({ active: false });
+    expect((await db.doc(`${INVENTORY_MANUFACTURER_NAME_PATH}/${manufacturerReservationId(renamed.normalizedName)}`).get()).data()).toMatchObject({
+      manufacturerId: manufacturer.manufacturerId, active: true,
+    });
+    expect((await db.doc(`auditLogs/inventory-${renameRequestId}`).get()).data()).toMatchObject({
+      eventType: "INVENTORY_MANUFACTURER_UPDATED", changedFields: ["name"],
+    });
     const inactive = await manufacturerService.update({ requestId: randomUUID(), manufacturerId: manufacturer.manufacturerId,
-      expectedRevision: manufacturer.revision, active: false }, admin);
+      expectedRevision: renamed.revision, active: false }, admin);
     expect(inactive.active).toBe(false);
     const preserved = await service.save({ requestId: randomUUID(), productId: product.productId, expectedRevision: product.revision,
       draft: { ...productInput.draft, manufacturerId: undefined, name: "비활성 기존 연결 표시" } }, member);

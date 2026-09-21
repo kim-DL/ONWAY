@@ -53,6 +53,14 @@ async function openEditor() {
   return cleanup;
 }
 describe("inventory in-memory draft lifecycle", () => {
+  it("passes backend admin capability to the new-product manufacturer field", async () => {
+    harness.context.mockResolvedValue({ ...context, canAdmin: true });
+    const cleanup = await openEditor();
+    const editor = find(render(), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
+    expect(editor.canManageManufacturers).toBe(true);
+    cleanup();
+  });
+
   it("publishes the first page before the full cold catalog completes and carries progress across re-entry", async () => {
     const first = { productId: "first-page", name: "첫 페이지 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
       createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),

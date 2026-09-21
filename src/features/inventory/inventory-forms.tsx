@@ -49,7 +49,7 @@ export function FormFooter({ id, busy, disabled = false, label, onClose, childre
   return <BottomSheetActions busy={busy} className={styles.formActions ?? ""}>{!online ? <p role="alert">{INVENTORY_OFFLINE_DRAFT_MESSAGE}</p> : null}{children}<GlassButton disabled={busy} onClick={onClose}>취소</GlassButton><GlassButton variant="primary" type="submit" form={id} disabled={busy || disabled || !online}>{busy ? "저장 중…" : label}</GlassButton></BottomSheetActions>;
 }
 export function validLotDraft(draft: InventoryLotDraft, allowLegacy = false) { return (allowLegacy || draft.expiryState !== "not_applicable") && inventoryLotDraftSchema.safeParse(draft).success && (draft.expiryState !== "dated" || isInventoryInputDate(draft.expiryDate ?? "")); }
-export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void };
+export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; canManageManufacturers?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void };
 export function InventoryProductEditor(props: InventoryProductEditorProps) {
   return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면을 준비하고 있어요.</p></BottomSheet>}><InventoryProductEditorImpl {...props} /></Suspense>;
 }
