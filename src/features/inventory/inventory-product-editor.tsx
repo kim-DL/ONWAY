@@ -14,9 +14,9 @@ const InventoryManufacturerField = lazy(() => import("./inventory-manufacturer-f
   .then((module) => ({ default: module.InventoryManufacturerField })));
 const ORIGIN_PRESETS = ["국내산", "수입산", "미확인"];
 const SPECIFICATION_PRESETS = ["100g", "200g", "300g", "500g", "700g", "1000g", "1200g", "1500g", "2000g", "5000g"];
-const UNIT_PRESETS = ["개", "봉", "팩", "병", "낱개"];
-function PresetChoices({ label, presets, selected, disabled, onSelect }: { label: string; presets: readonly string[]; selected: string | null; disabled: boolean; onSelect: (value: string | null) => void }) {
-  return <fieldset className={`${formStyles.expiryStatus} ${formStyles.presetChoices}`} disabled={disabled}><legend>{label}</legend><div>{[...presets, null].map((option) => <label key={option ?? label}><input type="radio" name={label} checked={option === selected} onChange={() => onSelect(option)} />{option ?? "직접입력"}</label>)}</div></fieldset>;
+const UNIT_PRESETS = ["개", "봉", "팩", "병"];
+function PresetChoices({ label, presets, selected, disabled, displayLabel, wideCustom = false, onSelect }: { label: string; presets: readonly string[]; selected: string | null; disabled: boolean; displayLabel?: (value: string) => string; wideCustom?: boolean; onSelect: (value: string | null) => void }) {
+  return <fieldset className={`${formStyles.expiryStatus} ${formStyles.presetChoices}`} disabled={disabled}><legend>{label}</legend><div>{[...presets, null].map((option) => <label key={option ?? label} className={!option && wideCustom ? formStyles.presetWide : undefined}><input type="radio" name={label} checked={option === selected} onChange={() => onSelect(option)} />{option ? displayLabel?.(option) ?? option : "직접입력"}</label>)}</div></fieldset>;
 }
 const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "개", unitsPerBox: 1, defaultLocationId: location, urgent: false });
 
@@ -38,6 +38,8 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
   const busy = action.busy || photoBusy;
   const set = <K extends keyof InventoryProductDraft>(key: K, value: InventoryProductDraft[K]) => setDraft((old) => ({ ...old, [key]: value }));
   const isCustom = (key: "origin" | "specification" | "unitLabel", presets: string[]) => focusCustom === key || !!draft[key] && !presets.includes(draft[key]);
+  const unitPreset = draft.unitLabel === "낱개" ? "개" : UNIT_PRESETS.includes(draft.unitLabel) ? draft.unitLabel : null;
+  const customUnit = focusCustom === "unitLabel" || !!draft.unitLabel && unitPreset === null;
   function selectPreset(key: "origin" | "specification" | "unitLabel", value: string | null) { setFocusCustom(value === null ? key : null); set(key, value ?? ""); }
   const customInput = (label: string, key: "origin" | "specification" | "unitLabel", maxLength = 200, required = false) => <label className={styles.field}>{label}<input autoFocus={focusCustom === key} required={required} maxLength={maxLength} value={draft[key]} onChange={(event) => set(key, event.target.value)} disabled={busy || key === "unitLabel" && !!product?.hasHistory} /></label>;
   async function submit(event: FormEvent) {
@@ -67,8 +69,8 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       {isCustom("origin", ORIGIN_PRESETS) ? customInput("원산지 직접입력", "origin") : null}
       <GlassButton aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>규격 · {draft.specification || "선택"}</GlassButton>
       {isCustom("specification", SPECIFICATION_PRESETS) ? customInput("규격 직접입력", "specification") : null}
-      <PresetChoices label="기준 단위 (필수)" presets={UNIT_PRESETS} selected={isCustom("unitLabel", UNIT_PRESETS) ? null : draft.unitLabel} disabled={busy || !!product?.hasHistory} onSelect={(value) => selectPreset("unitLabel", value)} />
-      {isCustom("unitLabel", UNIT_PRESETS) ? customInput("기준 단위 직접입력", "unitLabel", 20, true) : null}
+      <PresetChoices label="기준 단위 (필수)" presets={UNIT_PRESETS} selected={customUnit ? null : unitPreset} disabled={busy || !!product?.hasHistory} displayLabel={(value) => value === "개" ? "낱개" : value} wideCustom onSelect={(value) => selectPreset("unitLabel", value)} />
+      {customUnit ? customInput("기준 단위 직접입력", "unitLabel", 20, true) : null}
       {product?.hasHistory ? <p className={styles.muted}>입출고 기록이 있는 품목은 기준 단위를 바꿀 수 없어요.</p> : null}
       {!product ? <><LotFields draft={initialLot} onChange={setInitialLot} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} value={initialQuantity} onChange={setInitialQuantity} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
       <details><summary className={styles.label}>참고 메모 (선택)</summary><label className={styles.field}>메모<textarea maxLength={2000} rows={2} value={draft.note} onChange={(event) => set("note", event.target.value)} disabled={busy} /></label></details>

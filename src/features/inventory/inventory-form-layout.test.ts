@@ -38,14 +38,16 @@ describe("compact date-first inventory forms", () => {
     expect(html.indexOf("원산지")).toBeLessThan(html.indexOf("규격"));
     expect(html.indexOf("첫 유통기한 날짜")).toBeLessThan(html.indexOf("초기 수량 (필수)"));
     expect(html).toMatch(/type="radio"[^>]*checked=""[^>]*value="dated"/);
-    expect(html.match(/type="radio"/g)).toHaveLength(12);
+    expect(html.match(/type="radio"/g)).toHaveLength(11);
+    expect(html).toContain("낱개");
+    expect(html).not.toMatch(/>개</);
     expect(html.indexOf("유통기한 상태")).toBeLessThan(html.indexOf("첫 유통기한 날짜"));
     expect(html).not.toContain("해당 없음");
     expect(html).toMatch(/<details><summary[^>]*>참고 메모 \(선택\)/);
     expect(html).not.toContain("수량은 품목 등록 후");
     expect(html).not.toContain("입고 묶음");
     expect(html).not.toContain("박스");
-    expect(html).toContain('aria-label="초기 수량 (필수) (개)"');
+    expect(html).toContain('aria-label="초기 수량 (필수) (낱개)"');
     expect(html).toContain("규격 · 선택");
     expect(html).not.toContain("원산지 직접입력<input");
     expect(html).not.toContain("규격 직접입력<input");

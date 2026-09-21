@@ -11,6 +11,7 @@ import { InventoryCard } from "./inventory-card";
 import { InventoryCountForm, InventoryMovementForm, InventorySettingsForm } from "./inventory-forms";
 import { InventoryProductEditorImpl as InventoryProductEditor } from "./inventory-product-editor";
 import { ShellHeader } from "@/features/app-shell/app-shell-header";
+import { Icon } from "@/components/ui/icon";
 import styles from "./inventory.module.css";
 import headerStyles from "@/features/app-shell/app-shell-header.module.css";
 import brandStyles from "@/features/app-shell/app-brand.module.css";
@@ -34,6 +35,13 @@ describe("inventory UI contracts", () => {
     expect(html).not.toContain("박스"); expect(html).toContain("D-3"); expect(html).toContain("2026.09.13"); expect(html).toContain("냉장 · 온누리식품 · 봉"); expect(html).not.toContain("미확인");
     expect(html.match(/<button/g)).toHaveLength(1); expect(html).not.toContain("<img");
     expect(html).not.toContain("입고 기록"); expect(html).not.toContain("품목 삭제");
+  });
+  it("renders a stored 개 unit as 낱개 in inventory UI", () => {
+    const each = { ...product, unitLabel: "개" };
+    const html = renderToStaticMarkup(h(InventoryCard, { product: each, location: "refrigerated", context, onOpen: noop }));
+    expect(html).toContain('aria-label="국내산 닭가슴살, 29 낱개, 상세 보기"');
+    expect(html).toContain("냉장 · 온누리식품 · 낱개");
+    expect(html).not.toMatch(/>개</);
   });
   it("shows the expiry date without a D badge outside the urgent window, including all-location cards", () => {
     const html = renderToStaticMarkup(h(InventoryCard, { product: { ...product, nearestExpiryByLocation: { ...product.nearestExpiryByLocation, refrigerated: "2027-09-13" } }, location: "all", context, onOpen: noop }));
@@ -100,10 +108,13 @@ describe("inventory UI contracts", () => {
     }));
     const fixtureLocations = h("div", { className: styles.locations, "data-catalog": true },
       ...["전체", "냉장", "냉동1", "냉동2", "샘플"].map((label, index) => h("button", { key: label, "aria-pressed": index === 0 }, label)));
+    const fixtureSearch = h("div", { className: styles.filters },
+      h("label", { className: styles.search }, h(Icon, { name: "search", size: 18 }), h("input", { "aria-label": "품목 검색", placeholder: "상품명 · 제조사" })),
+      h("button", { className: styles.optionsTrigger, "aria-label": "목록 옵션", "data-active": true }, h(Icon, { name: "sliders", size: 20 }), h("span", { "aria-hidden": true })));
     const markup = renderToStaticMarkup(h("main", { className: "workspace-shell", "data-mode": "inventory" },
       h(ShellHeader, { mode: "inventory", availableModes: ["customer", "delivery", "sales", "inventory"], onModeChange: noop }),
       h("div", { className: "workspace-content" }, h("section", { className: `shell-page ${styles.workspace}` },
-        fixtureLocations, h("div", { className: styles.list }, ...fixtureCards)))));
+        fixtureLocations, fixtureSearch, h("p", { className: styles.countModeStatus }, h("span", { "aria-hidden": true }), "재고조사 ON"), h("div", { className: styles.list }, ...fixtureCards)))));
     const directory = new URL("../../../output/playwright/inventory-layout/", import.meta.url); mkdirSync(directory, { recursive: true });
     writeFileSync(new URL("catalog.html", directory), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${markup}</body></html>`);
     expect(css).not.toContain(":global(");

@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { inventoryLocationMap, inventoryProductSchema, type InventoryContext, type InventoryLot, type InventoryProduct } from "@/domain/inventory";
-import { inventoryCardHighlight, inventoryCountState, inventoryExpiryLabel, inventoryInitials, inventoryIsUrgent, inventoryLocationsFor, inventoryLotDateLabel, inventoryTransferPreview, matchesInventorySearch, inventoryScope, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryOpeningLocation } from "./inventory-model";
+import { inventoryCardHighlight, inventoryCountState, inventoryExpiryLabel, inventoryInitials, inventoryIsUrgent, inventoryLocationsFor, inventoryLotDateLabel, inventoryTransferPreview, inventoryUnitDisplayLabel, matchesInventorySearch, inventoryScope, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryOpeningLocation } from "./inventory-model";
 
 function product(overrides: Partial<InventoryProduct> = {}): InventoryProduct {
   return inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "닭 가슴살", manufacturer: "온누리식품", specification: "1kg", origin: "국내산", unitLabel: "봉", unitsPerBox: 12, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 2, stockRevision: 3, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1", ...overrides });
 }
 describe("inventory catalog model", () => {
+  it("maps canonical 개 to the user-facing 낱개 label without rewriting other stored values", () => {
+    expect(inventoryUnitDisplayLabel("개")).toBe("낱개");
+    expect(inventoryUnitDisplayLabel("낱개")).toBe("낱개");
+    expect(inventoryUnitDisplayLabel("봉")).toBe("봉");
+  });
   it("aggregates each product once across locations, keeping nearest expiry only from positive stock", () => {
     const item = product({ quantityByLocation: { refrigerated: 20, freezer1: 0, freezer2: 3, sample: 2 }, nearestExpiryByLocation: { refrigerated: "2027-01-01", freezer1: "2025-01-01", freezer2: "2026-09-14", sample: null } });
     expect(inventoryScope(item, "all")).toEqual({ locations: ["refrigerated", "freezer2", "sample"], quantity: 25, expiryDate: "2026-09-14" });

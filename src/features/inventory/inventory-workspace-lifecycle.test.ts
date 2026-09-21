@@ -27,6 +27,11 @@ function find(node: ReactNode, predicate: (type: unknown, props: Props) => boole
   if (!isValidElement<Props>(node)) return null;
   return predicate(node.type, node.props) ? node.props : find(node.props.children, predicate);
 }
+function textContent(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textContent).join("");
+  return isValidElement<Props>(node) ? textContent(node.props.children) : "";
+}
 function render(admin = false) { harness.stateCursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryWorkspace({ session, admin }); }
 function resetMountedInstance() { harness.states = []; harness.refs = []; harness.effects = []; }
 async function settle() { for (let index = 0; index < 12; index += 1) await Promise.resolve(); }
@@ -165,6 +170,38 @@ describe("inventory in-memory draft lifecycle", () => {
     expect(hasEditor(render())).toBe(true);
     cleanup();
   });
+  it("keeps search and all list options across opening and closing the options sheet", async () => {
+    const cleanup = await openEditor();
+    let tree = render();
+    const trigger = find(tree, (_type, props) => props["aria-label"] === "목록 옵션")!;
+    expect(trigger).toMatchObject({ "aria-expanded": false });
+    (trigger.onClick as () => void)(); tree = render();
+    expect(find(tree, (_type, props) => props.title === "목록 옵션")?.open).toBe(true);
+    const search = find(tree, (type, props) => type === "input" && props["aria-label"] === "품목 검색")!;
+    (search.onChange as (event: { target: { value: string } }) => void)({ target: { value: "닭" } });
+    const urgent = find(tree, (type, props) => type === "label" && textContent(props.children).includes("임박 상품만 보기"))!;
+    const urgentInput = find(urgent.children, (type) => type === "input")!;
+    (urgentInput.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
+    const inactive = find(tree, (type, props) => type === "label" && textContent(props.children).includes("비활성 품목 보기"))!;
+    const inactiveInput = find(inactive.children, (type) => type === "input")!;
+    (inactiveInput.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
+    const count = find(tree, (_type, props) => props.role === "switch" && props["aria-label"] === "재고조사 모드")!;
+    (count.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
+    tree = render();
+    const sheet = find(tree, (_type, props) => props.title === "목록 옵션")!;
+    (sheet.onClose as () => void)(); tree = render();
+    expect(find(tree, (type, props) => type === "input" && props["aria-label"] === "품목 검색")?.value).toBe("닭");
+    expect(find(tree, (_type, props) => props["aria-label"] === "목록 옵션")).toMatchObject({ "aria-expanded": false, "data-active": true });
+    expect(find(tree, (_type, props) => props.role === "status" && textContent(props.children) === "재고조사 ON")).not.toBeNull();
+    const reopen = find(tree, (_type, props) => props["aria-label"] === "목록 옵션")!;
+    (reopen.onClick as () => void)(); tree = render();
+    const restoredInactive = find(tree, (type, props) => type === "label" && textContent(props.children).includes("비활성 품목 보기"))!;
+    const restoredUrgent = find(tree, (type, props) => type === "label" && textContent(props.children).includes("임박 상품만 보기"))!;
+    expect(find(restoredInactive.children, (type) => type === "input")?.checked).toBe(true);
+    expect(find(restoredUrgent.children, (type) => type === "input")?.checked).toBe(true);
+    expect(find(tree, (_type, props) => props.role === "switch" && props["aria-label"] === "재고조사 모드")?.checked).toBe(true);
+    cleanup();
+  });
   it("omits an empty 0/0 progress card for new products but keeps eligible count progress", async () => {
     const product = { productId: "new-product", name: "새 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
       createdAt: "2026-09-13T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
@@ -201,7 +238,7 @@ describe("inventory in-memory draft lifecycle", () => {
   it("lets an inventory-writing employee find inactive products without exposing settings", async () => {
     const cleanup = await openEditor();
     const tree = render();
-    expect(find(tree, (type, props) => type === "label" && Array.isArray(props.children) && props.children.includes("비활성 품목 보기"))).not.toBeNull();
+    expect(find(tree, (type, props) => type === "label" && textContent(props.children).includes("비활성 품목 보기"))).not.toBeNull();
     expect(find(tree, (_type, props) => props["aria-label"] === "재고 설정")).toBeNull(); cleanup();
   });
   it("refreshes on return only when stale, without recurring full-list polling or dropping a draft", async () => {

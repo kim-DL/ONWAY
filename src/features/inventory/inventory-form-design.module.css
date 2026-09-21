@@ -11,6 +11,7 @@
 .expiryStatus label:has(input:focus-visible) { outline: 3px solid #3182f6; outline-offset: 2px; }
 .expiryStatus:disabled label { opacity: .55; cursor: default; }
 .presetChoices:has(label:nth-child(5)) > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.presetWide { grid-column: span 2; }
 .confirmQuestion { margin: 0; font-size: 16px; line-height: 1.65; font-weight: 650; color: #304257; }
 .countList { list-style: none; margin: 0; padding: 0; border: 1px solid #dce5ed; border-radius: 8px; overflow: hidden; background: #f7fafdc9; }
 .countList li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 12px; }

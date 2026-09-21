@@ -17,6 +17,10 @@ export function inventoryLocationsFor(product: InventoryProduct): InventoryLocat
   return INVENTORY_LOCATIONS.filter((location) => location === product.defaultLocationId || product.quantityByLocation[location] > 0);
 }
 export type InventoryLocationFilter = InventoryLocation | "all";
+
+export function inventoryUnitDisplayLabel(unitLabel: string): string {
+  return unitLabel === "개" ? "낱개" : unitLabel;
+}
 /** One product per all-location row; stock and completion retain their location boundaries. */
 export function inventoryScope(product: InventoryProduct, location: InventoryLocationFilter) {
   const locations = location === "all" ? inventoryLocationsFor(product) : [location];

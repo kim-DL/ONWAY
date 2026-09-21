@@ -30,6 +30,7 @@ const iconNames = Object.keys({
   route: true,
   search: true,
   settings: true,
+  sliders: true,
   sparkles: true,
   trash: true,
   upload: true,
