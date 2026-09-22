@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createRecentCustomerHistoryStore, parseRecentCustomerIds, recentCustomerStorageKey, resolveRecentCustomers, type RecentCustomerEnvironment } from "./recent-customer-history";
+import { createRecentCustomerHistoryStore, customerHomeRecents, MAX_RECENT_CUSTOMERS, parseRecentCustomerIds, recentCustomerStorageKey, resolveRecentCustomers, type RecentCustomerEnvironment } from "./recent-customer-history";
 
 const scope = { uid: "employee-1", claims: { sessionVersion: 2, permissionsVersion: 3 } };
 const key = recentCustomerStorageKey(scope);
-const allowed = new Set(["a", "b", "c", "d", "e", "f", "g"]);
+const allowed = new Set(["a", "b", "c", "d", "e", "f", "g", ...Array.from({ length: 25 }, (_, index) => `customer_${index + 1}`)]);
 
 function environment() {
   const values = new Map<string, string>();
@@ -39,8 +39,11 @@ describe("ID-only recent customer history", () => {
     expect(parseRecentCustomerIds(raw)).toEqual([]);
   });
 
-  it("deduplicates and caps an existing valid payload at five IDs", () => {
-    expect(parseRecentCustomerIds('["a","b","a","c","d","e","f"]')).toEqual(["a", "b", "c", "d", "e"]);
+  it("keeps the v1 ID-only payload compatible while deduplicating up to twenty IDs", () => {
+    const existingFive = ["customer_1", "customer_2", "customer_3", "customer_4", "customer_5"];
+    expect(parseRecentCustomerIds(JSON.stringify(existingFive))).toEqual(existingFive);
+    const withDuplicate = [...Array.from({ length: 22 }, (_, index) => `customer_${index + 1}`), "customer_2"];
+    expect(parseRecentCustomerIds(JSON.stringify(withDuplicate))).toEqual(withDuplicate.slice(0, MAX_RECENT_CUSTOMERS));
   });
 
   it("does not read browser storage until subscribed and never includes history on the server", () => {
@@ -64,11 +67,20 @@ describe("ID-only recent customer history", () => {
     store.remember("unknown", allowed);
     store.remember("not/an/id", new Set(["not/an/id"]));
     expect(env.storage.setItem).not.toHaveBeenCalled();
-    for (const id of ["a", "b", "c", "d", "e", "f", "c"]) store.remember(id, allowed);
-    expect(store.getSnapshot().ids).toEqual(["c", "f", "e", "d", "b"]);
-    expect(JSON.parse(env.values.get(key)!)).toEqual(["c", "f", "e", "d", "b"]);
+    for (const id of Array.from({ length: 21 }, (_, index) => `customer_${index + 1}`)) store.remember(id, allowed);
+    store.remember("customer_10", allowed);
+    expect(store.getSnapshot().ids).toHaveLength(20);
+    expect(store.getSnapshot().ids[0]).toBe("customer_10");
+    expect(store.getSnapshot().ids).not.toContain("customer_1");
+    expect(new Set(store.getSnapshot().ids).size).toBe(20);
+    expect(JSON.parse(env.values.get(key)!)).toEqual(store.getSnapshot().ids);
     expect(env.storage.setItem.mock.calls.every(([, value]) => (JSON.parse(value) as unknown[]).every((id) => typeof id === "string"))).toBe(true);
     cleanup();
+  });
+
+  it("keeps the customer home presentation at five cards while history exposes twenty", () => {
+    const customers = Array.from({ length: 20 }, (_, index) => ({ customerId: `customer_${index + 1}` }));
+    expect(customerHomeRecents(customers).map((customer) => customer.customerId)).toEqual(customers.slice(0, 5).map((customer) => customer.customerId));
   });
 
   it("resolves only current authorized objects and does not erase IDs during an empty loading catalog", () => {

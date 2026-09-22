@@ -39,6 +39,7 @@ import { WelcomeGreeting } from "./welcome-greeting";
 import { AppBrand } from "./app-brand";
 import { ShellHeader } from "./app-shell-header";
 import { useHeaderMotionPreference } from "./header-motion-preference";
+import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
 
 const subscribeToStoredMode = () => () => undefined;
 
@@ -73,6 +74,11 @@ const SalesWorkspace = dynamic(
 const CustomerWorkspace = dynamic(
   () => import("@/features/customers/customer-workspace").then((module) => module.CustomerWorkspace),
   { loading: () => <WorkspaceFeatureLoading label="거래처 화면을 준비하고 있습니다." /> },
+);
+
+const DeliveryPhotoWorkspace = dynamic(
+  () => import("@/features/delivery-photos/delivery-photo-workspace").then((module) => module.DeliveryPhotoWorkspace),
+  { loading: () => <WorkspaceFeatureLoading label="납품사진 화면을 준비하고 있습니다." /> },
 );
 
 const InventoryWorkspace = dynamic(
@@ -403,6 +409,8 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} />;
   } else if (view === "settings") {
     content = <SettingsPage session={session} />;
+  } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
+    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
   } else if (mode === "customer") {
     content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
   } else if (mode === "inventory") {

@@ -1,4 +1,5 @@
-export const MAX_RECENT_CUSTOMERS = 5;
+export const MAX_RECENT_CUSTOMERS = 20;
+export const MAX_CUSTOMER_HOME_RECENTS = 5;
 
 const customerIdPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const maximumStoredLength = 4096;
@@ -40,6 +41,10 @@ export function resolveRecentCustomers<T extends { customerId: string }>(ids: re
     const customer = authorized.get(id);
     return customer ? [customer] : [];
   });
+}
+
+export function customerHomeRecents<T>(customers: readonly T[]): readonly T[] {
+  return customers.slice(0, MAX_CUSTOMER_HOME_RECENTS);
 }
 
 const browserEnvironment: RecentCustomerEnvironment = {

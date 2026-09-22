@@ -80,6 +80,18 @@ const photoMorphAssets = new Set(photoMorphStylesheets.map((asset) => asset.asse
 const photoMorphRawBytes = photoMorphStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const photoMorphGzipBytes = photoMorphStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheets = stylesheets.filter((asset) => customerAssetNames.has(asset.asset) && !photoMorphAssets.has(asset.asset));
+// Delivery-photo Phase 1 is a hidden, independently loaded customer-mode
+// workspace. Keep its CSS and JavaScript out of the initial and legacy budgets,
+// while retaining the existing customer catalog chunk as an approved shared
+// dependency. Existing feature ceilings below remain unchanged.
+const deliveryPhotoEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-workspace"));
+const deliveryPhotoAssetNames = new Set(deliveryPhotoEntries.flatMap((entry) => entry.files));
+const deliveryPhotoExclusiveAssetNames = new Set([...deliveryPhotoAssetNames].filter((asset) => !customerAssetNames.has(asset)));
+const deliveryPhotoStylesheets = stylesheets.filter((asset) => deliveryPhotoAssetNames.has(asset.asset));
+const deliveryPhotoStylesheetRawBytes = deliveryPhotoStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
+const deliveryPhotoStylesheetGzipBytes = deliveryPhotoStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const deliveryPhotoJavascriptGzipBytes = [...deliveryPhotoAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 // Phase 40 moves the entire retired global admin layer into a scoped, lazy UI.
 // Measure the dock, forms and dialogs together: webpack combines their modules.
 // Employee/login boundaries must never acquire these styles.
@@ -127,7 +139,7 @@ const inventoryManufacturerFieldJavascriptGzipBytes = [...inventoryManufacturerF
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryManufacturerStylesheetRawBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryManufacturerStylesheetGzipBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -140,6 +152,15 @@ assertBudget(inventoryWorkspaceEntries.length === 2 && inventoryPhotoEntries.len
   "inventory must retain two staff/admin workspace entries and one deferred photo viewer");
 assertBudget(inventoryManufacturerEntries.length === 1, "inventory manufacturer picker must retain one deferred boundary");
 assertBudget(inventoryManufacturerFieldEntries.length === 1, "inventory manufacturer trigger must retain one deferred boundary");
+assertBudget(deliveryPhotoEntries.length === 1, "delivery photo workspace must retain one deferred boundary");
+assertBudget(deliveryPhotoStylesheets.length === 1, "delivery photo workspace must retain one isolated stylesheet");
+for (const asset of deliveryPhotoAssetNames) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo asset ${asset} must stay deferred`);
+}
+for (const asset of deliveryPhotoExclusiveAssetNames) {
+  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => deliveryPhotoEntries.includes(entry)),
+    `delivery photo asset ${asset} must not load with unrelated work modes`);
+}
 for (const asset of inventoryManufacturerFieldAssetNames) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `manufacturer trigger asset ${asset} must stay deferred`);
 }
@@ -172,7 +193,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 3 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the three approved photo viewers");
 }
-const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
+const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -217,7 +238,7 @@ for (const boundary of requiredBoundaries) {
   );
 }
 const serviceWorker = readFileSync(join(projectRoot, "public/sw.js"), "utf8");
-for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "inventory-workspace", "inventory-photo-viewer"]) {
+for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "inventory-workspace", "inventory-photo-viewer"]) {
   const entry = dynamicEntries.find(({ boundary }) => boundary.endsWith(tool));
   assertBudget(entry?.files.every((asset) => serviceWorker.includes(asset)),
     `deferred ${tool} assets must remain in the PWA precache`);
@@ -271,6 +292,9 @@ assertBudget(customerStylesheetGzipBytes <= 9.75 * 1024, `customer CSS gzip ${cu
 // existing customer boundary. Measured 36,705B gzip; add only 512B while the
 // initial, inventory, school/sales and stylesheet budgets remain unchanged.
 assertBudget(customerJavascriptGzipBytes <= 36 * 1024, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 36KiB`);
+assertBudget(deliveryPhotoStylesheetRawBytes <= 6 * 1024, `delivery photo CSS raw ${deliveryPhotoStylesheetRawBytes}B exceeds 6KiB`);
+assertBudget(deliveryPhotoStylesheetGzipBytes <= 2 * 1024, `delivery photo CSS gzip ${deliveryPhotoStylesheetGzipBytes}B exceeds 2KiB`);
+assertBudget(deliveryPhotoJavascriptGzipBytes <= 10 * 1024, `delivery photo JavaScript gzip ${deliveryPhotoJavascriptGzipBytes}B exceeds 10KiB`);
 assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${salesWorkspaceGzipBytes}B exceeds 14KiB`);
 // Phase 49: personal accessible count toggle, guarded More actions, read-only
 // lot confirmations and two-state expiry entry. Retired and overwritten CSS
@@ -302,6 +326,9 @@ const report = {
     customerStylesheetRawBytes: 48 * 1024,
     customerStylesheetGzipBytes: 9.75 * 1024,
     customerJavascriptGzipBytes: 36 * 1024,
+    deliveryPhotoStylesheetRawBytes: 6 * 1024,
+    deliveryPhotoStylesheetGzipBytes: 2 * 1024,
+    deliveryPhotoJavascriptGzipBytes: 10 * 1024,
     salesWorkspaceGzipBytes: 14 * 1024,
     inventoryStylesheetRawBytes: 28.5 * 1024,
     inventoryStylesheetGzipBytes: 6.5 * 1024,
@@ -326,6 +353,9 @@ const report = {
     customerStylesheetRawBytes,
     customerStylesheetGzipBytes,
     customerJavascriptGzipBytes,
+    deliveryPhotoStylesheetRawBytes,
+    deliveryPhotoStylesheetGzipBytes,
+    deliveryPhotoJavascriptGzipBytes,
     salesWorkspaceGzipBytes,
     inventoryStylesheetRawBytes,
     inventoryStylesheetGzipBytes,

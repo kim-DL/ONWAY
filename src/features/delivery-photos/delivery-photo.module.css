@@ -1,0 +1,29 @@
+.workspace { width: 100%; min-width: 0; max-width: 76rem; margin: 0 auto; padding: clamp(1rem,4vw,2rem); color: var(--shell-ink); }
+.hero { padding: .5rem 0 1.25rem; }
+.hero p,.eyebrow { margin: 0; color: var(--mode-customer-text); font-size: .72rem; font-weight: 800; letter-spacing: .12em; }
+.hero h1 { margin: .25rem 0; font-size: clamp(2rem,10vw,3.4rem); line-height: 1; }
+.hero span { color: var(--shell-ink-soft); font-size: .9rem; }
+.grid { display: grid; min-width: 0; gap: .85rem; }
+.panel { min-width: 0; padding: 1rem; border: 1px solid color-mix(in srgb,var(--mode-customer-text) 13%,transparent); border-radius: 20px; background: rgba(255,255,255,.78); box-shadow: 0 12px 34px rgba(25,52,40,.07); }
+.panel > header { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+.panel h2 { margin: .1rem 0 0; font-size: 1.08rem; }
+.panel > header > strong { display: grid; min-width: 2.5rem; height: 2.5rem; place-items: center; border-radius: 999px; color: var(--mode-customer-text); background: color-mix(in srgb,var(--mode-customer-text) 9%,white); }
+.customerList,.routeList { display: grid; min-width: 0; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.customerList li,.routeList li { display: flex; min-width: 0; min-height: 3.25rem; align-items: center; gap: .65rem; padding: .35rem .3rem .35rem .7rem; border-radius: 14px; background: rgba(245,249,247,.9); }
+.customerList li > span:first-child { display: grid; min-width: 0; flex: 1; }
+.customerList strong,.routeList strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.customerList small { color: var(--shell-ink-soft); }
+.customerList button,.routeList button,.linkButton { min-width: 44px; min-height: 44px; padding: .45rem .7rem; border-radius: 12px; color: var(--mode-customer-text); background: color-mix(in srgb,var(--mode-customer-text) 8%,white); font-weight: 750; }
+.customerList button:focus-visible,.routeList button:focus-visible,.linkButton:focus-visible,.search input:focus-visible { outline: 3px solid color-mix(in srgb,var(--mode-customer-text) 34%,transparent); outline-offset: 2px; }
+.actions { display: flex; min-width: 0; gap: .3rem; }
+.actions button { padding-inline: .55rem; }
+.search { display: flex; min-width: 0; min-height: 48px; align-items: center; gap: .55rem; margin-bottom: .7rem; padding: 0 .85rem; border: 1px solid rgba(42,84,63,.14); border-radius: 14px; background: #f7faf8; }
+.search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; font-size: 1rem; }
+.empty { margin: 0; padding: .8rem .25rem; color: var(--shell-ink-soft); line-height: 1.5; overflow-wrap: anywhere; }
+.linkButton { border: 0; background: transparent; }
+.order { display: grid; width: 1.8rem; height: 1.8rem; flex: 0 0 auto; place-items: center; border-radius: 999px; color: var(--mode-customer-text); background: white; font-weight: 800; }
+.routeList strong { min-width: 0; flex: 1; }
+.routeList button { display: grid; padding: 0; place-items: center; }
+.routeList button:disabled { opacity: .35; }
+@media (min-width: 760px) { .grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .routePanel { grid-column: 1/-1; } }
+@media (max-width: 380px) { .workspace { padding-inline: .75rem; } .panel { padding: .85rem; } .customerList li { align-items: stretch; flex-direction: column; } .customerList li > button,.customerList li > .actions { width: 100%; } .actions button { flex: 1; } }

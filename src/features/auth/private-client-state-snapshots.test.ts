@@ -37,4 +37,23 @@ describe("private workspace snapshot cleanup", () => {
     expect(readCustomerWorkspaceSnapshot(namespace).catalog).toBeNull();
     expect(getInventoryWorkspaceSession(namespace).snapshot.catalog).toBeNull();
   });
+
+  it("removes the namespaced recent-customer ID history on logout without touching public storage", async () => {
+    const values = new Map([
+      ["onnuriway:private:recent-customers:v1:employee:1:1", '["customer_1"]'],
+      ["public-preference", "keep"],
+    ]);
+    const scopedStorage = {
+      get length() { return values.size; },
+      key: (index: number) => [...values.keys()][index] ?? null,
+      removeItem: vi.fn((key: string) => { values.delete(key); }),
+    };
+    vi.stubGlobal("localStorage", scopedStorage);
+    vi.stubGlobal("sessionStorage", { length: 0, key: () => null, removeItem: vi.fn() });
+
+    await clearPrivateClientState();
+
+    expect(values.has("onnuriway:private:recent-customers:v1:employee:1:1")).toBe(false);
+    expect(values.get("public-preference")).toBe("keep");
+  });
 });

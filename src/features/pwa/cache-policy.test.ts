@@ -25,12 +25,14 @@ describe("Phase 14 PWA cache allowlist", () => {
     expect(isPublicAssetPath("/brand/bloub-welcome-still-v2.png")).toBe(false);
     expect(isPublicAssetPath("/brand/unlisted-private-file.png")).toBe(false);
     expect(isPublicAssetPath("/api/sales/export")).toBe(false);
+    expect(isPublicAssetPath("/delivery-photos/customer_1/evidence.webp")).toBe(false);
     expect(isPublicAssetPath("/google.firestore.v1.Firestore/Listen/channel")).toBe(false);
   });
 
   it("keeps the future thumbnail route narrow and same-origin compatible", () => {
     expect(isSchoolThumbnailPath("/school-thumbnails/school-1/main.webp")).toBe(true);
     expect(isSchoolThumbnailPath("/photos/original/private.jpg")).toBe(false);
+    expect(isSchoolThumbnailPath("/delivery-photos/customer_1/thumbnail.webp")).toBe(false);
   });
 
   it("cleans only obsolete Onnuriway runtime caches", () => {

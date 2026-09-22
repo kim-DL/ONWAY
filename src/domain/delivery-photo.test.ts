@@ -1,0 +1,26 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  DELIVERY_PHOTO_RETENTION_HOURS,
+  deliveryPhotoDaySchema,
+  deliveryPhotoRouteSchema,
+  deliveryPhotoSchema,
+} from "./delivery-photo";
+
+const timestamp = "2026-09-22T00:00:00.000Z";
+
+describe("delivery photo shared contract", () => {
+  it("accepts unique route/day customer order and rejects duplicates", () => {
+    expect(deliveryPhotoRouteSchema.parse({ employeeId: "employee_1", customerIds: ["a", "b"], revision: 1, updatedAt: timestamp, updatedByEmployeeId: "employee_1" }).customerIds).toEqual(["a", "b"]);
+    expect(deliveryPhotoDaySchema.safeParse({ employeeId: "employee_1", deliveryDateKey: "2026-09-22", customerIds: ["a", "a"], revision: 1, updatedAt: timestamp, updatedByEmployeeId: "employee_1", expiresAt: timestamp }).success).toBe(false);
+    expect(deliveryPhotoDaySchema.safeParse({ employeeId: "employee_1", deliveryDateKey: "2026-02-30", customerIds: ["a"], revision: 1, updatedAt: timestamp, updatedByEmployeeId: "employee_1", expiresAt: timestamp }).success).toBe(false);
+  });
+
+  it("models server-owned actor snapshots, private objects, and consistent deletion metadata", () => {
+    const object = { objectPath: "delivery/a.webp", generation: "123", contentType: "image/webp", byteSize: 100, width: 640, height: 480 } as const;
+    const active = { photoId: "00000000-0000-4000-8000-000000000000", customerId: "customer_1", deliveryDateKey: "2026-09-22", source: "camera", status: "active", createdAt: timestamp, createdByUid: "uid_1", createdByEmployeeId: "employee_1", createdByName: "홍길동", expiresAt: "2026-09-29T00:00:00.000Z", evidence: object, thumbnail: object } as const;
+    expect(deliveryPhotoSchema.parse(active).createdByName).toBe("홍길동");
+    expect(deliveryPhotoSchema.safeParse({ ...active, status: "deleted" }).success).toBe(false);
+    expect(DELIVERY_PHOTO_RETENTION_HOURS).toBe(168);
+  });
+});

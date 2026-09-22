@@ -41,6 +41,13 @@ describe("app shell role policy", () => {
     expect(normalizeView("customer", "activity")).toBe("schools");
   });
 
+  it("keeps production customer navigation unchanged until delivery photos are enabled", () => {
+    expect(getNavigation("customer", false).map((item) => item.label)).toEqual(["거래처", "설정"]);
+    expect(normalizeView("customer", "activity", false)).toBe("schools");
+    expect(getNavigation("customer", true).map((item) => item.label)).toEqual(["거래처", "납품사진", "설정"]);
+    expect(normalizeView("customer", "activity", true)).toBe("activity");
+  });
+
   it("restores only an available mode and normalizes unavailable views", () => {
     expect(getInitialMode(["delivery", "sales"], "sales")).toBe("sales");
     expect(getInitialMode(["delivery"], "sales")).toBe("delivery");
