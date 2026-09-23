@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import sharp from "sharp";
@@ -93,6 +93,10 @@ async function chooseRowPhoto(page: Page, customerName: string, source: "카메�
   await (await chooser).setFiles({ name, mimeType: "image/jpeg", buffer });
 }
 
+async function expectImageReady(image: Locator) {
+  await expect.poll(() => image.evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0)).toBe(true);
+}
+
 test("camera and album uploads stay non-blocking and merge only server-confirmed metadata", async ({ page }) => {
   await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
   const errors: string[] = []; const warnings: string[] = []; const directWrites: string[] = [];
@@ -170,6 +174,157 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
   } finally {
     releaseFirst(); await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
+  }
+});
+
+test("recent customer history lazily relays thumbnails and only the selected evidence", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]);
+  const errors: string[] = []; const warnings: string[] = []; const directWrites: string[] = [];
+  const listInputs: Array<{ scope?: string; customerId?: string; limit?: number }> = [];
+  const getInputs: Array<{ photoId?: string; variant?: string }> = [];
+  const listResults: Array<{ scope?: string; customerId?: string; photos?: Array<{ photoId: string; createdAt: string }> }> = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error" || message.type() === "warning") warnings.push(message.text()); });
+  await login(page);
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.includes(":9199") || /documents:commit/u.test(url)) directWrites.push(url);
+    const input = (request.postDataJSON() as { data?: unknown } | null)?.data;
+    if (url.endsWith("/listDeliveryPhotos")) listInputs.push(input as typeof listInputs[number]);
+    if (url.endsWith("/getDeliveryPhoto")) getInputs.push(input as typeof getInputs[number]);
+  });
+  page.on("response", async (response) => {
+    if (!response.url().endsWith("/listDeliveryPhotos")) return;
+    try {
+      const body = await response.json() as { data?: unknown; result?: unknown };
+      const result = (body.data ?? body.result) as typeof listResults[number];
+      if (result?.scope === "customer" && result.customerId === ids[1]) listResults.push(result);
+    } catch { /* A failed response remains visible through the UI assertion. */ }
+  });
+  await page.evaluate(() => {
+    const audit = { created: [] as string[], revoked: [] as string[] };
+    const create = URL.createObjectURL.bind(URL);
+    const revoke = URL.revokeObjectURL.bind(URL);
+    Object.assign(window, { __deliveryPhotoBlobAudit: audit });
+    URL.createObjectURL = (blob) => { const url = create(blob); audit.created.push(url); return url; };
+    URL.revokeObjectURL = (url) => { audit.revoked.push(url); revoke(url); };
+  });
+  const landscape = await sharp({ create: { width: 960, height: 640, channels: 3, background: "#7da6be" } }).jpeg().toBuffer();
+  const portrait = await sharp({ create: { width: 640, height: 960, channels: 3, background: "#8aa47a" } }).jpeg().toBuffer();
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", landscape, "history-1.jpg");
+    await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+    await page.locator("details").getByText("기록완료 2곳").click();
+    await chooseRowPhoto(page, "대전식품", "앨범 선택", landscape, "history-2.jpg");
+    await expect(page.locator("details").getByText("사진 2장", { exact: false })).toBeVisible({ timeout: 30_000 });
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", portrait, "history-3.jpg");
+    await expect(page.locator("details").getByText("사진 3장", { exact: false })).toBeVisible({ timeout: 30_000 });
+
+    const openHistory = page.getByRole("button", { name: "대전식품 납품사진 3장 보기" });
+    await openHistory.click();
+    const history = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
+    await expect(history.getByText("최근 기록 3장")).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => listInputs.length).toBe(1);
+    expect(listInputs[0]).toEqual({ scope: "customer", customerId: ids[1], limit: 30 });
+    await expect.poll(() => listResults.length).toBe(1);
+    expect(listResults[0]).toMatchObject({ scope: "customer", customerId: ids[1] });
+    expect(listResults[0]!.photos).toHaveLength(3);
+    expect(listResults[0]!.photos!.map((photo) => Date.parse(photo.createdAt)))
+      .toEqual([...listResults[0]!.photos!].map((photo) => Date.parse(photo.createdAt)).sort((left, right) => right - left));
+    await expect.poll(() => getInputs.filter((input) => input.variant === "thumbnail").length).toBeGreaterThan(0);
+    expect(getInputs.filter((input) => input.variant === "evidence")).toEqual([]);
+    await expect(history.getByText(/등록자 납품 담당/u).first()).toBeVisible();
+    await expect(history.getByRole("button", { name: /삭제|공유/u })).toHaveCount(0);
+    for (const thumbnail of await history.locator('img[src^="blob:"]').all()) await expectImageReady(thumbnail);
+
+    const grid = history.getByRole("list");
+    const columns = () => grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+    expect(await columns()).toBe(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.setViewportSize({ width: 320, height: 800 });
+    expect(await columns()).toBe(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+    expect(await columns()).toBe(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+
+    const firstThumbnail = history.getByRole("button", { name: /^대전식품 납품사진,/u }).first();
+    for (const button of await history.getByRole("button").all()) {
+      if (!await button.isVisible()) continue;
+      const box = await button.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+    }
+    await history.getByRole("button", { name: "닫기", exact: true }).focus();
+    await page.keyboard.press("Tab");
+    await expect(firstThumbnail).toBeFocused();
+    expect(await firstThumbnail.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
+    await firstThumbnail.click();
+    const viewer = page.getByRole("dialog", { name: "대전식품 납품사진 보기", exact: true });
+    await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => getInputs.filter((input) => input.variant === "evidence").length).toBe(1);
+    expect(getInputs.find((input) => input.variant === "evidence")).toEqual({ photoId: listResults[0]!.photos![0]!.photoId, variant: "evidence" });
+    const firstEvidenceUrl = await viewer.locator("img").getAttribute("src");
+    expect(firstEvidenceUrl).toMatch(/^blob:/u);
+    await expectImageReady(viewer.locator("img"));
+    const firstEvidenceBox = await viewer.locator("img").boundingBox();
+    expect(firstEvidenceBox && firstEvidenceBox.x >= 0 && firstEvidenceBox.y >= 0
+      && firstEvidenceBox.x + firstEvidenceBox.width <= 360 && firstEvidenceBox.y + firstEvidenceBox.height <= 800).toBe(true);
+    for (const button of await viewer.getByRole("button").all()) {
+      if (!await button.isVisible()) continue;
+      const box = await button.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+    await viewer.getByRole("button", { name: "다음" }).click();
+    await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
+    await expect.poll(() => getInputs.filter((input) => input.variant === "evidence").length).toBe(2);
+    await expectImageReady(viewer.locator("img"));
+    const landscapeBox = await viewer.locator("img").boundingBox();
+    expect(landscapeBox && landscapeBox.x >= 0 && landscapeBox.y >= 0
+      && landscapeBox.x + landscapeBox.width <= 360 && landscapeBox.y + landscapeBox.height <= 800).toBe(true);
+    await expect.poll(() => page.evaluate((url) => ((window as unknown as { __deliveryPhotoBlobAudit: { revoked: string[] } }).__deliveryPhotoBlobAudit.revoked).includes(url ?? ""), firstEvidenceUrl)).toBe(true);
+    await page.keyboard.press("ArrowLeft");
+    await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
+    await expect.poll(() => getInputs.filter((input) => input.variant === "evidence").length).toBe(3);
+    await expectImageReady(viewer.locator("img"));
+    const escapeEvidenceUrl = await viewer.locator("img").getAttribute("src");
+    await page.keyboard.press("Escape");
+    await expect(viewer).toHaveCount(0);
+    await expect(history).toBeVisible();
+    await expect(firstThumbnail).toBeFocused();
+    await expect.poll(() => page.evaluate((url) => ((window as unknown as { __deliveryPhotoBlobAudit: { revoked: string[] } }).__deliveryPhotoBlobAudit.revoked).includes(url ?? ""), escapeEvidenceUrl)).toBe(true);
+
+    await firstThumbnail.click();
+    await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectImageReady(viewer.locator("img"));
+    await page.goBack();
+    await expect(viewer).toHaveCount(0);
+    await expect(history).toBeVisible();
+    await expect(firstThumbnail).toBeFocused();
+    const thumbnailUrls = await history.locator('img[src^="blob:"]').evaluateAll((images) => images.map((image) => image.getAttribute("src") ?? ""));
+    await history.getByRole("button", { name: "닫기", exact: true }).click();
+    await expect(history).toHaveCount(0);
+    await expect(openHistory).toBeFocused();
+    await expect.poll(() => page.evaluate((urls) => urls.every((url) => ((window as unknown as { __deliveryPhotoBlobAudit: { revoked: string[] } }).__deliveryPhotoBlobAudit.revoked).includes(url)), thumbnailUrls)).toBe(true);
+
+    const persisted = await page.evaluate(async () => {
+      const cacheEntries = "caches" in window ? (await Promise.all((await caches.keys()).map(async (name) =>
+        (await (await caches.open(name)).keys()).map((request) => request.url)))).flat() : [];
+      return { local: Object.values(localStorage).join("\n"), session: Object.values(sessionStorage).join("\n"),
+        databases: typeof indexedDB.databases === "function" ? (await indexedDB.databases()).map((item) => item.name ?? "") : [], cacheEntries };
+    });
+    expect(`${persisted.local}\n${persisted.session}`).not.toMatch(/fileBase64|data:image|delivery-photo.*(?:binary|photoId|job)/iu);
+    expect(persisted.databases).not.toContain("delivery-photo");
+    expect(persisted.cacheEntries.join("\n")).not.toMatch(/getDeliveryPhoto|delivery-photos|blob:/iu);
+    expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
+  } finally {
+    await removePilotPhotos([ids[1]!]);
   }
 });
 

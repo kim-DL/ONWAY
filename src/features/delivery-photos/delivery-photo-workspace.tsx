@@ -20,10 +20,11 @@ import type { DeliveryPhotoEditorMode } from "./delivery-photo-editor";
 import styles from "./delivery-photo.module.css";
 
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor").then((module) => module.DeliveryPhotoEditor), { ssr: false });
+const DeliveryPhotoHistory = dynamic(() => import("./delivery-photo-history").then((module) => module.DeliveryPhotoHistory), { ssr: false });
 
-function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, job, uploadReady, onCapture, onAlbum, onRetry }: {
+function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, job, uploadReady, onView, onCapture, onAlbum, onRetry }: {
   customer: Customer; count?: number | undefined; latestAt?: string | undefined; first?: boolean; job?: DeliveryPhotoUploadProjection | undefined;
-  uploadReady: boolean; onCapture: (customer: Customer) => void; onAlbum: (customer: Customer) => void; onRetry: (jobId: string) => void;
+  uploadReady: boolean; onView?: ((customer: Customer) => void) | undefined; onCapture: (customer: Customer) => void; onAlbum: (customer: Customer) => void; onRetry: (jobId: string) => void;
 }) {
   const area = customer.administrativeDong || customer.district || "";
   const time = latestAt ? new Date(latestAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
@@ -31,6 +32,7 @@ function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, job, u
   const status = job && job.status !== "completed" ? deliveryPhotoUploadStatusText(job) : "";
   return <li className={`${styles.row} ${first ? styles.first : ""}`}>
     <span className={styles.rowText}><strong>{customer.name}</strong><small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{status || (count > 0 ? `사진 ${count}장${time ? ` · 마지막 등록 ${time}` : ""}` : area || "오늘 납품처")}</small></span>
+    {count > 0 && onView ? <button type="button" onClick={() => onView(customer)} aria-label={`${customer.name} 납품사진 ${count}장 보기`}>사진 보기</button> : null}
     {job?.status === "failed" && job.errorCategory === "retryable" ? <button type="button" onClick={() => onRetry(job.jobId)}>다시 시도</button> : <>
       <button type="button" className={styles.camera} aria-label={`${customer.name} 카메라 촬영`} disabled={active} onClick={() => onCapture(customer)}>📷</button>
       <button type="button" className={styles.camera} aria-label={`${customer.name} 앨범 선택`} disabled={active} onClick={() => onAlbum(customer)}>앨범</button>
@@ -67,6 +69,7 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
   const activeCustomers = useMemo(() => catalog.customers.filter((customer) => customer.status === "active"), [catalog.customers]);
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState<{ mode: DeliveryPhotoEditorMode; addId?: string } | null>(null);
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const knownIds = useMemo(() => new Set(activeCustomers.map((customer) => customer.customerId)), [activeCustomers]);
   const byId = useMemo(() => new Map(activeCustomers.map((customer) => [customer.customerId, customer])), [activeCustomers]);
   const routeIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(data.snapshot?.route?.customerIds ?? [], null, knownIds), [data.snapshot?.route?.customerIds, knownIds]);
@@ -132,7 +135,7 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
         {completion.completedCustomerIds.length ? <ul className={styles.list}>{completion.completedCustomerIds.map((id) => {
           const customer = byId.get(id);
           const summary = summaries.get(id);
-          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} job={uploads.byCustomer.get(id)} uploadReady={uploads.ready} onCapture={capture} onAlbum={album} onRetry={retry} /> : null;
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} job={uploads.byCustomer.get(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onAlbum={album} onRetry={retry} /> : null;
         })}</ul> : <p className={styles.empty}>아직 기록된 납품사진이 없습니다.</p>}
       </details>
       <div className={styles.secondaryActions}>
@@ -144,6 +147,8 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
     {editor && ready ? <DeliveryPhotoEditor key={`${editor.mode}:${editor.addId ?? ""}`} mode={editor.mode} session={session} customers={activeCustomers}
       initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}
       onSave={saveEditor} onClose={() => setEditor(null)} /> : null}
+    {historyCustomer ? <DeliveryPhotoHistory key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${historyCustomer.customerId}`}
+      customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} /> : null}
     <DeliveryPhotoInputController ref={inputs} coordinator={uploads.coordinator} />
   </section>;
 }

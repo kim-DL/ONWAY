@@ -36,7 +36,8 @@ describe("delivery photo field workspace", () => {
 
   it("does not add a persistent business-state or background queue dependency", () => {
     const files = ["delivery-photo-workspace.tsx", "delivery-photo-domain.ts", "delivery-photo-upload-state.ts", "delivery-photo-memory.ts",
-      "delivery-photo-upload-memory.ts", "delivery-photo-input-controller.tsx", "delivery-photo-preparation.ts", "use-delivery-photo-data.ts"];
+      "delivery-photo-upload-memory.ts", "delivery-photo-input-controller.tsx", "delivery-photo-preparation.ts", "use-delivery-photo-data.ts",
+      "delivery-photo-history.tsx", "delivery-photo-thumbnail.tsx", "delivery-photo-viewer.tsx", "use-delivery-photo-image.ts"];
     const source = files.map((file) => readFileSync(fileURLToPath(new URL(`./${file}`, import.meta.url)), "utf8")).join("\n");
     expect(source).not.toMatch(/localStorage|sessionStorage|indexedDB|serviceWorker|CacheStorage|BackgroundSync/u);
   });
