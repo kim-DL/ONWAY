@@ -1,22 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { initialDeliveryPhotoUploadState, reduceDeliveryPhotoUploadState } from "./delivery-photo-upload-state";
+import { deliveryPhotoUploadStatusText, isActiveDeliveryPhotoUpload, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 
 describe("memory-only delivery photo upload state", () => {
-  it("supports the explicit idle/preparing/uploading/completed lifecycle", () => {
-    const preparing = reduceDeliveryPhotoUploadState(initialDeliveryPhotoUploadState, { type: "prepare", customerId: "a", source: "camera" });
-    const uploading = reduceDeliveryPhotoUploadState(preparing, { type: "upload" });
-    const completed = reduceDeliveryPhotoUploadState(uploading, { type: "complete", photoId: "photo_1" });
-    expect([initialDeliveryPhotoUploadState.status, preparing.status, uploading.status, completed.status]).toEqual(["idle", "preparing", "uploading", "completed"]);
-    expect(reduceDeliveryPhotoUploadState(completed, { type: "reset" })).toBe(initialDeliveryPhotoUploadState);
+  const job = (status: DeliveryPhotoUploadProjection["status"], errorCategory: DeliveryPhotoUploadProjection["errorCategory"] = null): DeliveryPhotoUploadProjection => ({
+    jobId: "job", requestId: "request", customerId: "a", source: "camera", status, errorCategory,
+    message: status === "failed" ? "network" : "", startedAt: 1, updatedAt: 2,
   });
 
-  it("retains only small retry context after failure and ignores invalid transitions", () => {
-    const preparing = reduceDeliveryPhotoUploadState(initialDeliveryPhotoUploadState, { type: "prepare", customerId: "a", source: "album" });
-    const failed = reduceDeliveryPhotoUploadState(preparing, { type: "fail", message: "network" });
-    expect(failed).toEqual({ status: "failed", customerId: "a", source: "album", message: "network" });
-    expect(reduceDeliveryPhotoUploadState(failed, { type: "retry" }).status).toBe("preparing");
-    expect(reduceDeliveryPhotoUploadState(initialDeliveryPhotoUploadState, { type: "upload" })).toBe(initialDeliveryPhotoUploadState);
-    expect(JSON.stringify(failed)).not.toMatch(/blob|file|base64|objectURL/i);
+  it("labels preparation, queue, relay, completion and failure without fake progress", () => {
+    expect(["preparing", "queued", "uploading", "completed"].map((status) => deliveryPhotoUploadStatusText(job(status as DeliveryPhotoUploadProjection["status"])))).toEqual([
+      "사진 준비 중", "업로드 대기", "업로드 중", "등록 완료",
+    ]);
+    expect(deliveryPhotoUploadStatusText(job("failed", "retryable"))).toBe("network");
+  });
+
+  it("treats only in-flight and retryable failures as active and keeps the projection payload-free", () => {
+    expect(isActiveDeliveryPhotoUpload(job("preparing"))).toBe(true);
+    expect(isActiveDeliveryPhotoUpload(job("queued"))).toBe(true);
+    expect(isActiveDeliveryPhotoUpload(job("uploading"))).toBe(true);
+    expect(isActiveDeliveryPhotoUpload(job("failed", "retryable"))).toBe(true);
+    expect(isActiveDeliveryPhotoUpload(job("failed", "input"))).toBe(false);
+    expect(isActiveDeliveryPhotoUpload(job("completed"))).toBe(false);
+    expect(JSON.stringify(job("failed", "retryable"))).not.toMatch(/blob|file|base64|objectURL/i);
   });
 });

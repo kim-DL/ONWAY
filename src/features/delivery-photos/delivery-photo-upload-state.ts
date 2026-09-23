@@ -1,32 +1,30 @@
 import type { DeliveryPhoto } from "@/domain/delivery-photo";
+import type { DeliveryPhotoCreateErrorCategory } from "./delivery-photo-create-repository";
 
-type UploadContext = { customerId: string; source: DeliveryPhoto["source"] };
-export type DeliveryPhotoUploadState =
-  | { status: "idle" }
-  | ({ status: "preparing" } & UploadContext)
-  | ({ status: "uploading" } & UploadContext)
-  | ({ status: "completed"; photoId: string } & UploadContext)
-  | ({ status: "failed"; message: string } & UploadContext);
+export type DeliveryPhotoUploadStatus = "preparing" | "queued" | "uploading" | "completed" | "failed";
 
-export type DeliveryPhotoUploadEvent =
-  | ({ type: "prepare" } & UploadContext)
-  | { type: "upload" }
-  | { type: "complete"; photoId: string }
-  | { type: "fail"; message: string }
-  | { type: "retry" }
-  | { type: "reset" };
+export type DeliveryPhotoUploadProjection = {
+  jobId: string;
+  requestId: string;
+  customerId: string;
+  source: DeliveryPhoto["source"];
+  status: DeliveryPhotoUploadStatus;
+  errorCategory: DeliveryPhotoCreateErrorCategory | "preparation" | null;
+  message: string;
+  startedAt: number;
+  updatedAt: number;
+  photoId?: string;
+};
 
-export const initialDeliveryPhotoUploadState: DeliveryPhotoUploadState = Object.freeze({ status: "idle" });
+export function isActiveDeliveryPhotoUpload(job: DeliveryPhotoUploadProjection | undefined): boolean {
+  return !!job && (job.status === "preparing" || job.status === "queued" || job.status === "uploading"
+    || job.status === "failed" && job.errorCategory === "retryable");
+}
 
-export function reduceDeliveryPhotoUploadState(
-  state: DeliveryPhotoUploadState,
-  event: DeliveryPhotoUploadEvent,
-): DeliveryPhotoUploadState {
-  if (event.type === "reset") return initialDeliveryPhotoUploadState;
-  if (event.type === "prepare") return { status: "preparing", customerId: event.customerId, source: event.source };
-  if (event.type === "upload" && state.status === "preparing") return { ...state, status: "uploading" };
-  if (event.type === "complete" && state.status === "uploading") return { ...state, status: "completed", photoId: event.photoId };
-  if (event.type === "fail" && (state.status === "preparing" || state.status === "uploading")) return { ...state, status: "failed", message: event.message };
-  if (event.type === "retry" && state.status === "failed") return { status: "preparing", customerId: state.customerId, source: state.source };
-  return state;
+export function deliveryPhotoUploadStatusText(job: DeliveryPhotoUploadProjection): string {
+  if (job.status === "preparing") return "사진 준비 중";
+  if (job.status === "queued") return "업로드 대기";
+  if (job.status === "uploading") return "업로드 중";
+  if (job.status === "completed") return "등록 완료";
+  return job.message || "사진을 등록하지 못했어요.";
 }

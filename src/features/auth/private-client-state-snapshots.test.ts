@@ -15,6 +15,7 @@ import {
   clearInventoryWorkspaceSnapshot, commitInventoryCatalog, getInventoryWorkspaceSession,
 } from "@/features/inventory/inventory-workspace-snapshot";
 import { clearPrivateClientState } from "./private-client-state";
+import { registerPrivateClientCleanup } from "./private-client-cleanup-registry";
 
 const storage = { length: 0, key: () => null, removeItem: vi.fn() };
 
@@ -27,6 +28,16 @@ afterEach(() => {
 });
 
 describe("private workspace snapshot cleanup", () => {
+  it("runs registered memory-only feature cleanup on logout", async () => {
+    const cleanup = vi.fn();
+    const unregister = registerPrivateClientCleanup(cleanup);
+
+    await clearPrivateClientState();
+
+    expect(cleanup).toHaveBeenCalledOnce();
+    unregister();
+  });
+
   it("drops customer and inventory memory before logout completes", async () => {
     const namespace = "EMP:1:1";
     commitCustomerCatalogRead(namespace, [{ customerId: "customer" } as Customer], 1_000, beginCustomerCatalogRead(namespace));

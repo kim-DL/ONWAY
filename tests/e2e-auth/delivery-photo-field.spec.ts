@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import sharp from "sharp";
 
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 import { customerSchema, getCustomerChoseong, normalizeCustomerName } from "../../src/domain/customer";
@@ -77,6 +78,124 @@ async function login(page: Page) {
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
   await expect(page.getByRole("heading", { name: "납품사진" })).toBeVisible();
 }
+
+async function removePilotPhotos(customerIds: readonly string[]) {
+  for (const customerId of customerIds) {
+    const photos = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", customerId).get();
+    if (photos.empty) continue;
+    const batch = db().batch(); for (const photo of photos.docs) batch.delete(photo.ref); await batch.commit();
+  }
+}
+
+async function chooseRowPhoto(page: Page, customerName: string, source: "카메라 촬영" | "앨범 선택", buffer: Buffer, name = "delivery.jpg") {
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: `${customerName} ${source}` }).click();
+  await (await chooser).setFiles({ name, mimeType: "image/jpeg", buffer });
+}
+
+test("camera and album uploads stay non-blocking and merge only server-confirmed metadata", async ({ page }) => {
+  await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
+  const errors: string[] = []; const warnings: string[] = []; const directWrites: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error" || message.type() === "warning") warnings.push(message.text()); });
+  await login(page);
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.includes(":9199") || /documents:commit/u.test(url)) directWrites.push(url);
+  });
+  const oriented = await sharp({ create: { width: 1_200, height: 800, channels: 3, background: "#a7c5b1" } })
+    .withMetadata({ orientation: 6, exif: { IFD0: { Copyright: "private-exif-marker" } } }).jpeg().toBuffer();
+  const regular = await sharp({ create: { width: 960, height: 640, channels: 3, background: "#7da6be" } }).jpeg().toBuffer();
+  const requests: Array<{ requestId: string; customerId: string; source: string; contentType: string; fileBase64: string }> = [];
+  let releaseFirst!: () => void; const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  let callIndex = 0;
+  await page.route("**/createDeliveryPhoto", async (route) => {
+    const body = route.request().postDataJSON() as { data: typeof requests[number] };
+    requests.push(body.data); const current = callIndex; callIndex += 1;
+    if (current === 0) await firstGate;
+    await route.continue();
+  });
+  try {
+    const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
+    await search.fill("새봄");
+    const unsupportedChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "새봄마트 앨범 선택" }).click();
+    await (await unsupportedChooser).setFiles({ name: "unsupported.heic", mimeType: "image/heic", buffer: Buffer.from("unsupported") });
+    await expect(page.getByText(/HEIC\/HEIF 사진은 지원하지 않아요/u)).toBeVisible();
+    await search.fill("");
+
+    const cancelledChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "대전식품 카메라 촬영" }).click();
+    await cancelledChooser;
+    await page.getByLabel("납품사진 카메라 촬영").dispatchEvent("cancel");
+    const firstChooser = page.waitForEvent("filechooser");
+    const cameraButton = page.getByRole("button", { name: "대전식품 카메라 촬영" });
+    let rapidChooserCount = 0; const countRapidChooser = () => { rapidChooserCount += 1; };
+    page.on("filechooser", countRapidChooser);
+    await cameraButton.click(); await cameraButton.click();
+    await (await firstChooser).setFiles({ name: "oriented.jpg", mimeType: "image/jpeg", buffer: oriented });
+    await expect.poll(() => rapidChooserCount).toBe(1); page.off("filechooser", countRapidChooser);
+    await expect.poll(() => requests.length).toBe(1);
+    await expect(page.getByText("업로드 중", { exact: true })).toBeVisible();
+    await search.fill("새봄"); await expect(page.getByText("새봄마트")).toBeVisible(); await search.fill("");
+
+    await chooseRowPhoto(page, "푸른상회", "앨범 선택", regular, "album.jpg");
+    await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+    releaseFirst();
+    await expect(page.getByText("남음 0곳 · 기록완료 3곳")).toBeVisible({ timeout: 30_000 });
+    expect(requests.slice(0, 2).map((request) => request.source)).toEqual(["camera", "album"]);
+    expect(requests[0]).toMatchObject({ customerId: ids[1], contentType: "image/webp" });
+    expect(requests[0]).not.toHaveProperty("thumbnail");
+    const transportMetadata = await sharp(Buffer.from(requests[0]!.fileBase64, "base64")).metadata();
+    expect(transportMetadata).toMatchObject({ format: "webp", width: 800, height: 1_200 });
+    expect(transportMetadata.exif).toBeUndefined(); expect(transportMetadata.orientation).toBeUndefined();
+
+    await page.locator("details").getByText("기록완료 3곳").click();
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", regular, "additional.jpg");
+    await expect(page.locator("details").getByText("사진 2장")).toBeVisible({ timeout: 30_000 });
+    await page.reload();
+    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+    await expect(page.getByRole("heading", { name: "납품사진" })).toBeVisible();
+    await expect(page.getByText("남음 0곳 · 기록완료 3곳")).toBeVisible();
+    await page.locator("details").getByText("기록완료 3곳").click();
+    await expect(page.locator("details").getByText("사진 2장")).toBeVisible();
+    const persisted = await page.evaluate(async () => ({
+      local: Object.values(localStorage).join("\n"), session: Object.values(sessionStorage).join("\n"),
+      databases: typeof indexedDB.databases === "function" ? (await indexedDB.databases()).map((item) => item.name ?? "") : [],
+      caches: "caches" in window ? await caches.keys() : [],
+    }));
+    expect(`${persisted.local}\n${persisted.session}`).not.toMatch(/fileBase64|delivery-photo.*(?:job|requestId)|data:image/iu);
+    expect(persisted.databases).not.toContain("delivery-photo");
+    expect(persisted.caches.some((name) => /delivery-photo.*upload/iu.test(name))).toBe(false);
+    expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
+  } finally {
+    releaseFirst(); await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
+  }
+});
+
+test("a lost create response retries the same request and server replay does not duplicate the photo", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]); await login(page);
+  const regular = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#789b7e" } }).jpeg().toBuffer();
+  const requests: Array<{ requestId: string; fileBase64: string }> = []; let attempt = 0;
+  await page.route("**/createDeliveryPhoto", async (route) => {
+    requests.push((route.request().postDataJSON() as { data: typeof requests[number] }).data);
+    attempt += 1;
+    if (attempt === 1) { await route.fetch(); await route.abort("failed"); }
+    else await route.continue();
+  });
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", regular, "response-loss.jpg");
+    await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "다시 시도" }).click();
+    await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(requests[0]);
+    const photos = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get();
+    expect(photos.size).toBe(1);
+  } finally {
+    await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!]);
+  }
+});
 
 test("field route, completion, search, today override and reorder survive re-entry", async ({ page }, testInfo) => {
   const errors: string[] = [];

@@ -1,6 +1,10 @@
 // Shared pure client/server contract. This module has no Firebase Admin imports.
 export {
+  DELIVERY_PHOTO_CONTENT_TYPES,
+  DELIVERY_PHOTO_MAX_BYTES,
   DELIVERY_PHOTO_RETENTION_HOURS,
+  createDeliveryPhotoInputSchema,
+  createDeliveryPhotoResultSchema,
   deliveryDateKeySchema,
   deliveryPhotoDayResultSchema,
   deliveryPhotoCustomerSummarySchema,

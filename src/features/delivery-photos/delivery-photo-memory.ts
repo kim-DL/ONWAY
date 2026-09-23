@@ -1,3 +1,4 @@
+import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
 import type { DeliveryPhotoDayResult, DeliveryPhotoRouteResult, DeliveryPhotoTodayResult } from "./delivery-photo-repository";
 
 export type DeliveryPhotoSnapshot = {
@@ -31,6 +32,28 @@ export function acceptDeliveryPhotoWrite(key: string, update: (current: Delivery
   if (!memory.snapshot) return null;
   memory.snapshot = update(memory.snapshot);
   return memory.snapshot;
+}
+
+export function mergeConfirmedDeliveryPhoto(
+  snapshot: DeliveryPhotoSnapshot,
+  photo: DeliveryPhotoMetadata,
+  currentDateKey = deliveryPhotoDateKey(),
+): DeliveryPhotoSnapshot {
+  if (photo.deliveryDateKey !== currentDateKey || snapshot.today.deliveryDateKey !== currentDateKey) return snapshot;
+  const existingIndex = snapshot.today.photos.findIndex((item) => item.photoId === photo.photoId);
+  if (existingIndex >= 0) {
+    const photos = [...snapshot.today.photos]; photos[existingIndex] = photo;
+    const customers = snapshot.today.customers.map((summary) => summary.customerId === photo.customerId
+      ? { ...summary, latest: summary.latest?.photoId === photo.photoId ? photo : summary.latest }
+      : summary);
+    return { ...snapshot, today: { ...snapshot.today, photos, customers }, refreshedAt: Date.now() };
+  }
+  const prior = snapshot.today.customers.find((summary) => summary.customerId === photo.customerId);
+  const nextSummary = { customerId: photo.customerId, count: (prior?.count ?? 0) + 1, latest: photo };
+  const customers = prior
+    ? snapshot.today.customers.map((summary) => summary.customerId === photo.customerId ? nextSummary : summary)
+    : [nextSummary, ...snapshot.today.customers];
+  return { ...snapshot, today: { ...snapshot.today, photos: [photo, ...snapshot.today.photos], customers }, refreshedAt: Date.now() };
 }
 export function clearDeliveryPhotoSnapshot(key?: string) {
   if (memory && (!key || memory.key === key)) memory = null;

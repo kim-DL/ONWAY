@@ -4,6 +4,7 @@
 .summary{display:flex;align-items:center;justify-content:space-between;gap:.4rem;min-width:0}
 .summary strong{font-size:.9rem;font-weight:750;line-height:1.4}
 .workspace button{min-width:44px;min-height:44px;border:0;border-radius:11px;padding:.45rem .65rem;background:#eaf3ed;color:var(--mode-customer-text);font-weight:750;cursor:pointer}
+.workspace button:disabled{opacity:.5;cursor:default}
 .workspace button:focus-visible,.search input:focus-visible,.completed summary:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
 .search{display:block;margin-bottom:.9rem}
 .search input{width:100%;min-width:0;min-height:48px;border:1px solid #cbdad1;border-radius:13px;padding:.55rem .8rem;background:#fff;font-size:1rem}

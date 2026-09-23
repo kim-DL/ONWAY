@@ -92,6 +92,18 @@ const deliveryPhotoStylesheetRawBytes = deliveryPhotoStylesheets.reduce((sum, as
 const deliveryPhotoStylesheetGzipBytes = deliveryPhotoStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const deliveryPhotoJavascriptGzipBytes = [...deliveryPhotoAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+// Phase 3B keeps the memory-only upload coordinator outside the existing
+// workspace entry and loads image decoding/canvas encoding only after a picker
+// returns a file. Account for both deferred layers without raising the Phase 3A
+// workspace ceiling.
+const deliveryPhotoUploadEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-upload-memory"));
+const deliveryPhotoUploadAssetNames = new Set(deliveryPhotoUploadEntries.flatMap((entry) => entry.files));
+const deliveryPhotoUploadJavascriptGzipBytes = [...deliveryPhotoUploadAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const deliveryPhotoPreparationEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-preparation"));
+const deliveryPhotoPreparationAssetNames = new Set(deliveryPhotoPreparationEntries.flatMap((entry) => entry.files));
+const deliveryPhotoPreparationJavascriptGzipBytes = [...deliveryPhotoPreparationAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 // Phase 40 moves the entire retired global admin layer into a scoped, lazy UI.
 // Measure the dock, forms and dialogs together: webpack combines their modules.
 // Employee/login boundaries must never acquire these styles.
@@ -154,12 +166,24 @@ assertBudget(inventoryManufacturerEntries.length === 1, "inventory manufacturer 
 assertBudget(inventoryManufacturerFieldEntries.length === 1, "inventory manufacturer trigger must retain one deferred boundary");
 assertBudget(deliveryPhotoEntries.length === 1, "delivery photo workspace must retain one deferred boundary");
 assertBudget(deliveryPhotoStylesheets.length === 1, "delivery photo workspace must retain one isolated stylesheet");
+assertBudget(deliveryPhotoUploadEntries.length === 1, "delivery photo upload memory must retain one workspace runtime boundary");
+assertBudget(deliveryPhotoPreparationEntries.length === 2, "delivery photo preparation must retain picker and coordinator event boundaries");
 for (const asset of deliveryPhotoAssetNames) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo asset ${asset} must stay deferred`);
 }
 for (const asset of deliveryPhotoExclusiveAssetNames) {
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => deliveryPhotoEntries.includes(entry)),
     `delivery photo asset ${asset} must not load with unrelated work modes`);
+}
+for (const [label, assets, owners] of [
+  ["upload runtime", deliveryPhotoUploadAssetNames, deliveryPhotoUploadEntries],
+  ["image preparation", deliveryPhotoPreparationAssetNames, deliveryPhotoPreparationEntries],
+]) {
+  for (const asset of assets) {
+    assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo ${label} asset ${asset} must stay deferred`);
+    assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => owners.includes(entry)),
+      `delivery photo ${label} asset ${asset} must not load with unrelated work modes`);
+  }
 }
 for (const asset of inventoryManufacturerFieldAssetNames) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `manufacturer trigger asset ${asset} must stay deferred`);
@@ -238,7 +262,7 @@ for (const boundary of requiredBoundaries) {
   );
 }
 const serviceWorker = readFileSync(join(projectRoot, "public/sw.js"), "utf8");
-for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "inventory-workspace", "inventory-photo-viewer"]) {
+for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer"]) {
   const entry = dynamicEntries.find(({ boundary }) => boundary.endsWith(tool));
   assertBudget(entry?.files.every((asset) => serviceWorker.includes(asset)),
     `deferred ${tool} assets must remain in the PWA precache`);
@@ -295,6 +319,8 @@ assertBudget(customerJavascriptGzipBytes <= 36 * 1024, `deferred customer JavaSc
 assertBudget(deliveryPhotoStylesheetRawBytes <= 6 * 1024, `delivery photo CSS raw ${deliveryPhotoStylesheetRawBytes}B exceeds 6KiB`);
 assertBudget(deliveryPhotoStylesheetGzipBytes <= 2 * 1024, `delivery photo CSS gzip ${deliveryPhotoStylesheetGzipBytes}B exceeds 2KiB`);
 assertBudget(deliveryPhotoJavascriptGzipBytes <= 10 * 1024, `delivery photo JavaScript gzip ${deliveryPhotoJavascriptGzipBytes}B exceeds 10KiB`);
+assertBudget(deliveryPhotoUploadJavascriptGzipBytes <= 5 * 1024, `delivery photo upload runtime JavaScript gzip ${deliveryPhotoUploadJavascriptGzipBytes}B exceeds 5KiB`);
+assertBudget(deliveryPhotoPreparationJavascriptGzipBytes <= 3 * 1024, `delivery photo image preparation JavaScript gzip ${deliveryPhotoPreparationJavascriptGzipBytes}B exceeds 3KiB`);
 assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${salesWorkspaceGzipBytes}B exceeds 14KiB`);
 // Phase 49: personal accessible count toggle, guarded More actions, read-only
 // lot confirmations and two-state expiry entry. Retired and overwritten CSS
@@ -329,6 +355,8 @@ const report = {
     deliveryPhotoStylesheetRawBytes: 6 * 1024,
     deliveryPhotoStylesheetGzipBytes: 2 * 1024,
     deliveryPhotoJavascriptGzipBytes: 10 * 1024,
+    deliveryPhotoUploadJavascriptGzipBytes: 5 * 1024,
+    deliveryPhotoPreparationJavascriptGzipBytes: 3 * 1024,
     salesWorkspaceGzipBytes: 14 * 1024,
     inventoryStylesheetRawBytes: 28.5 * 1024,
     inventoryStylesheetGzipBytes: 6.5 * 1024,
@@ -356,6 +384,8 @@ const report = {
     deliveryPhotoStylesheetRawBytes,
     deliveryPhotoStylesheetGzipBytes,
     deliveryPhotoJavascriptGzipBytes,
+    deliveryPhotoUploadJavascriptGzipBytes,
+    deliveryPhotoPreparationJavascriptGzipBytes,
     salesWorkspaceGzipBytes,
     inventoryStylesheetRawBytes,
     inventoryStylesheetGzipBytes,

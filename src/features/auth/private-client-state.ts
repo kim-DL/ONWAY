@@ -4,6 +4,7 @@ import { clearSchoolDetailClientState } from "@/features/school-detail/school-de
 import { clearSchoolPhotoClientState } from "@/features/school-detail/school-photo-cache";
 import { clearCustomerWorkspaceSnapshot } from "@/features/customers/customer-workspace-snapshot";
 import { clearInventoryWorkspaceSnapshot } from "@/features/inventory/inventory-workspace-snapshot";
+import { runRegisteredPrivateClientCleanups } from "./private-client-cleanup-registry";
 
 const PRIVATE_STORAGE_PREFIX = "onnuriway:private:";
 const blobUrls = new Set<string>();
@@ -56,5 +57,7 @@ export async function clearPrivateClientState() {
     clearSalesWorkspaceClientState().catch(() => undefined),
     clearSchoolDetailClientState().catch(() => undefined),
     clearSchoolPhotoClientState().catch(() => undefined),
+    import("@/features/delivery-photos/delivery-photo-memory").then((module) => module.clearDeliveryPhotoSnapshot()).catch(() => undefined),
+    runRegisteredPrivateClientCleanups(),
   ]);
 }

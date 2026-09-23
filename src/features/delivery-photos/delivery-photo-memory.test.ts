@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { acceptDeliveryPhotoWrite, beginDeliveryPhotoRead, clearDeliveryPhotoSnapshot,
-  commitDeliveryPhotoRead, deliveryPhotoDateKey, readDeliveryPhotoSnapshot } from "./delivery-photo-memory";
+  commitDeliveryPhotoRead, deliveryPhotoDateKey, mergeConfirmedDeliveryPhoto, readDeliveryPhotoSnapshot } from "./delivery-photo-memory";
 
 afterEach(() => clearDeliveryPhotoSnapshot());
 
@@ -22,5 +22,22 @@ describe("delivery photo memory snapshot", () => {
     commitDeliveryPhotoRead(key, generation, snapshot);
     acceptDeliveryPhotoWrite(key, (current) => ({ ...current, refreshedAt: 20 }));
     expect(commitDeliveryPhotoRead(key, generation, snapshot)?.refreshedAt).toBe(20);
+  });
+
+  it("merges confirmed metadata by photo ID without double-counting a replay", () => {
+    const photo = { photoId: "eb12d3e0-35f3-400e-9165-32938939afc8", customerId: "a", deliveryDateKey: "2026-09-23",
+      source: "camera" as const, createdAt: "2026-09-23T01:18:00.000Z", createdByEmployeeId: "employee_1", createdByName: "등록자",
+      expiresAt: "2026-09-30T01:18:00.000Z", thumbnail: { width: 640, height: 480 } };
+    const once = mergeConfirmedDeliveryPhoto(snapshot, photo, "2026-09-23");
+    const replay = mergeConfirmedDeliveryPhoto(once, photo, "2026-09-23");
+    expect(once.today.photos).toEqual([photo]);
+    expect(replay.today.customers).toEqual([{ customerId: "a", count: 1, latest: photo }]);
+  });
+
+  it("does not merge a server-confirmed photo into a different Seoul day", () => {
+    const photo = { photoId: "eb12d3e0-35f3-400e-9165-32938939afc8", customerId: "a", deliveryDateKey: "2026-09-24",
+      source: "album" as const, createdAt: "2026-09-23T15:00:00.000Z", createdByEmployeeId: "employee_1", createdByName: "등록자",
+      expiresAt: "2026-09-30T15:00:00.000Z", thumbnail: { width: 480, height: 640 } };
+    expect(mergeConfirmedDeliveryPhoto(snapshot, photo, "2026-09-24")).toBe(snapshot);
   });
 });
