@@ -20,10 +20,12 @@ import {
   DeliveryPhotoRevisionConflict,
   DeliveryPhotoService,
 } from "./delivery-photo-service.js";
+import { deliveryPhotoServiceAccountOption } from "./delivery-photo-runtime-identity.js";
 
 const emulator = process.env.FUNCTIONS_EMULATOR === "true";
+const runtimeIdentity = deliveryPhotoServiceAccountOption();
 export function deliveryPhotoCallableOptions(isEmulator: boolean) {
-  return { enforceAppCheck: !isEmulator, region: "asia-northeast3" as const, maxInstances: 10 };
+  return { ...runtimeIdentity, enforceAppCheck: !isEmulator, region: "asia-northeast3" as const, maxInstances: 10 };
 }
 export function deliveryPhotoCreateCallableOptions(isEmulator: boolean) {
   return { ...deliveryPhotoCallableOptions(isEmulator), maxInstances: 4, concurrency: 1, memory: "1GiB" as const, timeoutSeconds: 120 };
@@ -105,7 +107,7 @@ export const deleteDeliveryPhoto = onCall(options, (request) => run(request, "de
 }));
 
 export const expireDeliveryPhotos = onSchedule({
-  schedule: "every 60 minutes", timeZone: "Asia/Seoul", region: "asia-northeast3", maxInstances: 1, timeoutSeconds: 120,
+  ...runtimeIdentity, schedule: "every 60 minutes", timeZone: "Asia/Seoul", region: "asia-northeast3", maxInstances: 1, timeoutSeconds: 120,
 }, async () => {
   const result = await new DeliveryPhotoService().expire();
   if (result.removed) logger.info("Expired delivery photos removed.", { count: result.removed });

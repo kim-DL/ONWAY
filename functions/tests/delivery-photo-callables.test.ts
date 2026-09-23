@@ -1,5 +1,5 @@
 import type { CallableRequest } from "firebase-functions/v2/https";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fixture = vi.hoisted(() => ({
   authorize: vi.fn(), create: vi.fn(), list: vi.fn(), get: vi.fn(), delete: vi.fn(),
@@ -15,7 +15,14 @@ vi.mock("../src/delivery-photo/delivery-photo-service.js", () => ({
   },
 }));
 
-import { createDeliveryPhoto, deliveryPhotoCallableOptions, deliveryPhotoCreateCallableOptions, getDeliveryPhoto, listDeliveryPhotos } from "../src/delivery-photo/delivery-photo-callables.js";
+let callables: typeof import("../src/delivery-photo/delivery-photo-callables.js");
+
+beforeAll(async () => {
+  vi.stubEnv("FUNCTIONS_EMULATOR", "true");
+  callables = await import("../src/delivery-photo/delivery-photo-callables.js");
+});
+
+afterAll(() => vi.unstubAllEnvs());
 
 const actor = { uid: "uid-staff", employeeId: "EMP-STAFF", roleScopes: ["delivery"], sessionVersion: 1, permissionsVersion: 1, isAdmin: false };
 const photoId = "00000000-0000-4000-8000-000000000000";
@@ -32,9 +39,9 @@ beforeEach(() => {
 
 describe("delivery photo Callable boundary", () => {
   it("enforces App Check outside the local Functions emulator", () => {
-    expect(deliveryPhotoCallableOptions(false).enforceAppCheck).toBe(true);
-    expect(deliveryPhotoCallableOptions(true).enforceAppCheck).toBe(false);
-    expect(deliveryPhotoCreateCallableOptions(false)).toMatchObject({ concurrency: 1, memory: "1GiB", maxInstances: 4, timeoutSeconds: 120 });
+    expect(callables.deliveryPhotoCallableOptions(false).enforceAppCheck).toBe(true);
+    expect(callables.deliveryPhotoCallableOptions(true).enforceAppCheck).toBe(false);
+    expect(callables.deliveryPhotoCreateCallableOptions(false)).toMatchObject({ concurrency: 1, memory: "1GiB", maxInstances: 4, timeoutSeconds: 120 });
   });
 
   it("authorizes, strictly validates relay input, and emits private no-store headers", async () => {
@@ -44,13 +51,13 @@ describe("delivery photo Callable boundary", () => {
     fixture.create.mockResolvedValue(result);
     const input = { requestId, customerId: "customer-a", source: "camera", contentType: "image/jpeg", fileBase64: "/9j/" };
     const call = request(input);
-    expect(await createDeliveryPhoto.run(call.value)).toEqual(result);
+    expect(await callables.createDeliveryPhoto.run(call.value)).toEqual(result);
     expect(fixture.authorize).toHaveBeenCalledOnce();
     expect(fixture.create).toHaveBeenCalledWith(input, actor);
     expect(call.headers).toHaveBeenCalledWith("Cache-Control", "private, no-store, max-age=0");
     expect(call.headers).toHaveBeenCalledWith("Pragma", "no-cache");
 
-    await expect(createDeliveryPhoto.run(request({ ...input, objectPath: "attacker/path" }).value)).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(callables.createDeliveryPhoto.run(request({ ...input, objectPath: "attacker/path" }).value)).rejects.toMatchObject({ code: "invalid-argument" });
     expect(fixture.create).toHaveBeenCalledOnce();
   });
 
@@ -58,9 +65,9 @@ describe("delivery photo Callable boundary", () => {
     fixture.list.mockResolvedValue({ scope: "today", deliveryDateKey: "2026-09-22", truncated: false, photos: [], customers: [] });
     fixture.get.mockResolvedValue({ photoId, variant: "thumbnail", contentType: "image/webp", byteSize: 4, fileBase64: "AAAA" });
     const listCall = request({ scope: "today" });
-    expect(await listDeliveryPhotos.run(listCall.value)).toMatchObject({ photos: [] });
+    expect(await callables.listDeliveryPhotos.run(listCall.value)).toMatchObject({ photos: [] });
     const getCall = request({ photoId, variant: "thumbnail" });
-    expect(await getDeliveryPhoto.run(getCall.value)).toMatchObject({ fileBase64: "AAAA" });
+    expect(await callables.getDeliveryPhoto.run(getCall.value)).toMatchObject({ fileBase64: "AAAA" });
     for (const headers of [listCall.headers, getCall.headers]) {
       expect(headers).toHaveBeenCalledWith("Cache-Control", "private, no-store, max-age=0");
     }
@@ -69,7 +76,7 @@ describe("delivery photo Callable boundary", () => {
   it("does not enter the service after authentication/session rejection", async () => {
     const { HttpsError } = await import("firebase-functions/v2/https");
     fixture.authorize.mockRejectedValueOnce(new HttpsError("failed-precondition", "세션 만료"));
-    await expect(listDeliveryPhotos.run(request({ scope: "today" }).value)).rejects.toMatchObject({ code: "failed-precondition" });
+    await expect(callables.listDeliveryPhotos.run(request({ scope: "today" }).value)).rejects.toMatchObject({ code: "failed-precondition" });
     expect(fixture.list).not.toHaveBeenCalled();
   });
 });

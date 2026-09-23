@@ -28,7 +28,7 @@
     "test:field:emulator": "node scripts/firebase-emulators.mjs phase7",
     "test:photo": "vitest run functions/tests/photo-processor.test.ts src/domain/phase1-contract.test.ts",
     "test:photo:emulator": "node scripts/firebase-emulators.mjs phase8",
-    "test:delivery-photo": "vitest run functions/tests/delivery-photo.test.ts functions/tests/delivery-photo-callables.test.ts src/domain/delivery-photo.test.ts",
+    "test:delivery-photo": "vitest run functions/tests/delivery-photo.test.ts functions/tests/delivery-photo-callables.test.ts functions/tests/delivery-photo-runtime-identity.test.ts src/domain/delivery-photo.test.ts",
     "test:delivery-photo:emulator": "node scripts/firebase-emulators.mjs delivery-photo",
     "test:sales": "vitest run functions/tests/sales-cycle-service.test.ts src/domain/phase1-contract.test.ts",
     "test:sales:emulator": "node scripts/firebase-emulators.mjs phase9",
