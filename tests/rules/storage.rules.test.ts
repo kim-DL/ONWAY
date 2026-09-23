@@ -21,6 +21,7 @@ const PROJECT_ID = "demo-onnuriway";
 const PHOTO_PATH = "schools/SCH-001/photos/01/v001/preview.webp";
 const TEMPORARY_PATH = "temporaryUploads/uid-sales/upload-001/original.jpg";
 const EXPORT_PATH = "exports/EMP-SALES-A/JOB-001/export.csv";
+const DELIVERY_PHOTO_PATH = "delivery-photos/2026-09-22/00000000-0000-4000-8000-000000000000/evidence.webp";
 
 const TOKENS: Record<string, TokenOptions> = {
   delivery: {
@@ -84,6 +85,9 @@ beforeEach(async () => {
     await uploadString(ref(storage, EXPORT_PATH), "schoolId,name", "raw", {
       contentType: "text/csv",
     });
+    await uploadString(ref(storage, DELIVERY_PHOTO_PATH), "delivery-photo", "raw", {
+      contentType: "image/webp",
+    });
   });
 });
 
@@ -95,7 +99,7 @@ describe("Storage server-only boundary", () => {
   it("denies unauthenticated downloads from every known and unknown area", async () => {
     const storage = modularStorage(testEnvironment.unauthenticatedContext());
 
-    for (const path of [PHOTO_PATH, TEMPORARY_PATH, EXPORT_PATH, "unknown/file.txt"]) {
+    for (const path of [PHOTO_PATH, TEMPORARY_PATH, EXPORT_PATH, DELIVERY_PHOTO_PATH, "unknown/file.txt"]) {
       await assertFails(getBytes(ref(storage, path)));
     }
   });
@@ -103,6 +107,8 @@ describe("Storage server-only boundary", () => {
   it("denies direct photo downloads to every role including Admin", async () => {
     for (const role of Object.keys(TOKENS) as Array<keyof typeof TOKENS>) {
       await assertFails(getBytes(ref(storageFor(role), PHOTO_PATH)));
+      await assertFails(getBytes(ref(storageFor(role), DELIVERY_PHOTO_PATH)));
+      await assertFails(uploadString(ref(storageFor(role), DELIVERY_PHOTO_PATH), "forged", "raw", { contentType: "image/webp" }));
     }
   });
 

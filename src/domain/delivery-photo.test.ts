@@ -17,9 +17,13 @@ describe("delivery photo shared contract", () => {
   });
 
   it("models server-owned actor snapshots, private objects, and consistent deletion metadata", () => {
-    const object = { objectPath: "delivery/a.webp", generation: "123", contentType: "image/webp", byteSize: 100, width: 640, height: 480 } as const;
-    const active = { photoId: "00000000-0000-4000-8000-000000000000", customerId: "customer_1", deliveryDateKey: "2026-09-22", source: "camera", status: "active", createdAt: timestamp, createdByUid: "uid_1", createdByEmployeeId: "employee_1", createdByName: "홍길동", expiresAt: "2026-09-29T00:00:00.000Z", evidence: object, thumbnail: object } as const;
+    const photoId = "00000000-0000-4000-8000-000000000000";
+    const uploadAttemptToken = "00000000-0000-4000-8000-000000000001";
+    const prefix = `delivery-photos/2026-09-22/${photoId}/attempts/${uploadAttemptToken}/`;
+    const object = { generation: "123", uploadAttemptToken, contentType: "image/webp", byteSize: 100, width: 640, height: 480 } as const;
+    const active = { photoId, customerId: "customer_1", deliveryDateKey: "2026-09-22", source: "camera", status: "active", createdAt: timestamp, createdByUid: "uid_1", createdByEmployeeId: "employee_1", createdByName: "홍길동", expiresAt: "2026-09-29T00:00:00.000Z", evidence: { ...object, objectPath: `${prefix}evidence.webp` }, thumbnail: { ...object, objectPath: `${prefix}thumbnail.webp` } } as const;
     expect(deliveryPhotoSchema.parse(active).createdByName).toBe("홍길동");
+    expect(deliveryPhotoSchema.safeParse({ ...active, thumbnail: { ...active.thumbnail, uploadAttemptToken: "00000000-0000-4000-8000-000000000002" } }).success).toBe(false);
     expect(deliveryPhotoSchema.safeParse({ ...active, status: "deleted" }).success).toBe(false);
     expect(DELIVERY_PHOTO_RETENTION_HOURS).toBe(168);
   });

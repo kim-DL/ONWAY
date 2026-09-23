@@ -24,6 +24,7 @@ environment.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??= "1234567890";
 environment.NEXT_PUBLIC_FIREBASE_APP_ID ??= "1:1234567890:web:demo-onnuriway";
 environment.NEXT_PUBLIC_USE_FIREBASE_EMULATORS ??= "true";
 environment.TARGET_EDUCATION_OFFICE_CODE ??= "G10";
+environment.DELIVERY_PHOTO_BUCKET ??= "demo-onnuriway-delivery-photos.appspot.com";
 
 if (!environment.JAVA_HOME && existsSync(toolsRoot)) {
   const localJdk = readdirSync(toolsRoot, { withFileTypes: true })
@@ -279,6 +280,28 @@ if (mode === "start") {
     ...commonArgs,
     phase15Command,
   ];
+} else if (mode === "delivery-photo") {
+  environment.CI = "true";
+  delete environment.GOOGLE_APPLICATION_CREDENTIALS;
+  delete environment.FIREBASE_TOKEN;
+  environment.GCLOUD_PROJECT = "demo-onnuriway";
+  environment.GOOGLE_CLOUD_PROJECT = "demo-onnuriway";
+  environment.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+  environment.STORAGE_EMULATOR_HOST = "http://127.0.0.1:9199";
+  environment.DELIVERY_PHOTO_BUCKET = "demo-onnuriway-delivery-photos.appspot.com";
+  environment.FIREBASE_CONFIG = JSON.stringify({
+    projectId: "demo-onnuriway",
+    storageBucket: "demo-onnuriway.appspot.com",
+  });
+  const tscCli = join(projectRoot, "node_modules", "typescript", "bin", "tsc");
+  const buildResult = spawnSync(process.execPath, [tscCli], {
+    cwd: join(projectRoot, "functions"), env: environment, stdio: "inherit",
+  });
+  if (buildResult.error) console.error(buildResult.error.message);
+  if (buildResult.status !== 0) process.exit(buildResult.status ?? 1);
+  const tsxCli = join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
+  const command = `"${process.execPath}" "${tsxCli}" "${join(projectRoot, "scripts", "run-delivery-photo-gate.ts")}"`;
+  firebaseArgs = ["emulators:exec", "--only", "firestore,storage", ...commonArgs, command];
 } else if (mode === "exec" && commandParts.length > 0) {
   firebaseArgs = [
     "emulators:exec",
@@ -288,7 +311,7 @@ if (mode === "start") {
     commandParts.join(" "),
   ];
 } else {
-  console.error("Usage: node scripts/firebase-emulators.mjs <start|rules|seed|phase3|phase4|phase5|phase6|phase6e2e|phase7|phase7e2e|phase8|phase8e2e|phase9|phase9e2e|phase9focus|phase10|phase10e2e|phase10focus|phase11|phase11e2e|phase11focus|phase12|phase12e2e|phase12focus|phase13|phase13e2e|phase13focus|phase15|phase16e2e|phase17|phase17e2e|phase18e2e|exec> [command]");
+  console.error("Usage: node scripts/firebase-emulators.mjs <start|rules|seed|phase3|phase4|phase5|phase6|phase6e2e|phase7|phase7e2e|phase8|phase8e2e|phase9|phase9e2e|phase9focus|phase10|phase10e2e|phase10focus|phase11|phase11e2e|phase11focus|phase12|phase12e2e|phase12focus|phase13|phase13e2e|phase13focus|phase15|phase16e2e|phase17|phase17e2e|phase18e2e|delivery-photo|exec> [command]");
   process.exit(1);
 }
 

@@ -13,6 +13,17 @@ export { employeeLogin, employeeLogout } from "./auth/callables.js";
 export { listCustomers, saveCustomer, searchCustomerLocations, reverseCustomerLocation } from "./customer/callables.js";
 export { uploadCustomerPhoto, getCustomerPhoto, expireCustomerPhotos } from "./customer/customer-photo-callables.js";
 export {
+  createDeliveryPhoto,
+  deleteDeliveryPhoto,
+  expireDeliveryPhotos,
+  getDeliveryPhoto,
+  getDeliveryPhotoDay,
+  getDeliveryPhotoRoute,
+  listDeliveryPhotos,
+  saveDeliveryPhotoDay,
+  saveDeliveryPhotoRoute,
+} from "./delivery-photo/delivery-photo-callables.js";
+export {
   getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct,
   recordInventoryMovement, recordInventoryCount, updateInventoryLot,
   setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings,
