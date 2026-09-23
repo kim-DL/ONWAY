@@ -1,6 +1,6 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-21
+기준일: 2026-09-23
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
@@ -9,7 +9,7 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- 현재 production application commit은 branch `codex/mobile-action-reach`의 `194309b9a9266045688d17d624c8d202d3fdd5ad` (`Add inventory manufacturer management`)이다. 이 문서의 후속 documentation-only commit은 production application commit을 바꾸지 않는다.
+- 현재 source/application HEAD는 branch `codex/mobile-action-reach`의 `a76871802374af8a3565f22c88c8b4166f8256c1`이다. 납품사진 backend 9개는 이 HEAD에서 targeted deploy했으며, 마지막으로 확인된 Hosting frontend release는 아래의 2026-09-21 기록이다. 이번 documentation-only checkpoint는 제품 코드를 바꾸지 않는다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
@@ -21,6 +21,16 @@
 
 - 8명 동시 사용 환경의 실제 read 비용과 현장망 T2/T3는 아직 계측하지 않았다. 이는 이번 inventory mobile UI release의 배포·사용성 확인과는 별도의 운영 계측 항목이다.
 - 실제 설치형 휴대폰 PWA의 카메라·키보드·safe-area를 포함한 저장 flow는 이번 read-only smoke 범위가 아니다. 운영 데이터를 수정하는 검증은 수행하지 않았다.
+
+### 2026-09-23 납품사진 Phase 2A/2B production backend — 완료, frontend 미활성
+
+- Project `onnuriway` (`347044588399`)의 `asia-northeast3`에 납품사진 Functions 9개만 targeted deploy했다: `getDeliveryPhotoRoute`, `saveDeliveryPhotoRoute`, `getDeliveryPhotoDay`, `saveDeliveryPhotoDay`, `createDeliveryPhoto`, `listDeliveryPhotos`, `getDeliveryPhoto`, `deleteDeliveryPhoto`, `expireDeliveryPhotos`. 모두 ACTIVE, Gen2, Node.js 22이며 전용 runtime SA `delivery-photo-runtime@onnuriway.iam.gserviceaccount.com`을 사용한다. `createDeliveryPhoto`는 1GiB/concurrency 1/maxInstances 4/timeout 120초, `expireDeliveryPhotos`는 maxInstances 1/timeout 120초다. 배포 전후 비교에서 기존 production Functions 62개의 이름·상태·runtime·service account·updateTime은 불변이다.
+- Scheduler job `firebase-schedule-expireDeliveryPhotos-asia-northeast3`는 ENABLED, `every 60 minutes`, `Asia/Seoul`이다. OIDC identity는 위 전용 SA이고, 정확한 scheduled Cloud Run service에 이 SA의 service-specific `roles/run.invoker`가 확인됐다. 실제 scheduled invocation은 Batch C에서 수동 실행하지 않았으며 당시 `lastAttemptTime`은 없었다.
+- 전용 Standard bucket `prod-delivery-photos-an3-68e5c4d72a90`은 같은 project/region에 있으며 UBLA ON, Public Access Prevention enforced, Soft Delete OFF, Versioning OFF, Autoclass OFF, retention/default hold 없음, bucket 전체에 적용되는 Lifecycle Delete age 8일이다. Batch C 후 object count는 0이다. 기존 업무 bucket `onnuriway.firebasestorage.app`은 변경하지 않았다.
+- 전용 SA의 project role은 `roles/datastore.user`뿐이다. 전용 bucket의 custom role `projects/onnuriway/roles/deliveryPhotoObjectRuntime`은 `storage.objects.create/get/delete`만 포함한다. 전용 bucket create/get/delete는 GRANTED, list/update는 DENIED이며, 기존 업무 bucket의 create/get/delete/list/update는 모두 DENIED로 검증했다. M2 legacy ACL baseline 대조에서도 새 SA의 기존 bucket 접근 경로는 확인되지 않았다.
+- `deliveryPhotos` COLLECTION composite index 2개는 `deliveryDateKey ASC, createdAt DESC` (`CICAgJjmiJEK`) 및 `customerId ASC, createdAt DESC` (`CICAgNi47oMK`)로 모두 READY다. 기존 index 5개는 불변이고 `deliveryPhotos`·`deliveryPhotoDays` TTL은 없다. Git에서 제외된 `functions/.env.onnuriway`에 production deploy용 `DELIVERY_PHOTO_BUCKET`·`DELIVERY_PHOTO_SERVICE_ACCOUNT`가 설정돼 있다.
+- Batch C에서 9개 runtime/options, 기존 62개 불변, Scheduler·Cloud Run invoker를 확인했다. 무인증 `getDeliveryPhotoRoute` Callable smoke는 HTTP 401, `application/json`, `error.status=UNAUTHENTICATED`였다. 인증된 운영 납품사진 Callable 호출, 사진/문서 write, Hosting/frontend deploy는 하지 않았다. 버킷 객체는 0개이며 Firestore 업무 collection의 document count는 직접 조회하지 않았다. rollback은 필요하지 않았다.
+- **현재 경계:** backend infrastructure는 production에 있지만 delivery-photo feature flag는 OFF이고 UI는 production에 노출되지 않는다. 사용자는 아직 사진 촬영·앨범 업로드를 할 수 없다. Phase 3 예정 범위는 오늘 납품처, 기본/오늘 순서, 거래처 검색과 최근 거래처 20 활용, 카메라 1-tap·앨범 선택, non-blocking upload와 진행/실패/재시도, 성공 후 기록완료 이동, 사진 N장, 등록자/날짜별 조회, viewer/share, Galaxy S20+ 화질 benchmark다. 이는 **예정 작업**이며 완료 상태가 아니다. GPS는 core UX 이후 별도 단계다.
 
 ## 2. 확정 요구사항과 현재 코드 대조
 
@@ -74,7 +84,7 @@ UI form
 | 학교 영업정보 | 활성 탭 | 저장하지 않음 | cache 안 함 |
 | 학교 thumbnail/preview | Blob Memory | IndexedDB 24개/36MiB | 명시적 thumbnail route만 허용 |
 | 학교 original | Memory | 저장하지 않음 | cache 안 함 |
-| 거래처 목록/사진 | Memory | 최근 거래처 ID 5개만 namespaced localStorage | cache 안 함 |
+| 거래처 목록/사진 | Memory | 최근 거래처 ID 저장 용량 20개, 기존 홈 표시는 최대 5개인 namespaced localStorage | cache 안 함 |
 | 재고 목록/상세/사진/draft | Memory | 실사 모드 preference만 날짜·session 기준 sessionStorage | cache 안 함 |
 
 - Serwist runtime cache version은 코드상 `phase35`다. App Shell navigation은 NetworkFirst(3초), public asset과 학교 thumbnail은 CacheFirst다.
