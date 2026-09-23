@@ -1,110 +1,123 @@
 "use client";
 
-import { useMemo, useReducer, useState } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState } from "react";
 
-import { Icon } from "@/components/ui/icon";
-import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { searchInputProps } from "@/components/ui/search-input-props";
+import type { Customer } from "@/domain/customer";
+import type { AuthenticatedSession } from "@/features/auth/auth-context";
+import { searchCustomers } from "@/features/customers/customer-search";
 
-import {
-  addDeliveryPhotoCustomer,
-  moveDeliveryPhotoCustomer,
-  projectDeliveryPhotoCompletion,
-  removeDeliveryPhotoCustomer,
-  resolveDeliveryPhotoDayCustomerIds,
-} from "./delivery-photo-domain";
-import { initialDeliveryPhotoUploadState, reduceDeliveryPhotoUploadState } from "./delivery-photo-upload-state";
+import { projectDeliveryPhotoCompletion, resolveDeliveryPhotoDayCustomerIds } from "./delivery-photo-domain";
+import { deliveryPhotoErrorKind, deliveryPhotoRepository } from "./delivery-photo-repository";
+import { useDeliveryPhotoData } from "./use-delivery-photo-data";
+import { useDeliveryPhotoCatalog } from "./use-delivery-photo-catalog";
+import type { DeliveryPhotoEditorMode } from "./delivery-photo-editor";
 import styles from "./delivery-photo.module.css";
 
-const compactListLimit = 5;
-type DeliveryPhotoCustomerSummary = { customerId: string; name: string; area: string };
-const emptyCustomers: readonly DeliveryPhotoCustomerSummary[] = Object.freeze([]);
+const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor").then((module) => module.DeliveryPhotoEditor), { ssr: false });
 
-function CustomerNameList({
-  customerIds,
-  customersById,
-  actionLabel,
-  onAction,
-}: {
-  customerIds: readonly string[];
-  customersById: ReadonlyMap<string, DeliveryPhotoCustomerSummary>;
-  actionLabel: string;
-  onAction: (customerId: string) => void;
-}) {
-  return <ul className={styles.customerList}>{customerIds.map((customerId) => {
-    const customer = customersById.get(customerId);
-    if (!customer) return null;
-    return <li key={customerId}><span><strong>{customer.name}</strong><small>{customer.area || "거래처"}</small></span><button type="button" onClick={() => onAction(customerId)}>{actionLabel}</button></li>;
-  })}</ul>;
+export type DeliveryPhotoRowActions = {
+  onCapture?: ((customer: Customer) => void) | undefined;
+  onAlbum?: ((customer: Customer) => void) | undefined;
+};
+
+function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, onCapture, onAlbum }: {
+  customer: Customer; count?: number | undefined; latestAt?: string | undefined; first?: boolean;
+} & DeliveryPhotoRowActions) {
+  const area = customer.administrativeDong || customer.district || "";
+  const time = latestAt ? new Date(latestAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+  return <li className={`${styles.row} ${first ? styles.first : ""}`}>
+    <span className={styles.rowText}><strong>{customer.name}</strong><small>{count > 0 ? `사진 ${count}장${time ? ` · 마지막 등록 ${time}` : ""}` : area || "오늘 납품처"}</small></span>
+    {onCapture ? <button type="button" className={styles.camera} aria-label={`${customer.name} 카메라 촬영`} onClick={() => onCapture(customer)}>📷</button> : null}
+    {onAlbum ? <button type="button" className={styles.camera} aria-label={`${customer.name} 앨범 선택`} onClick={() => onAlbum(customer)}>앨범</button> : null}
+  </li>;
 }
 
-export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSession }) {
-  // Phase 1 deliberately has no repository. Later phases can replace these
-  // Memory inputs with authorized customer/route/photo responses.
-  const activeCustomers = emptyCustomers;
-  const recentCustomers = emptyCustomers;
-  const [routeCustomerIds, setRouteCustomerIds] = useState<readonly string[]>([]);
-  const [dayOverrideCustomerIds, setDayOverrideCustomerIds] = useState<readonly string[] | null>(null);
+export function DeliveryPhotoWorkspace({ session, onCapture, onAlbum }: {
+  session: AuthenticatedSession;
+} & DeliveryPhotoRowActions) {
+  const data = useDeliveryPhotoData(session);
+  const catalog = useDeliveryPhotoCatalog(session, data.clear);
+  const activeCustomers = useMemo(() => catalog.customers.filter((customer) => customer.status === "active"), [catalog.customers]);
   const [query, setQuery] = useState("");
-  const [showAllRecent, setShowAllRecent] = useState(false);
-  const [editingRoute, setEditingRoute] = useState(false);
-  const [uploadState] = useReducer(reduceDeliveryPhotoUploadState, initialDeliveryPhotoUploadState);
-  const knownCustomerIds = useMemo(() => new Set(activeCustomers.map((customer) => customer.customerId)), [activeCustomers]);
-  const customersById = useMemo(() => new Map(activeCustomers.map((customer) => [customer.customerId, customer])), [activeCustomers]);
-  const normalizedRouteIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(routeCustomerIds, null, knownCustomerIds), [routeCustomerIds, knownCustomerIds]);
-  const todayCustomerIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(normalizedRouteIds, dayOverrideCustomerIds, knownCustomerIds), [normalizedRouteIds, dayOverrideCustomerIds, knownCustomerIds]);
-  const completion = useMemo(() => projectDeliveryPhotoCompletion(todayCustomerIds, new Map()), [todayCustomerIds]);
-  const searchResults = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
-    if (!normalizedQuery) return [];
-    return activeCustomers.filter((customer) => customer.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery)).slice(0, 8);
-  }, [activeCustomers, query]);
-  const visibleRecents = showAllRecent ? recentCustomers : recentCustomers.slice(0, compactListLimit);
+  const [editor, setEditor] = useState<{ mode: DeliveryPhotoEditorMode; addId?: string } | null>(null);
+  const knownIds = useMemo(() => new Set(activeCustomers.map((customer) => customer.customerId)), [activeCustomers]);
+  const byId = useMemo(() => new Map(activeCustomers.map((customer) => [customer.customerId, customer])), [activeCustomers]);
+  const routeIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(data.snapshot?.route?.customerIds ?? [], null, knownIds), [data.snapshot?.route?.customerIds, knownIds]);
+  const todayIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(routeIds,
+    data.snapshot?.day.isOverride ? data.snapshot.day.customerIds : null, knownIds), [routeIds, data.snapshot?.day, knownIds]);
+  const summaries = useMemo(() => new Map(data.snapshot?.today.customers.map((item) => [item.customerId, item]) ?? []), [data.snapshot?.today.customers]);
+  const counts = useMemo(() => new Map([...summaries].map(([id, summary]) => [id, summary.count])), [summaries]);
+  const completion = useMemo(() => projectDeliveryPhotoCompletion(todayIds, counts), [todayIds, counts]);
+  const searchResults = useMemo(() => query.trim() ? searchCustomers(activeCustomers, query).slice(0, 20) : [], [activeCustomers, query]);
+  const ready = Boolean(data.snapshot && catalog.status === "ready");
 
-  const addToday = (customerId: string) => {
-    setDayOverrideCustomerIds(addDeliveryPhotoCustomer(todayCustomerIds, customerId, knownCustomerIds));
-  };
-  const addRoute = (customerId: string) => {
-    setRouteCustomerIds(addDeliveryPhotoCustomer(normalizedRouteIds, customerId, knownCustomerIds));
+  const saveEditor = async (ids: readonly string[]): Promise<"saved" | "conflict" | "error"> => {
+    if (!editor || !data.snapshot) return "error";
+    try {
+      const input = { requestId: crypto.randomUUID(), expectedRevision: editor.mode === "route"
+        ? data.snapshot.route?.revision ?? null : data.snapshot.day.revision, customerIds: [...ids] };
+      if (editor.mode === "route") {
+        const route = await deliveryPhotoRepository.saveRoute(input);
+        data.accept((current) => ({ ...current, route, day: current.day.isOverride ? current.day
+          : { ...current.day, customerIds: route.customerIds }, refreshedAt: Date.now() }));
+      } else {
+        const day = await deliveryPhotoRepository.saveDay(input);
+        data.accept((current) => ({ ...current, day, refreshedAt: Date.now() }));
+      }
+      return "saved";
+    } catch (error) {
+      const kind = deliveryPhotoErrorKind(error);
+      if (kind === "auth") { data.clear(); return "error"; }
+      if (kind === "conflict") { data.refresh(); return "conflict"; }
+      return "error";
+    }
   };
 
-  return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace data-upload-state={uploadState.status}>
-    <header className={styles.hero}>
-      <p>DELIVERY PHOTO</p>
-      <h1 id="delivery-photo-heading">납품사진</h1>
-      <span>{session.displayName}님의 오늘 납품 순서를 빠르게 확인합니다.</span>
+  return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
+    <header className={styles.header}><h1 id="delivery-photo-heading">납품사진</h1>
+      <div className={styles.summary}><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong>
+        {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
     </header>
-
-    <div className={styles.grid}>
-      <section className={styles.panel} aria-labelledby="delivery-photo-remaining-heading">
-        <header><div><span className={styles.eyebrow}>TODAY</span><h2 id="delivery-photo-remaining-heading">오늘 남은 납품처</h2></div><strong>{completion.remainingCustomerIds.length}</strong></header>
-        {completion.remainingCustomerIds.length ? <CustomerNameList customerIds={completion.remainingCustomerIds} customersById={customersById} actionLabel="오늘 제외" onAction={(customerId) => setDayOverrideCustomerIds(removeDeliveryPhotoCustomer(todayCustomerIds, customerId))} /> : <p className={styles.empty}>내 납품처를 구성하거나 검색에서 오늘 목록에 추가하세요.</p>}
+    {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
+      if (data.error) data.refresh();
+      if (catalog.status === "error") catalog.retry();
+    }}>다시 시도</button></div> : null}
+    {data.loading && data.snapshot ? <p className={styles.freshness}>최신 목록을 확인하는 중입니다.</p> : null}
+    {data.snapshot?.today.truncated ? <p className={styles.notice}>오늘 사진이 많아 기록완료 수가 정확하지 않을 수 있습니다. 관리자에게 확인하세요.</p> : null}
+    <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
+    {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
+      {searchResults.length ? <ul className={styles.list}>{searchResults.map((customer) => <li key={customer.customerId} className={styles.searchRow}><span><strong>{customer.name}</strong><small>{summaries.get(customer.customerId)?.count
+          ? `사진 ${summaries.get(customer.customerId)!.count}장 · 기록완료`
+          : customer.administrativeDong || customer.district || "거래처"}</small></span>
+        {todayIds.includes(customer.customerId) ? <span className={styles.inToday}>오늘 목록</span> : <button type="button" onClick={() => setEditor({ mode: "day", addId: customer.customerId })}>오늘 추가</button>}
+        {onCapture ? <button type="button" aria-label={`${customer.name} 카메라 촬영`} onClick={() => onCapture(customer)}>📷</button> : null}
+        {onAlbum ? <button type="button" aria-label={`${customer.name} 앨범 선택`} onClick={() => onAlbum(customer)}>앨범</button> : null}</li>)}</ul>
+        : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
+    {!data.snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처를 불러오는 중입니다.</p> : null}
+    {ready ? <>
+      <section className={styles.section} aria-labelledby="delivery-photo-remaining-heading"><h2 id="delivery-photo-remaining-heading">오늘 남은 납품처</h2>
+        {completion.remainingCustomerIds.length ? <ul className={styles.list}>{completion.remainingCustomerIds.map((id, index) => {
+          const customer = byId.get(id);
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} first={index === 0} onCapture={onCapture} onAlbum={onAlbum} /> : null;
+        })}</ul> : <p className={styles.empty}>{todayIds.length ? "오늘 목록의 모든 거래처에 사진 기록이 있습니다." : "오늘 납품처가 비어 있습니다. 내 납품처를 설정해 주세요."}</p>}
       </section>
-
-      <section className={styles.panel} aria-labelledby="delivery-photo-completed-heading">
-        <header><div><span className={styles.eyebrow}>RECORDED</span><h2 id="delivery-photo-completed-heading">기록완료</h2></div><strong>{completion.completedCustomerIds.length}</strong></header>
-        {completion.completedCustomerIds.length ? <CustomerNameList customerIds={completion.completedCustomerIds} customersById={customersById} actionLabel="사진 보기" onAction={() => undefined} /> : <p className={styles.empty}>오늘 등록된 사진을 기준으로 자동 분류됩니다.</p>}
-      </section>
-
-      <section className={styles.panel} aria-labelledby="delivery-photo-search-heading">
-        <header><div><span className={styles.eyebrow}>FIND</span><h2 id="delivery-photo-search-heading">거래처 검색</h2></div></header>
-        <label className={styles.search}><Icon name="search" /><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처명 · 초성 검색" /></label>
-        {searchResults.length ? <ul className={styles.customerList}>{searchResults.map((customer) => <li key={customer.customerId}><span><strong>{customer.name}</strong><small>{customer.area || "거래처"}</small></span><span className={styles.actions}><button type="button" onClick={() => addToday(customer.customerId)}>오늘 추가</button><button type="button" onClick={() => addRoute(customer.customerId)}>내 납품처</button></span></li>)}</ul> : query.trim() ? <p className={styles.empty}>일치하는 거래처가 없습니다.</p> : null}
-      </section>
-
-      <section className={styles.panel} aria-labelledby="delivery-photo-recent-heading">
-        <header><div><span className={styles.eyebrow}>RECENT</span><h2 id="delivery-photo-recent-heading">최근 거래처</h2></div>{recentCustomers.length > compactListLimit ? <button type="button" className={styles.linkButton} onClick={() => setShowAllRecent((value) => !value)}>{showAllRecent ? "접기" : `전체 ${recentCustomers.length}곳`}</button> : null}</header>
-        {visibleRecents.length ? <CustomerNameList customerIds={visibleRecents.map((customer) => customer.customerId)} customersById={customersById} actionLabel="오늘 추가" onAction={addToday} /> : <p className={styles.empty}>거래처 검색 기록이 생기면 여기에 표시됩니다.</p>}
-      </section>
-
-      <section className={`${styles.panel} ${styles.routePanel}`} aria-labelledby="delivery-photo-route-heading">
-        <header><div><span className={styles.eyebrow}>MY ROUTE</span><h2 id="delivery-photo-route-heading">내 납품처</h2></div><button type="button" className={styles.linkButton} onClick={() => setEditingRoute((value) => !value)} aria-pressed={editingRoute}>{editingRoute ? "편집 완료" : "순서 편집"}</button></header>
-        {normalizedRouteIds.length ? <ol className={styles.routeList}>{normalizedRouteIds.map((customerId, index) => {
-          const customer = customersById.get(customerId);
-          if (!customer) return null;
-          return <li key={customerId}><span className={styles.order}>{index + 1}</span><strong>{customer.name}</strong>{editingRoute ? <span className={styles.actions}><button type="button" disabled={index === 0} aria-label={`${customer.name} 위로 이동`} onClick={() => setRouteCustomerIds(moveDeliveryPhotoCustomer(normalizedRouteIds, customerId, index - 1, knownCustomerIds))}><Icon name="arrow-up" /></button><button type="button" disabled={index === normalizedRouteIds.length - 1} aria-label={`${customer.name} 아래로 이동`} onClick={() => setRouteCustomerIds(moveDeliveryPhotoCustomer(normalizedRouteIds, customerId, index + 1, knownCustomerIds))}><Icon name="arrow-down" /></button><button type="button" aria-label={`${customer.name} 내 납품처에서 제외`} onClick={() => setRouteCustomerIds(removeDeliveryPhotoCustomer(normalizedRouteIds, customerId))}><Icon name="close" /></button></span> : null}</li>;
-        })}</ol> : <p className={styles.empty}>검색에서 자주 방문하는 거래처를 내 납품처에 추가하세요.</p>}
-      </section>
-    </div>
+      <details className={styles.completed}><summary>기록완료 {completion.completedCustomerIds.length}곳</summary>
+        {completion.completedCustomerIds.length ? <ul className={styles.list}>{completion.completedCustomerIds.map((id) => {
+          const customer = byId.get(id);
+          const summary = summaries.get(id);
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} onCapture={onCapture} onAlbum={onAlbum} /> : null;
+        })}</ul> : <p className={styles.empty}>아직 기록된 납품사진이 없습니다.</p>}
+      </details>
+      <div className={styles.secondaryActions}>
+        <button type="button" onClick={() => setEditor({ mode: "route" })}>{routeIds.length ? "내 납품처 편집" : "내 납품처 설정"}</button>
+        <button type="button" onClick={() => setEditor({ mode: "day" })}>오늘 거래처 추가</button>
+        <button type="button" onClick={() => data.refresh()}>새로고침</button>
+      </div>
+    </> : null}
+    {editor && ready ? <DeliveryPhotoEditor key={`${editor.mode}:${editor.addId ?? ""}`} mode={editor.mode} session={session} customers={activeCustomers}
+      initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}
+      onSave={saveEditor} onClose={() => setEditor(null)} /> : null}
   </section>;
 }

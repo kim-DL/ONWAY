@@ -73,8 +73,26 @@ if (mode === "start") {
     ...commonArgs,
     seedCommand,
   ];
-} else if (mode === "phase3" || mode === "phase4" || mode === "phase6e2e" || mode === "phase7e2e" || mode === "phase8e2e" || mode === "phase9e2e" || mode === "phase9focus" || mode === "phase10e2e" || mode === "phase10focus" || mode === "phase11e2e" || mode === "phase11focus" || mode === "phase12e2e" || mode === "phase12focus" || mode === "phase13e2e" || mode === "phase13focus" || mode === "phase16e2e" || mode === "phase17e2e" || mode === "phase18e2e") {
+} else if (mode === "phase3" || mode === "phase4" || mode === "phase6e2e" || mode === "phase7e2e" || mode === "phase8e2e" || mode === "phase9e2e" || mode === "phase9focus" || mode === "phase10e2e" || mode === "phase10focus" || mode === "phase11e2e" || mode === "phase11focus" || mode === "phase12e2e" || mode === "phase12focus" || mode === "phase13e2e" || mode === "phase13focus" || mode === "phase16e2e" || mode === "phase17e2e" || mode === "phase18e2e" || mode === "delivery-photo-frontend-e2e") {
   environment.CI = "true";
+  if (mode === "delivery-photo-frontend-e2e") {
+    delete environment.GOOGLE_APPLICATION_CREDENTIALS;
+    delete environment.FIREBASE_TOKEN;
+    environment.GCLOUD_PROJECT = "demo-onnuriway";
+    environment.GOOGLE_CLOUD_PROJECT = "demo-onnuriway";
+    environment.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS = "true";
+    environment.NEXT_PUBLIC_FIREBASE_API_KEY = "demo-api-key";
+    environment.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "demo-onnuriway.firebaseapp.com";
+    environment.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "demo-onnuriway";
+    environment.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "demo-onnuriway.appspot.com";
+    environment.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "1234567890";
+    environment.NEXT_PUBLIC_FIREBASE_APP_ID = "1:1234567890:web:demo-onnuriway";
+    environment.NEXT_PUBLIC_USE_FIREBASE_EMULATORS = "true";
+    environment.DELIVERY_PHOTO_BUCKET = "demo-onnuriway-delivery-photos.appspot.com";
+    environment.FIREBASE_CONFIG = JSON.stringify({
+      projectId: "demo-onnuriway", storageBucket: "demo-onnuriway.appspot.com",
+    });
+  }
   const tscCli = join(projectRoot, "node_modules", "typescript", "bin", "tsc");
   const buildResult = spawnSync(process.execPath, [tscCli], {
     cwd: join(projectRoot, "functions"),
@@ -89,7 +107,9 @@ if (mode === "start") {
   }
 
   const tsxCli = join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
-  const e2eRunner = mode === "phase18e2e"
+  const e2eRunner = mode === "delivery-photo-frontend-e2e"
+    ? "run-delivery-photo-frontend-e2e.ts"
+    : mode === "phase18e2e"
     ? "run-phase18-e2e.ts"
     : mode === "phase17e2e"
     ? "run-phase17-e2e.ts"
@@ -311,7 +331,7 @@ if (mode === "start") {
     commandParts.join(" "),
   ];
 } else {
-  console.error("Usage: node scripts/firebase-emulators.mjs <start|rules|seed|phase3|phase4|phase5|phase6|phase6e2e|phase7|phase7e2e|phase8|phase8e2e|phase9|phase9e2e|phase9focus|phase10|phase10e2e|phase10focus|phase11|phase11e2e|phase11focus|phase12|phase12e2e|phase12focus|phase13|phase13e2e|phase13focus|phase15|phase16e2e|phase17|phase17e2e|phase18e2e|delivery-photo|exec> [command]");
+  console.error("Usage: node scripts/firebase-emulators.mjs <start|rules|seed|phase3|phase4|phase5|phase6|phase6e2e|phase7|phase7e2e|phase8|phase8e2e|phase9|phase9e2e|phase9focus|phase10|phase10e2e|phase11|phase11e2e|phase11focus|phase12|phase12e2e|phase12focus|phase13|phase13e2e|phase13focus|phase15|phase16e2e|phase17|phase17e2e|phase18e2e|delivery-photo|delivery-photo-frontend-e2e|exec> [command]");
   process.exit(1);
 }
 
