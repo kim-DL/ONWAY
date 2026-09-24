@@ -44,8 +44,8 @@ const durations = queries.map((query) => {
 const p95SearchDurationMs = percentile(durations, 0.95);
 const maximumSearchDurationMs = Math.max(...durations);
 
-if (p95SearchDurationMs >= 100) {
-  throw new Error(`Phase 16 search p95 ${p95SearchDurationMs.toFixed(2)}ms exceeds 100ms.`);
+if (p95SearchDurationMs >= 50) {
+  throw new Error(`Phase 16 search p95 ${p95SearchDurationMs.toFixed(2)}ms exceeds 50ms.`);
 }
 if (catalogIndexDurationMs >= 500) {
   throw new Error(`Phase 16 catalog indexing ${catalogIndexDurationMs.toFixed(2)}ms exceeds 500ms.`);

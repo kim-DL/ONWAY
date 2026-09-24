@@ -69,7 +69,7 @@ describe("MemorySearchIndex", () => {
     expect(results.map((result) => result.matchType)).toEqual(["officialExact", "fuzzy"]);
   });
 
-  it("keeps 500-school searches within the 50ms calculation budget", () => {
+  it("finds exact short names across a 500-school catalog", () => {
     const items = Array.from({ length: 500 }, (_, index) => item({
       schoolId: `SCH-NEIS-G1${String(index).padStart(8, "0")}`,
       name: `대전테스트${index}초등학교`,
@@ -78,15 +78,14 @@ describe("MemorySearchIndex", () => {
       initials: `ㄷㅈㅌㅅㅌ${index}ㅊㄷㅎㄱ`,
     }));
     const largeIndex = new MemorySearchIndex(items);
-    const durations = Array.from({ length: 20 }, (_, index) => {
-      const startedAt = performance.now();
-      largeIndex.search(`테스트${index}초`);
-      return performance.now() - startedAt;
-    });
-    expect(Math.max(...durations)).toBeLessThan(50);
+    for (let index = 0; index < 20; index += 1) {
+      expect(largeIndex.search(`테스트${index}초`)[0]).toMatchObject({
+        item: { schoolId: items[index]!.schoolId }, matchType: "shortExact",
+      });
+    }
   });
 
-  it("keeps a 5,000-school direct-match catalog inside the 100ms perceived budget", () => {
+  it("finds exact short names across a 5,000-school catalog", () => {
     const items = Array.from({ length: 5_000 }, (_, index) => item({
       schoolId: `SCH-NEIS-LARGE${String(index).padStart(6, "0")}`,
       name: `대전성능${index}초등학교`,
@@ -95,13 +94,10 @@ describe("MemorySearchIndex", () => {
       initials: `ㄷㅈㅅㄴ${index}ㅊㄷㅎㄱ`,
     }));
     const largeIndex = new MemorySearchIndex(items);
-    largeIndex.search("성능");
-    const durations = Array.from({ length: 12 }, (_, index) => {
-      const startedAt = performance.now();
-      largeIndex.search(`성능${index}`);
-      return performance.now() - startedAt;
-    }).sort((left, right) => left - right);
-    const p95 = durations[Math.ceil(durations.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
-    expect(p95).toBeLessThan(100);
+    for (let index = 0; index < 12; index += 1) {
+      expect(largeIndex.search(`성능${index}초`)[0]).toMatchObject({
+        item: { schoolId: items[index]!.schoolId }, matchType: "shortExact",
+      });
+    }
   });
 });
