@@ -31,6 +31,14 @@ const actor: CustomerActor = {
   uid: "uid-delivery-photo", employeeId: "EMP-DELIVERY-PHOTO", roleScopes: ["delivery"],
   sessionVersion: 1, permissionsVersion: 1, isAdmin: false,
 };
+const otherActor: CustomerActor = {
+  uid: "uid-delivery-photo-other", employeeId: "EMP-DELIVERY-PHOTO-OTHER", roleScopes: ["delivery"],
+  sessionVersion: 1, permissionsVersion: 1, isAdmin: false,
+};
+const adminActor: CustomerActor = {
+  uid: "uid-delivery-photo-admin", employeeId: "EMP-DELIVERY-PHOTO-ADMIN", roleScopes: ["admin"],
+  sessionVersion: 1, permissionsVersion: 1, isAdmin: true,
+};
 const now = Timestamp.fromDate(new Date("2026-09-22T00:00:00.000Z"));
 
 await Promise.all([
@@ -39,18 +47,22 @@ await Promise.all([
   db.recursiveDelete(db.collection("companies/onnuri/deliveryPhotos")),
   db.recursiveDelete(db.collection("deliveryPhotoUploadRates")),
 ]);
-const staleLocks = await db.collection("requestLocks").where("operation", "==", "createDeliveryPhoto").get();
-await Promise.all(staleLocks.docs.map((document) => document.ref.delete()));
+for (const operation of ["createDeliveryPhoto", "deleteDeliveryPhoto"]) {
+  const staleLocks = await db.collection("requestLocks").where("operation", "==", operation).get();
+  await Promise.all(staleLocks.docs.map((document) => document.ref.delete()));
+}
 const [files] = await bucket.getFiles({ prefix: "delivery-photos/" });
 await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
 
-await db.doc(`authz/${actor.uid}`).set({
-  employeeId: actor.employeeId, active: true, sessionVersion: 1, permissionsVersion: 1, updatedAt: now,
-});
-await db.doc(`employees/${actor.employeeId}`).set({
-  employeeId: actor.employeeId, firebaseUid: actor.uid, displayName: "에뮬레이터 배송",
-  roleScopes: actor.roleScopes, status: "active", sessionVersion: 1, updatedAt: now,
-});
+for (const identity of [actor, otherActor, adminActor]) {
+  await db.doc(`authz/${identity.uid}`).set({
+    employeeId: identity.employeeId, active: true, sessionVersion: 1, permissionsVersion: 1, roleScopes: identity.roleScopes, updatedAt: now,
+  });
+  await db.doc(`employees/${identity.employeeId}`).set({
+    employeeId: identity.employeeId, firebaseUid: identity.uid, displayName: identity.isAdmin ? "에뮬레이터 관리자" : "에뮬레이터 배송",
+    roleScopes: identity.roleScopes, status: "active", sessionVersion: 1, updatedAt: now,
+  });
+}
 for (const customerId of ["delivery-photo-a", "delivery-photo-b"]) {
   await db.doc(`companies/onnuri/customers/${customerId}`).set({ customerId, companyId: "onnuri", name: customerId, status: "active" });
 }
@@ -82,7 +94,28 @@ try { await service.list({ scope: "today" }, actor, now); } catch { revoked = tr
 if (!revoked) throw new Error("Revoked session was accepted.");
 await db.doc(`authz/${actor.uid}`).update({ active: true });
 
-await service.delete({ requestId: randomUUID(), photoId: photo.photoId }, actor, now);
+let deniedOther = false;
+try { await service.delete({ requestId: randomUUID(), photoId: photo.photoId }, otherActor, now); } catch (error) {
+  deniedOther = (error as { code?: string }).code === "permission-denied";
+}
+if (!deniedOther) throw new Error("Another employee deleted the owner's photo.");
+const nextDay = Timestamp.fromDate(new Date("2026-09-23T00:00:00.000Z"));
+let deniedLateOwner = false;
+try { await service.delete({ requestId: randomUUID(), photoId: photo.photoId }, actor, nextDay); } catch (error) {
+  deniedLateOwner = (error as { code?: string }).code === "permission-denied";
+}
+if (!deniedLateOwner) throw new Error("The owner deleted a photo after its Seoul calendar day.");
+const adminRequestId = randomUUID();
+const adminDelete = await service.delete({ requestId: adminRequestId, photoId: photo.photoId }, adminActor, nextDay);
+if ((await service.delete({ requestId: adminRequestId, photoId: photo.photoId }, adminActor, nextDay)).deletedAt !== adminDelete.deletedAt) {
+  throw new Error("Admin delete replay was not stable.");
+}
+const owned = await service.create({ ...request, requestId: randomUUID() }, actor, now);
+const ownerRequestId = randomUUID();
+const ownerDelete = await service.delete({ requestId: ownerRequestId, photoId: owned.photoId }, actor, now);
+if ((await service.delete({ requestId: ownerRequestId, photoId: owned.photoId }, actor, now)).deletedAt !== ownerDelete.deletedAt) {
+  throw new Error("Owner delete replay was not stable.");
+}
 const hidden = await service.list({ scope: "today" }, actor, now);
 if (hidden.scope !== "today" || hidden.photos.length !== 0) throw new Error("Deleted photo remained visible.");
 
@@ -91,4 +124,4 @@ const cleanup = await service.expire(Timestamp.fromMillis(now.toMillis() + 169 *
 if (cleanup.removed < 2 || cleanup.failures !== 0) throw new Error(`Cleanup failed: ${JSON.stringify(cleanup)}`);
 if ((await db.doc(`companies/onnuri/deliveryPhotos/${expiring.photoId}`).get()).exists) throw new Error("Expired metadata remained.");
 
-console.log("Delivery photo emulator gate passed: route/day, create replay, list/get, revocation, delete and expiry cleanup.");
+console.log("Delivery photo emulator gate passed: route/day, create replay, list/get, revocation, owner/other/admin delete authorization, delete replay and expiry cleanup.");

@@ -30,11 +30,11 @@ const session: AuthenticatedSession = { uid: "uid_1", displayName: "홍길동",
   claims: { employeeId: "employee_1", sessionVersion: 1, permissionsVersion: 1, roleScopes: ["delivery"] } };
 const blob = new Blob([new Uint8Array([1, 2, 3])], { type: "image/webp" });
 
-function renderHook(currentSession = session, enabled = true) {
+function renderHook(currentSession = session, enabled = true, variant: "thumbnail" | "evidence" = "thumbnail") {
   harness.cursor = 0; harness.effects = [];
   // This focused harness executes the hook against deterministic mocked React state.
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useDeliveryPhotoImage(photoId, "thumbnail", currentSession, enabled);
+  return useDeliveryPhotoImage(photoId, variant, currentSession, enabled);
 }
 async function settle() { for (let index = 0; index < 8; index += 1) await Promise.resolve(); }
 
@@ -58,10 +58,10 @@ describe("delivery photo memory-only image lifecycle", () => {
     cleanup(); expect(harness.forget).toHaveBeenCalledWith("blob:delivery-thumbnail");
   });
 
-  it("never creates an Object URL for a response arriving after close", async () => {
+  it.each(["thumbnail", "evidence"] as const)("never promotes a late %s response after deletion unmounts it", async (variant) => {
     let resolve!: (value: Blob) => void;
     harness.load.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
-    renderHook(); const cleanup = harness.effects[0]!.run() as () => void;
+    renderHook(session, true, variant); const cleanup = harness.effects[0]!.run() as () => void;
     cleanup(); resolve(blob); await settle();
     expect(harness.create).not.toHaveBeenCalled();
   });

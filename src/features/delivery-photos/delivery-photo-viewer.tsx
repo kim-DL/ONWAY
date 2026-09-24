@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Full evidence stays in a revocable, authenticated blob URL. */
 
+import dynamic from "next/dynamic";
 import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -12,17 +13,21 @@ import morphStyles from "@/components/ui/photo-morph.module.css";
 import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
+import type { DeliveryPhotoDeleteUpdate } from "./delivery-photo-delete-model";
 import { deliveryPhotoRegisteredAt } from "./delivery-photo-history-model";
 import { useDeliveryPhotoImage } from "./use-delivery-photo-image";
 import styles from "./delivery-photo-history.module.css";
 
-export function DeliveryPhotoViewer({ customerName, session, photos, initialIndex, origin, onClose }: {
+const DeliveryPhotoDeleteAction = dynamic(() => import("./delivery-photo-delete-action").then((module) => module.DeliveryPhotoDeleteAction), { ssr: false });
+
+export function DeliveryPhotoViewer({ customerName, session, photos, initialIndex, origin, onClose, onDeleted }: {
   customerName: string;
   session: AuthenticatedSession;
   photos: DeliveryPhotoMetadata[];
   initialIndex: number;
   origin: HTMLElement | null;
   onClose: () => void;
+  onDeleted: (photoId: string, update: DeliveryPhotoDeleteUpdate) => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
   const photo = photos[index] ?? photos[0];
@@ -78,6 +83,7 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
       <span className={styles.position} role="status" aria-live="polite">{index + 1} / {photos.length}</span>
       <button type="button" disabled={index === 0} onClick={() => navigate(-1)}><Icon name="arrow-left" />이전</button>
       <button type="button" disabled={index === photos.length - 1} onClick={() => navigate(1)}>다음<Icon name="chevron-right" /></button>
+      <DeliveryPhotoDeleteAction key={photo.photoId} photo={photo} session={session} onDeleted={onDeleted} />
       <button type="button" onClick={requestClose}><Icon name="close" />닫기</button>
     </BottomSheetActions>
   </BottomSheet></div>, document.body);

@@ -5,6 +5,8 @@ export {
   DELIVERY_PHOTO_RETENTION_HOURS,
   createDeliveryPhotoInputSchema,
   createDeliveryPhotoResultSchema,
+  deleteDeliveryPhotoInputSchema,
+  deleteDeliveryPhotoResultSchema,
   deliveryPhotoDownloadSchema,
   deliveryDateKeySchema,
   deliveryPhotoDayResultSchema,

@@ -345,6 +345,133 @@ test("recent customer history lazily relays thumbnails and only the selected evi
   }
 });
 
+test("delete confirmation is permission-safe, retry-stable and reconciles the last photo", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]);
+  const errors: string[] = []; const warnings: string[] = []; const directWrites: string[] = [];
+  const deletes: Array<{ requestId: string; photoId: string }> = [];
+  let releaseLast!: () => void; const lastGate = new Promise<void>((resolve) => { releaseLast = resolve; });
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error" || message.type() === "warning") warnings.push(message.text()); });
+  await login(page);
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.includes(":9199") || /documents:commit/u.test(url)) directWrites.push(url);
+  });
+  await page.evaluate(() => {
+    const audit = { created: [] as string[], revoked: [] as string[] };
+    const create = URL.createObjectURL.bind(URL); const revoke = URL.revokeObjectURL.bind(URL);
+    Object.assign(window, { __deliveryPhotoDeleteBlobAudit: audit });
+    URL.createObjectURL = (blob) => { const url = create(blob); audit.created.push(url); return url; };
+    URL.revokeObjectURL = (url) => { audit.revoked.push(url); revoke(url); };
+  });
+  const photo = await sharp({ create: { width: 720, height: 480, channels: 3, background: "#789b7e" } }).jpeg().toBuffer();
+  await page.route("**/deleteDeliveryPhoto", async (route) => {
+    const input = (route.request().postDataJSON() as { data: typeof deletes[number] }).data;
+    deletes.push(input);
+    if (deletes.length === 1) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ error: { status: "PERMISSION_DENIED", message: "raw backend detail" } }) });
+    } else if (deletes.length === 2) {
+      await route.fetch();
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ error: { status: "UNAVAILABLE", message: "response obscured after commit" } }) });
+    } else {
+      if (deletes.length === 4) await lastGate;
+      await route.continue();
+    }
+  });
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", photo, "delete-1.jpg");
+    await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+    await page.locator("details").getByText("기록완료 2곳").click();
+    await chooseRowPhoto(page, "대전식품", "앨범 선택", photo, "delete-2.jpg");
+    await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("details").getByText("사진 2장", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 2장/u }).click();
+    const history = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
+    await expect(history.getByText("최근 기록 2장")).toBeVisible({ timeout: 30_000 });
+    const firstThumbnail = history.getByRole("button", { name: /^대전식품 납품사진,/u }).first();
+    await firstThumbnail.click();
+    const viewer = page.getByRole("dialog", { name: "대전식품 납품사진 보기", exact: true });
+    await expect(viewer.getByRole("button", { name: "사진 삭제", exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectImageReady(viewer.locator("img"));
+    const evidenceUrl = await viewer.locator("img").getAttribute("src");
+    const thumbnailUrl = await firstThumbnail.locator('img[src^="blob:"]').getAttribute("src");
+
+    await viewer.getByRole("button", { name: "사진 삭제", exact: true }).click();
+    let confirmation = page.getByRole("dialog", { name: "이 납품사진을 삭제할까요?", exact: true });
+    await expect(confirmation.getByText("삭제한 사진은 다시 볼 수 없습니다.")).toBeVisible();
+    await page.setViewportSize({ width: 320, height: 800 }); await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    for (const button of await confirmation.getByRole("button").all()) {
+      if (!await button.isVisible()) continue; const box = await button.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44); expect(box?.width).toBeGreaterThanOrEqual(44);
+    }
+    expect((await new AxeBuilder({ page }).include("dialog[open]").analyze()).violations).toEqual([]);
+    await confirmation.getByRole("button", { name: "닫기", exact: true }).focus(); await page.keyboard.press("Shift+Tab");
+    await expect(confirmation.getByRole("button", { name: "사진 삭제", exact: true })).toBeFocused();
+    await page.keyboard.press("Escape"); await expect(confirmation).toHaveCount(0); expect(deletes).toEqual([]); await expect(viewer).toBeVisible();
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; }); await page.setViewportSize({ width: 360, height: 800 });
+    await viewer.getByRole("button", { name: "사진 삭제", exact: true }).click(); confirmation = page.getByRole("dialog", { name: "이 납품사진을 삭제할까요?", exact: true });
+    await page.goBack(); await expect(confirmation).toHaveCount(0); expect(deletes).toEqual([]); await expect(viewer).toBeVisible();
+    await viewer.getByRole("button", { name: "사진 삭제", exact: true }).click(); confirmation = page.getByRole("dialog", { name: "이 납품사진을 삭제할까요?", exact: true });
+    await confirmation.getByRole("button", { name: "취소", exact: true }).click();
+    await expect(confirmation).toHaveCount(0); expect(deletes).toEqual([]); await expect(viewer).toBeVisible();
+
+    await viewer.getByRole("button", { name: "사진 삭제", exact: true }).click();
+    confirmation = page.getByRole("dialog", { name: "이 납품사진을 삭제할까요?", exact: true });
+    await confirmation.getByRole("button", { name: "사진 삭제", exact: true }).click();
+    await expect(confirmation.getByText("이 사진을 삭제할 권한이 없습니다.")).toBeVisible();
+    expect(JSON.stringify(await confirmation.textContent())).not.toContain("raw backend detail");
+    await confirmation.getByRole("button", { name: "사진 삭제", exact: true }).click();
+    await expect(confirmation.getByText("삭제하지 못했습니다. 다시 시도해 주세요.")).toBeVisible({ timeout: 30_000 });
+    await confirmation.getByRole("button", { name: "사진 삭제", exact: true }).click();
+    await expect(viewer).toHaveCount(0); await expect(history).toHaveCount(0);
+    expect(deletes.slice(1, 3)).toEqual([deletes[0], deletes[0]]);
+    await expect.poll(() => page.evaluate((urls) => urls.every((url) => ((window as unknown as { __deliveryPhotoDeleteBlobAudit: { revoked: string[] } }).__deliveryPhotoDeleteBlobAudit.revoked).includes(url)),
+      [evidenceUrl, thumbnailUrl].filter((url): url is string => Boolean(url)))).toBe(true);
+
+    await page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 1장/u }).click();
+    await expect(history.getByText("최근 기록 1장")).toBeVisible({ timeout: 30_000 });
+    const remainingThumbnail = history.getByRole("button", { name: /^대전식품 납품사진,/u }).first();
+    await remainingThumbnail.click();
+    await expect(viewer.getByRole("button", { name: "사진 삭제", exact: true })).toBeVisible({ timeout: 30_000 });
+    await viewer.getByRole("button", { name: "사진 삭제", exact: true }).click();
+    confirmation = page.getByRole("dialog", { name: "이 납품사진을 삭제할까요?", exact: true });
+    const danger = confirmation.getByRole("button", { name: "사진 삭제", exact: true });
+    await danger.evaluate((button) => { (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click(); });
+    await expect.poll(() => deletes.length).toBe(4); expect(deletes[3]!.requestId).not.toBe(deletes[0]!.requestId);
+    releaseLast();
+    await expect(viewer).toHaveCount(0); await expect(history).toHaveCount(0);
+    await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
+    await expect(page.getByRole("region", { name: "오늘 남은 납품처" }).getByText("대전식품")).toBeVisible();
+    expect(deletes).toHaveLength(4); expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
+  } finally {
+    releaseLast(); await page.unroute("**/deleteDeliveryPhoto").catch(() => {}); await removePilotPhotos([ids[1]!]);
+  }
+});
+
+test("another employee photo has no delete action in the viewer DOM", async ({ page }) => {
+  await removePilotPhotos([ids[2]!]); await login(page);
+  const photo = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#8b9ca8" } }).jpeg().toBuffer();
+  try {
+    await chooseRowPhoto(page, names[2]!, "카메라 촬영", photo, "other-owner.jpg");
+    await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+    const snapshots = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[2]).get();
+    expect(snapshots.size).toBe(1);
+    await snapshots.docs[0]!.ref.update({ createdByUid: "uid-other-delivery", createdByEmployeeId: "EMP-OTHER-DELIVERY", createdByName: "다른 직원" });
+    await page.reload(); await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+    await page.locator("details").getByText(/기록완료/u).click();
+    await page.getByRole("button", { name: new RegExp(`^${names[2]} 납품사진 보기`, "u") }).click();
+    const history = page.getByRole("dialog", { name: `${names[2]} 납품사진`, exact: true });
+    await expect(history.getByText("최근 기록 1장")).toBeVisible({ timeout: 30_000 });
+    await history.getByRole("button", { name: new RegExp(`^${names[2]} 납품사진,`, "u") }).click();
+    const viewer = page.getByRole("dialog", { name: `${names[2]} 납품사진 보기`, exact: true });
+    await expect(viewer.getByText("1 / 1", { exact: true })).toBeVisible(); await page.waitForTimeout(500);
+    await expect(viewer.getByRole("button", { name: "사진 삭제", exact: true })).toHaveCount(0);
+  } finally {
+    await removePilotPhotos([ids[2]!]);
+  }
+});
+
 test("a lost create response retries the same request and server replay does not duplicate the photo", async ({ page }) => {
   await removePilotPhotos([ids[1]!]); await login(page);
   const regular = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#789b7e" } }).jpeg().toBuffer();

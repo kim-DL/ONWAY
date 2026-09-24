@@ -27,8 +27,8 @@ function deliveryPhotoActions(customer: Customer, job: DeliveryPhotoUploadProjec
   const active = !uploadReady || isActiveDeliveryPhotoUpload(job);
   return job?.status === "failed" && job.errorCategory === "retryable"
     ? <button type="button" onClick={() => onRetry(job.jobId)}>다시 시도</button>
-    : <><button type="button" className={styles.cam} aria-label={`${customer.name} 카메라 촬영`} disabled={active} onClick={() => onCapture(customer)}>📷</button>
-      <button type="button" className={styles.cam} aria-label={`${customer.name} 앨범 선택`} disabled={active} onClick={() => onAlbum(customer)}>앨범</button></>;
+    : <><button type="button" aria-label={`${customer.name} 카메라 촬영`} disabled={active} onClick={() => onCapture(customer)}>📷</button>
+      <button type="button" aria-label={`${customer.name} 앨범 선택`} disabled={active} onClick={() => onAlbum(customer)}>앨범</button></>;
 }
 
 export function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, job, uploadReady, onView, onCapture, onAlbum, onRetry }: {
@@ -65,6 +65,7 @@ function DeliveryPhotoSearchRow({ customer, count = 0, inToday, job, uploadReady
 
 export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSession }) {
   const data = useDeliveryPhotoData(session);
+  const snapshot = data.snapshot;
   const catalog = useDeliveryPhotoCatalog(session, data.clear);
   const inputs = useRef<DeliveryPhotoInputControllerHandle>(null);
   const acceptData = data.accept; const refreshData = data.refresh;
@@ -79,23 +80,23 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const knownIds = useMemo(() => new Set(activeCustomers.map((customer) => customer.customerId)), [activeCustomers]);
   const byId = useMemo(() => new Map(activeCustomers.map((customer) => [customer.customerId, customer])), [activeCustomers]);
-  const routeIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(data.snapshot?.route?.customerIds ?? [], null, knownIds), [data.snapshot?.route?.customerIds, knownIds]);
+  const routeIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(snapshot?.route?.customerIds ?? [], null, knownIds), [snapshot?.route?.customerIds, knownIds]);
   const todayIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(routeIds,
-    data.snapshot?.day.isOverride ? data.snapshot.day.customerIds : null, knownIds), [routeIds, data.snapshot?.day, knownIds]);
-  const summaries = useMemo(() => new Map(data.snapshot?.today.customers.map((item) => [item.customerId, item]) ?? []), [data.snapshot?.today.customers]);
+    snapshot?.day.isOverride ? snapshot.day.customerIds : null, knownIds), [routeIds, snapshot?.day, knownIds]);
+  const summaries = useMemo(() => new Map(snapshot?.today.customers.map((item) => [item.customerId, item]) ?? []), [snapshot?.today.customers]);
   const completion = useMemo(() => projectDeliveryPhotoCompletion(todayIds,
     new Map([...summaries].map(([id, summary]) => [id, summary.count]))), [todayIds, summaries]);
   const searchResults = useMemo(() => query.trim() ? searchCustomers(activeCustomers, query).slice(0, 20) : [], [activeCustomers, query]);
-  const ready = Boolean(data.snapshot && catalog.status === "ready");
-  const capture = useCallback((customer: Customer) => { inputs.current?.openCamera(customer.customerId); }, []);
-  const album = useCallback((customer: Customer) => { inputs.current?.openAlbum(customer.customerId); }, []);
-  const retry = useCallback((jobId: string) => { uploads.coordinator?.retry(jobId); }, [uploads.coordinator]);
+  const ready = Boolean(snapshot && catalog.status === "ready");
+  const capture = (customer: Customer) => { inputs.current?.openCamera(customer.customerId); };
+  const album = (customer: Customer) => { inputs.current?.openAlbum(customer.customerId); };
+  const retry = (jobId: string) => { uploads.coordinator?.retry(jobId); };
 
   const saveEditor = async (ids: readonly string[]): Promise<"saved" | "conflict" | "error"> => {
-    if (!editor || !data.snapshot) return "error";
+    if (!editor || !snapshot) return "error";
     try {
       const input = { requestId: crypto.randomUUID(), expectedRevision: editor.mode === "route"
-        ? data.snapshot.route?.revision ?? null : data.snapshot.day.revision, customerIds: [...ids] };
+        ? snapshot.route?.revision ?? null : snapshot.day.revision, customerIds: [...ids] };
       if (editor.mode === "route") {
         const route = await deliveryPhotoRepository.saveRoute(input);
         data.accept((current) => ({ ...current, route, day: current.day.isOverride ? current.day
@@ -122,15 +123,15 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
       if (data.error) data.refresh();
       if (catalog.status === "error") catalog.retry();
     }}>다시 시도</button></div> : null}
-    {data.loading && data.snapshot ? <p className={styles.freshness}>최신 목록을 확인하는 중입니다.</p> : null}
-    {data.snapshot?.today.truncated ? <p className={styles.notice}>오늘 사진이 많아 기록완료 수가 정확하지 않을 수 있습니다. 관리자에게 확인하세요.</p> : null}
+    {data.loading && snapshot ? <p className={styles.freshness}>최신 목록을 확인하는 중입니다.</p> : null}
+    {snapshot?.today.truncated ? <p className={styles.notice}>오늘 사진이 많아 기록완료 수가 정확하지 않을 수 있습니다. 관리자에게 확인하세요.</p> : null}
     <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
     {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
       {searchResults.length ? <ul className={styles.list}>{searchResults.map((customer) => <DeliveryPhotoSearchRow key={customer.customerId} customer={customer}
         count={summaries.get(customer.customerId)?.count} inToday={todayIds.includes(customer.customerId)} job={uploads.byCustomer.get(customer.customerId)}
         uploadReady={uploads.ready} onAdd={(customerId) => setEditor({ mode: "day", addId: customerId })} onCapture={capture} onAlbum={album} onRetry={retry} />)}</ul>
         : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
-    {!data.snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처를 불러오는 중입니다.</p> : null}
+    {!snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처를 불러오는 중입니다.</p> : null}
     {ready ? <>
       <section className={styles.section} aria-labelledby="delivery-photo-remaining-heading"><h2 id="delivery-photo-remaining-heading">오늘 남은 납품처</h2>
         {completion.remainingCustomerIds.length ? <ul className={styles.list}>{completion.remainingCustomerIds.map((id, index) => {
@@ -155,7 +156,7 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
       initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}
       onSave={saveEditor} onClose={() => setEditor(null)} /> : null}
     {historyCustomer ? <DeliveryPhotoHistory key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${historyCustomer.customerId}`}
-      customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} /> : null}
+      customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} sync={data.accept} /> : null}
     <DeliveryPhotoInputController ref={inputs} coordinator={uploads.coordinator} />
   </section>;
 }

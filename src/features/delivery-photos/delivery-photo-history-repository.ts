@@ -17,7 +17,7 @@ import { getFirebaseClientServices } from "@/lib/firebase/client";
 export type DeliveryPhotoHistoryResult = Extract<z.infer<typeof listDeliveryPhotosResultSchema>, { scope: "customer" }>;
 export type DeliveryPhotoDownloadVariant = "thumbnail" | "evidence";
 
-function invalidResponse() {
+export function invalidDeliveryPhotoResponse() {
   return Object.assign(new Error("Delivery photo response was invalid."), { code: "delivery-photo/invalid-response" });
 }
 
@@ -25,7 +25,7 @@ function sessionSignature(session: AuthenticatedSession) {
   return JSON.stringify([session.uid, session.claims.employeeId, session.claims.sessionVersion, session.claims.permissionsVersion]);
 }
 
-async function verifiedSession(session: AuthenticatedSession, signal?: AbortSignal) {
+export async function verifyDeliveryPhotoSession(session: AuthenticatedSession, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const services = getFirebaseClientServices();
   const user = services?.auth.currentUser;
@@ -42,46 +42,46 @@ async function verifiedSession(session: AuthenticatedSession, signal?: AbortSign
   return { services, user };
 }
 
-async function verifySameSession(session: AuthenticatedSession, user: NonNullable<ReturnType<typeof getFirebaseClientServices>>["auth"]["currentUser"], signal?: AbortSignal) {
+export async function verifySameDeliveryPhotoSession(session: AuthenticatedSession, user: NonNullable<ReturnType<typeof getFirebaseClientServices>>["auth"]["currentUser"], signal?: AbortSignal) {
   signal?.throwIfAborted();
-  const current = await verifiedSession(session, signal);
+  const current = await verifyDeliveryPhotoSession(session, signal);
   if (current.user !== user) throw Object.assign(new Error("Delivery photo session changed."), { code: "unauthenticated" });
 }
 
 export function deliveryPhotoDownloadBlob(input: unknown, expectedPhotoId: string, expectedVariant: DeliveryPhotoDownloadVariant) {
   const parsed = deliveryPhotoDownloadSchema.safeParse(input);
-  if (!parsed.success || parsed.data.photoId !== expectedPhotoId || parsed.data.variant !== expectedVariant) throw invalidResponse();
+  if (!parsed.success || parsed.data.photoId !== expectedPhotoId || parsed.data.variant !== expectedVariant) throw invalidDeliveryPhotoResponse();
   let binary: string;
   try {
     binary = atob(parsed.data.fileBase64);
   } catch {
-    throw invalidResponse();
+    throw invalidDeliveryPhotoResponse();
   }
-  if (binary.length !== parsed.data.byteSize) throw invalidResponse();
+  if (binary.length !== parsed.data.byteSize) throw invalidDeliveryPhotoResponse();
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   if (bytes.length < 12
     || String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF"
-    || String.fromCharCode(...bytes.subarray(8, 12)) !== "WEBP") throw invalidResponse();
+    || String.fromCharCode(...bytes.subarray(8, 12)) !== "WEBP") throw invalidDeliveryPhotoResponse();
   const blob = new Blob([bytes], { type: parsed.data.contentType });
-  if (blob.size !== parsed.data.byteSize) throw invalidResponse();
+  if (blob.size !== parsed.data.byteSize) throw invalidDeliveryPhotoResponse();
   return blob;
 }
 
 async function list(customerId: string, session: AuthenticatedSession, signal?: AbortSignal): Promise<DeliveryPhotoHistoryResult> {
   const input = listDeliveryPhotosInputSchema.parse({ scope: "customer", customerId, limit: 30 });
-  const { services, user } = await verifiedSession(session, signal);
+  const { services, user } = await verifyDeliveryPhotoSession(session, signal);
   const response = await httpsCallable<typeof input, unknown>(services.functions, "listDeliveryPhotos", { timeout: 60_000 })(input);
-  await verifySameSession(session, user, signal);
+  await verifySameDeliveryPhotoSession(session, user, signal);
   const parsed = listDeliveryPhotosResultSchema.safeParse(response.data);
-  if (!parsed.success || parsed.data.scope !== "customer" || parsed.data.customerId !== customerId) throw invalidResponse();
+  if (!parsed.success || parsed.data.scope !== "customer" || parsed.data.customerId !== customerId) throw invalidDeliveryPhotoResponse();
   return parsed.data;
 }
 
 async function load(photoId: string, variant: DeliveryPhotoDownloadVariant, session: AuthenticatedSession, signal?: AbortSignal) {
   const input = getDeliveryPhotoInputSchema.parse({ photoId, variant });
-  const { services, user } = await verifiedSession(session, signal);
+  const { services, user } = await verifyDeliveryPhotoSession(session, signal);
   const response = await httpsCallable<typeof input, unknown>(services.functions, "getDeliveryPhoto", { timeout: 60_000 })(input);
-  await verifySameSession(session, user, signal);
+  await verifySameDeliveryPhotoSession(session, user, signal);
   signal?.throwIfAborted();
   return deliveryPhotoDownloadBlob(response.data, photoId, variant);
 }

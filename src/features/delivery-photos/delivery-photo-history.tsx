@@ -8,6 +8,7 @@ import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
+import type { DeliveryPhotoDeleteUpdate } from "./delivery-photo-delete-model";
 import { deliveryPhotoHistoryErrorMessage, deliveryPhotoHistoryRepository } from "./delivery-photo-history-repository";
 import { newestDeliveryPhotos } from "./delivery-photo-history-model";
 import { DeliveryPhotoThumbnail } from "./delivery-photo-thumbnail";
@@ -19,10 +20,11 @@ type HistoryState = { status: "loading"; photos: DeliveryPhotoMetadata[] }
   | { status: "ready"; photos: DeliveryPhotoMetadata[] }
   | { status: "error"; photos: DeliveryPhotoMetadata[]; message: string };
 
-export function DeliveryPhotoHistory({ customer, session, onClose }: {
+export function DeliveryPhotoHistory({ customer, session, onClose, sync }: {
   customer: Pick<Customer, "customerId" | "name">;
   session: AuthenticatedSession;
   onClose: () => void;
+  sync: (update: DeliveryPhotoDeleteUpdate) => void;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<HistoryState>({ status: "loading", photos: [] });
@@ -53,6 +55,10 @@ export function DeliveryPhotoHistory({ customer, session, onClose }: {
       </> : null}
     </section>
     {viewer ? <DeliveryPhotoViewer key={`${sessionKey}:${state.photos[viewer.index]?.photoId ?? "closed"}`} customerName={customer.name}
-      session={session} photos={state.photos} initialIndex={viewer.index} origin={viewer.origin} onClose={() => setViewer(null)} /> : null}
+      session={session} photos={state.photos} initialIndex={viewer.index} origin={viewer.origin} onClose={() => setViewer(null)}
+      onDeleted={(photoId, update) => {
+        sync(update); setViewer(null); setState((current) => ({ ...current, photos: current.photos.filter((photo) => photo.photoId !== photoId) }));
+        setAttempt((value) => value + 1);
+      }} /> : null}
   </BottomSheet>;
 }

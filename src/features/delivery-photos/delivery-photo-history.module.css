@@ -33,6 +33,8 @@
 .actions button{display:flex;align-items:center;justify-content:center;gap:.3rem;padding:.45rem .65rem}
 .actions button:disabled{opacity:.45;cursor:default}
 .actions button:focus-visible,.failure button:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
+.actions .danger{color:white;border-color:#a33e36;background:#b84c43}
+.confirmActions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:.45rem}
 .position{margin-right:auto;min-width:3.5rem;color:var(--shell-ink-soft);font-size:.84rem;font-variant-numeric:tabular-nums}
 @media(max-width:340px){.stage{height:min(52dvh,460px)}.actions button{flex:1 1 44px}.position{flex:1 0 100%}}
 @media(prefers-reduced-motion:reduce){.stage,.actions button{transition:none}}

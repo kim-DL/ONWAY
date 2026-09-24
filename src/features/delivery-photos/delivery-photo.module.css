@@ -20,7 +20,6 @@
 .row small,.searchRow small{color:var(--shell-ink-soft);font-size:.78rem}
 .row small{white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .searchRow small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cam{flex:0 0 auto}
 .inToday{color:var(--shell-ink-soft);font-size:.78rem}
 .completed{min-width:0;margin:.9rem 0;border-top:1px solid #dce6df;border-bottom:1px solid #dce6df}
 .completed summary{min-height:50px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-weight:750;list-style:none}

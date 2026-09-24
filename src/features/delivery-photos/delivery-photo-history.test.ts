@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
+import type { AuthenticatedSession } from "@/features/auth/auth-context";
+import { canDeleteDeliveryPhoto } from "./delivery-photo-delete-policy";
 import { deliveryPhotoCardLabel, newestDeliveryPhotos } from "./delivery-photo-history-model";
 
 const base = { customerId: "customer-a", deliveryDateKey: "2026-09-24", source: "camera",
@@ -14,6 +16,11 @@ const photos: DeliveryPhotoMetadata[] = [
 ];
 
 describe("delivery photo recent history and viewer", () => {
+  const employee: AuthenticatedSession = { uid: "uid_1", displayName: "홍길동",
+    claims: { employeeId: "employee_1", sessionVersion: 1, permissionsVersion: 1, roleScopes: ["delivery"] } };
+  const admin: AuthenticatedSession = { uid: "uid_admin", displayName: "관리자",
+    claims: { employeeId: "employee_admin", sessionVersion: 1, permissionsVersion: 1, roleScopes: ["admin"], adminApproved: true, signInProvider: "google.com" } };
+
   it("orders metadata newest-first and labels the person as 등록자", () => {
     expect(newestDeliveryPhotos(photos).map((photo) => photo.photoId)).toEqual([photos[1]!.photoId, photos[0]!.photoId]);
     expect(deliveryPhotoCardLabel("한빛유통", photos[1]!)).toMatch(/^한빛유통 납품사진, .*등록자 홍길동$/u);
@@ -39,6 +46,19 @@ describe("delivery photo recent history and viewer", () => {
     expect(viewer).toContain('aria-live="polite"');
     expect(viewer).toContain("<BottomSheet");
     expect(viewer).toContain("이전"); expect(viewer).toContain("다음"); expect(viewer).toContain("닫기");
+  });
+
+  it("shows delete only for a same-Seoul-day owner or a verified admin before expiry", () => {
+    const current = photos[1]!;
+    const sameDay = new Date("2026-09-24T02:00:00.000Z");
+    expect(canDeleteDeliveryPhoto(current, employee, sameDay)).toBe(true);
+    expect(canDeleteDeliveryPhoto({ ...current, deliveryDateKey: "2026-09-23" }, employee, sameDay)).toBe(false);
+    expect(canDeleteDeliveryPhoto({ ...current, createdByEmployeeId: "employee_2" }, employee, sameDay)).toBe(false);
+    expect(canDeleteDeliveryPhoto({ ...current, createdByEmployeeId: "employee_2" }, admin, sameDay)).toBe(true);
+    expect(canDeleteDeliveryPhoto({ ...current, expiresAt: "2026-09-24T01:59:59.000Z" }, admin, sameDay)).toBe(false);
+    expect(canDeleteDeliveryPhoto({ ...current, createdByEmployeeId: "employee_2" }, {
+      ...admin, claims: { ...admin.claims, adminApproved: false },
+    }, sameDay)).toBe(false);
   });
 
   it("uses a responsive two-to-one-column grid and 44px controls without persistent photo state", () => {

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DELIVERY_PHOTO_RETENTION_HOURS,
+  deleteDeliveryPhotoInputSchema,
+  deleteDeliveryPhotoResultSchema,
   deliveryPhotoDaySchema,
   deliveryPhotoRouteSchema,
   deliveryPhotoSchema,
@@ -26,5 +28,12 @@ describe("delivery photo shared contract", () => {
     expect(deliveryPhotoSchema.safeParse({ ...active, thumbnail: { ...active.thumbnail, uploadAttemptToken: "00000000-0000-4000-8000-000000000002" } }).success).toBe(false);
     expect(deliveryPhotoSchema.safeParse({ ...active, status: "deleted" }).success).toBe(false);
     expect(DELIVERY_PHOTO_RETENTION_HOURS).toBe(168);
+  });
+
+  it("shares the strict requestId/photoId delete contract with the client", () => {
+    const request = { requestId: "10000000-0000-4000-8000-000000000001", photoId: "20000000-0000-4000-8000-000000000001" };
+    expect(deleteDeliveryPhotoInputSchema.parse(request)).toEqual(request);
+    expect(deleteDeliveryPhotoInputSchema.safeParse({ ...request, customerId: "customer-a" }).success).toBe(false);
+    expect(deleteDeliveryPhotoResultSchema.parse({ photoId: request.photoId, deletedAt: timestamp })).toEqual({ photoId: request.photoId, deletedAt: timestamp });
   });
 });

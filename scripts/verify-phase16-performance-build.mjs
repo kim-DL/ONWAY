@@ -94,12 +94,14 @@ const deliveryPhotoStylesheetGzipBytes = deliveryPhotoStylesheets.reduce((sum, a
 const deliveryPhotoJavascriptGzipBytes = [...deliveryPhotoAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 // Phase 3C keeps customer history and evidence viewing behind two nested event
-// boundaries. The viewer reuses the already-loaded history module stylesheet
-// plus the existing shared photo-morph stylesheet, so it adds no third CSS file.
+// boundaries. Phase 3D adds deletion as a third boundary, loaded only after the
+// viewer is open. All three reuse the history and photo-morph stylesheets.
 const deliveryPhotoHistoryEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-history"));
 const deliveryPhotoViewerEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-viewer"));
+const deliveryPhotoDeleteEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-delete-action"));
 const deliveryPhotoHistoryAssetNames = new Set(deliveryPhotoHistoryEntries.flatMap((entry) => entry.files));
 const deliveryPhotoViewerAssetNames = new Set(deliveryPhotoViewerEntries.flatMap((entry) => entry.files));
+const deliveryPhotoDeleteAssetNames = new Set(deliveryPhotoDeleteEntries.flatMap((entry) => entry.files));
 const deliveryPhotoHistoryStylesheets = stylesheets.filter((asset) =>
   readFileSync(join(nextRoot, asset.asset), "utf8").includes("--delivery-photo-history-ui"));
 const deliveryPhotoHistoryStylesheetAssets = new Set(deliveryPhotoHistoryStylesheets.map((asset) => asset.asset));
@@ -108,6 +110,8 @@ const deliveryPhotoHistoryStylesheetGzipBytes = deliveryPhotoHistoryStylesheets.
 const deliveryPhotoHistoryJavascriptGzipBytes = [...deliveryPhotoHistoryAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const deliveryPhotoViewerJavascriptGzipBytes = [...deliveryPhotoViewerAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const deliveryPhotoDeleteJavascriptGzipBytes = [...deliveryPhotoDeleteAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const deliveryPhotoViewerAdditionalStylesheets = stylesheets.filter((asset) =>
   deliveryPhotoViewerAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset));
@@ -189,6 +193,7 @@ assertBudget(deliveryPhotoEntries.length === 1, "delivery photo workspace must r
 assertBudget(deliveryPhotoStylesheets.length === 1, "delivery photo workspace must retain one isolated stylesheet");
 assertBudget(deliveryPhotoHistoryEntries.length === 1, "delivery photo history must retain one event-loaded boundary");
 assertBudget(deliveryPhotoViewerEntries.length === 1, "delivery photo viewer must retain one nested event-loaded boundary");
+assertBudget(deliveryPhotoDeleteEntries.length === 1, "delivery photo delete must retain one nested event-loaded boundary");
 assertBudget(deliveryPhotoHistoryStylesheets.length === 1, "delivery photo history and viewer must retain one isolated stylesheet");
 assertBudget(deliveryPhotoViewerAdditionalStylesheets.length === 0, "delivery photo viewer must reuse history and photo-morph CSS without another stylesheet");
 assertBudget(deliveryPhotoUploadEntries.length === 1, "delivery photo upload memory must retain one workspace runtime boundary");
@@ -203,6 +208,7 @@ for (const asset of deliveryPhotoExclusiveAssetNames) {
 for (const [label, assets, owners] of [
   ["history", deliveryPhotoHistoryAssetNames, [...deliveryPhotoHistoryEntries, ...deliveryPhotoViewerEntries]],
   ["viewer", deliveryPhotoViewerAssetNames, deliveryPhotoViewerEntries],
+  ["delete", deliveryPhotoDeleteAssetNames, deliveryPhotoDeleteEntries],
 ]) {
   for (const asset of assets) {
     assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo ${label} asset ${asset} must stay event-loaded`);
@@ -359,6 +365,7 @@ assertBudget(deliveryPhotoHistoryStylesheetRawBytes <= 5.5 * 1024, `delivery pho
 assertBudget(deliveryPhotoHistoryStylesheetGzipBytes <= 1.75 * 1024, `delivery photo history/viewer CSS gzip ${deliveryPhotoHistoryStylesheetGzipBytes}B exceeds 1.75KiB`);
 assertBudget(deliveryPhotoHistoryJavascriptGzipBytes <= 3.5 * 1024, `delivery photo history JavaScript gzip ${deliveryPhotoHistoryJavascriptGzipBytes}B exceeds 3.5KiB`);
 assertBudget(deliveryPhotoViewerJavascriptGzipBytes <= 3 * 1024, `delivery photo viewer JavaScript gzip ${deliveryPhotoViewerJavascriptGzipBytes}B exceeds 3KiB`);
+assertBudget(deliveryPhotoDeleteJavascriptGzipBytes <= 1.75 * 1024, `delivery photo delete JavaScript gzip ${deliveryPhotoDeleteJavascriptGzipBytes}B exceeds 1.75KiB`);
 assertBudget(deliveryPhotoUploadJavascriptGzipBytes <= 5 * 1024, `delivery photo upload runtime JavaScript gzip ${deliveryPhotoUploadJavascriptGzipBytes}B exceeds 5KiB`);
 assertBudget(deliveryPhotoPreparationJavascriptGzipBytes <= 3 * 1024, `delivery photo image preparation JavaScript gzip ${deliveryPhotoPreparationJavascriptGzipBytes}B exceeds 3KiB`);
 assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${salesWorkspaceGzipBytes}B exceeds 14KiB`);
@@ -399,6 +406,7 @@ const report = {
     deliveryPhotoHistoryStylesheetGzipBytes: 1.75 * 1024,
     deliveryPhotoHistoryJavascriptGzipBytes: 3.5 * 1024,
     deliveryPhotoViewerJavascriptGzipBytes: 3 * 1024,
+    deliveryPhotoDeleteJavascriptGzipBytes: 1.75 * 1024,
     deliveryPhotoUploadJavascriptGzipBytes: 5 * 1024,
     deliveryPhotoPreparationJavascriptGzipBytes: 3 * 1024,
     salesWorkspaceGzipBytes: 14 * 1024,
@@ -432,6 +440,7 @@ const report = {
     deliveryPhotoHistoryStylesheetGzipBytes,
     deliveryPhotoHistoryJavascriptGzipBytes,
     deliveryPhotoViewerJavascriptGzipBytes,
+    deliveryPhotoDeleteJavascriptGzipBytes,
     deliveryPhotoViewerAdditionalStylesheetRawBytes,
     deliveryPhotoViewerAdditionalStylesheetGzipBytes,
     deliveryPhotoUploadJavascriptGzipBytes,
