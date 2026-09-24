@@ -9,19 +9,20 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- 마지막 제품 코드 commit은 branch `codex/mobile-action-reach`의 `7ad3ab89c7e020fbfabcd7d144f8d6fec4ef511d`다. 납품사진 Phase 3A/3B/3C와 Galaxy 실사용 기반 카드 UX 수정까지 checkpoint/push됐고, 아래 2026-09-24 Hosting release가 현재 production frontend다. 이후 Git HEAD에는 documentation-only checkpoint가 포함될 수 있으며 제품 코드는 바뀌지 않았다.
+- 마지막 제품 코드 commit은 branch `codex/mobile-action-reach`의 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 납품사진 Phase 3A/3B/3C/3D와 Galaxy 실사용 확인까지 완료됐으며 아래 2026-09-24 Hosting release가 현재 production frontend다. 이후 Git HEAD에는 documentation-only checkpoint가 포함될 수 있다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 거래처, 학교납품, 영업/홍보, 재고에 더해 납품사진 field workspace가 production feature flag로 활성화돼 있다.
-- 현재 Firebase Hosting live release는 `1790211742342000`, version은 `e603258b088093f0`, 배포 시각은 `2026-09-24 10:02:22.342 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `20520cc6aaa7d8b1ca5ee67522e41b9dc4f691429e8b940b7c154ecb52d5291d`다. `https://onnuriway.com`과 `https://onnuriway.web.app`에서 candidate/live worker와 82개 precache asset이 일치했다. 직전 rollback target은 version `d87b75d47936e2c3`다.
+- 현재 Firebase Hosting live release는 `1790217833155000`, version은 `79b66cdeae0b2036`, 배포 시각은 `2026-09-24 11:43:53.155 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `ebd4c57444b5437ba3f2fe4947a7b54d694ad02e7d56a22718f93fa5694d1a51`다. `https://onnuriway.com`과 `https://onnuriway.web.app`에서 candidate/live worker와 83개 precache asset이 일치했다. 직전 rollback target은 version `e603258b088093f0`다.
+- 납품사진 core feature는 Phase 3D production 배포와 Galaxy S20+ 실사용 확인을 마쳐 **FEATURE FREEZE** 상태다. 다음 작업은 신규 기능 개발이 아니라 repository cleanup/optimization의 OPT-0 read-only audit다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
 ### 미확인 또는 다시 확인할 사실
 
 - 8명 동시 사용 환경의 실제 read 비용과 현장망 T2/T3는 아직 계측하지 않았다. 이는 이번 inventory mobile UI release의 배포·사용성 확인과는 별도의 운영 계측 항목이다.
-- 납품사진 network 장애/retry는 구현·Emulator 검증 범위는 있으나 production fault injection 결과가 명확히 기록돼 있지 않다. delete UI, Web Share, GPS nearby suggestion은 아직 구현하지 않았다. delete UI가 다음 작업 우선순위이며 Web Share/GPS는 이후 업무 필요성을 확인해 판단한다.
+- 납품사진 network 장애/retry는 구현·Emulator 검증 범위는 있으나 production fault injection 결과가 명확히 기록돼 있지 않다. Web Share와 GPS nearby suggestion은 freeze 범위 밖의 후속 후보이며 실제 업무 필요성이 확인될 때 별도 Phase로 판단한다.
 
 ### 2026-09-23 납품사진 Phase 2A/2B production backend — 완료 당시 기록
 
@@ -44,15 +45,23 @@
 - **Production frontend:** `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` candidate를 Hosting site `onnuriway`에만 배포했다. live release `1790211742342000`, version `e603258b088093f0`, time `2026-09-24 10:02:22.342 KST`, `/sw.js` SHA-256 `20520cc6aaa7d8b1ca5ee67522e41b9dc4f691429e8b940b7c154ecb52d5291d`다. 두 production origin verifier와 candidate/live worker 및 precache asset 대조가 PASS했다.
 - **Bundle ceiling:** Workspace JS는 10,239B gzip / 10,240B로 headroom이 1B뿐이다. Workspace CSS는 6,066B raw / 1,584B gzip, History JS는 3,459B gzip, Viewer JS는 2,811B gzip, Initial JS는 141,040B gzip이다. 앞으로 delivery-photo workspace에 코드를 직접 늘리지 말고 가능한 기능을 event-loaded/lazy chunk로 분리하며 budget 완화보다 split을 우선한다.
 - **최종 검증:** app/Functions typecheck, backend contract/Functions 54 tests, frontend 12 files/50 tests, Demo Emulator Chromium 6/6, lint, production build, PWA/performance/Hosting gate, `git diff --check`, 320/360/200% overflow 0, 접근성, production Galaxy 실기기가 PASS했다.
-- **후속 범위:** delete UI, Web Share, GPS nearby suggestion은 완료로 기록하지 않는다. network 장애/retry도 production fault injection 완료로 과장하지 않으며 현재 구현과 Emulator 검증 상태만 인정한다.
+- **당시 후속 범위:** Phase 3A/3B/3C 완료 시점에는 delete UI, Web Share, GPS nearby suggestion을 완료로 기록하지 않았다. delete UI의 이후 완료 상태는 아래 Phase 3D 기록을 따른다. network 장애/retry도 production fault injection 완료로 과장하지 않는다.
 
-### 납품사진 다음 작업 순서와 repository 정리 경계
+### 2026-09-24 납품사진 Phase 3D Delete — production·Galaxy 완료
 
-1. Delivery-photo delete UI를 완성한다. 기존 private Callable·권한·request ID·감사 경계를 유지하고, 10,239B/10,240B인 workspace JS에 기능을 직접 늘리기보다 event-loaded/lazy chunk 분리를 우선한다.
-2. Galaxy S20+ production 실기기에서 delete UI의 최종 동작을 확인한다. 이 문서 시점에는 구현·실기기 결과가 없다.
-3. 납품사진 기능을 freeze한다. Web Share와 GPS nearby suggestion은 실제 업무 필요성을 확인한 뒤 별도 Phase로 판단한다.
-4. Repository cleanup/optimization에 앞서 다음 스레드에서 **OPT-0 READ-ONLY AUDIT**를 수행한다. 파일과 테스트를 `KEEP`, `CONSOLIDATE`, `DELETE CANDIDATE`, `GENERATED / SAFE TO CLEAN`으로 분류하고 근거와 영향을 기록한 뒤 실제 삭제 범위를 결정한다. OPT-0에서는 삭제·수정하지 않는다.
-5. 감사 결과를 검토한 후에만 실제 cleanup/optimization을 진행한다. security, Rules, Auth, revision, request ID, upload replay, PWA, performance, Hosting regression test는 안전망이므로 단순히 테스트 파일이라는 이유로 삭제하지 않는다.
+- **삭제 계약·권한:** 기존 `deleteDeliveryPhoto` Callable의 `requestId`/`photoId` 입력과 `photoId`/`deletedAt` 응답을 재사용했다. 일반 직원은 본인 UID·직원 ID로 등록한 서울 기준 당일 사진만, verified admin은 retention 만료 전 사진을 삭제할 수 있다. Frontend의 action 노출 조건은 UX용이며 최종 권한 판단은 backend다. Functions 제품 코드는 변경하지 않았다.
+- **확인·재시도:** 삭제 확인 UI에서 취소, Escape, Android Back은 write 0이다. 첫 delete intent에서 만든 requestId를 동일 photoId의 retry에 재사용하고 rapid double tap은 하나의 logical request로 제한한다. Server-confirmed success 후에만 local metadata를 제거하며 authoritative not-found/already deleted는 reconcile한다. Permission/transport failure에서는 local remove를 하지 않는다.
+- **기록완료 projection·privacy:** 사진 수는 삭제 성공에 따라 `3 → 2 → 1 → 0`으로 감소한다. 0장이 되면 오늘 customer photo summary와 기록완료에서 제거되고 오늘 남은 납품처로 즉시 복귀한다. 별도 completion boolean은 저장하지 않는다. 삭제한 사진의 thumbnail/evidence Object URL을 즉시 revoke하고 늦게 도착한 응답은 UI에 반영하지 않는다. Persistent photo cache는 추가하지 않았다.
+- **검증·bundle:** delete focused 10/10, delivery-photo frontend 62/62, demo Emulator Chromium 8/8, app/Functions typecheck, lint, production static build, PWA/performance/Hosting gate 및 `git diff --check`가 PASS했다. Workspace JS `10,230/10,240B` gzip(잔여 10B), History `3,559/3,584B`(25B), Viewer `2,918/3,072B`(154B), Delete `1,662/1,792B`(130B), History/viewer CSS `5,548B` raw/`1,418B` gzip, Initial JS `141,056B` gzip이다. 기존 budget 완화 없이 delete는 Viewer 내부 nested dynamic boundary로 유지했다.
+- **Production Hosting:** 제품 코드 commit `b4831ff4d24b8956e327ea806f1ca6bba1651d9c`를 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`로 build해 Firebase project/site `onnuriway`/`onnuriway`의 Hosting에만 배포했다. Release `1790217833155000`, version `79b66cdeae0b2036`, time `2026-09-24 11:43:53.155 KST`, `/sw.js` SHA-256 `ebd4c57444b5437ba3f2fe4947a7b54d694ad02e7d56a22718f93fa5694d1a51`다. 두 production origin verifier와 candidate/live worker 및 83개 precache asset hash 대조가 PASS했다. Rollback target은 직전 version `e603258b088093f0`다. Functions/Firestore/Storage/IAM/Scheduler 변경은 0이다.
+- **Galaxy S20+ 사용자 실기기 확인:** 사용자가 production에서 본인 당일 사진 delete action, 확인 UI, 취소, 실제 삭제, 사진 수 감소, 마지막 사진 삭제 뒤 기록완료에서 오늘 남은 납품처로 복귀, history/viewer reconciliation, Back/Escape를 모두 PASS로 확인했다. 기존 camera/album/history/viewer 회귀도 없었다. 이는 사용자의 실기기 확인 결과이며 Codex의 production authenticated photo read/write/delete 결과가 아니다.
+
+### 납품사진 FEATURE FREEZE와 다음 작업
+
+1. Core 범위인 route/day, camera, album, upload/retry model, 기록완료 projection, history, thumbnail, evidence viewer, delete, 출입비번 표시를 현재 상태에서 **FEATURE FREEZE**한다.
+2. Web Share와 GPS nearby suggestion은 freeze 범위 밖이다. 실제 업무 필요성이 확인되면 별도 Phase로 진행한다.
+3. 다음 새 Codex 스레드의 첫 단계는 repository cleanup/optimization을 위한 **OPT-0 READ-ONLY AUDIT**다. 파일과 테스트를 `KEEP`, `CONSOLIDATE`, `DELETE CANDIDATE`, `GENERATED / SAFE TO CLEAN`으로 분류하고 근거와 영향을 기록한다. OPT-0에서는 삭제·수정하지 않는다.
+4. 감사 결과를 검토한 후 실제 cleanup 범위를 결정한다. security, Rules, Auth, revision, requestId, upload replay, Emulator, PWA, performance, Hosting regression tests는 중요한 안전망이며 단순히 테스트 파일이라는 이유로 삭제하지 않는다.
 
 ## 2. 확정 요구사항과 현재 코드 대조
 
@@ -67,7 +76,7 @@
 | 재고 입력 | 사진은 등록/수정 모두 촬영 전용, 초기 수량을 한 화면에서 저장 | camera capture 입력과 제품+초기 lot 저장 흐름 존재 | 구현됨; 실기기 미확인 |
 | 재고 조사 | 직원별 ON/OFF, 지정일 미완료 강조, 조작한 유통기한만 확인 | sessionStorage preference, per-lot inspection, match-only 확인과 충돌 검증 | 구현됨 |
 | 재고 상세 | 2행 고정 action, 더보기에 이력·비활성·삭제, 사진 확대 힌트 | 상세 footer와 more dialog, `showExpandHint`, lot 카드 `수정` 텍스트 존재 | 로컬·운영 실제 Chromium 확인됨 |
-| 납품사진 | 오늘 route/day, camera/album upload, 기록완료 projection, customer history/viewer | Memory-only workspace/upload, private Callable relay, thumbnail/evidence lazy load, Galaxy production 검증 | Phase 3A/3B/3C 운영 완료 |
+| 납품사진 | 오늘 route/day, camera/album upload, 기록완료 projection, customer history/viewer/delete | Memory-only workspace/upload, private Callable relay, thumbnail/evidence lazy load, delete reconciliation, Galaxy production 검증 | Phase 3A/3B/3C/3D 운영 완료·FEATURE FREEZE |
 | 오프라인 | 조회 cache만 제한 허용, 민감 쓰기 queue 금지 | 검색/학교만 namespace IndexedDB, 거래처·재고는 Memory, 쓰기 queue 없음 | 구현됨 |
 | 보안 | Client 직접 쓰기 금지, App Check/권한/revision/request ID/audit 유지 | Callable service와 Rules 경계, private no-store 응답 | 구현됨 |
 
