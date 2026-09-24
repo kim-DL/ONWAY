@@ -1,6 +1,6 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-23
+기준일: 2026-09-24
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
@@ -9,20 +9,21 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- 현재 source/application HEAD는 branch `codex/mobile-action-reach`의 `a76871802374af8a3565f22c88c8b4166f8256c1`이다. 납품사진 backend 9개는 이 HEAD에서 targeted deploy했으며, 마지막으로 확인된 Hosting frontend release는 아래의 2026-09-21 기록이다. 이번 documentation-only checkpoint는 제품 코드를 바꾸지 않는다.
+- 현재 source/application HEAD는 branch `codex/mobile-action-reach`의 `7ad3ab89c7e020fbfabcd7d144f8d6fec4ef511d`다. 납품사진 Phase 3A/3B/3C와 Galaxy 실사용 기반 카드 UX 수정까지 checkpoint/push됐고, 아래 2026-09-24 Hosting release가 현재 production frontend다. 이번 documentation-only checkpoint는 제품 코드를 바꾸지 않는다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
-- 현재 앱 모드는 거래처, 학교납품, 영업/홍보, 재고 네 가지다. 재고는 운영 build에서 활성화된 상태로 마지막 문서에 기록돼 있다.
-- 2026-09-21 최종 Firebase Hosting live release는 `1789983232326000`, version은 `2c48893eab60f919`, 배포 시각은 `2026-09-21 18:33:52.326 KST`다. `https://onnuriway.com`과 `https://onnuriway.web.app`의 worker SHA-256은 `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`로 candidate 및 양 origin에서 일치한다.
+- 거래처, 학교납품, 영업/홍보, 재고에 더해 납품사진 field workspace가 production feature flag로 활성화돼 있다.
+- 현재 Firebase Hosting live release는 `1790211742342000`, version은 `e603258b088093f0`, 배포 시각은 `2026-09-24 10:02:22.342 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `20520cc6aaa7d8b1ca5ee67522e41b9dc4f691429e8b940b7c154ecb52d5291d`다. `https://onnuriway.com`과 `https://onnuriway.web.app`에서 candidate/live worker와 82개 precache asset이 일치했다. 직전 rollback target은 version `d87b75d47936e2c3`다.
+- 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
 ### 미확인 또는 다시 확인할 사실
 
 - 8명 동시 사용 환경의 실제 read 비용과 현장망 T2/T3는 아직 계측하지 않았다. 이는 이번 inventory mobile UI release의 배포·사용성 확인과는 별도의 운영 계측 항목이다.
-- 실제 설치형 휴대폰 PWA의 카메라·키보드·safe-area를 포함한 저장 flow는 이번 read-only smoke 범위가 아니다. 운영 데이터를 수정하는 검증은 수행하지 않았다.
+- 납품사진 network 장애/retry는 구현·Emulator 검증 범위는 있으나 production fault injection 결과가 명확히 기록돼 있지 않다. delete UI, Web Share, GPS nearby suggestion도 아직 구현하지 않았으며 실제 업무 필요성에 따라 별도 Phase로 판단한다.
 
-### 2026-09-23 납품사진 Phase 2A/2B production backend — 완료, frontend 미활성
+### 2026-09-23 납품사진 Phase 2A/2B production backend — 완료 당시 기록
 
 - Project `onnuriway` (`347044588399`)의 `asia-northeast3`에 납품사진 Functions 9개만 targeted deploy했다: `getDeliveryPhotoRoute`, `saveDeliveryPhotoRoute`, `getDeliveryPhotoDay`, `saveDeliveryPhotoDay`, `createDeliveryPhoto`, `listDeliveryPhotos`, `getDeliveryPhoto`, `deleteDeliveryPhoto`, `expireDeliveryPhotos`. 모두 ACTIVE, Gen2, Node.js 22이며 전용 runtime SA `delivery-photo-runtime@onnuriway.iam.gserviceaccount.com`을 사용한다. `createDeliveryPhoto`는 1GiB/concurrency 1/maxInstances 4/timeout 120초, `expireDeliveryPhotos`는 maxInstances 1/timeout 120초다. 배포 전후 비교에서 기존 production Functions 62개의 이름·상태·runtime·service account·updateTime은 불변이다.
 - Scheduler job `firebase-schedule-expireDeliveryPhotos-asia-northeast3`는 ENABLED, `every 60 minutes`, `Asia/Seoul`이다. OIDC identity는 위 전용 SA이고, 정확한 scheduled Cloud Run service에 이 SA의 service-specific `roles/run.invoker`가 확인됐다. 실제 scheduled invocation은 Batch C에서 수동 실행하지 않았으며 당시 `lastAttemptTime`은 없었다.
@@ -30,7 +31,20 @@
 - 전용 SA의 project role은 `roles/datastore.user`뿐이다. 전용 bucket의 custom role `projects/onnuriway/roles/deliveryPhotoObjectRuntime`은 `storage.objects.create/get/delete`만 포함한다. 전용 bucket create/get/delete는 GRANTED, list/update는 DENIED이며, 기존 업무 bucket의 create/get/delete/list/update는 모두 DENIED로 검증했다. M2 legacy ACL baseline 대조에서도 새 SA의 기존 bucket 접근 경로는 확인되지 않았다.
 - `deliveryPhotos` COLLECTION composite index 2개는 `deliveryDateKey ASC, createdAt DESC` (`CICAgJjmiJEK`) 및 `customerId ASC, createdAt DESC` (`CICAgNi47oMK`)로 모두 READY다. 기존 index 5개는 불변이고 `deliveryPhotos`·`deliveryPhotoDays` TTL은 없다. Git에서 제외된 `functions/.env.onnuriway`에 production deploy용 `DELIVERY_PHOTO_BUCKET`·`DELIVERY_PHOTO_SERVICE_ACCOUNT`가 설정돼 있다.
 - Batch C에서 9개 runtime/options, 기존 62개 불변, Scheduler·Cloud Run invoker를 확인했다. 무인증 `getDeliveryPhotoRoute` Callable smoke는 HTTP 401, `application/json`, `error.status=UNAUTHENTICATED`였다. 인증된 운영 납품사진 Callable 호출, 사진/문서 write, Hosting/frontend deploy는 하지 않았다. 버킷 객체는 0개이며 Firestore 업무 collection의 document count는 직접 조회하지 않았다. rollback은 필요하지 않았다.
-- **현재 경계:** backend infrastructure는 production에 있지만 delivery-photo feature flag는 OFF이고 UI는 production에 노출되지 않는다. 사용자는 아직 사진 촬영·앨범 업로드를 할 수 없다. Phase 3 예정 범위는 오늘 납품처, 기본/오늘 순서, 거래처 검색과 최근 거래처 20 활용, 카메라 1-tap·앨범 선택, non-blocking upload와 진행/실패/재시도, 성공 후 기록완료 이동, 사진 N장, 등록자/날짜별 조회, viewer/share, Galaxy S20+ 화질 benchmark다. 이는 **예정 작업**이며 완료 상태가 아니다. GPS는 core UX 이후 별도 단계다.
+- **당시 경계:** backend infrastructure는 production에 있지만 delivery-photo feature flag는 OFF이고 UI는 production에 노출되지 않았다. 아래 2026-09-24 Phase 3 기록이 이 과거 경계를 대체한다.
+
+### 2026-09-24 납품사진 Phase 3A/3B/3C — production 완료
+
+- **Phase 3A field workspace:** 오늘 남은 납품처와 기록완료 projection, 기본 route, today override, 내 납품처 편집, 오늘 거래처 추가/제외, 순서 편집, 거래처 검색, 최근 거래처 20 활용을 구현했다. route/day/photo metadata repository를 연결하고 화면 상태는 Memory-only로 유지하며 revision conflict를 처리한다. 별도 completion boolean은 저장하지 않고 server-confirmed photo metadata count에서 기록완료를 투영한다.
+- **Phase 3B capture/upload:** camera capture와 album selection, max long edge 2560, fresh WebP re-encode, orientation normalize, crop/upscale 금지, EXIF/GPS 제거를 적용했다. upload coordinator와 job은 Memory-only이고 customer당 active job 1개, preparation concurrency 1, Callable relay 최대 2개로 제한한다. duplicate tap을 막고 같은 사진 retry는 동일 request ID/payload를 유지한다. `createDeliveryPhoto`가 반환한 server-confirmed metadata 이후에만 기록완료로 이동하며 persistent/offline upload queue와 Client direct Storage write는 없다.
+- **Phase 3C history/viewer:** 기록완료 customer history를 `listDeliveryPhotos` customer scope로 읽고 최근 기록 N장, metadata-first, viewport thumbnail lazy load, 선택 evidence lazy load, 등록자/등록 시각을 제공한다. viewer는 previous/next, Arrow keys, Escape, Android Back, dependency 없는 pointer swipe를 지원한다. Blob/Object URL은 Memory-only이며 viewer close/logout/session 변경 시 정리하고 persistent photo cache는 두지 않는다.
+- **Galaxy 실기기:** Galaxy S20+ production에서 camera upload, album upload, 기록완료 이동, 기록완료 customer의 추가 사진, 여러 장 순차 촬영/저장, history, thumbnail, evidence viewer, previous/next, Back 뒤 history 유지가 모두 PASS했다.
+- **Card UX:** 기존 `Customer.accessPassword`를 추가 조회 없이 in-memory catalog에서 재사용하고 `accessPasswordState === "registered"`일 때만 `행정동 · 출입비번 1234#` 형태로 표시한다. 기록완료의 독립 `사진 보기` 버튼은 제거했고 왼쪽 customer 정보 block 전체가 History를 여는 native button이다. camera와 album은 각각 capture/album picker를 여는 독립 sibling control이며 Galaxy 최종 UX 확인이 PASS했다.
+- **Backend 불변:** Phase 2B의 delivery-photo Functions 9개 ACTIVE, dedicated runtime SA/bucket/custom Storage IAM, composite indexes 2개 READY, hourly expiration Scheduler, bucket lifecycle Delete age 8일과 기존 business bucket 격리를 유지한다. Phase 3 frontend와 Hosting release 때문에 Functions, Firestore, Storage, IAM, Scheduler resource를 변경하지 않았다.
+- **Production frontend:** `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` candidate를 Hosting site `onnuriway`에만 배포했다. live release `1790211742342000`, version `e603258b088093f0`, time `2026-09-24 10:02:22.342 KST`, `/sw.js` SHA-256 `20520cc6aaa7d8b1ca5ee67522e41b9dc4f691429e8b940b7c154ecb52d5291d`다. 두 production origin verifier와 candidate/live worker 및 precache asset 대조가 PASS했다.
+- **Bundle ceiling:** Workspace JS는 10,239B gzip / 10,240B로 headroom이 1B뿐이다. Workspace CSS는 6,066B raw / 1,584B gzip, History JS는 3,459B gzip, Viewer JS는 2,811B gzip, Initial JS는 141,040B gzip이다. 앞으로 delivery-photo workspace에 코드를 직접 늘리지 말고 가능한 기능을 event-loaded/lazy chunk로 분리하며 budget 완화보다 split을 우선한다.
+- **최종 검증:** app/Functions typecheck, backend contract/Functions 54 tests, frontend 12 files/50 tests, Demo Emulator Chromium 6/6, lint, production build, PWA/performance/Hosting gate, `git diff --check`, 320/360/200% overflow 0, 접근성, production Galaxy 실기기가 PASS했다.
+- **후속 후보:** delete UI, Web Share, GPS nearby suggestion은 완료로 기록하지 않는다. network 장애/retry도 production fault injection 완료로 과장하지 않으며 현재 구현과 Emulator 검증 상태만 인정한다.
 
 ## 2. 확정 요구사항과 현재 코드 대조
 
@@ -45,6 +59,7 @@
 | 재고 입력 | 사진은 등록/수정 모두 촬영 전용, 초기 수량을 한 화면에서 저장 | camera capture 입력과 제품+초기 lot 저장 흐름 존재 | 구현됨; 실기기 미확인 |
 | 재고 조사 | 직원별 ON/OFF, 지정일 미완료 강조, 조작한 유통기한만 확인 | sessionStorage preference, per-lot inspection, match-only 확인과 충돌 검증 | 구현됨 |
 | 재고 상세 | 2행 고정 action, 더보기에 이력·비활성·삭제, 사진 확대 힌트 | 상세 footer와 more dialog, `showExpandHint`, lot 카드 `수정` 텍스트 존재 | 로컬·운영 실제 Chromium 확인됨 |
+| 납품사진 | 오늘 route/day, camera/album upload, 기록완료 projection, customer history/viewer | Memory-only workspace/upload, private Callable relay, thumbnail/evidence lazy load, Galaxy production 검증 | Phase 3A/3B/3C 운영 완료 |
 | 오프라인 | 조회 cache만 제한 허용, 민감 쓰기 queue 금지 | 검색/학교만 namespace IndexedDB, 거래처·재고는 Memory, 쓰기 queue 없음 | 구현됨 |
 | 보안 | Client 직접 쓰기 금지, App Check/권한/revision/request ID/audit 유지 | Callable service와 Rules 경계, private no-store 응답 | 구현됨 |
 
