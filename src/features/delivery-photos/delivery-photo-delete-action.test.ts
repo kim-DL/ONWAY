@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   states: [] as unknown[], stateCursor: 0, refs: [] as Array<{ current: unknown }>, refCursor: 0,
@@ -52,9 +52,12 @@ function find(node: ReactNode, predicate: (element: TestElement) => boolean): Te
 async function settle() { for (let index = 0; index < 8; index += 1) await Promise.resolve(); }
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-09-24T03:00:00.000Z"));
   harness.states = []; harness.refs = []; harness.stateCursor = 0; harness.refCursor = 0;
   harness.remove.mockReset(); harness.onDeleted.mockReset();
 });
+afterEach(() => { vi.useRealTimers(); });
 
 function openConfirmation() {
   find(render(), (element) => element.props.children === "사진 삭제")!.props.onClick?.();
@@ -63,14 +66,12 @@ function openConfirmation() {
 
 describe("delivery photo delete confirmation", () => {
   it("keeps the action out of the DOM unless the current owner or verified admin is eligible", () => {
-    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-24T02:00:00.000Z"));
     expect(find(render(), (element) => element.props.children === "사진 삭제")).not.toBeNull();
     expect(render({ ...photo, deliveryDateKey: "2026-09-23" })).toBeNull();
     expect(render({ ...photo, createdByEmployeeId: "employee_2" })).toBeNull();
     const admin = { ...session, claims: { ...session.claims, employeeId: "admin_1", roleScopes: ["admin" as const],
       adminApproved: true, signInProvider: "google.com" as const } };
     expect(find(render({ ...photo, createdByEmployeeId: "employee_2" }, admin), (element) => element.props.children === "사진 삭제")).not.toBeNull();
-    vi.useRealTimers();
   });
 
   it("cancels without a write and collapses rapid activation into one request", async () => {
