@@ -12,6 +12,7 @@
 - 원본: 사용자가 제공한 `bloub-my-cycle.gif`.
 - 앱 에셋: `/brand/bloub-welcome-v1.webp` (429,484 bytes),
   `/brand/bloub-welcome-still-v1.png` (4,528 bytes).
+- 위 경로는 당시 배포된 퇴역 v1 자산의 기록이며, 현재 저장소에서는 OPT-1C 정리로 제거되었다.
 - 320×320, **314프레임 × 50ms = 15.7초**, 무한반복 설정 유지.
 - lossless WebP 변환으로 원본 580,833 bytes 대비 26.1% 절감.
 - 모든 프레임의 가시 RGB 및 alpha가 원본과 동일하고, 정지 이미지는 원본 첫 프레임이다.

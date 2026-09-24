@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
 import { isPublicAssetPath } from "@/features/pwa/cache-policy";
 
-async function inspectMark(filename: string) {
-  const { data, info } = await sharp(join(process.cwd(), "public", "icons", filename))
+async function inspectMark(filename: string, directory = join(process.cwd(), "public", "icons")) {
+  const { data, info } = await sharp(join(directory, filename))
     .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   let coloredPixels = 0;
   let maximumRadius = 0;
@@ -44,7 +44,7 @@ describe("production company icons", () => {
   });
 
   it("enlarges the mark without allowing Android masks to cut the logo", async () => {
-    const previous = await inspectMark("onnuriway-company-icon-maskable-512-v3.png");
+    const previous = await inspectMark("onnuriway-company-icon-maskable-512-v3.png", join(process.cwd(), "scripts", "fixtures"));
     const current = await inspectMark("onnuriway-company-icon-maskable-512-v4.png");
     expect(current.markWidth).toBeGreaterThan(previous.markWidth * 1.17);
     expect(current.coloredPixels).toBeGreaterThan(previous.coloredPixels * 1.38);

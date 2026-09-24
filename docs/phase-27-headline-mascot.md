@@ -15,8 +15,9 @@
 - 정지 PNG 4,529 bytes: 원본 첫 프레임과 동일.
 - 전체 200프레임의 가시 RGB와 모든 alpha 픽셀, 프레임 시간 및 반복 설정 동일 검증.
 - 출력: `/brand/bloub-welcome-v2.webp`, `/brand/bloub-welcome-still-v2.png`.
+- 위 경로는 당시 배포된 퇴역 v2 자산의 기록이며, 현재 저장소에서는 OPT-1C 정리로 제거되었다.
 - 생성: `node scripts/prepare-welcome-mascot.mjs "원본 GIF 경로"`.
-- 사용자 원본 및 이전 v1 자산은 그대로 보존.
+- 당시 사용자 원본 및 이전 v1 자산은 그대로 보존했다.
 
 ## 배치·접근성·캐시
 
