@@ -4,14 +4,23 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { customerSchema, getCustomerChoseong, normalizeCustomerName, type Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
-import { DeliveryPhotoWorkspace } from "./delivery-photo-workspace";
+import { DeliveryPhotoRow, DeliveryPhotoWorkspace } from "./delivery-photo-workspace";
 
 const session: AuthenticatedSession = {
   uid: "uid_1",
   displayName: "홍길동",
   claims: { employeeId: "employee_1", sessionVersion: 1, permissionsVersion: 1, roleScopes: ["delivery"] },
 };
+
+const customer: Customer = customerSchema.parse({
+  customerId: "customer_1", companyId: "onnuri", name: "농진", normalizedName: normalizeCustomerName("농진"), choseongName: getCustomerChoseong("농진"),
+  district: "서구", administrativeDong: "탄방동", officialAddress: "", deliveryAddress: "", deliveryPoint: null,
+  accessPassword: "00123*", accessPasswordState: "registered", deliveryLocationDescription: "", contacts: [], status: "active",
+  noticeType: "none", changeNote: "", revision: 1, createdAt: "2026-09-06T00:00:00.000Z", updatedAt: "2026-09-06T00:00:00.000Z",
+  createdBy: "EMP-ADMIN", updatedBy: "EMP-ADMIN",
+});
 
 describe("delivery photo field workspace", () => {
   it("renders a non-blocking loading shell with stable native camera and album inputs", () => {
@@ -32,6 +41,27 @@ describe("delivery photo field workspace", () => {
     expect(css).toContain("min-height:44px");
     expect(css).toContain("@media(max-width:380px)");
     expect(css).toContain(":focus-visible");
+  });
+
+  it.each([
+    { value: customer, expected: "탄방동 · 출입비번 00123*" },
+    { value: { ...customer, accessPassword: "", accessPasswordState: "none" as const }, expected: "탄방동" },
+    { value: { ...customer, administrativeDong: "" }, expected: "출입비번 00123*" },
+    { value: { ...customer, administrativeDong: "", accessPassword: "", accessPasswordState: "unknown" as const }, expected: "" },
+  ])("formats existing customer location/password data without placeholders", ({ value, expected }) => {
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer: value, uploadReady: true,
+      onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
+    if (expected) expect(html).toContain(expected);
+    else expect(html).not.toContain("<small");
+  });
+
+  it("uses the completed row information block as the history action without a separate label button", () => {
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, count: 3, latestAt: "2026-09-24T01:42:00.000Z", uploadReady: true,
+      onView: () => undefined, onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
+    expect(html).toContain("탄방동 · 출입비번 00123*");
+    expect(html).toContain("사진 3장 · 마지막 등록 10:42");
+    expect(html).toContain('aria-label="농진 납품사진 보기, 사진 3장 · 마지막 등록 10:42"');
+    expect(html).not.toContain(">사진 보기<");
   });
 
   it("does not add a persistent business-state or background queue dependency", () => {

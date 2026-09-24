@@ -22,21 +22,32 @@ import styles from "./delivery-photo.module.css";
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor").then((module) => module.DeliveryPhotoEditor), { ssr: false });
 const DeliveryPhotoHistory = dynamic(() => import("./delivery-photo-history").then((module) => module.DeliveryPhotoHistory), { ssr: false });
 
-function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, job, uploadReady, onView, onCapture, onAlbum, onRetry }: {
+function deliveryPhotoActions(customer: Customer, job: DeliveryPhotoUploadProjection | undefined, uploadReady: boolean,
+  onCapture: (customer: Customer) => void, onAlbum: (customer: Customer) => void, onRetry: (jobId: string) => void) {
+  const active = !uploadReady || isActiveDeliveryPhotoUpload(job);
+  return job?.status === "failed" && job.errorCategory === "retryable"
+    ? <button type="button" onClick={() => onRetry(job.jobId)}>다시 시도</button>
+    : <><button type="button" className={styles.cam} aria-label={`${customer.name} 카메라 촬영`} disabled={active} onClick={() => onCapture(customer)}>📷</button>
+      <button type="button" className={styles.cam} aria-label={`${customer.name} 앨범 선택`} disabled={active} onClick={() => onAlbum(customer)}>앨범</button></>;
+}
+
+export function DeliveryPhotoRow({ customer, count = 0, latestAt, first = false, job, uploadReady, onView, onCapture, onAlbum, onRetry }: {
   customer: Customer; count?: number | undefined; latestAt?: string | undefined; first?: boolean; job?: DeliveryPhotoUploadProjection | undefined;
   uploadReady: boolean; onView?: ((customer: Customer) => void) | undefined; onCapture: (customer: Customer) => void; onAlbum: (customer: Customer) => void; onRetry: (jobId: string) => void;
 }) {
-  const area = customer.administrativeDong || customer.district || "";
-  const time = latestAt ? new Date(latestAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
-  const active = !uploadReady || isActiveDeliveryPhotoUpload(job);
-  const status = job && job.status !== "completed" ? deliveryPhotoUploadStatusText(job) : "";
+  const password = customer.accessPasswordState === "registered" && customer.accessPassword;
+  const customerSecondary = password ? `${customer.administrativeDong}${customer.administrativeDong ? " · " : ""}출입비번 ${password}` : customer.administrativeDong;
+  const time = latestAt ? new Date(Date.parse(latestAt) + 9 * 60 * 60 * 1_000).toISOString().slice(11, 16) : "";
+  const status = job && job.status !== "completed" && deliveryPhotoUploadStatusText(job);
+  const photoSummary = count && `사진 ${count}장${time ? ` · 마지막 등록 ${time}` : ""}`;
+  const detail = status || photoSummary;
+  const rowInformation = <><strong>{customer.name}</strong>
+    {customerSecondary ? <small>{customerSecondary}</small> : null}
+    {detail ? <small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{detail}</small> : null}</>;
   return <li className={`${styles.row} ${first ? styles.first : ""}`}>
-    <span className={styles.rowText}><strong>{customer.name}</strong><small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{status || (count > 0 ? `사진 ${count}장${time ? ` · 마지막 등록 ${time}` : ""}` : area || "오늘 납품처")}</small></span>
-    {count > 0 && onView ? <button type="button" onClick={() => onView(customer)} aria-label={`${customer.name} 납품사진 ${count}장 보기`}>사진 보기</button> : null}
-    {job?.status === "failed" && job.errorCategory === "retryable" ? <button type="button" onClick={() => onRetry(job.jobId)}>다시 시도</button> : <>
-      <button type="button" className={styles.camera} aria-label={`${customer.name} 카메라 촬영`} disabled={active} onClick={() => onCapture(customer)}>📷</button>
-      <button type="button" className={styles.camera} aria-label={`${customer.name} 앨범 선택`} disabled={active} onClick={() => onAlbum(customer)}>앨범</button>
-    </>}
+    {onView ? <button type="button" className={styles.rowText} onClick={() => onView(customer)}
+      aria-label={`${customer.name} 납품사진 보기, ${photoSummary}`}>{rowInformation}</button> : <span className={styles.rowText}>{rowInformation}</span>}
+    {deliveryPhotoActions(customer, job, uploadReady, onCapture, onAlbum, onRetry)}
   </li>;
 }
 
@@ -44,15 +55,11 @@ function DeliveryPhotoSearchRow({ customer, count = 0, inToday, job, uploadReady
   customer: Customer; count?: number | undefined; inToday: boolean; job?: DeliveryPhotoUploadProjection | undefined;
   uploadReady: boolean; onAdd: (customerId: string) => void; onCapture: (customer: Customer) => void; onAlbum: (customer: Customer) => void; onRetry: (jobId: string) => void;
 }) {
-  const active = !uploadReady || isActiveDeliveryPhotoUpload(job);
-  const status = job && job.status !== "completed" ? deliveryPhotoUploadStatusText(job) : "";
+  const status = job && job.status !== "completed" && deliveryPhotoUploadStatusText(job);
   return <li className={styles.searchRow}><span><strong>{customer.name}</strong><small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{status
     || (count ? `사진 ${count}장 · 기록완료` : customer.administrativeDong || customer.district || "거래처")}</small></span>
     {inToday ? <span className={styles.inToday}>오늘 목록</span> : <button type="button" onClick={() => onAdd(customer.customerId)}>오늘 추가</button>}
-    {job?.status === "failed" && job.errorCategory === "retryable" ? <button type="button" onClick={() => onRetry(job.jobId)}>다시 시도</button> : <>
-      <button type="button" aria-label={`${customer.name} 카메라 촬영`} disabled={active} onClick={() => onCapture(customer)}>📷</button>
-      <button type="button" aria-label={`${customer.name} 앨범 선택`} disabled={active} onClick={() => onAlbum(customer)}>앨범</button>
-    </>}
+    {deliveryPhotoActions(customer, job, uploadReady, onCapture, onAlbum, onRetry)}
   </li>;
 }
 
@@ -76,8 +83,8 @@ export function DeliveryPhotoWorkspace({ session }: { session: AuthenticatedSess
   const todayIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(routeIds,
     data.snapshot?.day.isOverride ? data.snapshot.day.customerIds : null, knownIds), [routeIds, data.snapshot?.day, knownIds]);
   const summaries = useMemo(() => new Map(data.snapshot?.today.customers.map((item) => [item.customerId, item]) ?? []), [data.snapshot?.today.customers]);
-  const counts = useMemo(() => new Map([...summaries].map(([id, summary]) => [id, summary.count])), [summaries]);
-  const completion = useMemo(() => projectDeliveryPhotoCompletion(todayIds, counts), [todayIds, counts]);
+  const completion = useMemo(() => projectDeliveryPhotoCompletion(todayIds,
+    new Map([...summaries].map(([id, summary]) => [id, summary.count]))), [todayIds, summaries]);
   const searchResults = useMemo(() => query.trim() ? searchCustomers(activeCustomers, query).slice(0, 20) : [], [activeCustomers, query]);
   const ready = Boolean(data.snapshot && catalog.status === "ready");
   const capture = useCallback((customer: Customer) => { inputs.current?.openCamera(customer.customerId); }, []);

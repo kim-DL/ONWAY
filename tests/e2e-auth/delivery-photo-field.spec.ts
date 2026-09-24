@@ -12,7 +12,7 @@ const project = "demo-onnuriway";
 const customerPath = "companies/onnuri/customers";
 const routePath = "companies/onnuri/deliveryPhotoRoutes/EMP-DELIVERY";
 const photoPath = "companies/onnuri/deliveryPhotos/fed0b3f0-5b10-41d1-9bc3-e67d304fd283";
-const names = ["한빛유통", "대전식품", "푸른상회", "새봄마트",
+const names = ["한빛유통", "대전식품", "푸른상회 아주 긴 거래처 이름 현장 확인용", "새봄마트",
   ...Array.from({ length: 16 }, (_, index) => `테스트거래처${index + 1}`)];
 const ids = names.map((_, index) => `DP-FIELD-${String(index + 1).padStart(2, "0")}`);
 const appName = "delivery-photo-field-e2e";
@@ -30,11 +30,12 @@ test.beforeAll(async () => {
   const batch = db().batch();
   for (const [index, id] of ids.entries()) {
     const name = names[index]!;
+    const registeredPassword = index === 0 ? "00123*" : index === 1 ? "012345678901234567890123456789" : index === 3 ? "7788#" : "";
     const customer = customerSchema.parse({
       customerId: id, companyId: "onnuri", name, normalizedName: normalizeCustomerName(name),
-      choseongName: getCustomerChoseong(name), district: "서구", administrativeDong: "탄방동",
+      choseongName: getCustomerChoseong(name), district: "서구", administrativeDong: index === 3 || index === 4 ? "" : "탄방동",
       officialAddress: "", deliveryAddress: "", deliveryPoint: null,
-      accessPassword: "", accessPasswordState: "none", deliveryLocationDescription: "",
+      accessPassword: registeredPassword, accessPasswordState: registeredPassword ? "registered" : index === 4 ? "unknown" : "none", deliveryLocationDescription: "",
       contacts: [], status: "active", noticeType: "none", changeNote: "", revision: 1,
       createdAt: "2026-09-06T00:00:00.000Z", updatedAt: "2026-09-06T00:00:00.000Z",
       createdBy: "EMP-ADMIN", updatedBy: "EMP-ADMIN",
@@ -143,7 +144,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     await expect(page.getByText("업로드 중", { exact: true })).toBeVisible();
     await search.fill("새봄"); await expect(page.getByText("새봄마트")).toBeVisible(); await search.fill("");
 
-    await chooseRowPhoto(page, "푸른상회", "앨범 선택", regular, "album.jpg");
+    await chooseRowPhoto(page, names[2]!, "앨범 선택", regular, "album.jpg");
     await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
     releaseFirst();
     await expect(page.getByText("남음 0곳 · 기록완료 3곳")).toBeVisible({ timeout: 30_000 });
@@ -220,8 +221,24 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", portrait, "history-3.jpg");
     await expect(page.locator("details").getByText("사진 3장", { exact: false })).toBeVisible({ timeout: 30_000 });
 
-    const openHistory = page.getByRole("button", { name: "대전식품 납품사진 3장 보기" });
-    await openHistory.click();
+    const openHistory = page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 3장 · 마지막 등록 /u });
+    await expect(openHistory).toContainText("012345678901234567890123456789");
+    await expect(openHistory).toContainText(/사진 3장 · 마지막 등록/u);
+    for (const source of ["카메라 촬영", "앨범 선택"] as const) {
+      const chooser = page.waitForEvent("filechooser");
+      await page.getByRole("button", { name: `대전식품 ${source}` }).click();
+      await chooser;
+      await page.getByLabel(`납품사진 ${source}`).dispatchEvent("cancel");
+      await expect(page.getByRole("dialog", { name: "대전식품 납품사진", exact: true })).toHaveCount(0);
+    }
+    await openHistory.focus();
+    await page.keyboard.press("Space");
+    const keyboardHistory = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
+    await expect(keyboardHistory.getByText("최근 기록 3장")).toBeVisible({ timeout: 30_000 });
+    await keyboardHistory.getByRole("button", { name: "닫기", exact: true }).click();
+    await expect(openHistory).toBeFocused();
+    listInputs.length = 0; getInputs.length = 0; listResults.length = 0;
+    await page.keyboard.press("Enter");
     const history = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
     await expect(history.getByText("최근 기록 3장")).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => listInputs.length).toBe(1);
@@ -361,9 +378,11 @@ test("field route, completion, search, today override and reorder survive re-ent
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
   const remaining = page.getByRole("region", { name: "오늘 남은 납품처" });
   await expect(remaining.getByText("대전식품")).toBeVisible();
+  await expect(remaining.getByText("탄방동 · 출입비번 012345678901234567890123456789")).toBeVisible();
   await expect(remaining.getByText("한빛유통")).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("delivery-photo-360.png"), fullPage: true });
   await page.locator("details").getByText("기록완료 1곳").click();
+  await expect(page.locator("details").getByText("탄방동 · 출입비번 00123*")).toBeVisible();
   await expect(page.locator("details").getByText("사진 1장")).toBeVisible();
   await expect(page.locator("details").getByText(/마지막 등록/)).toBeVisible();
   const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
@@ -454,7 +473,7 @@ test("revision conflict refreshes server state without overwriting the draft", a
   await page.getByRole("button", { name: "내 납품처 편집" }).click();
   const editor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await editor.getByRole("searchbox", { name: "거래처 검색" }).fill("푸른상회");
-  await editor.getByRole("button", { name: "푸른상회 내 납품처에 추가" }).click();
+  await editor.getByRole("button", { name: `${names[2]} 내 납품처에 추가` }).click();
   await db().doc(routePath).update({ customerIds: ids.slice(0, 2), revision: 2, updatedAt: Timestamp.now() });
   await editor.getByRole("button", { name: "저장", exact: true }).click();
   await expect(editor.getByText("다른 기기에서 목록이 바뀌었습니다.", { exact: false })).toBeVisible();
