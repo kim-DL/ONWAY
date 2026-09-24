@@ -13,7 +13,7 @@ import {
 } from "react";
 import type { Serwist as WindowSerwist } from "@serwist/window";
 
-import { Icon } from "@/components/ui/icon";
+import { InitialStatusIcon } from "@/components/ui/initial-status-icon";
 import {
   probeNetworkReachability,
   subscribeToNetworkRecovery,
@@ -190,7 +190,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     <PwaContext.Provider value={value}>
       {updateReady ? (
         <aside className="pwa-update" role="status" aria-live="polite" data-testid="pwa-update-ready">
-          <span className="pwa-update__icon"><Icon name="refresh" size={20} /></span>
+          <span className="pwa-update__icon"><InitialStatusIcon name="refresh" size={20} /></span>
           <span><strong>새 버전이 준비되었습니다.</strong><small>입력 중인 내용은 자동으로 새로고침되지 않습니다.</small></span>
           <div>
             <button type="button" className="pwa-update__later" disabled={applyingUpdate} onClick={() => setUpdateReady(false)}>나중에</button>
@@ -201,7 +201,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       {children}
       {!isOnline ? (
         <div className="pwa-connectivity" role="status" data-testid="pwa-offline-status">
-          <Icon name="wifi-off" size={18} />
+          <InitialStatusIcon name="wifi-off" size={18} />
           <span><strong>오프라인</strong> · 저장된 정보를 표시하고 있습니다.</span>
         </div>
       ) : null}
