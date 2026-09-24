@@ -9,7 +9,7 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- 현재 source/application HEAD는 branch `codex/mobile-action-reach`의 `7ad3ab89c7e020fbfabcd7d144f8d6fec4ef511d`다. 납품사진 Phase 3A/3B/3C와 Galaxy 실사용 기반 카드 UX 수정까지 checkpoint/push됐고, 아래 2026-09-24 Hosting release가 현재 production frontend다. 이번 documentation-only checkpoint는 제품 코드를 바꾸지 않는다.
+- 마지막 제품 코드 commit은 branch `codex/mobile-action-reach`의 `7ad3ab89c7e020fbfabcd7d144f8d6fec4ef511d`다. 납품사진 Phase 3A/3B/3C와 Galaxy 실사용 기반 카드 UX 수정까지 checkpoint/push됐고, 아래 2026-09-24 Hosting release가 현재 production frontend다. 이후 Git HEAD에는 documentation-only checkpoint가 포함될 수 있으며 제품 코드는 바뀌지 않았다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
@@ -21,7 +21,7 @@
 ### 미확인 또는 다시 확인할 사실
 
 - 8명 동시 사용 환경의 실제 read 비용과 현장망 T2/T3는 아직 계측하지 않았다. 이는 이번 inventory mobile UI release의 배포·사용성 확인과는 별도의 운영 계측 항목이다.
-- 납품사진 network 장애/retry는 구현·Emulator 검증 범위는 있으나 production fault injection 결과가 명확히 기록돼 있지 않다. delete UI, Web Share, GPS nearby suggestion도 아직 구현하지 않았으며 실제 업무 필요성에 따라 별도 Phase로 판단한다.
+- 납품사진 network 장애/retry는 구현·Emulator 검증 범위는 있으나 production fault injection 결과가 명확히 기록돼 있지 않다. delete UI, Web Share, GPS nearby suggestion은 아직 구현하지 않았다. delete UI가 다음 작업 우선순위이며 Web Share/GPS는 이후 업무 필요성을 확인해 판단한다.
 
 ### 2026-09-23 납품사진 Phase 2A/2B production backend — 완료 당시 기록
 
@@ -44,7 +44,15 @@
 - **Production frontend:** `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` candidate를 Hosting site `onnuriway`에만 배포했다. live release `1790211742342000`, version `e603258b088093f0`, time `2026-09-24 10:02:22.342 KST`, `/sw.js` SHA-256 `20520cc6aaa7d8b1ca5ee67522e41b9dc4f691429e8b940b7c154ecb52d5291d`다. 두 production origin verifier와 candidate/live worker 및 precache asset 대조가 PASS했다.
 - **Bundle ceiling:** Workspace JS는 10,239B gzip / 10,240B로 headroom이 1B뿐이다. Workspace CSS는 6,066B raw / 1,584B gzip, History JS는 3,459B gzip, Viewer JS는 2,811B gzip, Initial JS는 141,040B gzip이다. 앞으로 delivery-photo workspace에 코드를 직접 늘리지 말고 가능한 기능을 event-loaded/lazy chunk로 분리하며 budget 완화보다 split을 우선한다.
 - **최종 검증:** app/Functions typecheck, backend contract/Functions 54 tests, frontend 12 files/50 tests, Demo Emulator Chromium 6/6, lint, production build, PWA/performance/Hosting gate, `git diff --check`, 320/360/200% overflow 0, 접근성, production Galaxy 실기기가 PASS했다.
-- **후속 후보:** delete UI, Web Share, GPS nearby suggestion은 완료로 기록하지 않는다. network 장애/retry도 production fault injection 완료로 과장하지 않으며 현재 구현과 Emulator 검증 상태만 인정한다.
+- **후속 범위:** delete UI, Web Share, GPS nearby suggestion은 완료로 기록하지 않는다. network 장애/retry도 production fault injection 완료로 과장하지 않으며 현재 구현과 Emulator 검증 상태만 인정한다.
+
+### 납품사진 다음 작업 순서와 repository 정리 경계
+
+1. Delivery-photo delete UI를 완성한다. 기존 private Callable·권한·request ID·감사 경계를 유지하고, 10,239B/10,240B인 workspace JS에 기능을 직접 늘리기보다 event-loaded/lazy chunk 분리를 우선한다.
+2. Galaxy S20+ production 실기기에서 delete UI의 최종 동작을 확인한다. 이 문서 시점에는 구현·실기기 결과가 없다.
+3. 납품사진 기능을 freeze한다. Web Share와 GPS nearby suggestion은 실제 업무 필요성을 확인한 뒤 별도 Phase로 판단한다.
+4. Repository cleanup/optimization에 앞서 다음 스레드에서 **OPT-0 READ-ONLY AUDIT**를 수행한다. 파일과 테스트를 `KEEP`, `CONSOLIDATE`, `DELETE CANDIDATE`, `GENERATED / SAFE TO CLEAN`으로 분류하고 근거와 영향을 기록한 뒤 실제 삭제 범위를 결정한다. OPT-0에서는 삭제·수정하지 않는다.
+5. 감사 결과를 검토한 후에만 실제 cleanup/optimization을 진행한다. security, Rules, Auth, revision, request ID, upload replay, PWA, performance, Hosting regression test는 안전망이므로 단순히 테스트 파일이라는 이유로 삭제하지 않는다.
 
 ## 2. 확정 요구사항과 현재 코드 대조
 
