@@ -47,6 +47,22 @@ async function chooseMode(page: Page, mode: string) {
   }
   await expect(page.locator("main.workspace-shell")).toHaveAttribute("data-mode", mode);
 }
+async function waitForAuthenticatedBoundary(page: Page) {
+  const modeUi = page.getByRole("button", { name: /^업무 모드 변경, 현재 / })
+    .or(page.getByRole("group", { name: "업무 모드" }));
+  const authenticatedShellFallback = page.getByRole("status")
+    .filter({ hasText: "저장된 업무 화면을 여는 중이에요." });
+  const authFailure = page.locator("#pin-error").filter({ hasText: /\S/ });
+
+  // The emulator's first callable can take 4–5 seconds. Wait for AuthGate to
+  // leave PIN/resolving state before starting the unchanged 5-second mode UI
+  // assertion. A failure alert ends readiness immediately with its message.
+  await expect(modeUi.or(authenticatedShellFallback).or(authFailure))
+    .toBeVisible({ timeout: 10_000 });
+  if (await authFailure.isVisible()) {
+    throw new Error(`Employee authentication failed: ${(await authFailure.innerText()).trim()}`);
+  }
+}
 function expiryAfter(days: number) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   return new Date(Date.parse(`${today}T00:00:00.000Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -57,6 +73,7 @@ async function login(page: Page, pin: string) {
   await page.getByLabel("직원 PIN").fill(pin);
   const contextResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/getInventoryContext"));
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await waitForAuthenticatedBoundary(page);
   await chooseMode(page, "inventory");
   await expect(page.getByRole("navigation").getByRole("button", { name: "실사", exact: true })).toHaveCount(0);
   const response = await contextResponse;
