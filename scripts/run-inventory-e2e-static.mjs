@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 export function assertStaticInventoryEnvironment(environment) {
   assert.equal(environment.INVENTORY_E2E, "true");
@@ -49,29 +49,45 @@ function productionArtifacts(root) {
   return result;
 }
 
+export function removeStaticInventoryApp(root, runtime, appRoot) {
+  const expectedRuntime = resolve(root, "output/playwright/inventory-runtime");
+  const target = resolve(appRoot);
+  assert.equal(resolve(runtime), expectedRuntime);
+  assert.equal(dirname(target), expectedRuntime, "Only a direct child of the inventory runtime may be removed.");
+  assert.match(basename(target), /^static-app-[A-Za-z0-9_-]+$/);
+  for (const path of [resolve(root), resolve(root, "output"), resolve(root, "output/playwright"), expectedRuntime, target]) {
+    const stat = lstatSync(path);
+    assert.ok(stat.isDirectory() && !stat.isSymbolicLink(), `Unsafe inventory temp path: ${path}`);
+  }
+  files(target); // Refuse nested links or junctions before recursive removal.
+  rmSync(target, { recursive: true });
+}
+
 export function prepareStaticInventoryApp(root, runtime, environment) {
   assertStaticInventoryEnvironment(environment);
   const expectedRuntime = resolve(root, "output/playwright/inventory-runtime");
   assert.equal(resolve(runtime), expectedRuntime);
   const before = productionArtifacts(root);
-  const appRoot = mkdtempSync(join(expectedRuntime, "static-app-"));
-  assert.ok(appRoot.startsWith(`${expectedRuntime}${sep}static-app-`));
-  // Explicit source allowlist: no .env, .firebase, .vercel, existing build or
-  // credential files are copied. Next and Serwist retain their original config.
-  for (const name of ["src", "public", "functions/src"]) {
-    cpSync(join(root, name), join(appRoot, name), { recursive: true,
-      filter: (path) => !/^sw\.js(?:\.map)?$|^swe-worker-/.test(basename(path)) });
-  }
-  for (const name of ["next.config.ts", "postcss.config.mjs", "package.json", "firebase.json"]) cpSync(join(root, name), join(appRoot, name));
-  const tsconfig = JSON.parse(readFileSync(join(root, "tsconfig.json"), "utf8"));
-  writeFileSync(join(appRoot, "tsconfig.json"), JSON.stringify({ ...tsconfig,
-    include: ["next-env.d.ts", ".next/types/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
-    exclude: ["node_modules", "functions", "public/sw.js", "src/**/*.test.ts", "src/**/*.test.tsx"],
-  }, null, 2));
-  mkdirSync(join(appRoot, "scripts"));
-  cpSync(join(root, "scripts/serve-hosting-local.mjs"), join(appRoot, "scripts/serve-hosting-local.mjs"));
-  const buildEnvironment = { ...environment, NODE_ENV: "production" };
+  let appRoot;
+  let failure;
   try {
+    appRoot = mkdtempSync(join(expectedRuntime, "static-app-"));
+    assert.ok(appRoot.startsWith(`${expectedRuntime}${sep}static-app-`));
+    // Explicit source allowlist: no .env, .firebase, .vercel, existing build or
+    // credential files are copied. Next and Serwist retain their original config.
+    for (const name of ["src", "public", "functions/src"]) {
+      cpSync(join(root, name), join(appRoot, name), { recursive: true,
+        filter: (path) => !/^sw\.js(?:\.map)?$|^swe-worker-/.test(basename(path)) });
+    }
+    for (const name of ["next.config.ts", "postcss.config.mjs", "package.json", "firebase.json"]) cpSync(join(root, name), join(appRoot, name));
+    const tsconfig = JSON.parse(readFileSync(join(root, "tsconfig.json"), "utf8"));
+    writeFileSync(join(appRoot, "tsconfig.json"), JSON.stringify({ ...tsconfig,
+      include: ["next-env.d.ts", ".next/types/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
+      exclude: ["node_modules", "functions", "public/sw.js", "src/**/*.test.ts", "src/**/*.test.tsx"],
+    }, null, 2));
+    mkdirSync(join(appRoot, "scripts"));
+    cpSync(join(root, "scripts/serve-hosting-local.mjs"), join(appRoot, "scripts/serve-hosting-local.mjs"));
+    const buildEnvironment = { ...environment, NODE_ENV: "production" };
     const result = spawnSync(process.execPath, [join(root, "node_modules/next/dist/bin/next"), "build", "--webpack"], {
       cwd: appRoot, env: buildEnvironment, stdio: "inherit", windowsHide: true,
     });
@@ -90,7 +106,20 @@ export function prepareStaticInventoryApp(root, runtime, environment) {
       serviceWorkerHash: createHash("sha256").update(readFileSync(join(output, "sw.js"))).digest("hex"),
     }, null, 2));
     return appRoot;
+  } catch (error) {
+    failure = error;
+    throw error;
   } finally {
-    assert.deepEqual(productionArtifacts(root), before, "The isolated test changed original production artifacts.");
+    try {
+      assert.deepEqual(productionArtifacts(root), before, "The isolated test changed original production artifacts.");
+    } catch (error) {
+      if (failure) console.error("Inventory production artifact verification also failed:", error);
+      else failure = error;
+    }
+    if (failure && appRoot) {
+      try { removeStaticInventoryApp(root, runtime, appRoot); }
+      catch (error) { console.error("Inventory static app cleanup also failed:", error); }
+    }
+    if (failure) throw failure;
   }
 }

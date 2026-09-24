@@ -3,7 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { delimiter, dirname, join } from "node:path";
 import { createServer } from "node:net";
 import { build } from "esbuild";
-import { prepareStaticInventoryApp } from "./run-inventory-e2e-static.mjs";
+import { prepareStaticInventoryApp, removeStaticInventoryApp } from "./run-inventory-e2e-static.mjs";
 
 // Dedicated emulator-only launcher. Never deploys, exports, imports, or reuses
 // a running emulator; all generated configuration lives under test artifacts.
@@ -46,32 +46,49 @@ function run(args, cwd = root) {
   if (result.status !== 0) throw new Error(`Inventory E2E helper exited ${result.status ?? 1}.`);
 }
 mkdirSync(runtime, { recursive: true });
-if (process.env.INVENTORY_E2E_STATIC === "true") {
-  environment.INVENTORY_E2E_STATIC = "true";
-  environment.INVENTORY_E2E_STATIC_APP = prepareStaticInventoryApp(root, runtime, environment);
+let appRoot;
+let failure;
+try {
+  if (process.env.INVENTORY_E2E_STATIC === "true") {
+    environment.INVENTORY_E2E_STATIC = "true";
+    appRoot = prepareStaticInventoryApp(root, runtime, environment);
+    environment.INVENTORY_E2E_STATIC_APP = appRoot;
+    if (process.env.INVENTORY_E2E_TEST_FAIL_CHILD === "true") run(["--eval", "process.exit(23)"]);
+  }
+  const functionsRoot = join(runtime, "functions");
+  mkdirSync(functionsRoot, { recursive: true });
+  run([join(root, "node_modules", "typescript", "bin", "tsc"), "--outDir", join(functionsRoot, "lib")], join(root, "functions"));
+  const manifest = JSON.parse(readFileSync(join(root, "functions", "package.json"), "utf8"));
+  writeFileSync(join(functionsRoot, "package.json"), JSON.stringify({ ...manifest, main: "lib/inventory-e2e-index.js" }, null, 2));
+  // Export real production callables, not mock implementations. Do not load
+  // scheduled/external NEIS/Kakao jobs or production functions/.env files.
+  writeFileSync(join(functionsRoot, "lib", "inventory-e2e-index.js"), [
+    'export { employeeLogin, employeeLogout } from "./auth/callables.js";',
+    'export { activateAdminSession } from "./admin/callables.js";',
+    'export { getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct, recordInventoryMovement, recordInventoryCount, updateInventoryLot, setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings, listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer, uploadInventoryPhoto, getInventoryPhoto } from "./inventory/callables.js";',
+  ].join("\n"));
+  writeFileSync(join(functionsRoot, ".secret.local"), `PIN_LOOKUP_SECRET=${environment.PIN_LOOKUP_SECRET}\nPIN_PEPPER=${environment.PIN_PEPPER}\n`);
+  for (const name of ["firestore.rules", "firestore.indexes.json", "storage.rules"]) cpSync(join(root, name), join(runtime, name));
+  const configuration = { functions: { source: "functions", runtime: "nodejs22" },
+    firestore: { rules: "firestore.rules", indexes: "firestore.indexes.json" }, storage: { rules: "storage.rules" },
+    emulators: { auth: { host: "127.0.0.1", port: 9099 }, functions: { host: "127.0.0.1", port: 5001 }, firestore: { host: "127.0.0.1", port: 8080 }, storage: { host: "127.0.0.1", port: 9199 }, ui: { enabled: false }, singleProjectMode: true } };
+  const configurationPath = join(runtime, "firebase.json");
+  writeFileSync(configurationPath, JSON.stringify(configuration, null, 2));
+  const runner = join(runtime, "runner.mjs");
+  await build({ absWorkingDir: root, tsconfig: "tsconfig.json", entryPoints: ["scripts/run-inventory-e2e.ts"], outfile: runner, bundle: true, platform: "node", format: "esm", packages: "external", logLevel: "warning" });
+  const firebaseCli = join(root, "node_modules", "firebase-tools", "lib", "bin", "firebase.js");
+  if (!existsSync(firebaseCli)) throw new Error("Install repository dependencies before running inventory E2E.");
+  run([firebaseCli, "emulators:exec", "--only", "auth,firestore,functions,storage", "--project", projectId,
+    "--config", configurationPath, `"${process.execPath}" "${runner}"`]);
+} catch (error) {
+  failure = error;
+  throw error;
+} finally {
+  if (appRoot) {
+    try { removeStaticInventoryApp(root, runtime, appRoot); }
+    catch (error) {
+      if (failure) console.error("Inventory static app cleanup also failed:", error);
+      else throw error;
+    }
+  }
 }
-const functionsRoot = join(runtime, "functions");
-mkdirSync(functionsRoot, { recursive: true });
-run([join(root, "node_modules", "typescript", "bin", "tsc"), "--outDir", join(functionsRoot, "lib")], join(root, "functions"));
-const manifest = JSON.parse(readFileSync(join(root, "functions", "package.json"), "utf8"));
-writeFileSync(join(functionsRoot, "package.json"), JSON.stringify({ ...manifest, main: "lib/inventory-e2e-index.js" }, null, 2));
-// Export real production callables, not mock implementations. Do not load
-// scheduled/external NEIS/Kakao jobs or production functions/.env files.
-writeFileSync(join(functionsRoot, "lib", "inventory-e2e-index.js"), [
-  'export { employeeLogin, employeeLogout } from "./auth/callables.js";',
-  'export { activateAdminSession } from "./admin/callables.js";',
-  'export { getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct, recordInventoryMovement, recordInventoryCount, updateInventoryLot, setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings, listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer, uploadInventoryPhoto, getInventoryPhoto } from "./inventory/callables.js";',
-].join("\n"));
-writeFileSync(join(functionsRoot, ".secret.local"), `PIN_LOOKUP_SECRET=${environment.PIN_LOOKUP_SECRET}\nPIN_PEPPER=${environment.PIN_PEPPER}\n`);
-for (const name of ["firestore.rules", "firestore.indexes.json", "storage.rules"]) cpSync(join(root, name), join(runtime, name));
-const configuration = { functions: { source: "functions", runtime: "nodejs22" },
-  firestore: { rules: "firestore.rules", indexes: "firestore.indexes.json" }, storage: { rules: "storage.rules" },
-  emulators: { auth: { host: "127.0.0.1", port: 9099 }, functions: { host: "127.0.0.1", port: 5001 }, firestore: { host: "127.0.0.1", port: 8080 }, storage: { host: "127.0.0.1", port: 9199 }, ui: { enabled: false }, singleProjectMode: true } };
-const configurationPath = join(runtime, "firebase.json");
-writeFileSync(configurationPath, JSON.stringify(configuration, null, 2));
-const runner = join(runtime, "runner.mjs");
-await build({ absWorkingDir: root, tsconfig: "tsconfig.json", entryPoints: ["scripts/run-inventory-e2e.ts"], outfile: runner, bundle: true, platform: "node", format: "esm", packages: "external", logLevel: "warning" });
-const firebaseCli = join(root, "node_modules", "firebase-tools", "lib", "bin", "firebase.js");
-if (!existsSync(firebaseCli)) throw new Error("Install repository dependencies before running inventory E2E.");
-run([firebaseCli, "emulators:exec", "--only", "auth,firestore,functions,storage", "--project", projectId,
-  "--config", configurationPath, `"${process.execPath}" "${runner}"`]);
