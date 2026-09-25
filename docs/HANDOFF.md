@@ -15,7 +15,7 @@
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 거래처, 학교납품, 영업/홍보, 재고에 더해 납품사진 field workspace가 production feature flag로 활성화돼 있다.
-- 현재 Firebase Hosting live release는 `1790217833155000`, version은 `79b66cdeae0b2036`, 배포 시각은 `2026-09-24 11:43:53.155 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `ebd4c57444b5437ba3f2fe4947a7b54d694ad02e7d56a22718f93fa5694d1a51`다. `https://onnuriway.com`과 `https://onnuriway.web.app`에서 candidate/live worker와 83개 precache asset이 일치했다. 직전 rollback target은 version `e603258b088093f0`다.
+- 현재 Firebase Hosting live release는 `1790297267844000`, version은 `a85d184f5184fcec`, 배포 시각은 `2026-09-25 09:47:47.844 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `095e171afb361969b91684702f94ef99c08aaa94208683d1eca16c377dcc9845`다. 직전 rollback 지점은 release `1790217833155000`, version `79b66cdeae0b2036`이다.
 - 납품사진 core feature는 Phase 3D production 배포와 Galaxy S20+ 실사용 확인을 마쳐 **FEATURE FREEZE** 상태다. 다음 작업은 신규 기능 개발이 아니라 repository cleanup/optimization의 OPT-0 read-only audit다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
@@ -26,6 +26,15 @@
 - 수정 후 canonical acceptance 10/10 gate와 내부 emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 09:34:36 KST). OPT-4는 clean commit에서 처음부터 다시 실행해 app/Functions typecheck, lint, unit 1,581 PASS/14 SKIP, 검색 성능 5,000건 p95 1.11ms/50ms, Rules 50/50, 납품사진 backend emulator, production build, PWA/성능/Hosting verifier, safe-config browser 262/262, 재고 static browser 12/12·emulator 11/11, 납품사진 frontend 8/8, 마지막 canonical acceptance 10/10·내부 emulator 12/12를 모두 PASS했다. 마지막 acceptance의 full user journey gate는 469,990ms였다.
 - production build의 초기 JS gzip은 139,733B, customer 36,821B, inventory 25,029B, 납품사진 10,230/3,559/2,918/1,662B로 기존 ceiling 안이다. Hosting export/shipped 96개, precache 83개, 초기 asset 9개다. 재고 격리 E2E 전후 기존 production `out` 96개 파일 집합 SHA-256은 `539e34efc16def7a83e8ab2801e82771b5b09f1d9584b42755b5812aca40564d`로 동일했고 `static-app-*` 잔여는 0이다. 마지막 acceptance의 demo build 뒤 production `out`을 다시 생성해 성능/PWA/Hosting verifier를 재통과했다.
 - Emulator gate는 순차 실행했고 각 종료 후 공유 포트와 관련 프로세스가 0임을 확인했다. production deploy와 운영 Firebase/GCP mutation은 하지 않았다. audit에는 high 이상 0건, moderate 7건이 남아 있다. 로컬 구조 검증은 통과했지만 설치 PWA의 실제 업데이트·offline 복구, 운영 Kakao 경로와 현장망, 운영 환경의 새 candidate 배포 후 브라우저 확인은 이번 미배포 검증 범위 밖이다.
+
+### 2026-09-25 검증된 RC의 Firebase Hosting 승격 — 완료
+
+- 검증된 HEAD `21bf5bd7358490eb12ed246c3e80a4cfeef1caa6`의 clean tree에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`를 빌드 프로세스에만 지정해 정적 `out`을 생성했다. flag는 ignored production env 파일에 정의돼 있지 않아 명시적 지정이 필요했고, 이전 운영 Hosting build도 같은 방식이었다. 생성된 navigation bundle의 납품사진 기본값은 활성(`true`)이다. 제품 코드, flag 기본값, dependency, budget, Firebase 설정 파일은 변경하지 않았다.
+- production build·성능·PWA·Hosting verifier PASS. 정적 export/shipped 96개, precache 83개, 초기 asset 9개다. 배포 후보 `out`의 파일 집합 SHA-256은 `12dcbb7e4c1a035f86c1ed93d237e02a6233c3c68db8f8ea789d714251f3151e`이고 `/sw.js` SHA-256은 `095e171afb361969b91684702f94ef99c08aaa94208683d1eca16c377dcc9845`다.
+- 저장소의 canonical 명령 `npx firebase deploy --project onnuriway --only hosting`으로 site `onnuriway`의 Hosting만 배포했다. 새 live release `1790297267844000`, version `a85d184f5184fcec`, time `2026-09-25 09:47:47.844 KST`를 Hosting API로 확인했다. 직전 release `1790217833155000` / version `79b66cdeae0b2036`가 rollback 지점이며 그 이전 version은 `e603258b088093f0`이다. Functions, Rules, Auth, Firestore, Storage, IAM, Scheduler, Vercel은 변경하지 않았다.
+- `https://onnuriway.web.app`과 `https://onnuriway.com`에서 canonical Hosting verifier가 각각 PASS했다. 두 origin의 worker hash, manifest, connectivity, 초기 asset, cache/scope header, 비공개·존재하지 않는 경로의 404를 확인했고, 두 origin 각각 83개 precache 자원을 후보 파일과 byte 단위로 대조해 불일치 0건이었다.
+- 운영 브라우저에서 기본 URL의 비로그인 PIN 화면을 확인했다. 기존 관리자 세션이 있는 custom domain에서는 새 버전 알림의 `업데이트` 적용 뒤 로그인 유지, 운영 개요·거래처 관리·재고 관리의 읽기 전용 진입과 console error 0건을 확인했다. 운영 데이터 저장·수정·삭제나 사진 업로드는 수행하지 않았다.
+- Galaxy S20+ 자체를 Codex 환경에서 조작하지 못했다. 사람이 설치 PWA에서 업데이트 적용 뒤 로그인 유지, 직원 계정의 거래처 `납품사진` 메뉴·오늘 경로/기록·viewer/Back, 재고 진입을 최소 확인해야 한다. 이는 이번 desktop browser 및 byte-level 검증으로 대체하지 않는다. 운영 Kakao 지도 타일/길찾기와 현장망 체감도 이번 배포 smoke에서 미확인이다.
 
 ### 미확인 또는 다시 확인할 사실
 
