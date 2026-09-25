@@ -1,5 +1,5 @@
 .thumbnail,
-.preview { position: relative; display: grid; place-items: center; overflow: hidden; border: 1px solid #d8e6e2; border-radius: 10px; color: #377e70; background: #edf5f2; }
+.preview { position: relative; display: grid; place-items: center; overflow: hidden; border: 1px solid #d6e0f3; border-radius: 10px; color: #2c56b9; background: #f1f5ff; }
 .thumbnail { flex-shrink: 0; width: 52px; height: 56px; }
 .preview { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border-radius: 12px; background: #f1f4f5; }
 .thumbnail > img,
@@ -9,21 +9,21 @@
 .expandPhoto { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: flex-end; width: 100%; padding: 10px; border: 0; border-radius: inherit; background: transparent; color: #263b33; cursor: zoom-in; }
 .expandPhoto > span { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 8px 11px; border: 1px solid rgb(255 255 255 / 80%); border-radius: 9px; background: rgb(255 255 255 / 94%); font: inherit; font-size: .75rem; font-weight: 700; box-shadow: 0 2px 10px rgb(20 42 34 / 12%); transition: transform 160ms; }
 .expandPhoto:hover > span { transform: translateY(-2px); }
-.expandPhoto:focus-visible { outline: 3px solid #087f75; outline-offset: -4px; }
+.expandPhoto:focus-visible { outline: 3px solid #2c56b9; outline-offset: -4px; }
 .viewerStage { display: grid; align-items: center; height: min(55dvh, 520px); min-height: 180px; overflow: auto; overscroll-behavior: contain; border: 1px solid #2e4549; border-radius: 14px; background: #17292d; touch-action: pan-x pan-y pinch-zoom; }
 .viewerStage > img { display: block; width: 100%; height: 100%; min-height: 0; max-height: min(55dvh, 520px); object-fit: contain; }
 .viewerStage[data-zoomed="true"] { display: block; }
 .viewerStage[data-zoomed="true"] > img { width: 200%; height: auto; min-height: 100%; max-height: none; max-width: none; }
-.viewerStage:focus-visible { outline: 2px solid #087f75; outline-offset: 3px; }
+.viewerStage:focus-visible { outline: 2px solid #2c56b9; outline-offset: 3px; }
 .viewerHint { margin: 10px 0 0; color: #52636b; font-size: .75rem; line-height: 1.6; text-align: center; }
 .viewerActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.viewerActions > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 10px; border: 1px solid #cdded8; border-radius: 11px; background: #f3f8f6; color: #2c6655; font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; }
-.viewerActions > button:last-child { background: #fff; color: #475c54; }
-.viewerActions > button:focus-visible { outline: 2px solid #087f75; outline-offset: 2px; }
-.placeholder { display: grid; place-items: center; align-content: center; gap: 10px; width: 100%; height: 100%; min-width: 0; color: #377e70; }
+.viewerActions > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 10px; border: 1px solid #cbd6e9; border-radius: 10px; background: #fff; box-shadow: 0 2px 0 #d5dfef; color: #263c68; font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; }
+.viewerActions > button:last-child { color: #475c67; }
+.viewerActions > button:focus-visible { outline: 2px solid #2c56b9; outline-offset: 2px; }
+.placeholder { display: grid; place-items: center; align-content: center; gap: 10px; width: 100%; height: 100%; min-width: 0; color: #2c56b9; }
 .placeholder > span { padding-inline: 12px; color: #52636b; font-size: .8125rem; text-align: center; line-height: 1.5; }
-.placeholder > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid #b9ccc7; border-radius: 9px; background: #fff; color: #276b5e; font: inherit; font-size: .8125rem; font-weight: 650; cursor: pointer; }
-.placeholder > button:focus-visible { outline: 2px solid #087f75; outline-offset: 2px; }
+.placeholder > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid #cbd6e9; border-radius: 9px; background: #fff; color: #263c68; font: inherit; font-size: .8125rem; font-weight: 650; cursor: pointer; }
+.placeholder > button:focus-visible { outline: 2px solid #2c56b9; outline-offset: 2px; }
 .thumbnail[data-customer-photo="loading"] > .placeholder { background: linear-gradient(100deg, #edf5f2 30%, #f9fcfb 50%, #edf5f2 70%); background-size: 200% 100%; }
 @media (prefers-reduced-motion: no-preference) { .thumbnail[data-customer-photo="loading"] > .placeholder { animation: customer-photo-shimmer 1.6s ease-in-out infinite; } }
 @media (prefers-reduced-motion: reduce) { .expandPhoto > span { transition: none; } }

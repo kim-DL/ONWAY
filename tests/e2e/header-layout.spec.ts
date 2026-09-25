@@ -341,7 +341,7 @@ for (const state of ["triple", "triple-detail"] as const) {
       expect(geometry.controlsRight).toBeLessThanOrEqual(width);
       await expect(group.locator(`[data-mode="${mode}"]`)).toHaveAttribute("aria-pressed", "true");
       const selected = selectedModeControl(page, mode);
-      const colors = { customer: ["rgb(36, 118, 71)", "rgb(38, 150, 83)"], delivery: ["rgb(27, 100, 218)", "rgb(49, 130, 246)"], sales: ["rgb(250, 111, 66)", "rgb(250, 170, 157)"] } as const;
+      const colors = { customer: ["rgb(39, 74, 148)", "rgb(56, 104, 206)"], delivery: ["rgb(27, 100, 218)", "rgb(49, 130, 246)"], sales: ["rgb(250, 111, 66)", "rgb(250, 170, 157)"] } as const;
       await expect(selected).toHaveCSS("color", colors[mode][0]);
       expect(await selected.evaluate(element => getComputedStyle(element).boxShadow)).toContain(colors[mode][1]);
       for (const button of await visibleModeFrame(page).getByRole("button").all()) {
@@ -434,7 +434,7 @@ test("header orbit supports an indefinite user pause, reduced motion, and forced
   expect(await pseudo()).toMatchObject({ display: "none", name: "none" });
   const selected = selectedModeControl(page, "sales");
   await expect(selected).toHaveCSS("box-shadow", "none");
-  expect(await selected.evaluate((element) => getComputedStyle(element).color)).not.toBe("rgb(36, 118, 71)");
+  expect(await selected.evaluate((element) => getComputedStyle(element).color)).not.toBe("rgb(39, 74, 148)");
   expect((await new AxeBuilder({ page }).include(".workspace-header").analyze()).violations).toEqual([]);
 });
 

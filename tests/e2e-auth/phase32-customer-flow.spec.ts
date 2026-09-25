@@ -202,6 +202,7 @@ test("offline clears sensitive views and explicit logout removes customer select
 
 test("recent customers keep five selected results, deduplicate, survive return and clear safely", async ({ page }, testInfo) => {
   await login(page, true, false);
+  await expect(page.locator("[data-customer-workspace] [data-freshness]")).toHaveCount(0);
   await expect(page.locator("[data-customer-card]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /자주 찾는 거래처/ })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("customer-home-empty.png"), fullPage: true });

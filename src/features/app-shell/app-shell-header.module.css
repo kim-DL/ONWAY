@@ -104,7 +104,7 @@
 
 .modeButton[data-mode="customer"][aria-pressed="true"] {
   color: var(--mode-customer-text);
-  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #269653;
+  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #3868ce;
 }
 
 .modeButton[data-mode="sales"][aria-pressed="true"] {
@@ -122,7 +122,7 @@
 }
 
 .header .singleMode i { background: #3182f6; }
-.header .singleMode[data-mode="customer"] i { background: #269653; }
+.header .singleMode[data-mode="customer"] i { background: #3868ce; }
 .header .singleMode[data-mode="sales"] i { background: #FAAA9D; }
 
 .compactFrame { display: none; }
@@ -137,8 +137,8 @@
 .modeTrigger[data-mode="customer"],
 .pickerOption[data-mode="customer"] {
   --option-ink: var(--mode-customer-text);
-  --option-tint: #edf6f0;
-  --option-line: #269653;
+  --option-tint: #edf2ff;
+  --option-line: #3868ce;
 }
 
 .modeTrigger[data-mode="sales"],

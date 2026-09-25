@@ -13,7 +13,6 @@ import { useToast } from "@/components/ui/toast";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
-import { revalidationFreshnessText } from "@/lib/revalidation-coordinator";
 import { restoreWorkspaceScroll } from "@/lib/workspace-scroll-memory";
 
 import { CustomerCard, RecentCustomerCard } from "./customer-card";
@@ -53,7 +52,6 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
   const homeRecentCustomers = customerHomeRecents(recentCustomers);
   const results = useMemo(() => searchCustomers(catalog.customers, query), [catalog.customers, query]);
   const selected = catalog.status === "ready" ? catalog.customers.find((customer) => customer.customerId === selectedId) : undefined;
-  const freshnessText = revalidationFreshnessText(catalog.freshness, catalog.lastSuccessAt);
   useEffect(() => {
     updateCustomerWorkspaceUi(sessionKey, { query, searchOpen });
   }, [sessionKey, query, searchOpen]);
@@ -96,7 +94,7 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
       </div> : undefined} />
     {catalog.status === "error" ? <div className={styles.empty} role="alert"><Icon name="wifi-off" size={26} /><p>{catalog.message}</p><GlassButton compact onClick={catalog.retry}>다시 불러오기</GlassButton></div>
       : catalog.status === "loading" ? <div className={styles.empty} role="status"><OnnuriLoader tone="customer" decorative /><p>거래처 정보를 불러오고 있어요.</p></div>
-        : <>{freshnessText ? <p className={styles.freshness} role="status" data-freshness={catalog.freshness}>{freshnessText}</p> : null}{!query.trim() ? <section className={styles.recentSection} aria-labelledby="customer-recents-heading" data-customer-recents>
+        : <>{!query.trim() ? <section className={styles.recentSection} aria-labelledby="customer-recents-heading" data-customer-recents>
           <header className={styles.recentHeading}><h2 id="customer-recents-heading">최근 검색 거래처</h2>{recentCustomers.length ? <button type="button" className={styles.textButton} onClick={() => { if (window.confirm("최근 검색한 거래처 기록을 지울까요? 거래처 정보는 삭제되지 않습니다.")) clearRecentCustomers(); }}>기록 지우기</button> : null}</header>
           {!recentsReady ? <p className={styles.resultCount} role="status">최근 거래처를 확인하고 있어요.</p> : homeRecentCustomers.length ? <ul className={`${fieldList.list} ${styles.recentList}`}>{homeRecentCustomers.map((customer) => <li key={customer.customerId}>
             <RecentCustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} />

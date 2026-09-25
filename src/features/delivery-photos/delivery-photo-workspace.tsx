@@ -46,7 +46,7 @@ export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, uploadRea
     {job?.status === "failed" && job.errorCategory === "retryable"
       ? <button type="button" className={styles.photoPrimary} onClick={() => onRetry(job.jobId)}>다시 시도</button>
       : <button type="button" className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
-        onClick={() => onCapture(customer)}><Icon name="camera" size={21} /></button>}
+        onClick={() => onCapture(customer)}><Icon name="camera" size={24} /></button>}
     <button type="button" className={styles.photoMore} aria-label={`${customer.name} 더보기`} aria-haspopup="dialog"
       onClick={() => onMore(customer)}>⋯</button>
   </div>

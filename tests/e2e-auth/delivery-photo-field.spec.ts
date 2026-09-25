@@ -113,6 +113,18 @@ test("field action layout audit and customer detail history use one customer sco
   const camera = page.getByRole("button", { name: `${name} 카메라 촬영` });
   const more = page.getByRole("button", { name: `${name} 더보기` });
   await expect(camera).toBeVisible();
+  const cameraAlignment = await camera.evaluate((button) => {
+    const icon = button.querySelector("svg")!;
+    const outer = button.getBoundingClientRect();
+    const inner = icon.getBoundingClientRect();
+    return { x: Math.abs(inner.left + inner.width / 2 - (outer.left + outer.width / 2)),
+      y: Math.abs(inner.top + inner.height / 2 - (outer.top + outer.height / 2)) };
+  });
+  expect(cameraAlignment.x).toBeLessThan(1);
+  expect(cameraAlignment.y).toBeLessThan(1);
+  const editButton = page.getByRole("button", { name: "내 납품처 편집" });
+  await expect(editButton).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  expect(await editButton.evaluate((button) => getComputedStyle(button).boxShadow)).not.toBe("none");
   for (const width of [320, 360, 390, 412]) {
     await page.setViewportSize({ width, height: 840 });
     for (const zoom of [100, 200]) {
@@ -155,9 +167,19 @@ test("field action layout audit and customer detail history use one customer sco
   await expect(summary).toContainText("최근 7일");
   await page.screenshot({ path: `${output}/customer-detail-history-390.png` });
   await summary.click();
-  await expect(page.getByRole("dialog", { name: `${name} 납품사진` })).toBeVisible();
+  const history = page.getByRole("dialog", { name: `${name} 납품사진` });
+  await expect(history).toBeVisible();
+  const dates = history.getByRole("group", { name: "사진 기록 날짜" }).getByRole("button");
+  expect(await dates.evaluateAll((buttons) => buttons.every((button) => {
+    const style = getComputedStyle(button);
+    return button.getBoundingClientRect().height >= 44 && button.getBoundingClientRect().width >= 44
+      && Number.parseFloat(style.borderRadius) <= 12;
+  }))).toBe(true);
   expect(customerLists).toEqual([{ scope: "customer", customerId: ids[2], limit: 30 }]);
   await page.screenshot({ path: `${output}/customer-history-390.png` });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  expect(await history.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: `${output}/customer-history-390-200.png` });
 });
 
 test("camera and album uploads stay non-blocking and merge only server-confirmed metadata", async ({ page }) => {

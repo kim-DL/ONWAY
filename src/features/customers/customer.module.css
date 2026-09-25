@@ -7,14 +7,14 @@
   --customer-line: var(--shell-line, rgb(25 31 40 / 10%));
   --customer-paper: var(--shell-paper-solid, #fff);
   --customer-canvas: var(--shell-canvas, #f7f8fa);
-  --customer-accent: var(--shell-accent-deep, #1b64da);
-  --customer-accent-soft: var(--shell-accent-soft, #e8f3ff);
+  --customer-accent: #2c56b9;
+  --customer-accent-soft: #eaf0fc;
   min-width: 0;
   color: var(--customer-ink);
   font-family: var(--font-sans);
 }
 
-.workspace { --customer-accent: #087f75; --customer-accent-soft: #e8f5f2; max-width: 1120px; margin-inline: auto; }
+.workspace { max-width: 1120px; margin-inline: auto; }
 .searchPanel { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; }
 .searchPanel .search { min-width: 0; gap: 8px; padding-inline: 12px 4px; border-radius: 12px; }
 .searchPanel .search > svg { flex-shrink: 0; }
@@ -68,8 +68,6 @@
 .locationResults button:focus-visible,
 .adminList button:focus-visible { outline: 2px solid var(--customer-accent); outline-offset: 2px; }
 .resultCount { margin: 16px 2px 9px; color: var(--customer-muted); font-size: .8125rem; font-weight: 650; }
-.freshness { margin: 10px 2px 0; color: var(--customer-muted); font-size: .6875rem; line-height: 1.5; }
-.freshness[data-freshness="stale-error"] { color: #8a5a13; }
 .results { max-width: 48rem; }
 .card { isolation: isolate; container-type: inline-size; }
 .cardSelect { position: absolute; z-index: 1; inset: 0; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
@@ -92,14 +90,13 @@
 .contactText { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; min-width: 0; column-gap: 8px; row-gap: 2px; color: var(--customer-muted); font-size: .75rem; line-height: 1.5; }
 .contactText span { word-break: keep-all; overflow-wrap: anywhere; }
 .contactText strong { color: var(--customer-ink); font-size: .8125rem; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
-.phoneLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid var(--customer-line); border-radius: 12px; color: var(--customer-accent); background: var(--customer-paper); text-decoration: none; pointer-events: auto; transition: background-color 150ms ease; }
+.phoneLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #cbd6e9; border-radius: 11px; color: #263c68; background: #fff; box-shadow: 0 2px 0 #d5dfef; text-decoration: none; pointer-events: auto; }
 .phoneLink:hover { background: var(--customer-accent-soft); }
-.card .phoneLink { border-color: transparent; background: transparent; }
-.directionsLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 5px; min-height: 48px; padding: 9px 11px; border: 1px solid var(--customer-line); border-radius: 10px; background: var(--customer-accent-soft); color: #08685f; font-size: .75rem; font-weight: 720; text-decoration: none; white-space: nowrap; pointer-events: auto; transition: background-color 150ms ease; }
-.directionsLink:hover { background: #daeee8; }
+.directionsLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 5px; min-height: 48px; padding: 9px 11px; border: 1px solid #cbd6e9; border-radius: 11px; background: #fff; box-shadow: 0 2px 0 #d5dfef; color: #263c68; font-size: .75rem; font-weight: 720; text-decoration: none; white-space: nowrap; pointer-events: auto; }
+.directionsLink:hover { background: var(--customer-accent-soft); }
 .directionsLink:focus-visible { outline: 2px solid var(--customer-accent); outline-offset: 2px; }
-.directionsLink[aria-disabled="true"] { color: var(--customer-muted); background: var(--customer-canvas); font-weight: 500; }
-.card .directionsLink { padding-inline: 8px; border-radius: 8px; }
+.directionsLink[aria-disabled="true"] { color: var(--customer-muted); background: var(--customer-canvas); box-shadow: none; font-weight: 500; }
+.card .directionsLink { padding-inline: 8px; }
 .cardChevron { flex-shrink: 0; color: var(--customer-muted); }
 @container (max-width: 18rem) {
   .card .contactRow { grid-template-columns: minmax(0, 1fr); }
@@ -115,7 +112,7 @@
 .mapLoading { display: grid; place-items: center; min-height: 240px; padding: 16px; border-radius: 16px; background: var(--customer-canvas); color: var(--customer-muted); font-size: .875rem; }
 .admin { max-width: 1060px; }
 .admin .heading { flex-wrap: wrap; }
-.admin .heading > :global(.glass-button) { min-height: 44px; padding: 10px 14px; font-size: .875rem; }
+.admin .heading > :global(.glass-button) { min-height: 48px; padding: 10px 14px; border-color: #1b366e; border-radius: 10px; background: #213e7a; box-shadow: 0 2px 0 #142b59; font-size: .875rem; }
 .adminList { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--customer-line); border-radius: 16px; list-style: none; background: var(--customer-paper); }
 .adminList li + li { border-top: 1px solid var(--customer-line); }
 .adminList button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 76px; padding: 12px 16px; border: 0; background: transparent; color: var(--customer-ink); text-align: left; cursor: pointer; }
@@ -158,7 +155,8 @@
 .radioLabel { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--customer-ink); font-size: .8125rem; font-weight: 650; }
 .radioLabel input { width: 19px; height: 19px; margin: 0; accent-color: var(--customer-accent); }
 .saveActions { display: grid; grid-template-columns: minmax(80px, .5fr) minmax(0, 1fr); gap: 8px; }
-.saveActions :global(.glass-button) { min-height: 48px; padding: 12px; font-size: .9375rem; }
+.saveActions :global(.glass-button) { min-height: 48px; padding: 12px; border: 1px solid #cbd6e9; border-radius: 10px; background: #fff; box-shadow: 0 2px 0 #d5dfef; color: #263c68; font-size: .9375rem; }
+.saveActions :global(.glass-button--primary) { border-color: #1b366e; background: #213e7a; box-shadow: 0 2px 0 #142b59; color: #fff; }
 .error { grid-column: 1 / -1; margin: 0 0 2px; color: var(--danger, #b63f29); font-size: .8125rem; line-height: 1.5; }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 

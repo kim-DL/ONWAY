@@ -40,7 +40,7 @@ describe("welcome quantum artwork", () => {
     const globals = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
     const header = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
     const greeting = readFileSync(new URL("./welcome-greeting.module.css", import.meta.url), "utf8");
-    for (const [mode, color] of [["delivery", "#1b64da"], ["customer", "#247647"], ["sales", "#FA6F42"]]) {
+    for (const [mode, color] of [["delivery", "#1b64da"], ["customer", "#274a94"], ["sales", "#FA6F42"]]) {
       expect(globals).toContain(`--mode-${mode}-text: ${color}`);
       expect(header).toContain(`color: var(--mode-${mode}-text)`);
       expect(greeting).toContain(`color: var(--mode-${mode}-text)`);
