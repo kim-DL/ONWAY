@@ -19,6 +19,13 @@
 - 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영한 기록 접근 UX는 production Hosting에 배포됐다. 새 UX의 Galaxy 실기기 smoke는 아직 남아 있다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
+### 2026-09-25 거래처 목록 UI/UX 리뉴얼 1차 — 로컬 prototype, 미배포
+
+- 거래처 홈의 장식 제목을 압축하고 최근 목록·검색 결과·전체보기를 공통 구분선 행으로 정리했다. 이름·상태·주소·출입비번·납품위치·연락처 순서, 상세 진입 화살표와 별도 전화·길안내 action, 48px 조작 영역을 적용했다. 인증·Callable·데이터 계약과 PWA 동작은 변경하지 않았다. 설계·비교와 Galaxy 확인 항목은 `docs/customer-list-ui-renewal.md`를 따른다.
+- 변경 전 390px 및 변경 후 320·360·390·412·768·1280px, 200% 확대 캡처는 ignored `output/playwright/ui-renewal/`에 있다. 실제 demo Emulator의 PIN 로그인, 거래처 빈/최근 목록, 검색·상세·Back·하단 탐색 캡처도 `after/emulator-*.png`에 모았다. fixture는 긴 한국어 이름·출입비번, 행·action 크기와 가로 넘침을 측정한다.
+- 거래처 unit 21 files/271 PASS, 거래처 demo Emulator 16/16 PASS. canonical acceptance 10/10 gate 및 내부 emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 15:09:50 KST). 전체 unit 1,583 PASS/14 SKIP, safe-config browser 282 PASS, Rules 50 PASS, full user journey 86 PASS/462,982ms, 검색 5,000건 p95 1.24ms다. production candidate build에서 기존 verifier를 수정하지 않고 customer CSS raw 49,101/49,152B, gzip 9,830/9,984B, JS gzip 36,804/36,864B, 초기 JS gzip 139,768B를 확인했다. PWA 및 Hosting build verifier는 PASS, export/shipped 98개·precache 85개·initial assets 9개다.
+- 운영 Hosting 배포는 하지 않는다. 따라서 현재 live release는 위의 `1790311854498000` 그대로다. Galaxy S20+에서 설치 PWA의 터치·키보드·글자 확대·하단 탐색·Back을 직접 확인한 뒤 후속 화면의 적용 순서를 결정한다. 현재 순서는 확정하지 않았다.
+
 ### 2026-09-25 OPT-4 release regression — 로컬 PASS, 미배포
 
 - 검증 코드 commit `570a46caaeee2b36963695ba997eac8621c227a0`에서 acceptance의 demo 환경을 고정하고 납품사진 flag를 해당 demo build에만 활성화했다. 원인은 acceptance launcher가 build-time `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS`를 설정하지 않아 납품사진 메뉴가 빠진 것이었다. production 기본값과 제품 코드는 변경하지 않았다.

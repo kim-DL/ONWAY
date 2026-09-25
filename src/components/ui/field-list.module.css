@@ -1,0 +1,6 @@
+.list { display: grid; min-width: 0; margin: 0; padding: 0; border-top: 1px solid var(--field-list-line, var(--shell-line)); list-style: none; }
+.list > li { min-width: 0; border-bottom: 1px solid var(--field-list-line, var(--shell-line)); }
+.row { position: relative; min-width: 0; width: 100%; border: 0; border-radius: 0; background: transparent; color: inherit; }
+.row:hover, .row:focus-within { background: var(--field-list-hover, rgb(255 255 255 / 60%)); }
+.row:active { background: var(--field-list-pressed, rgb(225 241 236 / 80%)); }
+@media (forced-colors: active) { .list, .list > li { border-color: CanvasText; } }

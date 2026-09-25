@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -33,7 +33,7 @@ async function fixture(page: Page, width: number) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setContent(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>거래처 검색 검증</title><style>${globals}</style><style>${css}</style></head><body><div id="root"></div></body></html>`);
   await page.addScriptTag({ content: script });
-  await expect(page.locator("[data-welcome-greeting]")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();
 }
 
 for (const width of [320, 390]) {
@@ -45,7 +45,7 @@ for (const width of [320, 390]) {
     await trigger.click();
     const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true });
     await expect(input).toBeFocused();
-    await expect(page.locator("[data-welcome-greeting]")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "거래처 등록", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /거래처 전체보기/ })).toHaveCount(0);
     await expect(input).toHaveAttribute("autocomplete", "off");
@@ -61,8 +61,8 @@ for (const width of [320, 390]) {
     const closeBox = (await close.boundingBox())!;
     const cardBox = (await cards.first().boundingBox())!;
     expect(Math.abs((closeBox.y + closeBox.height / 2) - (searchBox.y + searchBox.height / 2))).toBeLessThanOrEqual(1);
-    expect(closeBox.width).toBeGreaterThanOrEqual(44);
-    expect(closeBox.height).toBeGreaterThanOrEqual(44);
+    expect(closeBox.width).toBeGreaterThanOrEqual(48);
+    expect(closeBox.height).toBeGreaterThanOrEqual(48);
     expect(cardBox.y - searchBox.y - searchBox.height).toBeLessThanOrEqual(60);
 
     // A reduced layout viewport is the conservative keyboard-open case.
@@ -83,7 +83,7 @@ for (const width of [320, 390]) {
     await close.click();
     await expect(input).toHaveCount(0);
     await expect(trigger).toBeFocused();
-    await expect(page.locator("[data-welcome-greeting]")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "거래처 등록", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /거래처 전체보기/ })).toBeVisible();
     await trigger.click();
@@ -129,3 +129,45 @@ test("200% text keeps search actions reachable without horizontal overflow", asy
   await page.getByRole("button", { name: "검색 닫기", exact: true }).focus();
   await expect(page.getByRole("button", { name: "검색 닫기", exact: true })).toHaveCSS("outline-style", "solid");
 });
+
+for (const width of [320, 360, 390, 412, 768, 1280]) {
+  test(`${width}px renewal keeps rows readable and captures the home and search`, async ({ page }) => {
+    const output = "output/playwright/ui-renewal/after";
+    mkdirSync(output, { recursive: true });
+    await fixture(page, width);
+    const trigger = page.getByRole("button", { name: /거래처 이름으로 찾기/ });
+    const recent = page.locator("[data-customer-recent-card]");
+    await expect(recent).toHaveCount(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect((await trigger.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+    expect((await recent.first().boundingBox())!.height).toBeGreaterThanOrEqual(48);
+    const home = await page.evaluate(() => ({
+      headingBottom: document.querySelector("[data-customer-home]")!.getBoundingClientRect().bottom,
+      firstRowTop: document.querySelector("[data-customer-recent-card]")!.getBoundingClientRect().top,
+      visibleRows: [...document.querySelectorAll("[data-customer-recent-card]")].filter((item) => item.getBoundingClientRect().top < innerHeight).length,
+    }));
+    await page.screenshot({ path: `${output}/home-${width}.png` });
+    await trigger.click();
+    await page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true }).fill("온누리");
+    const cards = page.locator("[data-customer-card]");
+    await expect(cards).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const actions = await cards.first().locator("a").evaluateAll((links) => links.map((link) => ({ name: link.getAttribute("aria-label"), width: link.getBoundingClientRect().width, height: link.getBoundingClientRect().height })));
+    expect(actions.every((action) => action.width >= 48 && action.height >= 48)).toBe(true);
+    const search = await page.evaluate(() => ({
+      firstRowTop: document.querySelector("[data-customer-card]")!.getBoundingClientRect().top,
+      firstRowHeight: document.querySelector("[data-customer-card]")!.getBoundingClientRect().height,
+      visibleRows: [...document.querySelectorAll("[data-customer-card]")].filter((item) => item.getBoundingClientRect().top < innerHeight).length,
+    }));
+    await page.screenshot({ path: `${output}/search-${width}.png` });
+    if (width <= 412) {
+      await page.addStyleTag({ content: "html{font-size:200%}" });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      expect(await cards.first().evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      const zoomActions = await cards.first().locator("a").evaluateAll((links) => links.map((link) => ({ width: link.getBoundingClientRect().width, height: link.getBoundingClientRect().height })));
+      expect(zoomActions.every((action) => action.width >= 48 && action.height >= 48)).toBe(true);
+      await page.screenshot({ path: `${output}/search-200-${width}.png` });
+    }
+    writeFileSync(`${output}/metrics-${width}.json`, JSON.stringify({ width, home, search, actions }, null, 2));
+  });
+}

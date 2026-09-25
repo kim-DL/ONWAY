@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import fieldList from "@/components/ui/field-list.module.css";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { OnnuriLoader } from "@/components/ui/onnuri-loader";
@@ -95,7 +96,7 @@ export function CustomerWorkspace({ session }: { session: AuthenticatedSession }
       : catalog.status === "loading" ? <div className={styles.empty} role="status"><OnnuriLoader tone="customer" decorative /><p>거래처 정보를 불러오고 있어요.</p></div>
         : <>{freshnessText ? <p className={styles.freshness} role="status" data-freshness={catalog.freshness}>{freshnessText}</p> : null}{!query.trim() ? <section className={styles.recentSection} aria-labelledby="customer-recents-heading" data-customer-recents>
           <header className={styles.recentHeading}><h2 id="customer-recents-heading">최근 검색 거래처</h2>{recentCustomers.length ? <button type="button" className={styles.textButton} onClick={() => { if (window.confirm("최근 검색한 거래처 기록을 지울까요? 거래처 정보는 삭제되지 않습니다.")) clearRecentCustomers(); }}>기록 지우기</button> : null}</header>
-          {!recentsReady ? <p className={styles.resultCount} role="status">최근 거래처를 확인하고 있어요.</p> : homeRecentCustomers.length ? <ul className={styles.recentList}>{homeRecentCustomers.map((customer) => <li key={customer.customerId}>
+          {!recentsReady ? <p className={styles.resultCount} role="status">최근 거래처를 확인하고 있어요.</p> : homeRecentCustomers.length ? <ul className={`${fieldList.list} ${styles.recentList}`}>{homeRecentCustomers.map((customer) => <li key={customer.customerId}>
             <RecentCustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} />
           </li>)}</ul> : <button type="button" className={styles.recentEmpty} onClick={() => { setSearchOpen(true); searchRef.current?.focus(); }}>
             <span className={styles.recentIcon} aria-hidden="true"><Icon name="clock" size={23} /></span>
@@ -103,7 +104,7 @@ export function CustomerWorkspace({ session }: { session: AuthenticatedSession }
             <Icon name="chevron-right" size={17} />
           </button>}
         </section>
-          : <><div className={styles.resultsHeading}><p className={styles.resultCount} role="status">검색 결과 <strong>{results.length}</strong>곳</p><button type="button" className={styles.textButton} onClick={() => setQuery("")}>최근 거래처</button></div>{results.length ? <div className={styles.results}>{results.map((customer) => <CustomerCard key={customer.customerId} customer={customer} onSelect={() => openCustomer(customer.customerId)} />)}</div> : <div className={styles.empty}><Icon name="search" size={25} /><h2>등록된 거래처를 찾을 수 없습니다.</h2><p>거래처명의 일부나 초성으로 다시 찾아보세요.</p></div>}</>}</>}
+          : <><div className={styles.resultsHeading}><p className={styles.resultCount} role="status">검색 결과 <strong>{results.length}</strong>곳</p><button type="button" className={styles.textButton} onClick={() => setQuery("")}>최근 거래처</button></div>{results.length ? <ul className={`${fieldList.list} ${styles.results}`}>{results.map((customer) => <li key={customer.customerId}><CustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} /></li>)}</ul> : <div className={styles.empty}><Icon name="search" size={25} /><h2>등록된 거래처를 찾을 수 없습니다.</h2><p>거래처명의 일부나 초성으로 다시 찾아보세요.</p></div>}</>}</>}
     {directoryOpen ? <CustomerDirectory customers={catalog.customers} status={catalog.status} message={catalog.message} onRetry={catalog.retry} onSelect={openCustomer} onClose={() => setDirectoryOpen(false)} /> : null}
     {selected && !editing ? <CustomerDetail key={selected.customerId} customer={selected} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected)} /> : null}
     {editing && catalog.canRetainDraft ? <CustomerEditor key={editing === "new" ? "new" : `${editing.customerId}:${editing.revision}`} customer={editing === "new" ? null : editing} refreshMessage={catalog.status === "error" ? "목록 갱신이 지연되고 있어요. 작성 중인 내용은 유지됩니다." : ""} onClose={() => setEditing(null)} onSaved={(customer) => { catalog.accept(customer); setEditing(null); setSelectedId(customer.customerId); rememberCustomer(customer.customerId); catalog.retry(); showToast("거래처 정보를 저장했어요.", "success"); }} /> : null}

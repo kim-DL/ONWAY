@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
+import fieldList from "@/components/ui/field-list.module.css";
 import { Icon } from "@/components/ui/icon";
 import { OnnuriLoader } from "@/components/ui/onnuri-loader";
 import { searchInputProps } from "@/components/ui/search-input-props";
@@ -62,7 +63,7 @@ export function CustomerDirectory({ customers, onSelect, onClose, status = "read
         {status === "error" && onRetry ? <button type="button" className={shared.textButton} onClick={onRetry}>다시 불러오기</button> : null}
       </div> : <section aria-labelledby={`${id}-results`}>
         <header className={styles.resultHeading}><h3 id={`${id}-results`}>{dong || district || "전체 거래처"}</h3><span role="status" aria-live="polite">{results.length}곳</span></header>
-        {results.length ? <ul className={styles.list}>{results.slice(0, visibleCount).map((customer) => <li key={customer.customerId}>
+        {results.length ? <ul className={`${fieldList.list} ${styles.list}`}>{results.slice(0, visibleCount).map((customer) => <li key={customer.customerId}>
           <CustomerCard customer={customer} compact onSelect={() => onSelect(customer.customerId)} />
         </li>)}</ul> : <div className={shared.empty}><Icon name="search" size={28} /><h3>{customers.length ? "조건에 맞는 거래처가 없어요." : "등록된 거래처가 아직 없어요."}</h3>
           {district || dong || query ? <button type="button" className={shared.textButton} onClick={reset}>전체 거래처 보기</button> : null}

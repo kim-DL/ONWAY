@@ -3,6 +3,7 @@
 import type { MouseEvent } from "react";
 
 import { Icon } from "@/components/ui/icon";
+import fieldList from "@/components/ui/field-list.module.css";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { Customer, CustomerContact } from "@/domain/customer";
 
@@ -10,7 +11,6 @@ import { getPrimaryCustomerContact, sanitizeCustomerPhone } from "./customer-sea
 import { customerAddress } from "./customer-address";
 import { customerContactDisplayName } from "./customer-contact-name";
 import { CustomerOverviewPhoto } from "./customer-overview-photo";
-import { CustomerStorefrontIcon } from "./customer-storefront-icon";
 import { customerDirectionsHref } from "./customer-directions";
 import styles from "./customer.module.css";
 
@@ -80,10 +80,10 @@ export function CustomerCardDirectionsLink({ customer }: { customer: Customer })
 export function CustomerCard({ customer, onSelect, compact = false }: { customer: Customer; onSelect: () => void; compact?: boolean }) {
   const contact = primaryCustomerContact(customer);
   const Heading = compact ? "h4" : "h2";
-  return <article className={styles.card} data-customer-card data-compact={compact || undefined} data-closed={customer.status === "closed" || undefined}>
+  return <article className={`${fieldList.row} ${styles.card}`} data-customer-card data-compact={compact || undefined} data-closed={customer.status === "closed" || undefined}>
     <button type="button" className={styles.cardSelect} onClick={onSelect} aria-label={`${customer.name} 상세 정보`} aria-describedby={compact ? `customer-card-password-${customer.customerId}` : undefined} />
     <div className={styles.cardBody}>
-      <div className={styles.cardHeading}><div className={styles.cardName}><CustomerStorefrontIcon width={22} height={22} /><Heading>{customer.name}</Heading></div><CustomerBadges customer={customer} /></div>
+      <div className={styles.cardHeading}><div className={styles.cardName}><Heading>{customer.name}</Heading></div><CustomerBadges customer={customer} /><Icon name="chevron-right" size={17} className={styles.cardChevron} /></div>
       <p className={styles.region}>{customerAddress(customer)}</p>
       {compact ? <CustomerPasswordSummary customer={customer} id={`customer-card-password-${customer.customerId}`} /> : <CustomerCoreInformation customer={customer} />}
       <div className={styles.contactRow}>
@@ -99,7 +99,7 @@ export function CustomerCard({ customer, onSelect, compact = false }: { customer
 
 /** Photo requests are intentionally limited to these five recent rows, not search results. */
 export function RecentCustomerCard({ customer, onSelect }: { customer: Customer; onSelect: () => void }) {
-  return <button type="button" className={styles.recentItem} onClick={onSelect} aria-label={`${customer.name} 다시 열기`} aria-describedby={`customer-recent-address-${customer.customerId} customer-recent-password-${customer.customerId}`} data-customer-recent-card>
+  return <button type="button" className={`${fieldList.row} ${styles.recentItem}`} onClick={onSelect} aria-label={`${customer.name} 다시 열기`} aria-describedby={`customer-recent-address-${customer.customerId} customer-recent-password-${customer.customerId}`} data-customer-recent-card>
     <CustomerOverviewPhoto customer={customer} variant="thumbnail" />
     <span className={styles.recentCopy}>
       <span className={styles.recentName}><strong>{customer.name}</strong><CustomerBadges customer={customer} /></span>

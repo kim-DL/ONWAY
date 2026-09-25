@@ -2,11 +2,13 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { normalizeCustomerName, getCustomerChoseong, type Customer } from "../../../src/domain/customer";
 import { RecentCustomerCard } from "../../../src/features/customers/customer-card";
+import { CustomerHome } from "../../../src/features/customers/customer-home";
 import { CustomerDetail } from "../../../src/features/customers/customer-detail";
 import { CustomerPhotoPicker } from "../../../src/features/customers/customer-photo-picker";
 import { prepareCustomerPhoto } from "../../../src/features/customers/customer-photo-preparation";
 import { CustomerDirectory } from "../../../src/features/customers/customer-directory";
 import styles from "../../../src/features/customers/customer.module.css";
+import fieldList from "../../../src/components/ui/field-list.module.css";
 import { SchoolPhotoGallery } from "../../../src/features/school-detail/school-photo-gallery";
 import type { School, SchoolFieldProfile, SchoolFieldProfilePatch, SchoolPhoto } from "../../../src/domain/school";
 import type { AuthenticatedSession } from "../../../src/features/auth/auth-context";
@@ -40,10 +42,10 @@ function Fixture() {
     };
   }, []);
   return <div className="workspace-shell" data-mode="customer"><div className="aurora-background" aria-hidden="true"><i /><i /><i /></div><main className={styles.workspace} style={{ maxWidth: 600, padding: "20px 12px 28px", margin: "auto" }}>
-    <header style={{ marginBottom: 24 }}><p className="shell-greeting">김대인 부장님, 반가워요.</p><h1 style={{ fontSize: 30, lineHeight: 1.3, margin: "12px 0" }}>거래처 정보를<br />한눈에.</h1></header>
+    <CustomerHome greeting="김대인 부장님, 반가워요." onOpenSearch={() => undefined} onOpenDirectory={() => undefined} onRegister={() => undefined} />
     <section className={styles.recentSection} aria-labelledby="recent-heading">
       <div className={styles.recentHeading}><h2 id="recent-heading">최근 검색 거래처</h2><span>5곳</span></div>
-      <ul className={styles.recentList}>{customers.map((customer) => <li key={customer.customerId}><RecentCustomerCard customer={customer} onSelect={() => setSelected(customer)} /></li>)}</ul>
+      <ul className={`${fieldList.list} ${styles.recentList}`}>{customers.map((customer) => <li key={customer.customerId}><RecentCustomerCard customer={customer} onSelect={() => setSelected(customer)} /></li>)}</ul>
     </section>
     {selected ? <CustomerDetail customer={selected} onClose={() => setSelected(null)} onEdit={() => undefined} /> : null}
   </main></div>;

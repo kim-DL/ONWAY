@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -867,6 +867,33 @@ for (const width of [320, 390]) {
     expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
     await page.screenshot({ path: `output/playwright/customer-presentation/recent-password-200-${width}-${info.project.name}.png` });
     expect(errors).toEqual([]);
+  });
+}
+
+for (const width of [360, 412, 768, 1280]) {
+  test(`${width}px renewal audit keeps recent and directory rows within the viewport`, async ({ page }) => {
+    const output = "output/playwright/ui-renewal/after";
+    mkdirSync(output, { recursive: true });
+    await fixture(page, width);
+    const rows = page.locator("[data-customer-recent-card]");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await rows.evaluateAll((items) => items.every((item) => item.getBoundingClientRect().height >= 48 && item.scrollWidth <= item.clientWidth))).toBe(true);
+    const recent = await page.evaluate(() => ({ firstRowTop: document.querySelector("[data-customer-recent-card]")!.getBoundingClientRect().top, firstRowHeight: document.querySelector("[data-customer-recent-card]")!.getBoundingClientRect().height, visibleRows: [...document.querySelectorAll("[data-customer-recent-card]")].filter((item) => item.getBoundingClientRect().top < innerHeight).length }));
+    await page.screenshot({ path: `${output}/recent-${width}.png` });
+    await page.goto("about:blank");
+    await fixture(page, width, "directory");
+    const directory = page.getByRole("dialog", { name: "거래처 전체보기", exact: true });
+    const cards = directory.locator("[data-customer-card]");
+    await expect(cards).toHaveCount(32);
+    expect(await directory.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const listing = await directory.evaluate((element) => ({ firstRowTop: element.querySelector("[data-customer-card]")!.getBoundingClientRect().top, firstRowHeight: element.querySelector("[data-customer-card]")!.getBoundingClientRect().height, visibleRows: [...element.querySelectorAll("[data-customer-card]")].filter((item) => item.getBoundingClientRect().top < innerHeight - 48).length }));
+    await page.screenshot({ path: `${output}/directory-${width}.png` });
+    if (width === 412) {
+      await page.addStyleTag({ content: "html{font-size:200%}" });
+      expect(await directory.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await page.screenshot({ path: `${output}/directory-200-${width}.png` });
+    }
+    writeFileSync(`${output}/listing-metrics-${width}.json`, JSON.stringify({ width, recent, directory: listing }, null, 2));
   });
 }
 
