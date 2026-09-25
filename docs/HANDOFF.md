@@ -9,23 +9,25 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- Phase 3D 운영 배포 당시 제품 코드 commit은 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 현재 production frontend는 거래처 목록 UI/UX 리뉴얼 commit `4a8f170360bb7d8e4679899c0f07d0853bcae26c`에서 생성한 아래 Hosting release다.
+- Phase 3D 운영 배포 당시 제품 코드 commit은 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 현재 production frontend는 거래처·납품사진 현장 UX commit `ccaa4d13a9b918093f728d6560d59479d6a5239f`에서 생성한 아래 Hosting release다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 거래처, 학교납품, 영업/홍보, 재고에 더해 납품사진 field workspace가 production feature flag로 활성화돼 있다.
-- 현재 Firebase Hosting live release는 `1790322165230000`, version은 `7eaf3b7cde0bcb93`, 배포 시각은 `2026-09-25 16:42:45.230 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `d0897a5d6f2151fbe6aacaa821c3a1942be3542f0f372e9e9883248bfc366544`다. 직전 rollback 지점은 release `1790311854498000`, version `8e847575f9771450`이다.
+- 현재 Firebase Hosting live release는 `1790330480187000`, version은 `9e8223c7cd55fe7e`, 배포 시각은 `2026-09-25 19:01:20.187 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `8f21ecf92d504a93dd8761e37d7a9e6ecc0a53d534951c4e960fd9726f45998d`다. 직전 rollback 지점은 release `1790322165230000`, version `7eaf3b7cde0bcb93`이다.
 - 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영한 기록 접근 UX는 production Hosting에 배포됐다. 새 UX의 Galaxy 실기기 smoke는 아직 남아 있다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
-### 2026-09-25 거래처·납품사진 현장 UX — 로컬 검증 완료, 미배포
+### 2026-09-25 거래처·납품사진 현장 UX — production Hosting 승격, Galaxy smoke 대기
 
 - 거래처 목록은 연락처가 없는 행에서도 `길안내`를 독립된 48px action으로 배치해 320·360·390·412px과 200% 글자 확대에서 한 줄로 유지한다. 거래처 상세에는 `납품사진 기록` 요약과 기존 history 진입을 추가했다. 납품사진 목록은 별도 `기록` 버튼과 장식 세로선을 없애고 정보 영역→기존 history, 카메라→촬영, `⋯`→기존 BottomSheet의 앨범/거래처 상세로 정리했다. 날짜 pill은 변경하지 않았다.
 - 상세 요약은 기존 인증된 `listDeliveryPhotos({ scope: "customer", customerId, limit: 30 })` 결과만 사용한다. 서버가 적용하는 최근 168시간·active/만료 필터의 projection이며, 30장 한도에 닿으면 `30장 이상`으로 표시한다. History를 열 때 같은 결과를 전달해 중복 조회를 피하고 삭제 후에는 기존 history 경로로 갱신한다. 전체 기간 count, 요약용 Storage 조회, 거래처 목록 N+1 요청은 없다. Schema, Rules, backend 권한·retention, 운영 데이터는 변경하지 않았다.
 - 실제 browser 캡처는 ignored `output/playwright/ui-renewal/customer-photo-field/`에 있다. 두 화면의 320·360·390·412px 각각 100%/200%와 거래처 상세/history를 저장했다. 길안내 한 줄·가로 overflow 없음·48px 터치 크기, 정보/카메라/더보기 중심점의 독립 hit target, 상세에서 customer scope 요청 1회와 history 재사용을 검증했다. 설치 Galaxy S20+의 현장 체감은 아직 사람 확인이 필요하다.
 - Focused unit 55 PASS, 납품사진 인증 demo Emulator 10/10 PASS. Canonical acceptance는 10/10 gate 및 내부 Emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 18:52:44 KST): 전체 unit 1,583 PASS/14 SKIP, safe-config browser 290 PASS, Rules 50 PASS, full user journey 87 PASS/466,022ms, 검색 5,000건 p95 1.24ms다. 최종 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` production candidate build에서 PWA·기존 성능·Hosting verifier PASS, export/shipped 100개·precache 87개·initial assets 9개다. Customer CSS raw 49,055/49,152B·JS gzip 36,863/36,864B, 납품사진 CSS raw 6,051/6,144B·JS gzip 10,238/10,240B, 초기 JS gzip 139,797B다. Ceiling/verifier/테스트 기준은 변경하지 않았다.
-- **운영 상태:** 이번 candidate는 production에 배포하지 않았다. 현재 live Hosting release `1790322165230000` / version `7eaf3b7cde0bcb93`는 위 확인된 사실과 같다. Galaxy 사람 확인에서는 연락처 없는 행의 길안내, 긴 이름·주소·비번과 200% 확대, 정보·카메라·더보기의 한 손 터치 오작동, 앨범/상세/history/Back, 설치 PWA 업데이트와 하단 탐색 간섭, 원하는 거래처와 action을 찾는 속도를 확인한다. 이 결과 후에만 reference list 채택과 다음 화면 순서를 결정한다.
+- **운영 승격:** clean source `ccaa4d13a9b918093f728d6560d59479d6a5239f`에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`를 build 프로세스에 명시하고 위 gate를 재통과했다. `npx firebase deploy --project onnuriway --only hosting`으로 site `onnuriway`의 Hosting만 배포했다. 새 live release/version은 위와 같고 직전 release/version이 rollback 지점이다. Functions, Firestore, Storage, Rules, Auth, 기타 Firebase/GCP 설정과 production 데이터는 변경하지 않았다.
+- **운영 검증:** `https://onnuriway.com`과 `https://onnuriway.web.app`의 canonical Hosting verifier가 각각 PASS했다. 두 origin의 `/sw.js`가 후보 SHA-256과 일치하고 각각 precache 87개가 후보 파일과 byte 단위로 일치했다(불일치 0). 새 거래처 상세 사진 기록·납품사진 앨범/거래처 상세 chunk는 precache에 포함된다. 비로그인 브라우저에서 양쪽 PIN 화면, PWA `업데이트` 적용 뒤 PIN 복귀, console error 0건을 확인했다. 인증된 production session이 없어 내부 거래처·납품사진 조작과 기존 로그인 유지·실기기 체감은 PASS 처리하지 않는다.
+- **남은 Galaxy S20+ 사람 확인:** 설치 PWA 업데이트 후 기존 로그인/session 유지; 연락처 없는 거래처의 한 줄 길안내; 긴 거래처명·주소·출입비번과 200% 확대; row 상세/전화/길안내 touch 분리; 납품사진 정보 영역→기록, 카메라 촬영, `⋯`→앨범/거래처 상세, history→viewer→Back; 한 손 사용 시 오작동, 하단 navigation·keyboard 간섭과 가로 overflow를 확인한다. 원하는 거래처와 action을 더 빠르고 덜 헷갈리게 찾는지 평가한 뒤 reference list 채택과 다음 화면 순서를 결정한다.
 
 ### 2026-09-25 거래처 목록 UI/UX 리뉴얼 1차 — production Hosting 승격, Galaxy smoke 대기
 
