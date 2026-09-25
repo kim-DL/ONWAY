@@ -9,14 +9,14 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- Phase 3D 운영 배포 당시 제품 코드 commit은 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 현재 production frontend는 아래 2026-09-25 Hosting release이며, 그 뒤의 납품사진 기록 접근 UX 변경은 검증된 별도 로컬 후보로 아직 미배포다.
+- Phase 3D 운영 배포 당시 제품 코드 commit은 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 현재 production frontend는 납품사진 기록 접근 UX commit `0d3d5913ebf332282a8735656369b9a579ad4cd5`에서 생성한 아래 Hosting release다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 거래처, 학교납품, 영업/홍보, 재고에 더해 납품사진 field workspace가 production feature flag로 활성화돼 있다.
-- 현재 Firebase Hosting live release는 `1790297267844000`, version은 `a85d184f5184fcec`, 배포 시각은 `2026-09-25 09:47:47.844 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `095e171afb361969b91684702f94ef99c08aaa94208683d1eca16c377dcc9845`다. 직전 rollback 지점은 release `1790217833155000`, version `79b66cdeae0b2036`이다.
-- 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영해 기록 접근 UX만 로컬 후보에서 보완한다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
+- 현재 Firebase Hosting live release는 `1790311854498000`, version은 `8e847575f9771450`, 배포 시각은 `2026-09-25 13:50:54.498 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `9cfc045822a77c4f6da6e3717b176f8540818c0bc646eef2ae95e7a6c4b99492`다. 직전 rollback 지점은 release `1790297267844000`, version `a85d184f5184fcec`이다.
+- 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영한 기록 접근 UX는 production Hosting에 배포됐다. 새 UX의 Galaxy 실기기 smoke는 아직 남아 있다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
 ### 2026-09-25 OPT-4 release regression — 로컬 PASS, 미배포
@@ -36,12 +36,15 @@
 - 운영 브라우저에서 기본 URL의 비로그인 PIN 화면을 확인했다. 기존 관리자 세션이 있는 custom domain에서는 새 버전 알림의 `업데이트` 적용 뒤 로그인 유지, 운영 개요·거래처 관리·재고 관리의 읽기 전용 진입과 console error 0건을 확인했다. 운영 데이터 저장·수정·삭제나 사진 업로드는 수행하지 않았다.
 - Galaxy S20+ 자체를 Codex 환경에서 조작하지 못했다. 사람이 설치 PWA에서 업데이트 적용 뒤 로그인 유지, 직원 계정의 거래처 `납품사진` 메뉴·오늘 경로/기록·viewer/Back, 재고 진입을 최소 확인해야 한다. 이는 이번 desktop browser 및 byte-level 검증으로 대체하지 않는다. 운영 Kakao 지도 타일/길찾기와 현장망 체감도 이번 배포 smoke에서 미확인이다.
 
-### 2026-09-25 납품사진 과거 기록 접근 UX — 로컬 후보, 미배포
+### 2026-09-25 납품사진 과거 기록 접근 UX — production Hosting 배포, Galaxy smoke 대기
 
 - **원인:** Phase 3C history/viewer와 `listDeliveryPhotos` customer scope는 존재했지만, 오늘 사진이 있는 거래처의 접힌 `기록완료` 영역에서 버튼처럼 보이지 않는 왼쪽 정보 블록을 눌러야만 열렸다. 오늘 사진이 없는 납품처 및 검색 결과에는 history 진입 자체가 연결되지 않았다. 서버 list는 `deliveryDateKey`, `createdAt`, `expiresAt`, `fromDateKey`를 제공하고 168시간·만료·active 범위와 30장 제한을 이미 적용한다.
 - **변경:** 오늘 남은 납품처, 기록완료 납품처, 검색 결과 각각에 명시적 `기록` 버튼을 제공한다. 기록완료 정보 블록의 기존 진입과 history thumbnail/evidence viewer, 삭제·Back 경로는 유지한다. 기존 customer list 결과만 사용해 `전체`(기본), `오늘`, `어제`, 최근 날짜 가로 선택지를 제공하며 전체 기록은 날짜별로 묶는다. 빈 날짜 안내와 `사진은 최근 7일간 보관됩니다.` 문구를 표시한다. 서버의 rolling 168시간은 서울 달력 날짜로 최대 8개 날짜에 걸치므로, 칩은 서버 `fromDateKey`부터 오늘까지 8개로 구성하고 서버가 반환하지 않은 기록은 표시하지 않는다.
-- **범위:** 이 로컬 후보는 Hosting에 배포하지 않았다. Functions, Firestore/Storage/Auth 데이터·정책, production feature flag와 기존 performance ceiling은 변경하지 않았다. 날짜 UI는 history를 열 때만 로드하는 별도 chunk이며 자체 CSS/JS 계측 한도를 추가했다. Galaxy 실기기의 새 진입 UX는 아직 확인하지 않았다.
+- **범위:** 검증된 commit `0d3d5913ebf332282a8735656369b9a579ad4cd5`를 production Hosting site `onnuriway`에 배포했다. Functions, Firestore/Storage/Auth 데이터·정책, production feature flag 기본값과 기존 performance ceiling은 변경하지 않았다. 날짜 UI는 history를 열 때만 로드하는 별도 chunk이며 자체 CSS/JS 계측 한도를 추가했다. Galaxy 실기기의 새 진입 UX는 아직 확인하지 않았다.
 - **검증:** 납품사진 관련 unit/contract 19 files·119 PASS(서버의 167h 포함/169h 제외와 만료 evidence 거부 포함), demo Emulator Chromium 9/9 PASS(남은 납품처·검색의 진입, 전체/오늘/어제/빈 날짜, 과거 날짜 thumbnail·viewer·Back, 기존 삭제/업로드 회귀). Canonical acceptance 10/10 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 10:46:19 KST), unit 1,583 PASS/14 SKIP, Rules 50/50, safe-config browser 262/262, full user journey 469,807ms다. 최종 production 설정 static build와 PWA/성능/Hosting verifier PASS, export/shipped 98개·precache 85개·initial assets 9개. Initial JS 139,766B gzip, 납품사진 workspace 10,236/10,240B, history 2,683/3,584B, viewer 2,918/3,072B, 날짜 chunk 2,091/2,304B 및 CSS 1,003/1,024B(raw)다. Lint/typecheck와 `git diff --check`도 PASS했다.
+- **운영 승격:** clean source commit `0d3d5913ebf332282a8735656369b9a579ad4cd5`에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`를 빌드 프로세스에만 주입해 `npm run build` 및 PWA/성능/Hosting gate를 통과했다. navigation bundle의 납품사진 flag는 활성이고, `기록`·날짜 선택·보관 안내가 생성된 lazy chunk에 포함된다. 후보 `out` 98개 파일 집합 SHA-256은 `336555eff6e0669f5f74514d5a04143a71bae5a899a382d3652f6bde4e6e47e1`이다. `npx firebase deploy --project onnuriway --only hosting`으로 Hosting만 배포했으며 live release `1790311854498000` / version `8e847575f9771450` (`2026-09-25 13:50:54.498 KST`), rollback release `1790297267844000` / version `a85d184f5184fcec`을 Hosting API에서 확인했다.
+- **운영 검증:** `https://onnuriway.com`과 `https://onnuriway.web.app`의 canonical Hosting verifier가 각각 PASS했고, 두 origin 각각 85개 precache 파일을 후보와 byte 단위로 비교해 불일치 0건이다. `/sw.js` SHA-256은 양쪽 모두 후보의 `9cfc045822a77c4f6da6e3717b176f8540818c0bc646eef2ae95e7a6c4b99492`와 일치한다. 두 origin의 비로그인 PIN 초기 화면, PWA 업데이트 적용 뒤 정상 복귀, console error 0건을 확인했다. 이 브라우저에는 인증 세션이 없어 거래처·재고·납품사진의 운영 데이터 화면과 기존 session 유지는 직접 확인하지 못했다. 운영 데이터 write는 수행하지 않았다.
+- **남은 Galaxy S20+ 확인:** 설치 PWA 업데이트 후 로그인/session 유지, 오늘 사진 유무가 다른 거래처와 검색 결과의 `기록` 진입, `전체`/`오늘`/`어제`/과거 날짜·빈 날짜·보관 안내, 사진 viewer와 Back, 거래처·재고 read-only 진입을 사람이 확인한다. 이 항목은 Codex의 정적 파일 및 비로그인 브라우저 검증으로 PASS 처리하지 않는다.
 
 ### 미확인 또는 다시 확인할 사실
 
@@ -100,7 +103,7 @@
 | 재고 입력 | 사진은 등록/수정 모두 촬영 전용, 초기 수량을 한 화면에서 저장 | camera capture 입력과 제품+초기 lot 저장 흐름 존재 | 구현됨; 실기기 미확인 |
 | 재고 조사 | 직원별 ON/OFF, 지정일 미완료 강조, 조작한 유통기한만 확인 | sessionStorage preference, per-lot inspection, match-only 확인과 충돌 검증 | 구현됨 |
 | 재고 상세 | 2행 고정 action, 더보기에 이력·비활성·삭제, 사진 확대 힌트 | 상세 footer와 more dialog, `showExpandHint`, lot 카드 `수정` 텍스트 존재 | 로컬·운영 실제 Chromium 확인됨 |
-| 납품사진 | 오늘 route/day, camera/album upload, 기록완료 projection, customer history/viewer/delete | Memory-only workspace/upload, private Callable relay, thumbnail/evidence lazy load, delete reconciliation, Galaxy Phase 3D production 검증; 기록 진입·날짜 필터는 로컬 후보 | Phase 3A/3B/3C/3D 운영 완료, 후속 UX 미배포 |
+| 납품사진 | 오늘 route/day, camera/album upload, 기록완료 projection, customer history/viewer/delete | Memory-only workspace/upload, private Callable relay, thumbnail/evidence lazy load, delete reconciliation, Galaxy Phase 3D production 검증; 기록 진입·날짜 필터는 Hosting 배포·정적 검증 완료 | Phase 3A/3B/3C/3D 운영 완료, 후속 UX Galaxy smoke 대기 |
 | 오프라인 | 조회 cache만 제한 허용, 민감 쓰기 queue 금지 | 검색/학교만 namespace IndexedDB, 거래처·재고는 Memory, 쓰기 queue 없음 | 구현됨 |
 | 보안 | Client 직접 쓰기 금지, App Check/권한/revision/request ID/audit 유지 | Callable service와 Rules 경계, private no-store 응답 | 구현됨 |
 
