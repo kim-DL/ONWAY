@@ -33,7 +33,7 @@ describe("inventory scheduled and personal count badges", () => {
     expect(inventoryExpiryGroupCount(item, "all")).toBe(2);
     expect(inventoryExpiryGroupCount(item, "freezer1")).toBe(1);
     const html = renderToStaticMarkup(createElement(InventoryCard, { product: item, context, location: "all", onOpen: () => {} }));
-    expect(html).toContain("유통기한별 수량"); expect(html).toContain("<strong>2</strong>");
-    expect(html).not.toContain('data-count-highlight="pending"');
+    expect(html).toContain("유통기한별 수량 2");
+    expect(html).not.toContain('data-count-indicator="pending"');
   });
 });

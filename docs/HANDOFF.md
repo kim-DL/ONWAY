@@ -19,6 +19,14 @@
 - 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영한 기록 접근 UX는 production Hosting에 배포됐다. 새 UX의 Galaxy 실기기 smoke는 아직 남아 있다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
+### 2026-09-25 재고 목록 모바일 UI/UX 리뉴얼 — 로컬 후보, 미배포
+
+- 재고 카드를 기존 `field-list` 구분선 행으로 치환하고 사진이 없는 품목의 빈 thumbnail 자리를 없앴다. 사진이 있을 때만 기존 인증 미리보기를 40×44px로 표시한다. 조사 상태는 지정 조사일에 개인 조사모드 OFF여도 왼쪽에 표시하고 일반 날짜·모드 OFF에서는 숨긴다. 빈 원·체크·순환 화살표의 형태와 기존 `미확인`·`이번 주 확인`·`변동 후 미확인` 텍스트를 함께 사용하며 indicator 자체에는 동작이 없다. 상세 버튼은 행 전체에 유지하고 넓은 화면의 2열도 유지한다. 계산·저장·conflict·audit·PWA·backend 계약은 변경하지 않았다.
+- 전후 실제 인증 demo Emulator 캡처는 ignored `output/playwright/ui-renewal/inventory/before/`와 `after/`에 있다. 360×800 지정 조사일의 보이는 품목은 기존 약 3개에서 5개로 늘었고, 320px에서도 최소 4개가 보인다. 320·360·390·412px, 768·1280px, 긴 한국어 품명·큰 수량, 200% 유효 확대를 확인했다. 가로 overflow가 없고 1280px은 2열이다. 320px의 다섯 번째 행은 고정 `새 품목` action 아래에 일부 가려지지만 네 번째 행까지 보이며 마지막 행까지 스크롤할 하단 여백은 유지된다.
+- 최종 production 설정 build의 실제 bundle은 재고 CSS raw 29,062/29,184B·gzip 6,624/6,656B, 재고 JS gzip 25,031/25,600B다. 변경 전 29,095B·6,614B·25,029B에서 재측정했다. Customer CSS raw 49,055/49,152B·JS gzip 36,863/36,864B, Delivery-photo CSS raw 6,051/6,144B·JS gzip 10,238/10,240B는 전후 동일하다. 기존 ceiling·verifier·test 기준은 변경하지 않았다.
+- 재고 unit/model 405/405, 재고 static browser 12/12, 재고 demo Emulator 통합 11/11, app/Functions typecheck, lint, `git diff --check` PASS. Canonical acceptance 10/10 gate 및 내부 Emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 22:17:57 KST): 전체 unit 1,584 PASS/14 SKIP, 공통 browser 290 PASS, Rules 50 PASS, full user journey 87 PASS/472,686ms, 검색 5,000건 p95 1.23ms다. 마지막 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` production 설정 build와 PWA·성능·Hosting gate가 다시 PASS했고 export/shipped 100개·precache 87개·initial assets 9개다.
+- **배포 경계:** 이번 재고 후보는 production에 배포하지 않았다. Galaxy S20+에서 지정 조사일·일반 날짜의 상태 원/텍스트, 사진 유무, 긴 품명과 200% 확대, 행 상세 터치, 한 손 스캔·스크롤, 하단 탐색과 고정 `새 품목` action의 간섭을 사람이 확인해야 한다. 그 결과 뒤에 reference list 채택과 다음 화면을 결정한다.
+
 ### 2026-09-25 거래처·납품사진 현장 UX — production Hosting 승격, Galaxy smoke 대기
 
 - 거래처 목록은 연락처가 없는 행에서도 `길안내`를 독립된 48px action으로 배치해 320·360·390·412px과 200% 글자 확대에서 한 줄로 유지한다. 거래처 상세에는 `납품사진 기록` 요약과 기존 history 진입을 추가했다. 납품사진 목록은 별도 `기록` 버튼과 장식 세로선을 없애고 정보 영역→기존 history, 카메라→촬영, `⋯`→기존 BottomSheet의 앨범/거래처 상세로 정리했다. 날짜 pill은 변경하지 않았다.

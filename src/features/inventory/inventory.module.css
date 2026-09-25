@@ -2,11 +2,11 @@
 /* A fixed, compact action stays reachable; the last row can scroll fully above it. */
 .workspace[data-write-actions] { padding-bottom: calc(var(--inventory-action-inset) + 64px + env(safe-area-inset-bottom)); }
 .workspace[data-admin] { --inventory-action-inset: 100px; }
-.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row, .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .muted { color: var(--shell-soft-ink, #4e5968); font-size: 13px; line-height: 1.65; margin: 4px 0 0; }
-.locations { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px; border: 1px solid #d3dde6; border-radius: 10px; background: #e8eef3; box-shadow: inset 0 1px 2px #8293a31f; gap: 4px; }
-.locations button { min-width: 0; min-height: 44px; padding: 4px 2px; border: 1px solid #d7e0e8; border-radius: 7px; background: linear-gradient(145deg, #f8fafc, #e6edf3); box-shadow: 0 2px 4px #5266791a, inset 0 1px #ffffffcc; color: #526173; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; transition: background 160ms, box-shadow 160ms, color 160ms; }
-.locations button[aria-pressed="true"] { border-color: #c0ccd7; background: #dfe7ed; box-shadow: inset 0 2px 4px #60738524, inset 0 -1px #ffffff99; color: #23384e; font-weight: 750; }
+.locations { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px; border: 1px solid #d3dde6; border-radius: 10px; background: #e8eef3; gap: 4px; }
+.locations button { min-width: 0; min-height: 44px; padding: 4px 2px; border: 1px solid #d7e0e8; border-radius: 7px; background: #f8fafc; color: #526173; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.locations button[aria-pressed="true"] { border-color: #c0ccd7; background: #dfe7ed; color: #23384e; font-weight: 750; }
 .workspace :is(button, input, select, textarea):focus-visible, .sheet :is(button, input, select, textarea):focus-visible { outline: 3px solid #3182f6; outline-offset: 3px; }
 .progressCard { display: grid; gap: 6px; padding: 9px 11px; border: 1px solid #e9cf9d; border-radius: 7px; background: #fffaf0; }
 .progressCard > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
@@ -24,8 +24,7 @@
 .optionsTrigger { position: relative; display: grid; place-items: center; flex: 0 0 48px; min-width: 48px; min-height: 48px; padding: 0; border: 1px solid #cbd6e0; border-radius: 8px; background: #f4f7f9; color: #49627b; cursor: pointer; }
 .optionsTrigger > span { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border: 1px solid #f4f7f9; border-radius: 50%; background: #27745d; opacity: 0; }
 .optionsTrigger[data-active] > span { opacity: 1; }
-.countModeStatus { display: inline-flex; align-items: center; justify-self: end; gap: 5px; margin: -3px 4px 0 0; color: #256952; font-size: 11px; font-weight: 700; }
-.countModeStatus > span { width: 7px; height: 7px; border-radius: 50%; background: #34876f; }
+.countModeStatus { margin: 0; color: #256952; font-size: 13px; font-weight: 700; }
 .optionToggle { display: flex; align-items: center; gap: 11px; min-height: 56px; padding: 5px 11px; border: 1px solid #d8e1e8; border-radius: 8px; background: #f8fafb; color: #2b3b4c; font-size: 16px; font-weight: 700; line-height: 1.3; cursor: pointer; transition: background 160ms, border-color 160ms, box-shadow 160ms; }
 .optionToggle:has(input:checked) { border-color: #9fc9bb; background: #edf8f3; box-shadow: inset 3px 0 #34876f; color: #205f4c; }
 .optionToggle:has(input:disabled) { cursor: not-allowed; opacity: .55; }
@@ -33,7 +32,7 @@
 .optionToggle > span { min-width: 0; }
 .optionToggle small { display: block; margin-top: 3px; color: #657386; font-size: 11px; font-weight: 550; }
 .resultCount { margin: 0; color: #4e5968; font-size: 13px; }
-.catalogMeta { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+.catalogMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; min-height: 26px; }
 .countToggle { display: grid; position: relative; grid-template-columns: minmax(0, 1fr) minmax(150px, 46%); align-items: center; gap: 12px; min-height: 64px; padding: 8px 10px; border: 1px solid #d8e1e8; border-radius: 8px; background: #f8fafb; cursor: pointer; }
 .countToggleLabel { color: #2b3b4c; font-size: 16px; font-weight: 720; line-height: 1.3; }
 .countToggle > input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -44,31 +43,30 @@
 .countToggle[data-active] .countToggleLabel, .countToggle[data-active] .countToggleControl > span:last-child { color: #20654f; }
 .countToggle:has(input:focus-visible) { outline: 3px solid #3182f6; outline-offset: 3px; }
 .countToggle:has(input:disabled) { cursor: wait; opacity: .55; }
-.catalogMeta :global(.glass-button) { min-height: 44px; padding: 4px 8px; margin-block: -8px; color: #50667f; font-size: 12px; }
-.list { display: grid; gap: 5px; }
-.product { background: #ffffffd9; border: 1.5px solid #dce3ea; border-radius: 7px; min-width: 0; }
-.product[data-count-highlight="pending"] { border-color: #d8a957; }
-.product[data-count-highlight="done"] { border-color: #65b28b; }
+.catalogMeta :global(.glass-button) { min-height: 44px; padding: 4px 8px; margin-block: -8px; margin-left: auto; color: #50667f; font-size: 12px; }
+.list { composes: list from "../../components/ui/field-list.module.css?inventory"; }
 .productBody { min-width: 0; flex: 1; display: grid; gap: 2px; }
-.thumbnail { display: grid; place-items: center; flex: 0 0 56px; width: 56px; height: 64px; overflow: hidden; border: 1px solid #e5e8eb; border-radius: 5px; background: #f5f6f8; color: #8b95a1; }
+.thumbnail { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 44px; overflow: hidden; border: 1px solid #e5e8eb; border-radius: 5px; background: #f5f6f8; color: #8b95a1; }
 .thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.cardTitle { font-size: 15px; line-height: 1.45; font-weight: 750; overflow-wrap: anywhere; letter-spacing: -.03em; }
-.cardMeta, .cardDate { color: #58687c; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.cardBadges { display: flex; flex-wrap: wrap; gap: 3px 5px; align-items: center; }
-.cardBadges:empty { display: none; }
-.expiryBadge, .countBadge { display: inline-flex; align-items: center; gap: 3px; color: #677486; font-size: 10px; line-height: 1.4; font-weight: 600; }
+.cardTitle { font-size: 16px; line-height: 1.35; font-weight: 750; overflow-wrap: anywhere; }
+.cardMeta, .cardDetails { color: #58687c; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.cardDetails { display: flex; flex-wrap: wrap; gap: 1px 8px; }
+.rowUrgent { color: #85500f; font-weight: 700; }
+.rowStatus[data-state="done"] { color: #217750; }
+.rowStatus[data-state="changed"] { color: #97641d; }
+.rowStatus { font-weight: 700; }
+.countIndicator { display: grid; place-items: center; flex: 0 0 20px; height: 20px; border: 2px solid #8393a5; border-radius: 50%; color: #fff; font-size: 16px; line-height: 1; }
+.countIndicator[data-state="done"] { border-color: #23865d; background: #23865d; }
+.countIndicator[data-state="changed"] { border-color: #a36c26; color: #8a571b; }
+.countIndicator[data-state="none"] { border-color: transparent; }
+.expiryBadge { display: inline-flex; align-items: center; gap: 3px; color: #677486; font-size: 10px; line-height: 1.4; font-weight: 600; }
 .expiryBadge[data-urgent] { color: #85500f; background: #fff2d5; border-radius: 5px; padding: 3px 5px; }
-.countBadge[data-state="done"] { color: #217750; }
-.countBadge[data-state="changed"] { color: #97641d; }
-.lotSummaryBadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #eaf0f8; color: #47658a; }
-.lotSummaryBadge strong { font-variant-numeric: tabular-nums; }
-.cardStock { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 3px; flex: 0 0 auto; max-width: 92px; color: #215fac; }
-.cardStock strong { font-size: 23px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
-.cardStock > span { color: #617084; font-size: 11px; }
+.cardStock { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 3px; flex: 0 1 auto; max-width: 84px; color: #215fac; }
+.cardStock strong { font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
+.cardStock > span { color: #617084; font-size: 13px; }
 .message { padding: 30px 20px; border: 1px solid #e5e8eb; border-radius: 14px; background: #fff; text-align: center; display: grid; justify-items: center; gap: 16px; color: #4e5968; line-height: 1.7; }
 .loadMore { justify-self: center; scroll-margin-block-end: calc(var(--inventory-action-inset) + 90px); }
-.productButton { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 84px; padding: 8px 9px; border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.productButton:hover { background: #f7f8fa; }
+.productButton { composes: row from "../../components/ui/field-list.module.css?inventory"; display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 8px 4px; font: inherit; text-align: left; cursor: pointer; }
 .sheet { color: #191f28; display: grid; gap: 12px; padding: 2px 0 6px; }
 .sheet :global(.glass-button) { min-height: 44px; }
 .sheet :global(.glass-button--glass) { background: #e8eef5; border-color: #cbd8e5; color: #304d6b; }
@@ -171,7 +169,6 @@
 .lotCard { display: grid; gap: 8px; padding: 12px; border: 1px solid #e5e8eb; border-radius: 7px; background: #fff; }
 .lotCard > label { width: 100%; }
 .lotCard strong { font-size: 14px; overflow-wrap: anywhere; }
-.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sectionHeading h3 { margin: 0; font-size: 16px; }
 .sectionHeading h3 span { color: #1b64da; margin-left: 5px; }
 .stickyActions { position: fixed; bottom: calc(var(--inventory-action-inset) + env(safe-area-inset-bottom)); right: max(16px, env(safe-area-inset-right)); z-index: 5; pointer-events: none; }
@@ -179,6 +176,6 @@
 @media (min-width: 761px) { .workspace, .workspace[data-admin] { --inventory-action-inset: 16px; } }
 @media (max-width: 480px) { .sheet .row { flex-wrap: wrap; } }
 @media (min-width: 900px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 359px) { .productButton { gap: 7px; padding: 8px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 20px; } .cardTitle { font-size: 14px; } .filters { gap: 6px; } }
+@media (max-width: 359px) { .productButton { gap: 6px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 18px; } .filters { gap: 6px; } }
 @media (prefers-reduced-motion: reduce) { .locations button, .optionToggle, .countToggleControl > span { transition: none; } }
-@media (forced-colors: active) { .product[data-count-highlight="done"], .product[data-count-highlight="pending"] { border-color: Highlight; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }
+@media (forced-colors: active) { .countIndicator { border-color: CanvasText; } .countIndicator[data-state="done"], .countIndicator[data-state="changed"] { border-color: Highlight; color: HighlightText; background: Highlight; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }

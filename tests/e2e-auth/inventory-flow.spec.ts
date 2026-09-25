@@ -747,7 +747,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await submitMutation(page, count, "수량 일치 · 실사 완료", "recordInventoryCount");
   await expect(detail.getByText("이번 주 확인", { exact: true })).toBeVisible();
   await expect.poll(async () => (await storedProduct()).lastCountByLocation.refrigerated?.changed).toBe(false);
-  await expect(page.locator('article[data-count-state="done"]').filter({ hasText: productName })).toHaveAttribute("data-count-highlight", "done");
+  await expect(page.locator('article[data-count-state="done"]').filter({ hasText: productName })).toHaveAttribute("data-count-indicator", "done");
 
   await detail.getByRole("button", { name: "출고", exact: true }).click();
   const issue = page.getByRole("dialog", { name: "출고 기록", exact: true });
@@ -1013,7 +1013,7 @@ test("an offline registration draft stays in memory and saves only after an expl
   }
 });
 
-test("all locations sum one product and require each location's count, with progress only on the configured count day", async ({ page }, info) => {
+test("all locations sum one product and require each location's count, with progress only on the configured count day", async ({ page, browser }, info) => {
   assertInventoryE2EEnvironment();
   const settingsRef = db().doc(INVENTORY_SETTINGS_PATH);
   const originalSettings = await settingsRef.get();
@@ -1023,6 +1023,10 @@ test("all locations sum one product and require each location's count, with prog
     pendingWeekday: null, effectiveDate: null, pendingCycleStartDate: null, updatedAt: null, updatedBy: null });
   const fixtureId = "inventory-multi-location-e2e";
   const fixtureName = "여러 구역 합산 검증 상품";
+  const densityProducts = [
+    { id: "inventory-row-density-e2e", name: "재고 조사 보조 품목", quantity: 8 },
+    { id: "inventory-row-long-e2e", name: "초장문 한국어 품명 줄바꿈 검증 식재료 냉장 보관 제품", quantity: 98765 },
+  ];
   const now = new Date().toISOString();
   const fixture = inventoryProductSchema.parse({
     productId: fixtureId, companyId: "onnuri", name: fixtureName, manufacturer: "합산 검증", specification: "1kg", origin: "대한민국", note: "",
@@ -1045,6 +1049,17 @@ test("all locations sum one product and require each location's count, with prog
       quantity: fixture.quantityByLocation[locationId], revision: 1, createdAt: now, updatedAt: now,
     }));
   }
+  for (const item of densityProducts) {
+    const extra = inventoryProductSchema.parse({ ...fixture, productId: item.id, name: item.name,
+      quantityByLocation: { ...inventoryLocationMap(0), refrigerated: item.quantity },
+      nearestExpiryByLocation: { ...inventoryLocationMap(null), refrigerated: expiryAfter(12) },
+      lastCountByLocation: inventoryLocationMap(null), photo: null });
+    batch.create(db().doc(`${INVENTORY_PRODUCT_PATH}/${item.id}`), extra);
+    batch.create(db().doc(`${INVENTORY_PRODUCT_PATH}/${item.id}/lots/${item.id}-lot`), inventoryLotSchema.parse({
+      lotId: `${item.id}-lot`, originLotId: `${item.id}-lot`, productId: item.id, locationId: "refrigerated", label: "",
+      expiryState: "dated", expiryDate: expiryAfter(12), quantity: item.quantity, revision: 1, createdAt: now, updatedAt: now,
+    }));
+  }
   await batch.commit();
   try {
     await login(page, PHASE3_TEST_PINS.salesA);
@@ -1056,11 +1071,42 @@ test("all locations sum one product and require each location's count, with prog
     await expect(card).toContainText("D-4");
     const article = page.locator("article").filter({ has: card });
     await expect(article).toHaveAttribute("data-count-state", "pending");
-    await expect(article).toHaveAttribute("data-count-highlight", "pending");
+    await expect(article).toHaveAttribute("data-count-indicator", "pending");
     const progress = page.getByRole("progressbar");
     await expect(page.getByText("오늘은 재고조사일", { exact: true })).toBeVisible();
     const initialComplete = await progress.evaluate((element) => (element as HTMLProgressElement).value);
+    const density = await page.evaluate(() => {
+      const navTop = document.querySelector("nav")!.getBoundingClientRect().top;
+      const rows = [...document.querySelectorAll('section[aria-label="재고 관리"] ul li article')].map((row) => row.getBoundingClientRect());
+      return { navTop, firstRowTop: rows[0]?.top, visibleRows: rows.filter((row) => row.top >= 0 && row.bottom <= navTop).length,
+        rowHeights: rows.map((row) => Math.round(row.height)), horizontalOverflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    expect(density.visibleRows, "four inventory rows should fit above mobile navigation").toBeGreaterThanOrEqual(4);
+    expect(density.horizontalOverflow).toBe(false);
+    await info.attach("inventory-row-density-360", { body: JSON.stringify(density), contentType: "application/json" });
     await capture(page, info, "all-locations-before-count-360");
+    for (const width of [320, 390, 412]) {
+      await page.setViewportSize({ width, height: 800 });
+      await captureInventoryList(page, info, `survey-day-rows-${width}`);
+    }
+    const zoomContext = await browser.newContext({ viewport: { width: 384, height: 450 }, deviceScaleFactor: 2 });
+    try {
+      await zoomContext.route("**/*", async (route) => {
+        const url = new URL(route.request().url());
+        if (allowedOrigins.has(url.origin) || ["blob:", "data:"].includes(url.protocol)) await route.continue();
+        else await route.abort("blockedbyclient");
+      });
+      const zoomPage = await zoomContext.newPage();
+      await login(zoomPage, PHASE3_TEST_PINS.salesA);
+      await zoomPage.setViewportSize({ width: 384, height: 450 });
+      await capture(zoomPage, info, "survey-day-rows-zoom-200");
+    } finally { await zoomContext.close(); }
+    await page.setViewportSize({ width: 360, height: 800 });
+    const searchForLongName = page.getByRole("searchbox", { name: "품목 검색", exact: true });
+    await searchForLongName.fill("초장문 한국어");
+    await expect(page.getByRole("button", { name: new RegExp(`^${densityProducts[1]!.name},`) })).toBeVisible();
+    await captureInventoryList(page, info, "survey-day-long-name-360");
+    await searchForLongName.fill("");
     let listOptions = await openListOptions(page);
     await expect(listOptions.getByRole("switch", { name: "재고조사 모드", exact: true })).not.toBeChecked();
     await listOptions.getByRole("switch", { name: "재고조사 모드", exact: true }).check();
@@ -1100,7 +1146,7 @@ test("all locations sum one product and require each location's count, with prog
     expect(stored.quantityByLocation).toEqual(fixture.quantityByLocation);
     await detail.getByRole("button", { name: "닫기", exact: true }).click();
     await expect(article).toHaveAttribute("data-count-state", "done");
-    await expect(article).toHaveAttribute("data-count-highlight", "done");
+    await expect(article).toHaveAttribute("data-count-indicator", "done");
     await expect(progress).toHaveJSProperty("value", initialComplete + 1);
     await capture(page, info, "all-locations-completed-360");
     const events = await productRef.collection("events").get();
@@ -1134,9 +1180,13 @@ test("all locations sum one product and require each location's count, with prog
     expect((await refreshed).ok()).toBe(true);
     await expect(page.getByRole("progressbar")).toHaveCount(0);
     await expect(page.getByText("오늘은 재고조사일", { exact: true })).toHaveCount(0);
-    await expect(article).toHaveAttribute("data-count-highlight", "neutral");
+    await expect(article).not.toHaveAttribute("data-count-indicator", /.+/);
     await capture(page, info, "all-locations-non-count-day-360");
   } finally {
+    for (const item of densityProducts) {
+      await db().doc(`${INVENTORY_PRODUCT_PATH}/${item.id}/lots/${item.id}-lot`).delete();
+      await db().doc(`${INVENTORY_PRODUCT_PATH}/${item.id}`).delete();
+    }
     if (originalSettings.exists) await settingsRef.set(originalSettings.data()!);
     else await settingsRef.delete();
   }
@@ -1190,12 +1240,13 @@ for (const scenario of [
     const card = page.getByRole("button", { name: new RegExp(`^${name}, .*상세 보기$`) });
     const article = page.locator("article").filter({ has: card });
     await expect(card.getByText(/유통기한별 수량/)).toHaveText("유통기한별 수량 2");
-    await expect(article).toHaveAttribute("data-count-highlight", scenario.scheduled || scenario.manual ? "pending" : "neutral");
+    if (scenario.scheduled || scenario.manual) await expect(article).toHaveAttribute("data-count-indicator", "pending");
+    else await expect(article).not.toHaveAttribute("data-count-indicator", /.+/);
     if (!scenario.scheduled) {
       const fresh = page.getByRole("button", { name: `${newName}, 0 봉, 상세 보기`, exact: true });
       await expect(fresh).toBeVisible();
       await expect(fresh.getByText("미확인", { exact: true })).toHaveCount(0);
-      await expect(page.locator("article").filter({ has: fresh })).toHaveAttribute("data-count-highlight", "neutral");
+      await expect(page.locator("article").filter({ has: fresh })).not.toHaveAttribute("data-count-indicator", /.+/);
     }
     await card.click();
     const detail = page.getByRole("dialog", { name, exact: true });
@@ -1232,7 +1283,8 @@ for (const scenario of [
       await expect(detail.getByText("이번 주 확인", { exact: true })).toHaveCount(0);
     }
     await detail.getByRole("button", { name: "닫기", exact: true }).click();
-    await expect(article).toHaveAttribute("data-count-highlight", scenario.scheduled || scenario.manual ? "done" : "neutral");
+    if (scenario.scheduled || scenario.manual) await expect(article).toHaveAttribute("data-count-indicator", "done");
+    else await expect(article).not.toHaveAttribute("data-count-indicator", /.+/);
     await capture(page, info, `inspection-${scenario.key}-360`);
     const events = await ref.collection("events").get();
     expect(events.docs.map((event) => event.get("kind")).sort()).toEqual(["adjust", "receive"]);
