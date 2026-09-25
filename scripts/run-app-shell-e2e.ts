@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { chromium } from "@playwright/test";
 
 const environment = {
   ...process.env,
@@ -33,9 +34,24 @@ async function waitForServer() {
   throw new Error("Next.js app-shell test server did not become ready in time.");
 }
 
+async function waitForClientReady() {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto("http://127.0.0.1:3102/", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: /앱 연결 설정이\s*필요합니다\./ }).waitFor({
+      state: "visible",
+      timeout: 120_000,
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
 let exitCode = 1;
 try {
   await waitForServer();
+  await waitForClientReady();
   const playwrightCli = join(
     process.cwd(),
     "node_modules",

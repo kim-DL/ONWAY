@@ -136,6 +136,22 @@ if (mode === "start") {
   ];
 } else if (mode === "phase17") {
   environment.CI = "true";
+  delete environment.GOOGLE_APPLICATION_CREDENTIALS;
+  delete environment.FIREBASE_TOKEN;
+  environment.GCLOUD_PROJECT = "demo-onnuriway";
+  environment.GOOGLE_CLOUD_PROJECT = "demo-onnuriway";
+  environment.NEXT_PUBLIC_FIREBASE_API_KEY = "demo-api-key";
+  environment.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "demo-onnuriway.firebaseapp.com";
+  environment.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "demo-onnuriway";
+  environment.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "demo-onnuriway.appspot.com";
+  environment.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "1234567890";
+  environment.NEXT_PUBLIC_FIREBASE_APP_ID = "1:1234567890:web:demo-onnuriway";
+  environment.NEXT_PUBLIC_USE_FIREBASE_EMULATORS = "true";
+  environment.DELIVERY_PHOTO_BUCKET = "demo-onnuriway-delivery-photos.appspot.com";
+  environment.FIREBASE_CONFIG = JSON.stringify({
+    projectId: "demo-onnuriway", storageBucket: "demo-onnuriway.appspot.com",
+  });
+  environment.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS = "true";
   const tscCli = join(projectRoot, "node_modules", "typescript", "bin", "tsc");
   const buildResult = spawnSync(process.execPath, [tscCli], {
     cwd: join(projectRoot, "functions"),

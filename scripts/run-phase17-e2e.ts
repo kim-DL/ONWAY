@@ -1,6 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 
+if (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== "demo-onnuriway"
+  || process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS !== "true"
+  || process.env.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS !== "true"
+  || !/^(127\.0\.0\.1|localhost):/.test(process.env.FIRESTORE_EMULATOR_HOST ?? "")
+  || !/^(127\.0\.0\.1|localhost):/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "")) {
+  throw new Error("Phase 17 user journey requires demo emulators and a local delivery-photo flag-on build.");
+}
+
 await import("./seed-emulator.js");
 
 const environment = {

@@ -27,6 +27,27 @@ async function submitPin(page: Page, pin: string) {
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
 }
 
+type AuditLogDocument = {
+  name: string;
+  fields?: { type?: { stringValue?: string }; actorUid?: { stringValue?: string } };
+};
+
+async function listAuditLogs(): Promise<AuditLogDocument[]> {
+  const documents: AuditLogDocument[] = [];
+  let pageToken: string | undefined;
+  do {
+    const url = new URL("http://127.0.0.1:8080/v1/projects/demo-onnuriway/databases/(default)/documents/auditLogs");
+    url.searchParams.set("pageSize", "100");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await fetch(url, { headers: { authorization: "Bearer owner" } });
+    expect(response.ok).toBe(true);
+    const page = await response.json() as { documents?: AuditLogDocument[]; nextPageToken?: string };
+    documents.push(...(page.documents ?? []));
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return documents;
+}
+
 test("valid PIN persists through reopen and explicit logout clears the session", async ({ page, context }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
@@ -46,22 +67,24 @@ test("valid PIN persists through reopen and explicit logout clears the session",
   await reopened.getByRole("button", { name: "로그아웃" }).click();
   const logoutDialog = reopened.getByRole("dialog", { name: "로그아웃할까요?" });
   await expect(logoutDialog).toBeVisible();
+  const priorLogoutIds = new Set((await listAuditLogs())
+    .filter((document) => document.fields?.type?.stringValue === "LOGOUT"
+      && document.fields?.actorUid?.stringValue === "uid-delivery")
+    .map((document) => document.name));
   await logoutDialog.getByRole("button", { name: "로그아웃", exact: true }).click();
   await expect(reopened.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
   await expect.poll(() => reopened.evaluate(() => localStorage.getItem("onnuriway:private:e2e"))).toBeNull();
 
-  let auditPayload = "";
+  let auditDocuments: AuditLogDocument[] = [];
   await expect.poll(async () => {
-    const auditResponse = await fetch(
-      "http://127.0.0.1:8080/v1/projects/demo-onnuriway/databases/(default)/documents/auditLogs",
-      { headers: { authorization: "Bearer owner" } },
-    );
-    expect(auditResponse.ok).toBe(true);
-    auditPayload = JSON.stringify(await auditResponse.json());
-    return auditPayload;
-  }, { timeout: 5_000 }).toContain("LOGOUT");
-  expect(auditPayload).toContain("LOGIN_SUCCESS");
-  expect(auditPayload).not.toContain(PHASE3_TEST_PINS.delivery);
+    auditDocuments = await listAuditLogs();
+    return auditDocuments.some((document) => document.fields?.type?.stringValue === "LOGOUT"
+      && document.fields?.actorUid?.stringValue === "uid-delivery"
+      && !priorLogoutIds.has(document.name));
+  }, { timeout: 5_000 }).toBe(true);
+  expect(auditDocuments.some((document) => document.fields?.type?.stringValue === "LOGIN_SUCCESS"
+    && document.fields?.actorUid?.stringValue === "uid-delivery")).toBe(true);
+  expect(JSON.stringify(auditDocuments)).not.toContain(PHASE3_TEST_PINS.delivery);
 });
 
 test("unknown PIN uses a generic error and locks that lookup after five failures", async ({ page }) => {
