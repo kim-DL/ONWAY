@@ -29,8 +29,8 @@
 .more span { color: var(--customer-muted); font-size: .75rem; }
 .regionStatus { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin: 0; color: var(--customer-muted); font-size: .75rem; line-height: 1.5; }
 .regionStatus button { min-height: 48px; padding: 8px; border: 0; border-radius: 8px; background: var(--customer-accent-soft); color: var(--customer-accent); font: inherit; font-weight: 650; cursor: pointer; }
-.footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--shell-ink-soft, #4e5968); font-size: .8125rem; }
-.footer > span { min-width: 0; }
+.footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--shell-ink-soft, #4e5968); font-size: .8125rem; }
+.footer > span { flex: 1 1 8rem; min-width: 0; }
 .footer strong { color: var(--shell-ink, #191f28); }
 .footer button { display: flex; align-items: center; justify-content: center; gap: 5px; flex-shrink: 0; min-height: 48px; padding: 10px 12px; border: 1px solid #cbded9; border-radius: 10px; background: #e8f5f2; color: #08685f; font: inherit; font-weight: 700; cursor: pointer; }
 .footer button:focus-visible { outline: 2px solid #087f75; outline-offset: 2px; }

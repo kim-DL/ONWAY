@@ -238,3 +238,5 @@ function InteractiveCustomerMap({
     </section>
   );
 }
+
+export default CustomerMap;

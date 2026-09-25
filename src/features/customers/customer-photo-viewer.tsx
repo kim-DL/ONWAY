@@ -32,3 +32,5 @@ export function CustomerPhotoViewer({ url, name, origin, onClose, onImageError }
     </BottomSheetActions>
   </BottomSheet></div>, document.body);
 }
+
+export default CustomerPhotoViewer;

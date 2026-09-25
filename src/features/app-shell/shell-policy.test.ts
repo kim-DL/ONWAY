@@ -37,8 +37,8 @@ describe("app shell role policy", () => {
     expect(getInitialMode(["sales"], "customer")).toBe("customer");
     expect(getInitialMode(["sales"])).toBe("sales");
     expect(getInitialMode(["delivery"])).toBe("delivery");
-    expect(getNavigation("customer").map((item) => item.label)).toEqual(["거래처", "설정"]);
-    expect(normalizeView("customer", "activity")).toBe("schools");
+    expect(getNavigation("customer", false).map((item) => item.label)).toEqual(["거래처", "설정"]);
+    expect(normalizeView("customer", "activity", false)).toBe("schools");
   });
 
   it("keeps production customer navigation unchanged until delivery photos are enabled", () => {

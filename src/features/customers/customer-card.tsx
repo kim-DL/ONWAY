@@ -73,7 +73,7 @@ export function CustomerCardDirectionsLink({ customer }: { customer: Customer })
   if (!href) return <span className={styles.directionsLink} aria-disabled="true"><Icon name="route" size={18} />위치 미등록</span>;
   return <a className={styles.directionsLink} href={href} target="_blank" rel="noopener noreferrer"
     aria-label={`${customer.name} 납품지 길안내`} onClick={(event) => confirmClosedCustomer(event, customer)}>
-    <Icon name="route" size={18} /><span>길안내</span>
+    <Icon name="route" size={18} />길안내
   </a>;
 }
 
@@ -83,15 +83,17 @@ export function CustomerCard({ customer, onSelect, compact = false }: { customer
   return <article className={`${fieldList.row} ${styles.card}`} data-customer-card data-compact={compact || undefined} data-closed={customer.status === "closed" || undefined}>
     <button type="button" className={styles.cardSelect} onClick={onSelect} aria-label={`${customer.name} 상세 정보`} aria-describedby={compact ? `customer-card-password-${customer.customerId}` : undefined} />
     <div className={styles.cardBody}>
-      <div className={styles.cardHeading}><div className={styles.cardName}><Heading>{customer.name}</Heading></div><CustomerBadges customer={customer} /><Icon name="chevron-right" size={17} className={styles.cardChevron} /></div>
+      <div className={styles.cardHeading}><Heading className={styles.cardName}>{customer.name}</Heading><CustomerBadges customer={customer} /><Icon name="chevron-right" size={17} className={styles.cardChevron} /></div>
       <p className={styles.region}>{customerAddress(customer)}</p>
       {compact ? <CustomerPasswordSummary customer={customer} id={`customer-card-password-${customer.customerId}`} /> : <CustomerCoreInformation customer={customer} />}
       <div className={styles.contactRow}>
         <div className={styles.contactText}>
-          {contact ? <><span>{customerContactDisplayName(contact) || "담당자"}</span><strong>{contact.phoneNumber || "연락처 미등록"}</strong></> : <span>연락처 미등록</span>}
+          {contact ? <><span>{customerContactDisplayName(contact) || "담당자"}</span><strong>{contact.phoneNumber || "연락처 미등록"}</strong></> : "연락처 미등록"}
         </div>
-        {contact ? <CustomerPhoneLink customer={customer} contact={contact} /> : null}
-        <CustomerCardDirectionsLink customer={customer} />
+        <div className={styles.contactActions}>
+          {contact?.phoneNumber && <CustomerPhoneLink customer={customer} contact={contact} />}
+          <CustomerCardDirectionsLink customer={customer} />
+        </div>
       </div>
     </div>
   </article>;

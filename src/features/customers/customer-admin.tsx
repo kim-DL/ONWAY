@@ -17,7 +17,7 @@ import { searchCustomers } from "./customer-search";
 import { useCustomers } from "./use-customers";
 import styles from "./customer.module.css";
 
-const CustomerEditor = dynamic(() => import("./customer-editor").then((module) => module.CustomerEditor));
+const CustomerEditor = dynamic(() => import("./customer-editor"));
 
 function CustomerAdminContent({ session }: { session: AuthenticatedSession }) {
   const { showToast } = useToast();

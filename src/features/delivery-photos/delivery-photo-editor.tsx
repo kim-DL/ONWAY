@@ -77,3 +77,5 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
     <BottomSheetActions busy={busy}><button type="button" onClick={onClose} disabled={busy}>취소</button><button type="button" onClick={() => void save()} disabled={!dirty || busy || error === "conflict"}>{busy ? "저장 중" : "저장"}</button></BottomSheetActions>
   </BottomSheet>;
 }
+
+export default DeliveryPhotoEditor;

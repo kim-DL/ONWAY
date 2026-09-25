@@ -27,11 +27,13 @@ import { customerHomeRecents } from "./recent-customer-history";
 import { useCustomers } from "./use-customers";
 import styles from "./customer.module.css";
 
-const CustomerEditor = dynamic(() => import("./customer-editor").then((module) => module.CustomerEditor), {
+const CustomerEditor = dynamic(() => import("./customer-editor"), {
   loading: () => <BottomSheet open title="거래처 정보" onClose={() => undefined} dismissible={false}><p role="status">입력 화면을 준비하고 있어요.</p></BottomSheet>,
 });
 
-export function CustomerWorkspace({ session }: { session: AuthenticatedSession }) {
+export function CustomerWorkspace({ session, requestedCustomerId }: {
+  session: AuthenticatedSession; requestedCustomerId: string | null;
+}) {
   const sessionKey = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`;
   const initialSnapshot = readCustomerWorkspaceSnapshot(sessionKey);
   const greeting = useTimeGreeting();
@@ -43,7 +45,7 @@ export function CustomerWorkspace({ session }: { session: AuthenticatedSession }
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreSearchFocus = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState(requestedCustomerId);
   const [editing, setEditing] = useState<Customer | "new" | null>(null);
   const clearSensitiveState = useCallback(() => { setSelectedId(null); setEditing(null); setQuery(""); setDirectoryOpen(false); }, []);
   const catalog = useCustomers(session, clearSensitiveState);
@@ -106,7 +108,7 @@ export function CustomerWorkspace({ session }: { session: AuthenticatedSession }
         </section>
           : <><div className={styles.resultsHeading}><p className={styles.resultCount} role="status">검색 결과 <strong>{results.length}</strong>곳</p><button type="button" className={styles.textButton} onClick={() => setQuery("")}>최근 거래처</button></div>{results.length ? <ul className={`${fieldList.list} ${styles.results}`}>{results.map((customer) => <li key={customer.customerId}><CustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} /></li>)}</ul> : <div className={styles.empty}><Icon name="search" size={25} /><h2>등록된 거래처를 찾을 수 없습니다.</h2><p>거래처명의 일부나 초성으로 다시 찾아보세요.</p></div>}</>}</>}
     {directoryOpen ? <CustomerDirectory customers={catalog.customers} status={catalog.status} message={catalog.message} onRetry={catalog.retry} onSelect={openCustomer} onClose={() => setDirectoryOpen(false)} /> : null}
-    {selected && !editing ? <CustomerDetail key={selected.customerId} customer={selected} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected)} /> : null}
+    {selected && !editing ? <CustomerDetail key={selected.customerId} customer={selected} session={session} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected)} /> : null}
     {editing && catalog.canRetainDraft ? <CustomerEditor key={editing === "new" ? "new" : `${editing.customerId}:${editing.revision}`} customer={editing === "new" ? null : editing} refreshMessage={catalog.status === "error" ? "목록 갱신이 지연되고 있어요. 작성 중인 내용은 유지됩니다." : ""} onClose={() => setEditing(null)} onSaved={(customer) => { catalog.accept(customer); setEditing(null); setSelectedId(customer.customerId); rememberCustomer(customer.customerId); catalog.retry(); showToast("거래처 정보를 저장했어요.", "success"); }} /> : null}
   </section>;
 }

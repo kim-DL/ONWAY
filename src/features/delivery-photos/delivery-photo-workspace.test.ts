@@ -50,26 +50,27 @@ describe("delivery photo field workspace", () => {
     { value: { ...customer, administrativeDong: "", accessPassword: "", accessPasswordState: "unknown" as const }, expected: "" },
   ])("formats existing customer location/password data without placeholders", ({ value, expected }) => {
     const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer: value, uploadReady: true,
-      onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
+      onView: () => undefined, onCapture: () => undefined, onMore: () => undefined, onRetry: () => undefined }));
     if (expected) expect(html).toContain(expected);
     else expect(html).not.toContain("<small");
   });
 
-  it("keeps the completed row action and exposes a visible history button", () => {
+  it("makes the information area the sole history action and keeps camera and more separate", () => {
     const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, count: 3, latestAt: "2026-09-24T01:42:00.000Z", uploadReady: true,
-      onView: () => undefined, onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
+      onView: () => undefined, onCapture: () => undefined, onMore: () => undefined, onRetry: () => undefined }));
     expect(html).toContain("탄방동 · 출입비번 00123*");
     expect(html).toContain("사진 3장 · 마지막 등록 10:42");
-    expect(html).toContain('aria-label="농진 납품사진 보기, 사진 3장 · 마지막 등록 10:42"');
     expect(html).toContain('aria-label="농진 사진 기록"');
-    expect(html).toContain(">기록</button>");
+    expect(html).toContain('aria-label="농진 카메라 촬영"');
+    expect(html).toContain('aria-label="농진 더보기"');
+    expect(html).not.toContain(">기록</button>");
   });
 
   it("exposes history before a customer has a photo today", () => {
     const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, uploadReady: true,
-      onView: () => undefined, onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
+      onView: () => undefined, onCapture: () => undefined, onMore: () => undefined, onRetry: () => undefined }));
     expect(html).toContain('aria-label="농진 사진 기록"');
-    expect(html).not.toContain("납품사진 보기");
+    expect(html).toContain('aria-label="농진 카메라 촬영"');
   });
 
   it("does not add a persistent business-state or background queue dependency", () => {

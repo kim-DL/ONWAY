@@ -3,7 +3,9 @@ export type DeliveryPhotoCompletionProjection = {
   completedCustomerIds: readonly string[];
 };
 
-function uniqueKnownCustomerIds(customerIds: readonly string[], knownCustomerIds: ReadonlySet<string>): string[] {
+type KnownCustomerIds = Pick<ReadonlySet<string>, "has">;
+
+function uniqueKnownCustomerIds(customerIds: readonly string[], knownCustomerIds: KnownCustomerIds): string[] {
   const seen = new Set<string>();
   return customerIds.filter((customerId) => {
     if (!knownCustomerIds.has(customerId) || seen.has(customerId)) return false;
@@ -15,7 +17,7 @@ function uniqueKnownCustomerIds(customerIds: readonly string[], knownCustomerIds
 export function resolveDeliveryPhotoDayCustomerIds(
   routeCustomerIds: readonly string[],
   dayOverrideCustomerIds: readonly string[] | null,
-  knownCustomerIds: ReadonlySet<string>,
+  knownCustomerIds: KnownCustomerIds,
 ): string[] {
   return uniqueKnownCustomerIds(dayOverrideCustomerIds ?? routeCustomerIds, knownCustomerIds);
 }
@@ -23,7 +25,7 @@ export function resolveDeliveryPhotoDayCustomerIds(
 export function addDeliveryPhotoCustomer(
   customerIds: readonly string[],
   customerId: string,
-  knownCustomerIds: ReadonlySet<string>,
+  knownCustomerIds: KnownCustomerIds,
 ): string[] {
   return uniqueKnownCustomerIds([...customerIds, customerId], knownCustomerIds);
 }
@@ -36,7 +38,7 @@ export function moveDeliveryPhotoCustomer(
   customerIds: readonly string[],
   customerId: string,
   targetIndex: number,
-  knownCustomerIds: ReadonlySet<string>,
+  knownCustomerIds: KnownCustomerIds,
 ): string[] {
   const normalized = uniqueKnownCustomerIds(customerIds, knownCustomerIds);
   const sourceIndex = normalized.indexOf(customerId);
@@ -51,12 +53,12 @@ export function moveDeliveryPhotoCustomer(
 
 export function projectDeliveryPhotoCompletion(
   customerIds: readonly string[],
-  activePhotoCounts: ReadonlyMap<string, number>,
+  photoCount: (customerId: string) => number,
 ): DeliveryPhotoCompletionProjection {
   const remainingCustomerIds: string[] = [];
   const completedCustomerIds: string[] = [];
   for (const customerId of customerIds) {
-    if ((activePhotoCounts.get(customerId) ?? 0) > 0) completedCustomerIds.push(customerId);
+    if (photoCount(customerId) > 0) completedCustomerIds.push(customerId);
     else remainingCustomerIds.push(customerId);
   }
   return { remainingCustomerIds, completedCustomerIds };

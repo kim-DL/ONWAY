@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import type { Customer, CustomerContact } from "@/domain/customer";
+import type { AuthenticatedSession } from "@/features/auth/auth-context";
+import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
 
 import { customerAddress } from "./customer-address";
 import { customerDirectionsHref } from "./customer-directions";
@@ -15,9 +17,10 @@ import { customerContactDisplayName } from "./customer-contact-name";
 import { CustomerOverviewPhoto } from "./customer-overview-photo";
 import styles from "./customer-detail.module.css";
 
-const CustomerMap = dynamic(() => import("./customer-map").then((module) => module.CustomerMap), {
+const CustomerMap = dynamic(() => import("./customer-map"), {
   loading: () => <div className={styles.mapLoading} role="status">지도를 준비하고 있어요.</div>,
 });
+const DeliveryPhotoCustomerSection = dynamic(() => import("@/features/delivery-photos/delivery-photo-customer-section"));
 
 const dateFormat = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeZone: "Asia/Seoul" });
 
@@ -35,7 +38,10 @@ function ContactList({ customer, contacts }: { customer: Customer; contacts: rea
   </li>)}</ul>;
 }
 
-export function CustomerDetail({ customer, onClose, onEdit }: { customer: Customer; onClose: () => void; onEdit: () => void }) {
+export function CustomerDetail({ customer, session, onClose, onEdit }: {
+  customer: Customer; session: AuthenticatedSession; onClose: () => void;
+  onEdit: () => void;
+}) {
   const [markerInfo, setMarkerInfo] = useState(false);
   const markerInfoRef = useRef<HTMLElement>(null);
   const { visible: visibleContacts, additional: additionalContacts, phoneContact: contact } = customerDetailContacts(customer.contacts);
@@ -58,6 +64,8 @@ export function CustomerDetail({ customer, onClose, onEdit }: { customer: Custom
         <p className={styles.deliveryNote}>{customer.deliveryLocationDescription || "납품 위치 안내가 아직 없어요."}</p>
         <div className={styles.passwordRow}><span>출입 비밀번호</span><strong data-registered={customer.accessPasswordState === "registered" || undefined}>{customerPasswordLabel(customer)}</strong></div>
       </section>
+
+      {DELIVERY_PHOTOS_ENABLED && <DeliveryPhotoCustomerSection customer={customer} session={session} className={styles.metadata!} />}
 
       <section className={styles.contacts} aria-label="전체 연락처">
         <div className={styles.sectionTitle}><h3>연락처</h3><span>{customer.contacts.length}명</span></div>
@@ -83,7 +91,7 @@ export function CustomerDetail({ customer, onClose, onEdit }: { customer: Custom
         <summary>기본 정보<Icon name="arrow-down" size={16} /></summary>
         <dl><div><dt>거래처 주소</dt><dd>{customer.officialAddress || "미등록"}</dd></div><div><dt>최근 수정</dt><dd><time dateTime={customer.updatedAt}>{dateFormat.format(new Date(customer.updatedAt))}</time></dd></div></dl>
       </details>
-      <BottomSheetActions className={styles.actions ?? ""}>
+      <BottomSheetActions className={styles.actions!}>
         <CustomerDirectionsLink customer={customer} />
         {phoneHref && contact ? <a className={styles.action} href={phoneHref} aria-label={`${customer.name} ${customerContactDisplayName(contact) || "담당자"} 바로 전화`} onClick={(event) => confirmClosedCustomer(event, customer)}><Icon name="phone" size={20} />전화</a> : <span className={styles.action} aria-disabled="true"><Icon name="phone" size={20} />연락처 없음</span>}
         <button type="button" className={styles.action} onClick={onEdit}><Icon name="settings" size={20} />정보 수정</button>

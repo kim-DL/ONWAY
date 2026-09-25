@@ -14,7 +14,7 @@ import { CustomerStorefrontIcon } from "./customer-storefront-icon";
 import { useCustomerPhoto } from "./use-customer-photo";
 import styles from "./customer-overview-photo.module.css";
 
-const CustomerPhotoViewer = dynamic(() => import("./customer-photo-viewer").then((module) => module.CustomerPhotoViewer), { ssr: false });
+const CustomerPhotoViewer = dynamic(() => import("./customer-photo-viewer"));
 
 interface CustomerOverviewPhotoProps {
   customer: Customer;

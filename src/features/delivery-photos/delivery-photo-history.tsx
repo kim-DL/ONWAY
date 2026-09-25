@@ -9,7 +9,7 @@ import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
 import type { DeliveryPhotoDeleteUpdate } from "./delivery-photo-delete-model";
-import { deliveryPhotoHistoryErrorMessage, deliveryPhotoHistoryRepository } from "./delivery-photo-history-repository";
+import { deliveryPhotoHistoryErrorMessage, deliveryPhotoHistoryRepository, type DeliveryPhotoHistoryResult } from "./delivery-photo-history-repository";
 import { newestDeliveryPhotos } from "./delivery-photo-history-model";
 import styles from "./delivery-photo-history.module.css";
 
@@ -19,27 +19,35 @@ type HistoryState = { status: "loading"; photos: DeliveryPhotoMetadata[] }
   | { status: "ready"; photos: DeliveryPhotoMetadata[]; fromDateKey: string }
   | { status: "error"; photos: DeliveryPhotoMetadata[]; message: string };
 
-export function DeliveryPhotoHistory({ customer, session, onClose, sync }: {
+export function DeliveryPhotoHistory({ customer, session, onClose, sync, initialResult, onResult }: {
   customer: Pick<Customer, "customerId" | "name">;
   session: AuthenticatedSession;
   onClose: () => void;
   sync: (update: DeliveryPhotoDeleteUpdate) => void;
+  initialResult?: DeliveryPhotoHistoryResult | undefined;
+  onResult?: ((result: DeliveryPhotoHistoryResult) => void) | undefined;
 }) {
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<HistoryState>({ status: "loading", photos: [] });
+  const [state, setState] = useState<HistoryState>(initialResult
+    ? { status: "ready", photos: newestDeliveryPhotos(initialResult.photos), fromDateKey: initialResult.fromDateKey }
+    : { status: "loading", photos: [] });
   const sessionKey = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`;
 
   useEffect(() => {
+    if (initialResult && attempt === 0) return;
     let active = true;
     const controller = new AbortController();
     queueMicrotask(() => { if (active) setState({ status: "loading", photos: [] }); });
     void deliveryPhotoHistoryRepository.list(customer.customerId, session, controller.signal).then((result) => {
-      if (active && !controller.signal.aborted) setState({ status: "ready", photos: newestDeliveryPhotos(result.photos), fromDateKey: result.fromDateKey });
+      if (active && !controller.signal.aborted) {
+        setState({ status: "ready", photos: newestDeliveryPhotos(result.photos), fromDateKey: result.fromDateKey });
+        onResult?.(result);
+      }
     }).catch((error: unknown) => {
       if (active && !controller.signal.aborted) setState({ status: "error", photos: [], message: deliveryPhotoHistoryErrorMessage(error) });
     });
     return () => { active = false; controller.abort(); };
-  }, [attempt, customer.customerId, session, sessionKey]);
+  }, [attempt, customer.customerId, initialResult, onResult, session, sessionKey]);
 
   return <BottomSheet open title={`${customer.name} 납품사진`} onClose={onClose}>
     <section className={styles.history} aria-label={`${customer.name} 최근 납품사진`}>
@@ -53,3 +61,5 @@ export function DeliveryPhotoHistory({ customer, session, onClose, sync }: {
     </section>
   </BottomSheet>;
 }
+
+export default DeliveryPhotoHistory;

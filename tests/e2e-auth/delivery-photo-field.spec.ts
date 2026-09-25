@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
@@ -89,14 +90,75 @@ async function removePilotPhotos(customerIds: readonly string[]) {
 }
 
 async function chooseRowPhoto(page: Page, customerName: string, source: "카메라 촬영" | "앨범 선택", buffer: Buffer, name = "delivery.jpg") {
+  if (source === "앨범 선택") {
+    await page.getByRole("button", { name: `${customerName} 더보기` }).click();
+    await expect(page.getByRole("dialog", { name: `${customerName} 더보기` })).toBeVisible();
+  }
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: `${customerName} ${source}` }).click();
+  await page.getByRole("button", { name: source === "앨범 선택" ? "앨범에서 사진 추가" : `${customerName} 카메라 촬영` }).click();
   await (await chooser).setFiles({ name, mimeType: "image/jpeg", buffer });
+  if (source === "앨범 선택") await expect(page.getByRole("dialog", { name: `${customerName} 더보기` })).toBeHidden();
 }
 
 async function expectImageReady(image: Locator) {
   await expect.poll(() => image.evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0)).toBe(true);
 }
+
+test("field action layout audit and customer detail history use one customer scope", async ({ page }) => {
+  await login(page);
+  const output = "output/playwright/ui-renewal/customer-photo-field";
+  mkdirSync(output, { recursive: true });
+  const name = names[2]!;
+  const info = page.getByRole("button", { name: `${name} 사진 기록` });
+  const camera = page.getByRole("button", { name: `${name} 카메라 촬영` });
+  const more = page.getByRole("button", { name: `${name} 더보기` });
+  await expect(camera).toBeVisible();
+  for (const width of [320, 360, 390, 412]) {
+    await page.setViewportSize({ width, height: 840 });
+    for (const zoom of [100, 200]) {
+      await page.evaluate((value) => { document.documentElement.style.fontSize = `${value}%`; }, zoom);
+      await info.scrollIntoViewIfNeeded();
+      const metrics = await info.evaluate((button) => {
+        const row = button.closest("li")!;
+        const controls = [button, ...row.querySelectorAll("button")].filter((item, index, items) => items.indexOf(item) === index);
+        const boxes = controls.slice(0, 3).map((item) => {
+          const rect = item.getBoundingClientRect();
+          const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          return { width: rect.width, height: rect.height, hit: hit === item || item.contains(hit) };
+        });
+        return { boxes, rowFits: row.scrollWidth <= row.clientWidth, pageFits: document.documentElement.scrollWidth <= innerWidth };
+      });
+      expect(metrics.rowFits, JSON.stringify({ width, zoom, metrics })).toBe(true);
+      expect(metrics.pageFits).toBe(true);
+      expect(metrics.boxes).toHaveLength(3);
+      for (const box of metrics.boxes) {
+        expect(box.width).toBeGreaterThanOrEqual(48);
+        expect(box.height).toBeGreaterThanOrEqual(48);
+        expect(box.hit).toBe(true);
+      }
+      await page.screenshot({ path: `${output}/delivery-photo-${width}-${zoom}.png` });
+    }
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = "100%"; });
+  await page.setViewportSize({ width: 390, height: 840 });
+  const customerLists: unknown[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/listDeliveryPhotos")) customerLists.push(request.postDataJSON()?.data);
+  });
+  await more.click();
+  const menu = page.getByRole("dialog", { name: `${name} 더보기` });
+  await expect(menu.getByRole("button", { name: "앨범에서 사진 추가" })).toBeVisible();
+  await menu.getByRole("button", { name: "거래처 상세정보" }).click();
+  const detail = page.getByRole("dialog", { name, exact: true });
+  await expect(detail).toBeVisible();
+  const summary = detail.getByRole("button", { name: /납품사진 기록/u });
+  await expect(summary).toContainText("최근 7일");
+  await page.screenshot({ path: `${output}/customer-detail-history-390.png` });
+  await summary.click();
+  await expect(page.getByRole("dialog", { name: `${name} 납품사진` })).toBeVisible();
+  expect(customerLists).toEqual([{ scope: "customer", customerId: ids[2], limit: 30 }]);
+  await page.screenshot({ path: `${output}/customer-history-390.png` });
+});
 
 test("camera and album uploads stay non-blocking and merge only server-confirmed metadata", async ({ page }) => {
   await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
@@ -123,8 +185,9 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
   try {
     const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
     await search.fill("새봄");
+    await page.getByRole("button", { name: "새봄마트 더보기" }).click();
     const unsupportedChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "새봄마트 앨범 선택" }).click();
+    await page.getByRole("button", { name: "앨범에서 사진 추가" }).click();
     await (await unsupportedChooser).setFiles({ name: "unsupported.heic", mimeType: "image/heic", buffer: Buffer.from("unsupported") });
     await expect(page.getByText(/HEIC\/HEIF 사진은 지원하지 않아요/u)).toBeVisible();
     await search.fill("");
@@ -221,16 +284,18 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", portrait, "history-3.jpg");
     await expect(page.locator("details").getByText("사진 3장", { exact: false })).toBeVisible({ timeout: 30_000 });
 
-    const informationButton = page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 3장 · 마지막 등록 /u });
+    const informationButton = page.getByRole("button", { name: "대전식품 사진 기록" });
     await expect(informationButton).toContainText("012345678901234567890123456789");
     await expect(informationButton).toContainText(/사진 3장 · 마지막 등록/u);
-    const openHistory = page.getByRole("button", { name: "대전식품 사진 기록" });
-    await expect(openHistory).toHaveText("기록");
+    const openHistory = informationButton;
+    await expect(openHistory).toHaveCount(1);
     for (const source of ["카메라 촬영", "앨범 선택"] as const) {
+      if (source === "앨범 선택") await page.getByRole("button", { name: "대전식품 더보기" }).click();
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: `대전식품 ${source}` }).click();
+      await page.getByRole("button", { name: source === "앨범 선택" ? "앨범에서 사진 추가" : "대전식품 카메라 촬영" }).click();
       await chooser;
       await page.getByLabel(`납품사진 ${source}`).dispatchEvent("cancel");
+      if (source === "앨범 선택") await expect(page.getByRole("dialog", { name: "대전식품 더보기" })).toBeHidden();
       await expect(page.getByRole("dialog", { name: "대전식품 납품사진", exact: true })).toHaveCount(0);
     }
     await openHistory.focus();
@@ -450,7 +515,7 @@ test("delete confirmation is permission-safe, retry-stable and reconciles the la
     await chooseRowPhoto(page, "대전식품", "앨범 선택", photo, "delete-2.jpg");
     await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("details").getByText("사진 2장", { exact: false })).toBeVisible();
-    await page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 2장/u }).click();
+    await page.getByRole("button", { name: "대전식품 사진 기록" }).click();
     const history = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
     await expect(history.getByText("최근 기록 2장")).toBeVisible({ timeout: 30_000 });
     const firstThumbnail = history.getByRole("button", { name: /^대전식품 납품사진,/u }).first();
@@ -495,7 +560,7 @@ test("delete confirmation is permission-safe, retry-stable and reconciles the la
     await expect.poll(() => page.evaluate((urls) => urls.every((url) => ((window as unknown as { __deliveryPhotoDeleteBlobAudit: { revoked: string[] } }).__deliveryPhotoDeleteBlobAudit.revoked).includes(url)),
       [evidenceUrl, thumbnailUrl].filter((url): url is string => Boolean(url)))).toBe(true);
 
-    await page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 1장/u }).click();
+    await page.getByRole("button", { name: "대전식품 사진 기록" }).click();
     await expect(history.getByText("최근 기록 1장")).toBeVisible({ timeout: 30_000 });
     const remainingThumbnail = history.getByRole("button", { name: /^대전식품 납품사진,/u }).first();
     await remainingThumbnail.click();
@@ -526,7 +591,7 @@ test("another employee photo has no delete action in the viewer DOM", async ({ p
     await snapshots.docs[0]!.ref.update({ createdByUid: "uid-other-delivery", createdByEmployeeId: "EMP-OTHER-DELIVERY", createdByName: "다른 직원" });
     await page.reload(); await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
     await page.locator("details").getByText(/기록완료/u).click();
-    await page.getByRole("button", { name: new RegExp(`^${names[2]} 납품사진 보기`, "u") }).click();
+    await page.getByRole("button", { name: `${names[2]} 사진 기록` }).click();
     const history = page.getByRole("dialog", { name: `${names[2]} 납품사진`, exact: true });
     await expect(history.getByText("최근 기록 1장")).toBeVisible({ timeout: 30_000 });
     await history.getByRole("button", { name: new RegExp(`^${names[2]} 납품사진,`, "u") }).click();

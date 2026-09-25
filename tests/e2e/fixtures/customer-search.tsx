@@ -24,7 +24,7 @@ function renderWorkspace() { root.render(
   <main className="workspace-shell" data-mode="customer">
     <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
     <div aria-hidden="true" style={{ height: 120, padding: "24px 20px", fontWeight: 700 }}>온누리종합식품</div>
-    <div className="workspace-content"><CustomerWorkspace key={workspaceVersion} session={session} /></div>
+    <div className="workspace-content"><CustomerWorkspace key={workspaceVersion} session={session} requestedCustomerId={null} /></div>
   </main>,
 ); }
 (window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture = () => { workspaceVersion += 1; renderWorkspace(); };

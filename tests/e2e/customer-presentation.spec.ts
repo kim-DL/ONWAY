@@ -30,11 +30,11 @@ test.beforeAll(async () => {
     auth: `export function useAuth(){return {state:{status:'authenticated',session:{uid:'FIXTURE',claims:{sessionVersion:1,permissionsVersion:1}}}}}`,
     private: `export const registerPrivateBlobUrl=url=>url; export const forgetPrivateBlobUrl=url=>URL.revokeObjectURL(url);`,
     photo: `export const customerPhotoRepository={load:async(_,id,{signal})=>{await new Promise(done=>setTimeout(done,120)); signal.throwIfAborted(); if(id.endsWith('1'))throw new Error('fixture unavailable'); return new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dce9e9"/><rect y="285" width="640" height="115" fill="#bbc4c5"/><rect x="90" y="95" width="460" height="205" fill="#f6f7f5"/><rect x="90" y="95" width="460" height="38" fill="#326b66"/><rect x="140" y="170" width="140" height="130" fill="#d0d9db"/><rect x="355" y="170" width="115" height="90" fill="#94b7c6"/><text x="320" y="120" text-anchor="middle" font-size="20" fill="white">TEST FIXTURE</text></svg>'],{type:'image/svg+xml'})}};`,
-    map: `export function CustomerMap(){return <div aria-label="검증용 지도 대체 영역" style={{height:180,borderRadius:12,background:'#edf2f4',display:'grid',placeItems:'center',color:'#52636b'}}>지도 영역 · UI 검증용</div>}`,
+    map: `export function CustomerMap(){return <div aria-label="검증용 지도 대체 영역" style={{height:180,borderRadius:12,background:'#edf2f4',display:'grid',placeItems:'center',color:'#52636b'}}>지도 영역 · UI 검증용</div>} export default CustomerMap;`,
     repository: `export const customerRepository={reverseLocation:async()=>{await new Promise(done=>setTimeout(done,120));return {district:'서구',administrativeDong:'둔산1동',address:'대전광역시 서구 검증로 1'}}};`,
     schoolPhoto: `export const PHOTO_UPLOAD_MAX_BYTES=10485760; export const PHOTO_UPLOAD_TYPES=['image/jpeg','image/png','image/webp']; export const schoolPhotoRepository={getVariant:async({slotId})=>{await new Promise(done=>setTimeout(done,80));return {blob:new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#e2eaf0"/><path d="M0 450L800 390V600H0Z" fill="#b6c8d0"/><rect x="100" y="140" width="600" height="300" fill="#f8f7f2"/><rect x="100" y="140" width="600" height="55" fill="#4b7f99"/><rect x="280" y="260" width="200" height="180" fill="#9fb9c2"/><text x="400" y="180" text-anchor="middle" font-size="28" fill="white">SCHOOL FIXTURE '+slotId+'</text></svg>'],{type:'image/svg+xml'}),source:'memory'}},upload:async()=>{throw Error('Unexpected fixture write')},delete:async()=>{throw Error('Unexpected fixture write')},restore:async()=>{throw Error('Unexpected fixture write')}};`,
   };
-  const result = await build({ absWorkingDir: root, entryPoints: ["tests/e2e/fixtures/customer-presentation.tsx"], outfile: "customer-presentation.js", bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent", define: { "process.env.NODE_ENV": '"development"' },
+  const result = await build({ absWorkingDir: root, entryPoints: ["tests/e2e/fixtures/customer-presentation.tsx"], outfile: "customer-presentation.js", bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent", define: { "process.env.NODE_ENV": '"development"', "process.env.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS": '"false"' },
     plugins: [{ name: "isolated-customer-presentation", setup(builder) {
       builder.onResolve({ filter: /auth-context$|private-client-state$|customer-photo-repository$|customer-map$|customer-repository$|school-photo-repository$|use-school-detail$|school-detail-repository$|use-sales-history$|sales-history-repository$|^next\/dynamic$/ }, (args) => args.path === "next/dynamic" && !/school-detail\.tsx$/.test(args.importer) ? undefined : ({ path: args.path === "next/dynamic" ? "dynamic" : args.path.endsWith("use-sales-history") ? "salesHistory" : args.path.endsWith("sales-history-repository") ? "salesHistoryRepository" : args.path.endsWith("use-school-detail") ? "schoolDetail" : args.path.endsWith("school-detail-repository") ? "schoolDetailRepository" : args.path.endsWith("auth-context") ? "auth" : args.path.endsWith("private-client-state") ? "private" : args.path.endsWith("customer-map") ? "map" : args.path.endsWith("customer-repository") ? "repository" : args.path.endsWith("school-photo-repository") ? "schoolPhoto" : "photo", namespace: "customer-fixture" }));
       builder.onLoad({ filter: /.*/, namespace: "customer-fixture" }, (args) => ({ contents: mocks[args.path]!, loader: "tsx", resolveDir: root }));
@@ -894,6 +894,39 @@ for (const width of [360, 412, 768, 1280]) {
       await page.screenshot({ path: `${output}/directory-200-${width}.png` });
     }
     writeFileSync(`${output}/listing-metrics-${width}.json`, JSON.stringify({ width, recent, directory: listing }, null, 2));
+  });
+}
+
+for (const width of [320, 360, 390, 412]) {
+  test(`${width}px no-contact customer keeps directions on one line and separate from detail`, async ({ page }) => {
+    const output = "output/playwright/ui-renewal/customer-photo-field";
+    mkdirSync(output, { recursive: true });
+    await fixture(page, width, "directory", "long");
+    const directory = page.getByRole("dialog", { name: "거래처 전체보기", exact: true });
+    const card = directory.locator("[data-customer-card]").filter({ hasText: "거래처 05 아주 긴 이름" }).first();
+    await card.scrollIntoViewIfNeeded();
+    const directions = card.getByRole("link", { name: /거래처 05.*납품지 길안내/u });
+    await expect(directions).toBeVisible();
+    await expect(card.getByRole("link", { name: /전화/u })).toHaveCount(0);
+    const measure = async () => card.evaluate((element) => {
+      const link = element.querySelector("a[href*='map.kakao.com']")! as HTMLAnchorElement;
+      const detail = element.querySelector("button[aria-label$='상세 정보']")! as HTMLButtonElement;
+      const rect = link.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return { directionHeight: rect.height, directionFits: link.scrollWidth <= link.clientWidth,
+        directionNoWrap: getComputedStyle(link).whiteSpace === "nowrap", directionHit: hit === link || link.contains(hit),
+        detailHeight: detail.getBoundingClientRect().height, cardFits: element.scrollWidth <= element.clientWidth,
+        pageFits: document.documentElement.scrollWidth <= innerWidth };
+    });
+    for (const zoom of [100, 200]) {
+      if (zoom === 200) await page.addStyleTag({ content: "html{font-size:200%}" });
+      await directions.scrollIntoViewIfNeeded();
+      const metrics = await measure();
+      expect(metrics, JSON.stringify({ width, zoom, metrics })).toMatchObject({ directionFits: true, directionNoWrap: true, directionHit: true, cardFits: true, pageFits: true });
+      expect(metrics.directionHeight).toBeGreaterThanOrEqual(48);
+      expect(metrics.detailHeight).toBeGreaterThanOrEqual(48);
+      await page.screenshot({ path: `${output}/customer-no-contact-${width}-${zoom}.png` });
+    }
   });
 }
 

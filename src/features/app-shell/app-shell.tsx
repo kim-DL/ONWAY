@@ -291,6 +291,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     : getInitialMode(session.claims.roleScopes, storedMode);
   const [view, setView] = useState<ShellView>("schools");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [customerDetailRequest, setCustomerDetailRequest] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
@@ -343,6 +344,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
       setChosenMode(restoredMode);
       setView(restoredView);
       setSelectedSchool(restoredSchool);
+      setCustomerDetailRequest(null);
       const nextSearchOpen = isSchoolWorkMode(restoredMode) && snapshot.searchOpen === true && restoredSchool === null;
       if (nextSearchOpen) setSearchMounted(true);
       setSearchOpen(nextSearchOpen);
@@ -401,7 +403,14 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     setSelectedSchool(null);
     setView(nextView);
     setSearchOpen(false);
+    setCustomerDetailRequest(null);
     writeHistory({ mode, view: nextView, school: null, searchOpen: false });
+  };
+
+  const openCustomerDetailFromPhoto = (customerId: string) => {
+    setCustomerDetailRequest(customerId);
+    setView("schools");
+    writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false });
   };
 
   let content;
@@ -410,9 +419,10 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   } else if (view === "settings") {
     content = <SettingsPage session={session} />;
   } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
-    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
+    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} />;
   } else if (mode === "customer") {
-    content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
+    content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session}
+      requestedCustomerId={customerDetailRequest} />;
   } else if (mode === "inventory") {
     content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
   } else if (view === "activity" && mode === "sales") {

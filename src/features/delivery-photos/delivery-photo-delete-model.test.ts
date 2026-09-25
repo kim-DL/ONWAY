@@ -34,7 +34,7 @@ describe("delivery photo delete projection", () => {
     const result = removeDeliveryPhotoFromToday(photos[0]!)(snapshot([photos[0]!]));
     expect(result.today.photos).toEqual([]);
     expect(result.today.customers).toEqual([]);
-    expect(projectDeliveryPhotoCompletion(["customer-a", "customer-b"], new Map(result.today.customers.map((item) => [item.customerId, item.count]))))
+    expect(projectDeliveryPhotoCompletion(["customer-a", "customer-b"], (id) => result.today.customers.find((item) => item.customerId === id)?.count ?? 0))
       .toEqual({ remainingCustomerIds: ["customer-a", "customer-b"], completedCustomerIds: [] });
   });
 

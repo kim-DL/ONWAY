@@ -26,7 +26,7 @@ describe("delivery photo route/day domain", () => {
   });
 
   it("projects completion from active photo counts instead of persisting completion", () => {
-    expect(projectDeliveryPhotoCompletion(["a", "b", "c"], new Map([["b", 2]]))).toEqual({ remainingCustomerIds: ["a", "c"], completedCustomerIds: ["b"] });
-    expect(projectDeliveryPhotoCompletion(["a", "b", "c"], new Map([["b", 0]]))).toEqual({ remainingCustomerIds: ["a", "b", "c"], completedCustomerIds: [] });
+    expect(projectDeliveryPhotoCompletion(["a", "b", "c"], (id) => id === "b" ? 2 : 0)).toEqual({ remainingCustomerIds: ["a", "c"], completedCustomerIds: ["b"] });
+    expect(projectDeliveryPhotoCompletion(["a", "b", "c"], () => 0)).toEqual({ remainingCustomerIds: ["a", "b", "c"], completedCustomerIds: [] });
   });
 });

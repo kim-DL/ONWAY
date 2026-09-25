@@ -18,6 +18,7 @@ import { ToastProvider } from "../../../src/components/ui/toast";
 import { setHeaderMotionPaused } from "../../../src/features/app-shell/header-motion-preference";
 
 const fixturePassword = document.documentElement.dataset.passwordCase === "long" ? '0012*#<>&"'.repeat(12) : "0012*";
+const fixtureSession = { uid: "FIXTURE", displayName: "검증 직원", claims: { employeeId: "FIXTURE", roleScopes: ["customer"], sessionVersion: 1, permissionsVersion: 1 } } as AuthenticatedSession;
 const customers = ["강은유통", "매일식품", "도담식자재", "온유푸드 대전직영물류센터", "마음담은식품"].map((name, index) => ({
   customerId: `PRESENTATION-${index}`, companyId: "onnuri", name, normalizedName: name, choseongName: "ㄱㅇ",
   district: "", administrativeDong: "", officialAddress: "대전광역시 서구 둔산로 100", deliveryAddress: index === 3 ? "대전광역시 대덕구 산업단지길 120번길 30, 후면 물류창고 2층" : `대전광역시 서구 둔산로 ${100 + index}`,
@@ -47,7 +48,7 @@ function Fixture() {
       <div className={styles.recentHeading}><h2 id="recent-heading">최근 검색 거래처</h2><span>5곳</span></div>
       <ul className={`${fieldList.list} ${styles.recentList}`}>{customers.map((customer) => <li key={customer.customerId}><RecentCustomerCard customer={customer} onSelect={() => setSelected(customer)} /></li>)}</ul>
     </section>
-    {selected ? <CustomerDetail customer={selected} onClose={() => setSelected(null)} onEdit={() => undefined} /> : null}
+    {selected ? <CustomerDetail customer={selected} session={fixtureSession} onClose={() => setSelected(null)} onEdit={() => undefined} /> : null}
   </main></div>;
 }
 function PickerFixture() {
@@ -63,9 +64,10 @@ function PickerFixture() {
 const directoryCustomers: Customer[] = Array.from({ length: 40 }, (_, index) => {
   const district = index < 20 ? "서구" : index < 32 ? "대덕구" : "중구";
   const administrativeDong = district === "서구" ? index % 2 ? "둔산2동" : "둔산1동" : district === "대덕구" ? "오정동" : "선화동";
-  const name = `거래처 ${String(index + 1).padStart(2, "0")}`;
+  const name = index === 4 ? "거래처 05 아주 긴 이름의 납품 현장 확인용 거래처" : `거래처 ${String(index + 1).padStart(2, "0")}`;
   return { ...customers[index % customers.length]!, customerId: `DIRECTORY-${index}`, name, normalizedName: normalizeCustomerName(name), choseongName: getCustomerChoseong(name),
-    district, administrativeDong: index === 0 ? "" : administrativeDong, deliveryAddress: `대전광역시 ${district} 검증로 ${index + 1}`,
+    district, administrativeDong: index === 0 ? "" : administrativeDong, contacts: index === 4 ? [] : customers[index % customers.length]!.contacts,
+    deliveryAddress: index === 4 ? "대전광역시 서구 산업단지길 120번길 후문 안쪽 물류창고 2층 맨 끝 입구" : `대전광역시 ${district} 검증로 ${index + 1}`,
     officialAddress: `대전광역시 ${district} 검증로 ${index + 1}`, overviewPhoto: index === 0 ? customers[0]!.overviewPhoto : null };
 });
 function DirectoryFixture() {
@@ -73,7 +75,7 @@ function DirectoryFixture() {
   const [selected, setSelected] = useState<Customer | null>(null);
   return <main className={styles.workspace}><h1>거래처 전체보기 검증</h1><button type="button" onClick={() => setOpen(true)}>전체보기 열기</button>
     {open ? <CustomerDirectory customers={directoryCustomers} onSelect={(id) => setSelected(directoryCustomers.find((customer) => customer.customerId === id) ?? null)} onClose={() => setOpen(false)} /> : null}
-    {selected ? <CustomerDetail customer={selected} onClose={() => setSelected(null)} onEdit={() => undefined} /> : null}
+    {selected ? <CustomerDetail customer={selected} session={fixtureSession} onClose={() => setSelected(null)} onEdit={() => undefined} /> : null}
   </main>;
 }
 const kind = document.documentElement.dataset.fixture;
