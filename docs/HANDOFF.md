@@ -1,6 +1,6 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-25
+기준일: 2026-09-26
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
@@ -19,7 +19,14 @@
 - 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영한 기록 접근 UX는 production Hosting에 배포됐다. 새 UX의 Galaxy 실기기 smoke는 아직 남아 있다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
-### 2026-09-25 재고 목록 모바일 UI/UX 리뉴얼 — production Hosting 승격, Galaxy smoke 대기
+### 2026-09-26 거래처·납품사진 버튼 리뉴얼 — 로컬 후보, production 미배포
+
+- 사용자가 Galaxy S20+의 이전 재고 리뉴얼 결과를 PASS로 보고한 뒤, 운영 `onnuriway.com`의 인증된 거래처 홈·상세와 납품사진 목록·기록 날짜를 읽기 전용으로 관찰했다. 운영 사진 촬영·편집·저장은 실행하지 않았다. 검증된 제품 source commit은 `0c04dd47022025f5426d3f2db7c79006a1af0e60`이며, 버튼 관찰·디자인 결정과 전후 캡처는 `docs/customer-button-design-renewal.md`에 기록했다.
+- 기존 화면 배경을 유지하며 거래처 검색·상세 길찾기와 납품사진 카메라·선택 날짜를 남색 주 행동으로, 보조 버튼은 흰색 면·청색 테두리·하단 그림자로 통일했다. 카메라 아이콘과 중앙 정렬을 수정하고 사진 기록 날짜의 둥근 pill을 각진 탭으로 교체했다. 거래처 홈의 `마지막 확인` 표시만 제거했다. 기능·backend·Rules·feature flag·운영 데이터 계약은 변경하지 않았다.
+- 로컬 후보의 브라우저 캡처는 ignored `output/playwright/button-renewal/before/`와 `after/`에 있다. Galaxy S20+에서 배경·색·버튼 압감, 카메라 중심, 날짜 스와이프와 200% 확대, 검색·상세·전화·길안내·카메라·더보기의 한 손 터치 분리 및 하단 탐색 간섭을 사람이 확인해야 한다. Production 배포는 별도 승인 전까지 하지 않는다.
+- 거래처 static browser 28/28, 인증 demo Emulator 거래처 16/16·납품사진 10/10 PASS. Canonical acceptance 10/10 gate와 내부 Emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-26 00:37:45 KST): unit 1,584 PASS/14 SKIP, 공통 browser 290 PASS, Rules 50 PASS, full user journey 75 PASS/12 SKIP, 검색 5,000건 p95 1.24ms. 최종 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` build와 PWA·성능·Hosting gate가 다시 PASS했고 export/shipped 100개·precache 87개·initial assets 9개다. Customer CSS raw 48,132/49,152B·JS gzip 36,798/36,864B, Delivery-photo CSS raw 6,121/6,144B·JS gzip 10,222/10,240B, History dates CSS raw 1,013/1,024B다. 기존 ceiling·verifier는 변경하지 않았다.
+
+### 2026-09-25 재고 목록 모바일 UI/UX 리뉴얼 — production Hosting 승격, Galaxy PASS 보고
 
 - 재고 카드를 기존 `field-list` 구분선 행으로 치환하고 사진이 없는 품목의 빈 thumbnail 자리를 없앴다. 사진이 있을 때만 기존 인증 미리보기를 40×44px로 표시한다. 조사 상태는 지정 조사일에 개인 조사모드 OFF여도 왼쪽에 표시하고 일반 날짜·모드 OFF에서는 숨긴다. 빈 원·체크·순환 화살표의 형태와 기존 `미확인`·`이번 주 확인`·`변동 후 미확인` 텍스트를 함께 사용하며 indicator 자체에는 동작이 없다. 상세 버튼은 행 전체에 유지하고 넓은 화면의 2열도 유지한다. 계산·저장·conflict·audit·PWA·backend 계약은 변경하지 않았다.
 - 전후 실제 인증 demo Emulator 캡처는 ignored `output/playwright/ui-renewal/inventory/before/`와 `after/`에 있다. 360×800 지정 조사일의 보이는 품목은 기존 약 3개에서 5개로 늘었고, 320px에서도 최소 4개가 보인다. 320·360·390·412px, 768·1280px, 긴 한국어 품명·큰 수량, 200% 유효 확대를 확인했다. 가로 overflow가 없고 1280px은 2열이다. 320px의 다섯 번째 행은 고정 `새 품목` action 아래에 일부 가려지지만 네 번째 행까지 보이며 마지막 행까지 스크롤할 하단 여백은 유지된다.
@@ -27,7 +34,7 @@
 - 재고 unit/model 405/405, 재고 static browser 12/12, 재고 demo Emulator 통합 11/11, app/Functions typecheck, lint, `git diff --check` PASS. Canonical acceptance 10/10 gate 및 내부 Emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 22:17:57 KST): 전체 unit 1,584 PASS/14 SKIP, 공통 browser 290 PASS, Rules 50 PASS, full user journey 87 PASS/472,686ms, 검색 5,000건 p95 1.23ms다. 마지막 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` production 설정 build와 PWA·성능·Hosting gate가 다시 PASS했고 export/shipped 100개·precache 87개·initial assets 9개다.
 - **운영 승격:** clean source `4b778e6c895adba083816569fa349321a6e2a2ee`에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`를 명시해 정적 build와 변경 없는 PWA·성능·Hosting gate를 재통과했다. 생성 navigation chunk의 납품사진 기본값은 `true`다. 후보 `out` 100개 파일 집합 SHA-256은 `04e781f0c71e36f19fe070403c3ac10eba5872600fb1724bd0ca08d151a49423`이다. `npx firebase deploy --project onnuriway --only hosting`으로 site `onnuriway`의 Hosting만 배포했고 새 live/rollback release·version은 위와 같다. 직전과 Hosting 설정의 의미도 동일하다. Functions, Firestore, Storage, Rules, Auth, Vercel, 기타 Firebase/GCP 설정과 production 데이터는 변경하지 않았다.
 - **운영 검증:** `https://onnuriway.com`과 `https://onnuriway.web.app`의 canonical Hosting verifier가 각각 PASS했다. 각 origin에서 후보의 전체 `_next/static`과 주요 설치 자원·SW 등 90개를 SHA-256으로 대조해 불일치 0건이며, `/sw.js`와 precache 87개도 후보와 일치한다. 새 재고 상태 chunk가 배포본에 포함된다. 비로그인 Chromium에서 양쪽 PIN 화면, root scope의 활성 worker, `registration.update()`와 controlled reload 뒤 PIN 복귀를 확인했고 앱 page error는 0건이다. 새 headless 세션의 Google reCAPTCHA Enterprise는 storage access 거부 및 App Check attestation 403을 console에 남겼다. 관련 App Check chunk 3개는 직전 live version과 byte 단위로 동일하므로 이번 재고 bundle 회귀의 증거는 없지만, 인증된 production 내부 UI와 설치 PWA의 실제 업데이트·세션 유지는 PASS 처리하지 않는다.
-- **남은 Galaxy S20+ 사람 확인:** 설치 PWA 업데이트와 기존 session 유지; 일반 목록 밀도; 지정 조사일의 ○/✓/변동 후 미확인, 개인 모드 OFF일 때 표시와 일반 날짜·모드 OFF일 때 숨김, 색 없는 상태 구분; 긴 품명·단위·큰 숫자; 사진 있는 품목의 compact thumbnail과 사진 없는 품목의 빈 공간 제거; 행 전체 상세·한 손 스크롤·검색·200% 확대; 하단 탐색과 고정 `새 품목`/keyboard 간섭·가로 overflow; 품목과 조사 상태를 기존보다 빠르게 훑을 수 있는지를 확인한다. 그 뒤 reference list 채택과 다음 화면을 결정한다.
+- **Galaxy S20+ 사람 확인:** 2026-09-26 사용자가 재고 리뉴얼 결과를 PASS로 보고했다. 세부 항목별 기록은 전달되지 않았으므로 아래 개발자 검증과 구분한다. 거래처를 reference list로 확정할지와 후속 화면 순서는 아직 결정하지 않았다.
 
 ### 2026-09-25 거래처·납품사진 현장 UX — production Hosting 승격, Galaxy smoke 대기
 
