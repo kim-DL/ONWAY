@@ -9,22 +9,24 @@
 
 - 저장소: `C:\Users\HOME\Desktop\onnuriway`
 - Git branch: `codex/mobile-action-reach`
-- Phase 3D 운영 배포 당시 제품 코드 commit은 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 현재 production frontend는 납품사진 기록 접근 UX commit `0d3d5913ebf332282a8735656369b9a579ad4cd5`에서 생성한 아래 Hosting release다.
+- Phase 3D 운영 배포 당시 제품 코드 commit은 `b4831ff4d24b8956e327ea806f1ca6bba1651d9c` (`Add delivery photo deletion`)다. 현재 production frontend는 거래처 목록 UI/UX 리뉴얼 commit `4a8f170360bb7d8e4679899c0f07d0853bcae26c`에서 생성한 아래 Hosting release다.
 - 초기 HANDOFF 정리 시점에 기록된 대규모 dirty worktree는 이후 P0~P2, 재고 제조사 M1~M3, inventory mobile controls checkpoint로 정리되었다. 이 문서의 각 시점별 기록은 역사적 검증 결과로 유지한다.
 - 2026-09-21 HANDOFF 마감은 documentation-only로 진행하며 제품 코드·dependency·테스트·설정을 변경하지 않는다.
 - 운영 Frontend는 Next.js static export → Firebase Hosting site `onnuriway`다. 운영 주소는 `https://onnuriway.com`, 기본 주소는 `https://onnuriway.web.app`이다.
 - Backend는 Firebase Auth, App Check, Firestore Standard/Native(서울), Storage, Cloud Functions 2nd gen(Node 22, `asia-northeast3`)이다.
 - 거래처, 학교납품, 영업/홍보, 재고에 더해 납품사진 field workspace가 production feature flag로 활성화돼 있다.
-- 현재 Firebase Hosting live release는 `1790311854498000`, version은 `8e847575f9771450`, 배포 시각은 `2026-09-25 13:50:54.498 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `9cfc045822a77c4f6da6e3717b176f8540818c0bc646eef2ae95e7a6c4b99492`다. 직전 rollback 지점은 release `1790297267844000`, version `a85d184f5184fcec`이다.
+- 현재 Firebase Hosting live release는 `1790322165230000`, version은 `7eaf3b7cde0bcb93`, 배포 시각은 `2026-09-25 16:42:45.230 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `d0897a5d6f2151fbe6aacaa821c3a1942be3542f0f372e9e9883248bfc366544`다. 직전 rollback 지점은 release `1790311854498000`, version `8e847575f9771450`이다.
 - 납품사진 Phase 3D 운영 기능과 Galaxy S20+ 실사용 확인은 완료됐다. 실기기에서 과거 기록 진입점을 찾기 어려웠다는 후속 피드백을 반영한 기록 접근 UX는 production Hosting에 배포됐다. 새 UX의 Galaxy 실기기 smoke는 아직 남아 있다. 아래 과거 FEATURE FREEZE 기록은 당시 결정이며 이 후속 범위를 제한하지 않는다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
 
-### 2026-09-25 거래처 목록 UI/UX 리뉴얼 1차 — 로컬 prototype, 미배포
+### 2026-09-25 거래처 목록 UI/UX 리뉴얼 1차 — production Hosting 승격, Galaxy smoke 대기
 
 - 거래처 홈의 장식 제목을 압축하고 최근 목록·검색 결과·전체보기를 공통 구분선 행으로 정리했다. 이름·상태·주소·출입비번·납품위치·연락처 순서, 상세 진입 화살표와 별도 전화·길안내 action, 48px 조작 영역을 적용했다. 인증·Callable·데이터 계약과 PWA 동작은 변경하지 않았다. 설계·비교와 Galaxy 확인 항목은 `docs/customer-list-ui-renewal.md`를 따른다.
 - 변경 전 390px 및 변경 후 320·360·390·412·768·1280px, 200% 확대 캡처는 ignored `output/playwright/ui-renewal/`에 있다. 실제 demo Emulator의 PIN 로그인, 거래처 빈/최근 목록, 검색·상세·Back·하단 탐색 캡처도 `after/emulator-*.png`에 모았다. fixture는 긴 한국어 이름·출입비번, 행·action 크기와 가로 넘침을 측정한다.
 - 거래처 unit 21 files/271 PASS, 거래처 demo Emulator 16/16 PASS. canonical acceptance 10/10 gate 및 내부 emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 15:09:50 KST). 전체 unit 1,583 PASS/14 SKIP, safe-config browser 282 PASS, Rules 50 PASS, full user journey 86 PASS/462,982ms, 검색 5,000건 p95 1.24ms다. production candidate build에서 기존 verifier를 수정하지 않고 customer CSS raw 49,101/49,152B, gzip 9,830/9,984B, JS gzip 36,804/36,864B, 초기 JS gzip 139,768B를 확인했다. PWA 및 Hosting build verifier는 PASS, export/shipped 98개·precache 85개·initial assets 9개다.
-- 운영 Hosting 배포는 하지 않는다. 따라서 현재 live release는 위의 `1790311854498000` 그대로다. Galaxy S20+에서 설치 PWA의 터치·키보드·글자 확대·하단 탐색·Back을 직접 확인한 뒤 후속 화면의 적용 순서를 결정한다. 현재 순서는 확정하지 않았다.
+- **운영 승격:** clean source `4a8f170360bb7d8e4679899c0f07d0853bcae26c`에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`를 build 프로세스에 지정했다. production build 및 변경 없는 PWA·성능·Hosting gate PASS, export/shipped 98개·precache 85개·initial assets 9개다. 후보 `out` 파일 집합 SHA-256은 `67fb3442ee2863ab93459e8383675b94834326f8370aa9f388f4393f69e02209`이고 `/sw.js` SHA-256은 위와 같다. 생성된 navigation bundle의 납품사진 기본값은 활성(`true`)이다. `npx firebase deploy --project onnuriway --only hosting`으로 site `onnuriway`의 Hosting만 배포했다. Functions, Firestore, Storage, Rules, Auth, Vercel, production 데이터는 변경하지 않았다.
+- **운영 검증:** Hosting API에서 새 live release/version과 직전 rollback 지점을 확인했다. `https://onnuriway.com`과 `https://onnuriway.web.app`의 canonical Hosting verifier가 각각 PASS했고 두 origin 각각 85개 precache 파일이 후보와 byte 단위로 일치한다(불일치 0). 두 origin의 worker hash·manifest·connectivity·초기 asset·cache/scope header·비공개/없는 경로 404를 확인했다. 새 거래처 행 및 납품사진 navigation chunk가 precache에 포함되며 후보와 일치한다. 비로그인 브라우저에서 두 origin 모두 PIN 화면, PWA `업데이트` 적용 뒤 PIN 복귀, console error 0건을 확인했다. Codex는 인증된 production session이 없어 거래처 내부 UI나 기존 로그인 유지·실기기 체감을 PASS 처리하지 않는다.
+- **남은 Galaxy S20+ 사람 확인:** 설치 PWA 업데이트 뒤 기존 로그인/session 유지; 거래처 첫 화면의 정보 밀도와 최근 5개; 긴 거래처명·주소·출입비번 줄바꿈; 전체 row 상세 진입; 별도 전화·길안내와 세 touch target의 오작동 여부; 한 손 엄지 사용성; 검색→키보드→결과→상세→Back; 전체보기; 200% 글자 확대; 하단 navigation과 콘텐츠/키보드 간섭; 가로 overflow; 스크롤 정보 scanning을 확인한다. 핵심 판단은 원하는 거래처와 action을 이전보다 빠르고 덜 헷갈리게 찾을 수 있는지다. 이 결과를 사람이 확인한 뒤 reference list 채택 여부와 다음 화면 순서를 결정한다.
 
 ### 2026-09-25 OPT-4 release regression — 로컬 PASS, 미배포
 
