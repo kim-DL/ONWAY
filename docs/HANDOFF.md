@@ -1,6 +1,6 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-24
+기준일: 2026-09-25
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
@@ -18,6 +18,14 @@
 - 현재 Firebase Hosting live release는 `1790217833155000`, version은 `79b66cdeae0b2036`, 배포 시각은 `2026-09-24 11:43:53.155 KST`다. 실제 Service Worker 경로는 `/sw.js`이고 SHA-256은 `ebd4c57444b5437ba3f2fe4947a7b54d694ad02e7d56a22718f93fa5694d1a51`다. `https://onnuriway.com`과 `https://onnuriway.web.app`에서 candidate/live worker와 83개 precache asset이 일치했다. 직전 rollback target은 version `e603258b088093f0`다.
 - 납품사진 core feature는 Phase 3D production 배포와 Galaxy S20+ 실사용 확인을 마쳐 **FEATURE FREEZE** 상태다. 다음 작업은 신규 기능 개발이 아니라 repository cleanup/optimization의 OPT-0 read-only audit다.
 - 2026-09-21 release `1789983232326000`, version `2c48893eab60f919`와 worker `2129650a8800dedc5239af91185d3310ba735fe0fd9d8dffb3d3910e84f48594`는 당시 inventory/manufacturer production 기록이며 현재 live baseline이 아니다.
+
+### 2026-09-25 OPT-4 release regression — 로컬 PASS, 미배포
+
+- 검증 코드 commit `570a46caaeee2b36963695ba997eac8621c227a0`에서 acceptance의 demo 환경을 고정하고 납품사진 flag를 해당 demo build에만 활성화했다. 원인은 acceptance launcher가 build-time `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS`를 설정하지 않아 납품사진 메뉴가 빠진 것이었다. production 기본값과 제품 코드는 변경하지 않았다.
+- 추가 harness 오류 두 건도 수정했다. safe-config 브라우저 runner는 HTTP 200 뒤 실제 클라이언트 설정 화면이 준비될 때까지 기다리고, PIN 로그아웃 테스트는 Firestore auditLogs의 모든 page에서 이번 로그아웃 기록을 확인한다. 단언 완화, 테스트 skip/retry, 성능 예산 증가는 없다.
+- 수정 후 canonical acceptance 10/10 gate와 내부 emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-25 09:34:36 KST). OPT-4는 clean commit에서 처음부터 다시 실행해 app/Functions typecheck, lint, unit 1,581 PASS/14 SKIP, 검색 성능 5,000건 p95 1.11ms/50ms, Rules 50/50, 납품사진 backend emulator, production build, PWA/성능/Hosting verifier, safe-config browser 262/262, 재고 static browser 12/12·emulator 11/11, 납품사진 frontend 8/8, 마지막 canonical acceptance 10/10·내부 emulator 12/12를 모두 PASS했다. 마지막 acceptance의 full user journey gate는 469,990ms였다.
+- production build의 초기 JS gzip은 139,733B, customer 36,821B, inventory 25,029B, 납품사진 10,230/3,559/2,918/1,662B로 기존 ceiling 안이다. Hosting export/shipped 96개, precache 83개, 초기 asset 9개다. 재고 격리 E2E 전후 기존 production `out` 96개 파일 집합 SHA-256은 `539e34efc16def7a83e8ab2801e82771b5b09f1d9584b42755b5812aca40564d`로 동일했고 `static-app-*` 잔여는 0이다. 마지막 acceptance의 demo build 뒤 production `out`을 다시 생성해 성능/PWA/Hosting verifier를 재통과했다.
+- Emulator gate는 순차 실행했고 각 종료 후 공유 포트와 관련 프로세스가 0임을 확인했다. production deploy와 운영 Firebase/GCP mutation은 하지 않았다. audit에는 high 이상 0건, moderate 7건이 남아 있다. 로컬 구조 검증은 통과했지만 설치 PWA의 실제 업데이트·offline 복구, 운영 Kakao 경로와 현장망, 운영 환경의 새 candidate 배포 후 브라우저 확인은 이번 미배포 검증 범위 밖이다.
 
 ### 미확인 또는 다시 확인할 사실
 
