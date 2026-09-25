@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { canDeleteDeliveryPhoto } from "./delivery-photo-delete-policy";
-import { deliveryPhotoCardLabel, newestDeliveryPhotos } from "./delivery-photo-history-model";
+import { deliveryPhotoCardLabel, deliveryPhotoHistoryDateLabel, deliveryPhotoHistoryDates, newestDeliveryPhotos } from "./delivery-photo-history-model";
 
 const base = { customerId: "customer-a", deliveryDateKey: "2026-09-24", source: "camera",
   createdByEmployeeId: "employee_1", createdByName: "홍길동", expiresAt: "2026-10-01T01:42:00.000Z",
@@ -27,6 +27,16 @@ describe("delivery photo recent history and viewer", () => {
     expect(deliveryPhotoCardLabel("한빛유통", photos[1]!)).not.toContain("촬영자");
   });
 
+  it("uses the server 168h boundary to cover the eight calendar dates it can span", () => {
+    const dates = deliveryPhotoHistoryDates("2026-09-18");
+    expect(dates).toEqual(["2026-09-25", "2026-09-24", "2026-09-23", "2026-09-22",
+      "2026-09-21", "2026-09-20", "2026-09-19", "2026-09-18"]);
+    expect(deliveryPhotoHistoryDateLabel(dates[0]!, dates)).toBe("오늘");
+    expect(deliveryPhotoHistoryDateLabel(dates[1]!, dates)).toBe("어제");
+    expect(deliveryPhotoHistoryDateLabel(dates[7]!, dates)).toBe("9월 18일");
+    expect(dates).not.toContain("2026-09-17");
+  });
+
   it("keeps thumbnail fetches viewport-gated and evidence fetches viewer-only", () => {
     const thumbnail = readFileSync(fileURLToPath(new URL("./delivery-photo-thumbnail.tsx", import.meta.url)), "utf8");
     const viewer = readFileSync(fileURLToPath(new URL("./delivery-photo-viewer.tsx", import.meta.url)), "utf8");
@@ -38,9 +48,8 @@ describe("delivery photo recent history and viewer", () => {
   });
 
   it("retains keyboard, Back/Escape foundation, position announcements and explicit controls", () => {
-    const history = readFileSync(fileURLToPath(new URL("./delivery-photo-history.tsx", import.meta.url)), "utf8");
     const viewer = readFileSync(fileURLToPath(new URL("./delivery-photo-viewer.tsx", import.meta.url)), "utf8");
-    expect(history).toContain("최근 기록");
+    expect(readFileSync(fileURLToPath(new URL("./delivery-photo-history-dates.tsx", import.meta.url)), "utf8")).toContain("최근 기록");
     expect(viewer).toContain('event.key === "ArrowLeft"');
     expect(viewer).toContain('event.key === "ArrowRight"');
     expect(viewer).toContain('aria-live="polite"');

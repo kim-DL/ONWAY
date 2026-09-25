@@ -55,13 +55,21 @@ describe("delivery photo field workspace", () => {
     else expect(html).not.toContain("<small");
   });
 
-  it("uses the completed row information block as the history action without a separate label button", () => {
+  it("keeps the completed row action and exposes a visible history button", () => {
     const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, count: 3, latestAt: "2026-09-24T01:42:00.000Z", uploadReady: true,
       onView: () => undefined, onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
     expect(html).toContain("탄방동 · 출입비번 00123*");
     expect(html).toContain("사진 3장 · 마지막 등록 10:42");
     expect(html).toContain('aria-label="농진 납품사진 보기, 사진 3장 · 마지막 등록 10:42"');
-    expect(html).not.toContain(">사진 보기<");
+    expect(html).toContain('aria-label="농진 사진 기록"');
+    expect(html).toContain(">기록</button>");
+  });
+
+  it("exposes history before a customer has a photo today", () => {
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, uploadReady: true,
+      onView: () => undefined, onCapture: () => undefined, onAlbum: () => undefined, onRetry: () => undefined }));
+    expect(html).toContain('aria-label="농진 사진 기록"');
+    expect(html).not.toContain("납품사진 보기");
   });
 
   it("does not add a persistent business-state or background queue dependency", () => {

@@ -221,9 +221,11 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", portrait, "history-3.jpg");
     await expect(page.locator("details").getByText("사진 3장", { exact: false })).toBeVisible({ timeout: 30_000 });
 
-    const openHistory = page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 3장 · 마지막 등록 /u });
-    await expect(openHistory).toContainText("012345678901234567890123456789");
-    await expect(openHistory).toContainText(/사진 3장 · 마지막 등록/u);
+    const informationButton = page.getByRole("button", { name: /^대전식품 납품사진 보기, 사진 3장 · 마지막 등록 /u });
+    await expect(informationButton).toContainText("012345678901234567890123456789");
+    await expect(informationButton).toContainText(/사진 3장 · 마지막 등록/u);
+    const openHistory = page.getByRole("button", { name: "대전식품 사진 기록" });
+    await expect(openHistory).toHaveText("기록");
     for (const source of ["카메라 촬영", "앨범 선택"] as const) {
       const chooser = page.waitForEvent("filechooser");
       await page.getByRole("button", { name: `대전식품 ${source}` }).click();
@@ -241,6 +243,14 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     await page.keyboard.press("Enter");
     const history = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
     await expect(history.getByText("최근 기록 3장")).toBeVisible({ timeout: 30_000 });
+    await expect(history.getByText("사진은 최근 7일간 보관됩니다.")).toBeVisible();
+    const dates = history.getByRole("group", { name: "사진 기록 날짜" });
+    await expect(dates.getByRole("button", { name: "전체" })).toHaveAttribute("aria-pressed", "true");
+    await dates.getByRole("button", { name: "오늘" }).click();
+    await expect(history.getByRole("list").getByRole("button", { name: /^대전식품 납품사진,/u })).toHaveCount(3);
+    await dates.getByRole("button", { name: "어제" }).click();
+    await expect(history.getByText("이 날짜에 납품사진 기록이 없습니다.")).toBeVisible();
+    await dates.getByRole("button", { name: "전체" }).click();
     await expect.poll(() => listInputs.length).toBe(1);
     expect(listInputs[0]).toEqual({ scope: "customer", customerId: ids[1], limit: 30 });
     await expect.poll(() => listResults.length).toBe(1);
@@ -276,7 +286,8 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     }
     await history.getByRole("button", { name: "닫기", exact: true }).focus();
     await page.keyboard.press("Tab");
-    await expect(firstThumbnail).toBeFocused();
+    await expect(dates.getByRole("button", { name: "전체" })).toBeFocused();
+    await firstThumbnail.focus();
     expect(await firstThumbnail.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
     await firstThumbnail.click();
     const viewer = page.getByRole("dialog", { name: "대전식품 납품사진 보기", exact: true });
@@ -345,6 +356,60 @@ test("recent customer history lazily relays thumbnails and only the selected evi
   }
 });
 
+test("history is discoverable without a photo today and filters a past server result", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]);
+  await login(page);
+  await expect(page.getByRole("button", { name: "대전식품 사진 기록" })).toBeVisible();
+  await page.getByRole("button", { name: "대전식품 사진 기록" }).click();
+  const emptyHistory = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
+  await expect(emptyHistory.getByText("최근 확인할 수 있는 납품사진이 없습니다.")).toBeVisible();
+  await emptyHistory.getByRole("group", { name: "사진 기록 날짜" }).getByRole("button", { name: "어제" }).click();
+  await expect(emptyHistory.getByText("이 날짜에 납품사진 기록이 없습니다.")).toBeVisible();
+  await emptyHistory.getByRole("button", { name: "닫기", exact: true }).click();
+
+  await page.getByLabel("납품사진 거래처 검색").fill("새봄마트");
+  await expect(page.getByRole("button", { name: "새봄마트 사진 기록" })).toBeVisible();
+  await page.getByLabel("납품사진 거래처 검색").fill("");
+
+  const pastPhoto = await sharp({ create: { width: 720, height: 480, channels: 3, background: "#789b7e" } }).jpeg().toBuffer();
+  await chooseRowPhoto(page, "대전식품", "카메라 촬영", pastPhoto, "past-history.jpg");
+  await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
+  await page.route("**/listDeliveryPhotos", async (route) => {
+    const input = (route.request().postDataJSON() as { data?: { scope?: string; customerId?: string } } | null)?.data;
+    if (input?.scope !== "customer" || input.customerId !== ids[1]) { await route.continue(); return; }
+    const response = await route.fetch();
+    const body = await response.json() as { result?: { fromDateKey: string; photos: Array<{ deliveryDateKey: string; createdAt: string }> } };
+    const result = body.result;
+    if (!result?.photos.length) throw new Error("Expected the uploaded customer history.");
+    const yesterday = new Date(Date.parse(`${result.fromDateKey}T00:00:00Z`) + 6 * 86_400_000).toISOString().slice(0, 10);
+    result.photos[0] = { ...result.photos[0]!, deliveryDateKey: yesterday,
+      createdAt: new Date(Date.parse(result.photos[0]!.createdAt) - 86_400_000).toISOString() };
+    await route.fulfill({ response, json: body });
+  });
+  await page.locator("details").getByText(/기록완료/u).click();
+  await page.getByRole("button", { name: "대전식품 사진 기록" }).click();
+  const pastHistory = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
+  await expect(pastHistory.getByText("최근 기록 1장")).toBeVisible();
+  await expect(pastHistory.getByRole("region", { name: /사진 기록/u })).toHaveCount(1);
+  const dates = pastHistory.getByRole("group", { name: "사진 기록 날짜" });
+  await dates.getByRole("button", { name: "오늘" }).click();
+  await expect(pastHistory.getByText("이 날짜에 납품사진 기록이 없습니다.")).toBeVisible();
+  await dates.getByRole("button", { name: "어제" }).click();
+  const pastThumbnail = pastHistory.getByRole("list").getByRole("button", { name: /^대전식품 납품사진,/u });
+  await expect(pastThumbnail).toHaveCount(1);
+  await expectImageReady(pastThumbnail.locator("img"));
+  await pastThumbnail.click();
+  const viewer = page.getByRole("dialog", { name: "대전식품 납품사진 보기", exact: true });
+  await expectImageReady(viewer.locator("img"));
+  await page.goBack();
+  await expect(viewer).toHaveCount(0);
+  await expect(dates.getByRole("button", { name: "어제" })).toHaveAttribute("aria-pressed", "true");
+  await dates.getByRole("button", { name: "전체" }).click();
+  await expect(pastHistory.getByRole("list").getByRole("button", { name: /^대전식품 납품사진,/u })).toHaveCount(1);
+  await pastHistory.getByRole("button", { name: "닫기", exact: true }).click();
+  await removePilotPhotos([ids[1]!]);
+});
+
 test("delete confirmation is permission-safe, retry-stable and reconciles the last photo", async ({ page }) => {
   await removePilotPhotos([ids[1]!]);
   const errors: string[] = []; const warnings: string[] = []; const directWrites: string[] = [];
@@ -391,6 +456,7 @@ test("delete confirmation is permission-safe, retry-stable and reconciles the la
     const firstThumbnail = history.getByRole("button", { name: /^대전식품 납품사진,/u }).first();
     await firstThumbnail.click();
     const viewer = page.getByRole("dialog", { name: "대전식품 납품사진 보기", exact: true });
+    await expect(viewer).toBeVisible();
     await expect(viewer.getByRole("button", { name: "사진 삭제", exact: true })).toBeVisible({ timeout: 30_000 });
     await expectImageReady(viewer.locator("img"));
     const evidenceUrl = await viewer.locator("img").getAttribute("src");

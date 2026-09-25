@@ -29,7 +29,8 @@ try {
   }
   const cli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
   const result = spawnSync(process.execPath,
-    [cli, "test", "tests/e2e-auth/delivery-photo-field.spec.ts", "--config", "playwright.phase3.config.ts"],
+    [cli, "test", "tests/e2e-auth/delivery-photo-field.spec.ts", "--config", "playwright.phase3.config.ts",
+      ...(process.env.DELIVERY_PHOTO_E2E_GREP ? ["--grep", process.env.DELIVERY_PHOTO_E2E_GREP] : [])],
     { cwd: process.cwd(), env: environment, stdio: "inherit" });
   if (result.error) console.error(result.error.message);
   exitCode = result.status ?? 1;

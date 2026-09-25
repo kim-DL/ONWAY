@@ -1,0 +1,7 @@
+.datesUi{--delivery-photo-dates-ui:1;display:grid;gap:.75rem;min-width:0}
+.retention{margin:0;color:var(--shell-ink-soft);font-size:.82rem}
+.dates{display:flex;gap:.4rem;overflow-x:auto;padding:.15rem .1rem .4rem}
+.dates button{flex:none;min-width:44px;min-height:44px;padding:.4rem .7rem;border:1px solid #d5e2da;border-radius:999px;background:#fff;color:var(--shell-ink);font:inherit;font-size:.86rem;cursor:pointer}
+.dates button[aria-pressed="true"]{border-color:var(--mode-customer-text);background:#eaf3ed;color:var(--mode-customer-text);font-weight:750}
+.dates button:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
+.day{display:grid;gap:.5rem}.day h2{margin:.2rem 0 0;font-size:.95rem}

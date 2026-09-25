@@ -30,7 +30,7 @@
 .notice{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:.5rem 0;padding:.6rem;border-radius:12px;background:#fff2e7;color:#704020;font-size:.88rem;line-height:1.4}
 .secondaryActions{display:flex;flex-wrap:wrap;gap:.4rem;margin:1rem 0 2rem}
 .secondaryActions button{font-size:.86rem}
-@media(max-width:380px){.workspace{padding:.75rem}.summary strong{font-size:.82rem}.summary button{font-size:.8rem}.secondaryActions button{flex:1 1 auto}}
+@media(max-width:380px){.workspace{padding:.75rem}.summary strong{font-size:.82rem}.summary button{font-size:.8rem}.searchRow{flex-wrap:wrap}.searchRow>span:first-child{flex-basis:100%}.secondaryActions button{flex:1 1 auto}}
 @media(prefers-reduced-motion:reduce){.completed summary:after{transition:none}}
 .editorContent{display:grid;gap:.7rem;padding:.2rem 0 1rem;min-width:0}
 .count,.hint{margin:0;color:var(--shell-ink-soft);font-size:.86rem}

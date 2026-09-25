@@ -94,12 +94,14 @@ const deliveryPhotoStylesheetGzipBytes = deliveryPhotoStylesheets.reduce((sum, a
 const deliveryPhotoJavascriptGzipBytes = [...deliveryPhotoAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 // Phase 3C keeps customer history and evidence viewing behind two nested event
-// boundaries. Phase 3D adds deletion as a third boundary, loaded only after the
-// viewer is open. All three reuse the history and photo-morph stylesheets.
+// boundaries. Phase 3D adds deletion after the viewer opens. The later date
+// selector has its own bounded event-loaded assets; existing ceilings stay fixed.
 const deliveryPhotoHistoryEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-history"));
+const deliveryPhotoHistoryDatesEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-history-dates"));
 const deliveryPhotoViewerEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-viewer"));
 const deliveryPhotoDeleteEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/delivery-photo-delete-action"));
 const deliveryPhotoHistoryAssetNames = new Set(deliveryPhotoHistoryEntries.flatMap((entry) => entry.files));
+const deliveryPhotoHistoryDatesAssetNames = new Set(deliveryPhotoHistoryDatesEntries.flatMap((entry) => entry.files));
 const deliveryPhotoViewerAssetNames = new Set(deliveryPhotoViewerEntries.flatMap((entry) => entry.files));
 const deliveryPhotoDeleteAssetNames = new Set(deliveryPhotoDeleteEntries.flatMap((entry) => entry.files));
 const deliveryPhotoHistoryStylesheets = stylesheets.filter((asset) =>
@@ -107,7 +109,14 @@ const deliveryPhotoHistoryStylesheets = stylesheets.filter((asset) =>
 const deliveryPhotoHistoryStylesheetAssets = new Set(deliveryPhotoHistoryStylesheets.map((asset) => asset.asset));
 const deliveryPhotoHistoryStylesheetRawBytes = deliveryPhotoHistoryStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const deliveryPhotoHistoryStylesheetGzipBytes = deliveryPhotoHistoryStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const deliveryPhotoHistoryDatesStylesheets = stylesheets.filter((asset) =>
+  readFileSync(join(nextRoot, asset.asset), "utf8").includes("--delivery-photo-dates-ui"));
+const deliveryPhotoHistoryDatesStylesheetAssets = new Set(deliveryPhotoHistoryDatesStylesheets.map((asset) => asset.asset));
+const deliveryPhotoHistoryDatesStylesheetRawBytes = deliveryPhotoHistoryDatesStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
+const deliveryPhotoHistoryDatesStylesheetGzipBytes = deliveryPhotoHistoryDatesStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const deliveryPhotoHistoryJavascriptGzipBytes = [...deliveryPhotoHistoryAssetNames].filter((asset) => asset.endsWith(".js"))
+  .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const deliveryPhotoHistoryDatesJavascriptGzipBytes = [...deliveryPhotoHistoryDatesAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const deliveryPhotoViewerJavascriptGzipBytes = [...deliveryPhotoViewerAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
@@ -176,7 +185,7 @@ const inventoryManufacturerFieldJavascriptGzipBytes = [...inventoryManufacturerF
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryManufacturerStylesheetRawBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryManufacturerStylesheetGzipBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -192,9 +201,16 @@ assertBudget(inventoryManufacturerFieldEntries.length === 1, "inventory manufact
 assertBudget(deliveryPhotoEntries.length === 1, "delivery photo workspace must retain one deferred boundary");
 assertBudget(deliveryPhotoStylesheets.length === 1, "delivery photo workspace must retain one isolated stylesheet");
 assertBudget(deliveryPhotoHistoryEntries.length === 1, "delivery photo history must retain one event-loaded boundary");
+assertBudget(deliveryPhotoHistoryDatesEntries.length === 1, "delivery photo date filtering must retain one nested event-loaded boundary");
 assertBudget(deliveryPhotoViewerEntries.length === 1, "delivery photo viewer must retain one nested event-loaded boundary");
 assertBudget(deliveryPhotoDeleteEntries.length === 1, "delivery photo delete must retain one nested event-loaded boundary");
 assertBudget(deliveryPhotoHistoryStylesheets.length === 1, "delivery photo history and viewer must retain one isolated stylesheet");
+assertBudget(deliveryPhotoHistoryDatesStylesheets.length === 1, "delivery photo dates must retain one isolated stylesheet");
+for (const asset of deliveryPhotoHistoryDatesAssetNames) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo dates asset ${asset} must stay event-loaded`);
+  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => deliveryPhotoHistoryDatesEntries.includes(entry)),
+    `delivery photo dates asset ${asset} must not load with unrelated work modes`);
+}
 assertBudget(deliveryPhotoViewerAdditionalStylesheets.length === 0, "delivery photo viewer must reuse history and photo-morph CSS without another stylesheet");
 assertBudget(deliveryPhotoUploadEntries.length === 1, "delivery photo upload memory must retain one workspace runtime boundary");
 assertBudget(deliveryPhotoPreparationEntries.length === 2, "delivery photo preparation must retain picker and coordinator event boundaries");
@@ -259,7 +275,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 4 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the four approved photo viewers");
 }
-const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoHistoryStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
+const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -304,7 +320,7 @@ for (const boundary of requiredBoundaries) {
   );
 }
 const serviceWorker = readFileSync(join(projectRoot, "public/sw.js"), "utf8");
-for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer"]) {
+for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-history-dates", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer"]) {
   const entry = dynamicEntries.find(({ boundary }) => boundary.endsWith(tool));
   assertBudget(entry?.files.every((asset) => serviceWorker.includes(asset)),
     `deferred ${tool} assets must remain in the PWA precache`);
@@ -364,6 +380,9 @@ assertBudget(deliveryPhotoJavascriptGzipBytes <= 10 * 1024, `delivery photo Java
 assertBudget(deliveryPhotoHistoryStylesheetRawBytes <= 5.5 * 1024, `delivery photo history/viewer CSS raw ${deliveryPhotoHistoryStylesheetRawBytes}B exceeds 5.5KiB`);
 assertBudget(deliveryPhotoHistoryStylesheetGzipBytes <= 1.75 * 1024, `delivery photo history/viewer CSS gzip ${deliveryPhotoHistoryStylesheetGzipBytes}B exceeds 1.75KiB`);
 assertBudget(deliveryPhotoHistoryJavascriptGzipBytes <= 3.5 * 1024, `delivery photo history JavaScript gzip ${deliveryPhotoHistoryJavascriptGzipBytes}B exceeds 3.5KiB`);
+assertBudget(deliveryPhotoHistoryDatesStylesheetRawBytes <= 1024, `delivery photo dates CSS raw ${deliveryPhotoHistoryDatesStylesheetRawBytes}B exceeds 1KiB`);
+assertBudget(deliveryPhotoHistoryDatesStylesheetGzipBytes <= 512, `delivery photo dates CSS gzip ${deliveryPhotoHistoryDatesStylesheetGzipBytes}B exceeds 512B`);
+assertBudget(deliveryPhotoHistoryDatesJavascriptGzipBytes <= 2.25 * 1024, `delivery photo dates JavaScript gzip ${deliveryPhotoHistoryDatesJavascriptGzipBytes}B exceeds 2.25KiB`);
 assertBudget(deliveryPhotoViewerJavascriptGzipBytes <= 3 * 1024, `delivery photo viewer JavaScript gzip ${deliveryPhotoViewerJavascriptGzipBytes}B exceeds 3KiB`);
 assertBudget(deliveryPhotoDeleteJavascriptGzipBytes <= 1.75 * 1024, `delivery photo delete JavaScript gzip ${deliveryPhotoDeleteJavascriptGzipBytes}B exceeds 1.75KiB`);
 assertBudget(deliveryPhotoUploadJavascriptGzipBytes <= 5 * 1024, `delivery photo upload runtime JavaScript gzip ${deliveryPhotoUploadJavascriptGzipBytes}B exceeds 5KiB`);
@@ -405,6 +424,9 @@ const report = {
     deliveryPhotoHistoryStylesheetRawBytes: 5.5 * 1024,
     deliveryPhotoHistoryStylesheetGzipBytes: 1.75 * 1024,
     deliveryPhotoHistoryJavascriptGzipBytes: 3.5 * 1024,
+    deliveryPhotoHistoryDatesStylesheetRawBytes: 1024,
+    deliveryPhotoHistoryDatesStylesheetGzipBytes: 512,
+    deliveryPhotoHistoryDatesJavascriptGzipBytes: 2.25 * 1024,
     deliveryPhotoViewerJavascriptGzipBytes: 3 * 1024,
     deliveryPhotoDeleteJavascriptGzipBytes: 1.75 * 1024,
     deliveryPhotoUploadJavascriptGzipBytes: 5 * 1024,
@@ -439,6 +461,9 @@ const report = {
     deliveryPhotoHistoryStylesheetRawBytes,
     deliveryPhotoHistoryStylesheetGzipBytes,
     deliveryPhotoHistoryJavascriptGzipBytes,
+    deliveryPhotoHistoryDatesStylesheetRawBytes,
+    deliveryPhotoHistoryDatesStylesheetGzipBytes,
+    deliveryPhotoHistoryDatesJavascriptGzipBytes,
     deliveryPhotoViewerJavascriptGzipBytes,
     deliveryPhotoDeleteJavascriptGzipBytes,
     deliveryPhotoViewerAdditionalStylesheetRawBytes,
