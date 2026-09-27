@@ -1,9 +1,20 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-26
+기준일: 2026-09-27
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-09-27 재고 즉각성 최적화 — 로컬 구현·반복 측정·회귀 검증 완료, 운영 미배포
+
+- 기준 source는 `082a6c0`다. 변경 전 source/export와 최종 측정 버전 `final-v3-source`/`final-v3-built`는 ignored `output/playwright/inventory-benchmark/`에 보존했다. 이번 변경은 로컬 작업 트리에 있으며 commit·push·운영 배포는 하지 않았다. 사용자 운영 데이터와 자격 증명도 변경하지 않았다.
+- 목록 사진·사진 유무 표시 제거, snapshot 기반 상세 즉시 표시와 최신 확인 전 수정 차단, 접근 상실·늦은 응답 정리, 검색 파생 계산 재사용, idle 코드 준비와 등록 폼 첫 paint 분리, 비동기 Base64 변환, 재고에서 소비하지 않는 original encode 생략을 적용했다. 기존 thumbnail/preview 바이트·품질과 학교 original 경로, Auth/App Check·revision·request ID·감사·재시도 계약은 유지했다.
+- 동일 CPU 4배·RTT 120ms·모바일 회선 조건에서 변경 전/후 각각 100개·1,000개 상품 20회씩 측정했다. 1,000개 p75는 중간 검색 123→19ms, 상세 첫 표시 2,028→160ms, 최신 상세 2,036→285ms, 첫 등록 입력 준비 797→346ms다. 첫 목록 행은 1,521→1,512ms로 사실상 유지됐다. 목록 사진 POST 18→0, 사진 수신 749,682→0B; 전체 목록 수신량은 100개 86.3%·1,000개 46.6% 감소했다.
+- lab INP 추정 p75는 1,000개 224→176ms지만 100개는 152→192ms로 악화됐다. 두 조건 모두 200ms 이하며 실제 field INP는 아니다. 제한 회선의 상세 사진 약 7.1초·사진 포함 저장 확정 약 19.1초가 남는다. 저장 첫 paint의 일관된 개선으로 주장하지 않는다.
+- page size 40은 초기 검색 completeness 실패로 폐기하고 기본 100건을 유지했다. 60초 TTL·검색/필터/스크롤 복원과 warm context/list 0요청을 유지했으며 실제 61초 뒤 재조회도 확인했다. idle import·준비된 컴포넌트 사용·폼 mount gate는 일반 및 설치/제어 SW 비교의 결합 효과를 근거로 채택했다. Save-Data에서 speculative code import를 생략하고 선행 데이터/사진 요청은 없다.
+- 최종 canonical acceptance 10/10 및 내부 Emulator 12/12 gate PASS (`output/acceptance/phase17-report.json`, 2026-09-27 13:14:09 KST): unit 1,661 PASS/14 조건부 SKIP, 공통 browser 290 PASS, Rules 50 PASS, full user journey 75 PASS/재고 별도 실행 대상 13 SKIP. 재고 static browser 13/13와 Functions integration 11/11는 별도 최종 실행에서도 PASS했다. 320·360·390·412px 및 실제 브라우저 200% 확대의 경계·캡처를 확인했다. 48px DOMRect의 미세한 부동소수점 오차만 검사에서 허용했으며 실제 layout subpixel 미달은 계속 실패한다.
+- 마지막 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` build와 기존 PWA·성능·Hosting build gate PASS. Export/shipped 101개·precache 88개·initial assets 9개, 재고 JS gzip 25,590/25,600B다. 기존 verifier·ceiling은 변경하지 않았다. 남은 JS 여유가 10B이므로 후속 변경에도 같은 gate가 필요하다. 전체 측정 이후의 작은 중복/용량 정리는 보고서에 구분했고 최종 제품 SHA-256 manifest로 마지막 build 이후 소스 불변을 확인했다.
+- 전체 수치·방법·실패한 후보·안전성 근거·한계는 `docs/inventory-responsiveness.md`. 최종 로그는 `output/inventory-performance/acceptance-final-2.log`, `inventory-e2e-final-4.log`, `release-*.log`다. 실제 Galaxy 카메라·설치 PWA·OS 키보드·Cloud Functions cold start는 미측정이다. 운영 배포는 별도 명시적 승인 후 별도 작업으로만 진행한다.
 
 ### 2026-09-26 검토본 거래처 이전 준비 — 운영 데이터 등록 대기
 

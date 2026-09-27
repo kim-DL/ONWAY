@@ -15,6 +15,7 @@ vi.mock("react", async (original) => ({
   useEffect: () => undefined,
 }));
 vi.mock("client-only", () => ({}));
+vi.mock("@/lib/firebase/client", () => ({ getFirebaseClientServices: () => null }));
 vi.mock("./use-inventory-connection", () => ({ useInventoryConnection: () => harness.online, INVENTORY_OFFLINE_DRAFT_MESSAGE: "인터넷이 끊겨 저장할 수 없어요. 이 창의 입력은 유지돼요." }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { movement: harness.movement, count: harness.count, updateLot: harness.updateLot }, inventoryErrorMessage: () => "다시 확인해주세요." }));
 import { InventoryCountForm, InventoryLotEditor, InventoryMovementForm } from "./inventory-forms";

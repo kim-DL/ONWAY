@@ -7,9 +7,10 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import { searchInputProps } from "@/components/ui/search-input-props";
-import { inventoryCountEligible, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryLocationsFor, inventoryOpeningLocation, matchesInventorySearch, type InventoryLocationFilter } from "./inventory-model";
+import { inventoryCountEligible, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryLocationsFor, inventoryOpeningLocation, inventorySearchText, inventorySearchMatcher, type InventoryLocationFilter } from "./inventory-model";
 import { readInventoryCountPreference, writeInventoryCountPreference } from "./inventory-count-preference";
 import { inventoryErrorMessage, inventoryRepository } from "./inventory-repository";
+import { isInventoryAccessFailure, subscribeInventoryAccessFailure } from "./inventory-access-boundary";
 import { InventoryDetail } from "./inventory-detail";
 import { InventoryCard } from "./inventory-card";
 import { inventoryKoreaDate, watchInventoryCalendar } from "./inventory-calendar";
@@ -21,6 +22,7 @@ import {
 } from "./inventory-workspace-snapshot";
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
 import { InventoryProductEditor, InventorySettingsForm } from "./inventory-forms";
+import { scheduleInventoryProductEditorPreload } from "./inventory-editor-loader";
 import { revalidationFreshnessText, type RevalidationFreshness } from "@/lib/revalidation-coordinator";
 import { restoreWorkspaceScroll } from "@/lib/workspace-scroll-memory";
 import styles from "./inventory.module.css";
@@ -97,8 +99,22 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
     let pending = false;
     let queuedAfterFlight = false;
     let queuedForce = false;
+    let accessLost = false;
     const { coordinator, reconciler } = workspaceSession;
     const unsubscribeCatalog = subscribeInventoryCatalog(sessionKey, acceptCatalog);
+    const revokeAccess = (cause: unknown) => {
+      if (cancelled) return;
+      accessLost = true; queuedAfterFlight = false; queuedForce = false;
+      discardInventoryWorkspaceCatalog(sessionKey); catalogReady.current = false;
+      setContext(null); setProducts([]); setSelectedId(null); setEditorOpen(false); setSettingsOpen(false); setOptionsOpen(false);
+      setQuery(""); setLocation("all"); setUrgentOnly(false); setShowInactive(false); setLimit(60);
+      setNotice({ message: "", sequence: 0 }); setLoading(false); setError(inventoryErrorMessage(cause));
+      setFreshness({ status: "idle", lastSuccessAt: null });
+      setCalendarRefreshing(false); setCalendarError(inventoryErrorMessage(cause));
+    };
+    const unsubscribeAccess = subscribeInventoryAccessFailure((cause, uid) => {
+      if (uid === null || uid === session.uid) revokeAccess(cause);
+    });
     // Keep already-open drafts in this authenticated component's memory. There
     // is no persistent cache or queued write, and an auth failure still clears it.
     const clear = () => {
@@ -113,7 +129,7 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
       }
     };
     const load = async (force = false) => {
-      if (pending || document.visibilityState === "hidden") return;
+      if (pending || accessLost || document.visibilityState === "hidden") return;
       if (!navigator.onLine) { clear(); setLoading(false); return; }
       const requestIsCurrent = coordinator.guardCurrentGeneration();
       const run = coordinator.run(async () => {
@@ -162,18 +178,14 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
       setCalendarRefreshing(true);
       try {
         const { nextContext, mergedProducts, observedDate, refreshedAt } = await run.promise;
-        if (!cancelled && navigator.onLine) {
+        if (!cancelled && !accessLost && navigator.onLine) {
           catalogReady.current = true;
           acceptContext(nextContext); setProducts(mergedProducts); setError(""); setCalendarObservedDate(observedDate); setCalendarError(""); setCalendarRefreshing(false);
           setFreshness({ status: "fresh", lastSuccessAt: refreshedAt });
         }
       } catch (cause) {
         if (!cancelled) {
-          const code = cause && typeof cause === "object" && "code" in cause ? String(cause.code) : "";
-          if (["unauthenticated", "permission-denied", "failed-precondition"].some((suffix) => code.endsWith(suffix))) {
-            discardInventoryWorkspaceCatalog(sessionKey); catalogReady.current = false;
-            setContext(null); setProducts([]); setSelectedId(null); setEditorOpen(false); setSettingsOpen(false);
-          }
+          if (isInventoryAccessFailure(cause)) revokeAccess(cause);
           if (catalogReady.current) {
             updateInventoryCatalogFreshness(sessionKey, "stale-error", null);
             setFreshness((current) => ({ status: "stale-error", lastSuccessAt: current.lastSuccessAt })); setError("");
@@ -198,8 +210,8 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
     const onOnline = () => void load();
     window.addEventListener("online", onOnline); window.addEventListener("focus", firstVisible); window.addEventListener("offline", clear);
     document.addEventListener("visibilitychange", firstVisible);
-    return () => { cancelled = true; unsubscribeCatalog(); window.removeEventListener("online", onOnline); window.removeEventListener("focus", firstVisible); window.removeEventListener("offline", clear); document.removeEventListener("visibilitychange", firstVisible); };
-  }, [refreshKey, sessionKey, acceptContext, acceptCatalog, workspaceSession]);
+    return () => { cancelled = true; unsubscribeCatalog(); unsubscribeAccess(); window.removeEventListener("online", onOnline); window.removeEventListener("focus", firstVisible); window.removeEventListener("offline", clear); document.removeEventListener("visibilitychange", firstVisible); };
+  }, [refreshKey, sessionKey, session.uid, acceptContext, acceptCatalog, workspaceSession]);
   useEffect(() => {
     if (!hasCalendarContext || !calendarObservedDate) return;
     const watcher = watchInventoryCalendar({
@@ -213,8 +225,7 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
       onError: (cause) => {
         const message = inventoryErrorMessage(cause);
         setCalendarError(message);
-        const code = cause && typeof cause === "object" && "code" in cause ? String(cause.code) : "";
-        if (["unauthenticated", "permission-denied", "failed-precondition"].some((suffix) => code.endsWith(suffix))) {
+        if (isInventoryAccessFailure(cause)) {
           discardInventoryWorkspaceCatalog(sessionKey);
           setContext(null); setProducts([]); setSelectedId(null); setEditorOpen(false); setSettingsOpen(false); setError(message);
         }
@@ -226,6 +237,9 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
   useEffect(() => {
     updateInventoryWorkspaceUi(sessionKey, { location, query, urgentOnly, showInactive, limit });
   }, [sessionKey, location, query, urgentOnly, showInactive, limit]);
+  useEffect(() => {
+    if (!loading && context?.canWrite) return scheduleInventoryProductEditorPreload();
+  }, [loading, context?.canWrite]);
   useLayoutEffect(() => {
     const scroller = workspaceRef.current?.closest(".workspace-content") as HTMLElement | null;
     if (!scroller) return;
@@ -242,10 +256,19 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
   const inactiveView = showInactive && !!context?.canWrite;
   const countControlsReady = calendarReady && !inactiveView;
   const rows = useMemo(() => products.filter((product) => product.status === (inactiveView ? "inactive" : "active") && (location === "all" || inventoryLocationsFor(product).includes(location))).sort((a, b) => a.name.localeCompare(b.name, "ko")), [products, location, inactiveView]);
-  const countRows = context ? rows.filter((product) => inventoryCountEligible(product, context) || inventoryScopeCountState(product, location, context.cycle.cycleId) === "done") : [];
-  const completed = context ? countRows.filter((product) => inventoryScopeCountState(product, location, context.cycle.cycleId) === "done").length : 0;
-  const filtered = useMemo(() => rows.filter((product) => matchesInventorySearch(product, query)
-    && (!countControlsReady || !urgentOnly || !!context && inventoryScopeIsUrgent(product, location, context.today, context.settings.urgentDays))), [rows, query, urgentOnly, context, location, countControlsReady]);
+  const { countRows, completed } = useMemo(() => {
+    const countRows = context ? rows.filter((product) => inventoryCountEligible(product, context) || inventoryScopeCountState(product, location, context.cycle.cycleId) === "done") : [];
+    const completed = context ? countRows.filter((product) => inventoryScopeCountState(product, location, context.cycle.cycleId) === "done").length : 0;
+    return { countRows, completed };
+  }, [rows, context, location]);
+  // Derived private strings live only with this mounted catalog. A catalog
+  // update or access cleanup replaces them; typing never renormalizes 1,000 rows.
+  const searchableRows = useMemo(() => rows.map((product) => ({ product, search: inventorySearchText(product) })), [rows]);
+  const filtered = useMemo(() => {
+    const matches = inventorySearchMatcher(query);
+    return searchableRows.filter(({ product, search }) => matches(search)
+      && (!countControlsReady || !urgentOnly || !!context && inventoryScopeIsUrgent(product, location, context.today, context.settings.urgentDays))).map(({ product }) => product);
+  }, [searchableRows, query, urgentOnly, context, location, countControlsReady]);
   const selectedProduct = products.find((product) => product.productId === selectedId);
   const locationLabel = location === "all" ? "전체" : INVENTORY_LOCATION_LABELS[location];
   const freshnessText = revalidationFreshnessText(freshness.status, freshness.lastSuccessAt);
@@ -260,7 +283,7 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}
     {loading ? <p role="status" className={styles.message}>재고를 불러오고 있어요.</p> : <><div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div><ul className={styles.list}>{filtered.slice(0, limit).map((product) => <li key={product.productId}><InventoryCard product={product} location={location} context={calendarReady ? context : null} countMode={countMode} onOpen={setSelectedId} /></li>)}</ul>{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
     {context?.canWrite ? <div className={styles.stickyActions}><GlassButton variant="primary" aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}><Icon name="plus" />새 품목</GlassButton></div> : null}
-    {context && selectedId && selectedProduct ? <InventoryDetail key={selectedId} productId={selectedId} initialLocation={inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setSelectedId(null)} onSaved={saved} /> : null}
+    {context && selectedId && selectedProduct ? <InventoryDetail key={selectedId} productId={selectedId} initialProduct={selectedProduct} initialLocation={inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setSelectedId(null)} onSaved={saved} /> : null}
     {context?.canWrite && editorOpen ? <InventoryProductEditor product={null} location={location === "all" ? "refrigerated" : location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setEditorOpen(false)} onSaved={(product) => { saved(product); setSelectedId(product.productId); }} /> : null}
     {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}
     {context?.canWrite ? <BottomSheet open={optionsOpen} title="목록 옵션" onClose={() => setOptionsOpen(false)}><div className={styles.sheet}>

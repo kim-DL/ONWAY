@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { expect, test, type Locator, type Page, type Request, type TestInfo } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { chromium, expect, test, type Locator, type Page, type Request, type TestInfo } from "@playwright/test";
 import { build } from "esbuild";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -159,9 +159,12 @@ async function captureInventoryList(page: Page, info: TestInfo, name: string) {
       search: search.toJSON(), options: options.toJSON(),
     };
   });
-  expect(controls.search.height).toBeGreaterThanOrEqual(48);
-  expect(controls.options.width).toBeGreaterThanOrEqual(48);
-  expect(controls.options.height).toBeGreaterThanOrEqual(48);
+  // DOMRect subtraction can yield 47.9999847 for a 48px control. This epsilon
+  // is far below a layout subpixel; an actual undersized target still fails.
+  const minimumTarget = 48 - 0.0001;
+  expect(controls.search.height).toBeGreaterThanOrEqual(minimumTarget);
+  expect(controls.options.width).toBeGreaterThanOrEqual(minimumTarget);
+  expect(controls.options.height).toBeGreaterThanOrEqual(minimumTarget);
   expect(controls.search.right).toBeLessThanOrEqual(controls.options.left);
   expect(controls.options.right).toBeLessThanOrEqual(geometry.contentRight + 0.5);
   await capture(page, info, name);
@@ -713,7 +716,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   const registeredCard = page.getByRole("button", { name: new RegExp(`${productName}, .*상세 보기`) });
   await expect(registeredCard).toBeVisible();
   await expect(registeredCard.getByText(/유통기한별 수량/)).toHaveCount(0);
-  await expect(registeredCard.locator('[data-inventory-photo="ready"] img')).toBeVisible();
+  await expect(registeredCard.locator('img, [data-inventory-photo]')).toHaveCount(0);
   await captureInventoryList(page, info, "inventory-d100-filter-360");
   listOptions = await openListOptions(page);
   await listOptions.getByRole("checkbox", { name: /임박 상품만/ }).uncheck();
@@ -1013,7 +1016,7 @@ test("an offline registration draft stays in memory and saves only after an expl
   }
 });
 
-test("all locations sum one product and require each location's count, with progress only on the configured count day", async ({ page, browser }, info) => {
+test("all locations sum one product and require each location's count, with progress only on the configured count day", async ({ page }, info) => {
   assertInventoryE2EEnvironment();
   const settingsRef = db().doc(INVENTORY_SETTINGS_PATH);
   const originalSettings = await settingsRef.get();
@@ -1089,17 +1092,55 @@ test("all locations sum one product and require each location's count, with prog
       await page.setViewportSize({ width, height: 800 });
       await captureInventoryList(page, info, `survey-day-rows-${width}`);
     }
-    const zoomContext = await browser.newContext({ viewport: { width: 384, height: 450 }, deviceScaleFactor: 2 });
+    // Use actual page zoom: CSS zoom does not change viewport media queries,
+    // and deviceScaleFactor alone only changes pixel density.
+    const zoomExtension = info.outputPath("zoom-extension");
+    await mkdir(zoomExtension, { recursive: true });
+    await writeFile(`${zoomExtension}/manifest.json`, JSON.stringify({ manifest_version: 3, name: "Inventory zoom test", version: "1.0", permissions: ["tabs"], background: { service_worker: "worker.js" } }));
+    await writeFile(`${zoomExtension}/worker.js`, "chrome.runtime.onInstalled.addListener(() => {});");
+    const zoomContext = await chromium.launchPersistentContext(info.outputPath(`zoom-profile-${randomUUID()}`), {
+      channel: "chromium", headless: true, baseURL: INVENTORY_E2E_ORIGIN, viewport: { width: 768, height: 900 },
+      args: [`--disable-extensions-except=${zoomExtension}`, `--load-extension=${zoomExtension}`],
+    });
     try {
       await zoomContext.route("**/*", async (route) => {
         const url = new URL(route.request().url());
         if (allowedOrigins.has(url.origin) || ["blob:", "data:"].includes(url.protocol)) await route.continue();
         else await route.abort("blockedbyclient");
       });
+      const zoomWorker = zoomContext.serviceWorkers()[0] ?? await zoomContext.waitForEvent("serviceworker");
       const zoomPage = await zoomContext.newPage();
       await login(zoomPage, PHASE3_TEST_PINS.salesA);
-      await zoomPage.setViewportSize({ width: 384, height: 450 });
-      await capture(zoomPage, info, "survey-day-rows-zoom-200");
+      await zoomPage.setViewportSize({ width: 768, height: 900 });
+      const beforeZoom = await zoomPage.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));
+      expect(beforeZoom).toEqual({ width: 768, height: 900, dpr: 1 });
+      const actualZoom = await zoomWorker.evaluate(async (origin) => {
+        const { tabs } = (globalThis as unknown as { chrome: { tabs: {
+          query: (query: object) => Promise<Array<{ id?: number; url?: string }>>;
+          setZoom: (id: number, factor: number) => Promise<void>;
+          getZoom: (id: number) => Promise<number>;
+        } } }).chrome;
+        const target = (await tabs.query({})).find((tab) => tab.url && new URL(tab.url).origin === origin);
+        if (target?.id === undefined) throw new Error("Missing isolated inventory zoom tab");
+        await tabs.setZoom(target.id, 2);
+        return tabs.getZoom(target.id);
+      }, INVENTORY_E2E_ORIGIN);
+      expect(actualZoom).toBe(2);
+      await expect.poll(() => zoomPage.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }))).toEqual({ width: 384, height: 450, dpr: 2 });
+      await expect.poll(() => zoomPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const zoomRowsFit = await zoomPage.locator('section[aria-label="재고 관리"] ul li article button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => {
+        const bounds = button.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth + 1;
+      }));
+      expect(zoomRowsFit).toBe(true);
+      await info.attach("inventory-real-page-zoom", { body: JSON.stringify({ beforeZoom, actualZoom, afterZoom: await zoomPage.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio, mobileLayout: matchMedia("(max-width: 760px)").matches })) }), contentType: "application/json" });
+      // Chromium full-page screenshots crop at native page zoom. Capture the
+      // physical viewport, then scroll the real list into a second viewport.
+      await zoomPage.screenshot({ path: info.outputPath("survey-day-header-zoom-200.png"), fullPage: false });
+      const firstZoomRow = zoomPage.locator('section[aria-label="재고 관리"] ul li article button').first();
+      await firstZoomRow.scrollIntoViewIfNeeded();
+      await expect(firstZoomRow).toBeInViewport();
+      await zoomPage.screenshot({ path: info.outputPath("survey-day-rows-zoom-200.png"), fullPage: false });
     } finally { await zoomContext.close(); }
     await page.setViewportSize({ width: 360, height: 800 });
     const searchForLongName = page.getByRole("searchbox", { name: "품목 검색", exact: true });
@@ -1292,6 +1333,45 @@ for (const scenario of [
     if (previousSettings.exists) await settingsRef.set(previousSettings.data()!);
     else await settingsRef.delete();
   }
+});
+
+test("a list snapshot paints immediately while authoritative detail gates stock changes", async ({ page }) => {
+  const fixtureId = "inventory-immediate-shell-e2e";
+  const name = "즉시 상세 최신성 검증";
+  const now = new Date().toISOString();
+  const fixture = inventoryProductSchema.parse({ productId: fixtureId, companyId: "onnuri", name, manufacturer: "검증 제조사", specification: "1kg", origin: "대한민국", note: "",
+    unitLabel: "봉", unitsPerBox: 1, defaultLocationId: "refrigerated", urgent: false, status: "active", revision: 1, stockRevision: 1, hasHistory: true,
+    quantityByLocation: { ...inventoryLocationMap(0), refrigerated: 12 }, nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null,
+    createdAt: now, updatedAt: now, createdBy: "EMP-DELIVERY", updatedBy: "EMP-DELIVERY" });
+  const ref = db().doc(`${INVENTORY_PRODUCT_PATH}/${fixtureId}`);
+  const lotRef = ref.collection("lots").doc("shell-lot");
+  await ref.set(fixture);
+  await lotRef.set(inventoryLotSchema.parse({ lotId: "shell-lot", originLotId: "shell-lot", productId: fixtureId, locationId: "refrigerated", label: "", expiryState: "unknown", expiryDate: null, quantity: 12, revision: 1, createdAt: now, updatedAt: now }));
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let requested = false;
+  await page.route("**/getInventoryProduct", async (route) => {
+    if (route.request().method() === "POST" && route.request().postDataJSON()?.data?.productId === fixtureId) { requested = true; await held; }
+    await route.continue();
+  });
+  try {
+    await login(page, PHASE3_TEST_PINS.delivery);
+    await page.getByRole("searchbox", { name: "품목 검색", exact: true }).fill(name);
+    await page.getByRole("button", { name: `${name}, 12 봉, 상세 보기`, exact: true }).click();
+    const detail = page.getByRole("dialog", { name, exact: true });
+    await expect(detail).toBeVisible();
+    await expect(detail.locator("strong").filter({ hasText: /^12봉$/ })).toBeVisible();
+    await expect(detail.getByText("최신 재고를 확인하고 있어요.", { exact: true })).toBeVisible();
+    for (const action of ["입고", "출고", "조정", "품목 정보 수정", "수량 일치 확인"]) await expect(detail.getByRole("button", { name: action, exact: true })).toBeDisabled();
+    await expect.poll(() => requested).toBe(true);
+    const batch = db().batch();
+    batch.update(ref, { "quantityByLocation.refrigerated": 15, stockRevision: 2 });
+    batch.update(lotRef, { quantity: 15, revision: 2 });
+    await batch.commit(); release();
+    await expect(detail.getByRole("button", { name: "입고", exact: true })).toBeEnabled();
+    await expect(detail.locator("strong").filter({ hasText: /^15봉$/ })).toBeVisible();
+    await expect(detail.getByText("최신 재고를 확인하고 있어요.", { exact: true })).toHaveCount(0);
+  } finally { release(); await page.unroute("**/getInventoryProduct"); await lotRef.delete(); await ref.delete(); }
 });
 
 test("a 1,000-product catalog fetches every server page while rendering 60 rows at a time", async ({ page }, info) => {

@@ -13,7 +13,7 @@ import { InventoryHistory } from "./inventory-history";
 import { useInventoryConnection } from "./use-inventory-connection";
 import styles from "./inventory.module.css";
 
-export function InventoryDetail({ productId, initialLocation, context, calendarReady = true, countMode = false, onClose, onSaved }: { productId: string; initialLocation: InventoryLocation; context: InventoryContext; calendarReady?: boolean; countMode?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void }) {
+export function InventoryDetail({ productId, initialProduct, initialLocation, context, calendarReady = true, countMode = false, onClose, onSaved }: { productId: string; initialProduct?: InventoryProduct; initialLocation: InventoryLocation; context: InventoryContext; calendarReady?: boolean; countMode?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void }) {
   const online = useInventoryConnection();
   const [detail, setDetail] = useState<InventoryProductDetail | null>(null);
   const [error, setError] = useState("");
@@ -58,12 +58,15 @@ export function InventoryDetail({ productId, initialLocation, context, calendarR
     pendingMutationRefresh.current = { productId };
     setLoading(true); setVersion((value) => value + 1);
   }
-  const product = detail?.product;
+  // List data gives an immediate shell, never authority for a write or photo.
+  // A failed/deleted read must not reveal the old snapshot again on retry.
+  const product = detail?.product ?? (loading && !error && initialProduct?.productId === productId ? initialProduct : undefined);
   const locations = product ? inventoryLocationsFor(product) : [initialLocation];
   const location = locations.includes(selectedLocation) ? selectedLocation : locations[0]!;
   const lots = detail?.lots.filter((lot) => lot.locationId === location) ?? [];
   const writeAllowed = context.canWrite && product?.status === "active";
-  const canWrite = online && writeAllowed && !loading;
+  const confirmed = detail?.product.productId === productId && !loading;
+  const canWrite = online && writeAllowed && confirmed;
   const canCount = canWrite && countMode && calendarReady && (lots.length > 0 || location === product?.defaultLocationId);
   const countHint = !countMode ? "실사 모드에서 사용" : !calendarReady ? "날짜 기준 확인 필요" : !online ? "온라인에서 사용" : loading ? "최신 재고 확인 중" : null;
   const countState = product ? inventoryCountBadgeState(product, location, calendarReady ? context : null, countMode) : null;
@@ -77,7 +80,7 @@ export function InventoryDetail({ productId, initialLocation, context, calendarR
       {error ? <div className={styles.message} role="alert">{error}<GlassButton onClick={() => { setLoading(true); setVersion((value) => value + 1); }}>다시 확인</GlassButton></div> : null}
       {product ? <>
         <div className={styles.detailSummary}>
-          <div className={styles.detailPhoto}>{product.photo ? <InventoryPhoto key={product.photo.photoId} product={product} expandable showExpandHint /> : <span className={styles.detailPhotoEmpty}><Icon name="camera" size={28} /><span>제품 사진</span></span>}</div>
+          <div className={styles.detailPhoto}>{detail?.product.photo ? <InventoryPhoto key={`${productId}:${detail.product.photo.photoId}`} product={detail.product} expandable /> : <span className={styles.detailPhotoEmpty}><Icon name="camera" size={28} /><span>제품 사진</span></span>}</div>
           <div className={styles.detailStock}>{locations.length > 1 ? <label className={styles.detailLocation}><span className={styles.detailLocationControl}><select aria-label="상세 보관 장소" value={location} onChange={(event) => setLocation(event.target.value as InventoryLocation)}>{locations.map((item) => <option key={item} value={item}>{INVENTORY_LOCATION_LABELS[item]}</option>)}</select><Icon name="chevron-right" size={14} /></span><span>현재 재고</span></label> : <span>{INVENTORY_LOCATION_LABELS[location]} 현재 재고</span>}<strong>{product.quantityByLocation[location].toLocaleString("ko-KR")}<small>{inventoryUnitDisplayLabel(product.unitLabel)}</small></strong>{countState ? <StatusBadge tone={countState === "done" ? "success" : "neutral"}>{INVENTORY_COUNT_LABELS[countState]}</StatusBadge> : null}</div>
         </div>
         <dl className={styles.productFacts}>{[["제조사", product.manufacturer], ["규격", product.specification], ["원산지", product.origin], ["기준 단위", inventoryUnitDisplayLabel(product.unitLabel)]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "미등록"}</dd></div>)}</dl>
@@ -103,15 +106,15 @@ export function InventoryDetail({ productId, initialLocation, context, calendarR
       </div>
     </BottomSheetActions> : null}
   </BottomSheet></div>
-    {detail && (action === "receive" || action === "issue" || action === "adjust") ? <InventoryMovementForm detail={detail} location={location} kind={action} {...(movementLotId ? { initialLotId: movementLotId } : {})} {...(countMode && calendarReady ? { inspectionCycleId: context.cycle.cycleId } : {})} onClose={() => { setAction(null); setMovementLotId(undefined); }} onSaved={saved} /> : null}
-    {detail && action === "count" ? <InventoryCountForm detail={detail} location={location} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setAction(null)} onSaved={saved} /> : null}
-    {product && action === "edit" ? <InventoryProductEditor product={product} location={location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setAction(null)} onSaved={saved} /> : null}
-    {detail && editingLot ? <InventoryLotEditor detail={detail} lot={editingLot} onMovement={openMovement} onClose={() => setEditingLot(null)} onSaved={saved} /> : null}
+    {confirmed && detail && (action === "receive" || action === "issue" || action === "adjust") ? <InventoryMovementForm detail={detail} location={location} kind={action} {...(movementLotId ? { initialLotId: movementLotId } : {})} {...(countMode && calendarReady ? { inspectionCycleId: context.cycle.cycleId } : {})} onClose={() => { setAction(null); setMovementLotId(undefined); }} onSaved={saved} /> : null}
+    {confirmed && detail && action === "count" ? <InventoryCountForm detail={detail} location={location} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setAction(null)} onSaved={saved} /> : null}
+    {confirmed && product && action === "edit" ? <InventoryProductEditor product={product} location={location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setAction(null)} onSaved={saved} /> : null}
+    {confirmed && detail && editingLot ? <InventoryLotEditor detail={detail} lot={editingLot} onMovement={openMovement} onClose={() => setEditingLot(null)} onSaved={saved} /> : null}
     {product && action === "more" ? <BottomSheet open title="품목 더보기" onClose={() => setAction(null)}><div className={styles.detailMoreActions}>
       <GlassButton onClick={() => setAction("history")}><Icon name="clock" size={18} /><span>입출고·실사 이력</span><Icon name="chevron-right" size={16} /></GlassButton>
       {context.canWrite ? <><GlassButton className={styles.detailStatusAction} disabled={!online || loading} onClick={() => setAction("status")}><Icon name={product.status === "active" ? "close" : "refresh"} size={18} /><span>{product.status === "active" ? "비활성화" : "다시 활성화"}</span><Icon name="chevron-right" size={16} /></GlassButton><GlassButton className={styles.detailDeleteAction} variant="danger" disabled={!online || loading} onClick={() => setAction("delete")}><Icon name="trash" size={18} /><span>품목 삭제</span><Icon name="chevron-right" size={16} /></GlassButton></> : null}
     </div></BottomSheet> : null}
-    {product && (action === "status" || action === "delete") ? <InventoryStatusForm product={product} remove={action === "delete"} onClose={() => setAction(null)} onSaved={saved} /> : null}
+    {confirmed && product && (action === "status" || action === "delete") ? <InventoryStatusForm product={product} remove={action === "delete"} onClose={() => setAction(null)} onSaved={saved} /> : null}
     {action === "history" ? <BottomSheet open title="입출고·실사 기록" onClose={() => setAction(null)}><InventoryHistory productId={productId} /></BottomSheet> : null}
   </>;
 }

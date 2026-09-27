@@ -10,9 +10,11 @@ import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-i
 import { InventoryDateField, isInventoryInputDate } from "./inventory-date-field";
 import styles from "./inventory.module.css";
 import formStyles from "./inventory-form-design.module.css";
+import { getLoadedInventoryProductEditor, loadInventoryProductEditor } from "./inventory-editor-loader";
+import { getFirebaseClientServices } from "@/lib/firebase/client";
+import { inventoryAccessGeneration, inventoryAuthenticationError } from "./inventory-access-boundary";
 
-const InventoryProductEditorImpl = lazy(() => import("./inventory-product-editor")
-  .then((module) => ({ default: module.InventoryProductEditorImpl })));
+const InventoryProductEditorImpl = lazy(loadInventoryProductEditor);
 
 export function useInventoryAction() {
   const online = useInventoryConnection();
@@ -20,6 +22,7 @@ export function useInventoryAction() {
   const [error, setError] = useState("");
   const pending = useRef(false);
   const alive = useRef(true);
+  const lifecycle = useRef(0);
   const request = useRef({ signature: "", id: "" });
   useEffect(() => {
     alive.current = true;
@@ -28,16 +31,26 @@ export function useInventoryAction() {
       event.preventDefault(); event.returnValue = "";
     };
     window.addEventListener("beforeunload", beforeUnload);
-    return () => { alive.current = false; window.removeEventListener("beforeunload", beforeUnload); };
+    return () => { alive.current = false; lifecycle.current += 1; window.removeEventListener("beforeunload", beforeUnload); };
   }, []);
-  async function run<T>(payload: unknown, action: (requestId: string) => Promise<T>, success: (result: T) => void) {
-    if (pending.current) return;
+  async function run<T>(payload: unknown, action: (requestId: string, assertCurrent: () => void) => Promise<T>, success: (result: T) => void) {
+    if (pending.current || !alive.current) return;
     // Recheck at the action boundary as an offline event may precede React's render.
     if (typeof navigator !== "undefined" && !navigator.onLine) { setError(INVENTORY_OFFLINE_DRAFT_MESSAGE); return; }
     const signature = JSON.stringify(payload);
     if (request.current.signature !== signature || !request.current.id) request.current = { signature, id: crypto.randomUUID() };
     pending.current = true; setBusy(true); setError("");
-    try { const result = await action(request.current.id); if (alive.current) success(result); }
+    const generation = inventoryAccessGeneration();
+    const mountedGeneration = lifecycle.current;
+    const uid = getFirebaseClientServices()?.auth.currentUser?.uid;
+    // Async preparation can finish after this form or its authenticated session
+    // ends. Recheck before each subsequent network operation, not only onSaved.
+    const assertCurrent = () => {
+      if (!alive.current || lifecycle.current !== mountedGeneration || inventoryAccessGeneration() !== generation || getFirebaseClientServices()?.auth.currentUser?.uid !== uid) {
+        throw inventoryAuthenticationError();
+      }
+    };
+    try { const result = await action(request.current.id, assertCurrent); assertCurrent(); success(result); }
     catch (cause) { if (alive.current) setError(inventoryErrorMessage(cause)); }
     finally { pending.current = false; if (alive.current) setBusy(false); }
   }
@@ -51,7 +64,10 @@ export function FormFooter({ id, busy, disabled = false, label, onClose, childre
 export function validLotDraft(draft: InventoryLotDraft, allowLegacy = false) { return (allowLegacy || draft.expiryState !== "not_applicable") && inventoryLotDraftSchema.safeParse(draft).success && (draft.expiryState !== "dated" || isInventoryInputDate(draft.expiryDate ?? "")); }
 export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; canManageManufacturers?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void };
 export function InventoryProductEditor(props: InventoryProductEditorProps) {
-  return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면을 준비하고 있어요.</p></BottomSheet>}><InventoryProductEditorImpl {...props} /></Suspense>;
+  // Latch the component type for this form's lifetime. Switching a mounted lazy
+  // editor to its resolved component would discard the employee's draft.
+  const [Editor] = useState(() => getLoadedInventoryProductEditor() ?? InventoryProductEditorImpl);
+  return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면을 준비하고 있어요.</p></BottomSheet>}><Editor {...props} /></Suspense>;
 }
 
 export function QuantityFields({ product, value, onChange, disabled, minimum = 0, label = "수량" }: { product: Pick<InventoryProduct, "unitLabel">; value: number; onChange: (value: number) => void; disabled: boolean; minimum?: number; label?: string }) {

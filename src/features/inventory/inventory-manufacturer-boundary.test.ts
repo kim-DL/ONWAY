@@ -6,7 +6,9 @@ describe("inventory manufacturer lazy boundary", () => {
     const formSource = readFileSync(new URL("./inventory-forms.tsx", import.meta.url), "utf8");
     const productSource = readFileSync(new URL("./inventory-product-editor.tsx", import.meta.url), "utf8");
     const fieldSource = readFileSync(new URL("./inventory-manufacturer-field.tsx", import.meta.url), "utf8");
-    expect(formSource).toContain('lazy(() => import("./inventory-product-editor")');
+    const loaderSource = readFileSync(new URL("./inventory-editor-loader.ts", import.meta.url), "utf8");
+    expect(formSource).toContain("lazy(loadInventoryProductEditor)");
+    expect(loaderSource).toContain('import("./inventory-product-editor")');
     expect(formSource).not.toMatch(/import\s+\{[^}]*InventoryManufacturerPicker[^}]*\}\s+from/u);
     expect(productSource).toContain('lazy(() => import("./inventory-manufacturer-field")');
     expect(fieldSource).toContain('lazy(() => import("./inventory-manufacturer-picker")');

@@ -1,6 +1,7 @@
 "use client";
 import "client-only";
 import { httpsCallable } from "firebase/functions";
+import { inventoryAccessGeneration, inventoryAuthenticationError, reportInventoryAccessFailure } from "./inventory-access-boundary";
 import { z } from "zod";
 import * as contract from "@/domain/inventory";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
@@ -11,29 +12,39 @@ export function inventoryErrorMessage(error: unknown): string {
   if (code.endsWith("permission-denied") || code.endsWith("unauthenticated")) return "사용 권한을 확인하지 못했어요. 다시 로그인하거나 관리자에게 문의해주세요.";
   if (code.endsWith("failed-precondition")) return "현재 재고 상태나 실사 기간을 다시 확인해야 해요. 이 창을 닫고 품목을 다시 열어주세요.";
   if (code.endsWith("not-found")) return "품목이 삭제되었거나 정보가 바뀌었어요. 재고 모드를 다시 열어 목록을 확인해주세요.";
-  if (code.endsWith("invalid-argument") || error instanceof z.ZodError) return error instanceof z.ZodError ? (error.issues[0]?.message ?? "입력값을 확인해주세요.") : "수량과 필수 입력 정보를 확인해주세요.";
+  if (error instanceof z.ZodError) return error.issues[0]?.message ?? "입력값을 확인해주세요.";
+  if (code.endsWith("invalid-argument")) return "수량과 필수 입력 정보를 확인해주세요.";
   if (typeof navigator !== "undefined" && !navigator.onLine) return "인터넷 연결 후 다시 시도해주세요. 재고는 기기에 저장하지 않아요.";
   return "재고 정보를 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
 }
+
 async function call<T>(name: string, input: unknown, schema: z.ZodType<T>): Promise<T> {
   const services = getFirebaseClientServices();
   const uid = services?.auth.currentUser?.uid;
-  if (!services || !uid) throw Object.assign(new Error("Inventory authentication required"), { code: "unauthenticated" });
-  const result = await httpsCallable<unknown, unknown>(services.functions, name)(input);
-  if (services.auth.currentUser?.uid !== uid) throw Object.assign(new Error("Inventory session changed"), { code: "unauthenticated" });
-  return schema.parse(result.data);
+  const generation = inventoryAccessGeneration();
+  try {
+    if (!services || !uid) throw inventoryAuthenticationError();
+    const result = await httpsCallable<unknown, unknown>(services.functions, name)(input);
+    if (services.auth.currentUser?.uid !== uid || inventoryAccessGeneration() !== generation) throw inventoryAuthenticationError();
+    return schema.parse(result.data);
+  } catch (cause) {
+    // A superseded account/session request cannot clear the next session's UI.
+    if (inventoryAccessGeneration() === generation && services?.auth.currentUser?.uid === uid) reportInventoryAccessFailure(cause, uid ?? null);
+    throw cause;
+  }
 }
+
 export type InventoryListProgress = { pageCount: number; complete: boolean };
 async function list(onProgress?: (products: contract.InventoryProduct[], progress: InventoryListProgress) => void): Promise<contract.InventoryProduct[]> {
   const initialUid = getFirebaseClientServices()?.auth.currentUser?.uid;
-  if (!initialUid) throw Object.assign(new Error("Inventory authentication required"), { code: "unauthenticated" });
+  if (!initialUid) throw inventoryAuthenticationError();
   const products = new Map<string, contract.InventoryProduct>();
   const cursors = new Set<string>();
   let afterId: string | null = null;
   let pageCount = 0;
   do {
     const page: z.infer<typeof contract.inventoryListPageSchema> = await call("listInventoryProducts", { afterId, includeSummary: true }, contract.inventoryListPageSchema);
-    if (getFirebaseClientServices()?.auth.currentUser?.uid !== initialUid) throw Object.assign(new Error("Inventory session changed"), { code: "unauthenticated" });
+    if (getFirebaseClientServices()?.auth.currentUser?.uid !== initialUid) throw inventoryAuthenticationError();
     page.products.forEach((product) => products.set(product.productId, product));
     afterId = page.nextCursor;
     if (afterId && (cursors.has(afterId) || products.size >= 5_000)) throw new Error("Inventory pagination limit");

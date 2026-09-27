@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { inventoryLocationMap, inventoryProductSchema, type InventoryContext, type InventoryLot, type InventoryProduct } from "@/domain/inventory";
-import { inventoryCardHighlight, inventoryCountState, inventoryExpiryLabel, inventoryInitials, inventoryIsUrgent, inventoryLocationsFor, inventoryLotDateLabel, inventoryTransferPreview, inventoryUnitDisplayLabel, matchesInventorySearch, inventoryScope, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryOpeningLocation } from "./inventory-model";
+import { inventoryCardHighlight, inventoryCountState, inventoryExpiryLabel, inventoryInitials, inventoryIsUrgent, inventoryLocationsFor, inventoryLotDateLabel, inventoryTransferPreview, inventoryUnitDisplayLabel, matchesInventorySearch, inventorySearchText, inventorySearchMatcher, inventoryScope, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryOpeningLocation } from "./inventory-model";
 
 function product(overrides: Partial<InventoryProduct> = {}): InventoryProduct {
   return inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "닭 가슴살", manufacturer: "온누리식품", specification: "1kg", origin: "국내산", unitLabel: "봉", unitsPerBox: 12, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 2, stockRevision: 3, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1", ...overrides });
@@ -78,6 +78,37 @@ describe("inventory catalog model", () => {
     expect(inventoryInitials("닭 가슴살 ABC")).toBe("ㄷ ㄱㅅㅅ ABC");
     for (const query of ["닭가슴살", "ㄷㄱㅅ", "온누리", "1KG", "ㄱㄴㅅ", ""]) expect(matchesInventorySearch(product(), query)).toBe(true);
     expect(matchesInventorySearch(product(), "소고기")).toBe(false);
+  });
+  it("preserves legacy matching for Unicode forms, punctuation and cross-field substrings", () => {
+    const items = [product(), product({ name: "닭·가슴살", manufacturer: "ＡＢＣ", specification: "１００Ｇ", origin: "국내 산" }),
+      product({ name: "닭 가슴살".normalize("NFD"), manufacturer: "ㄱㄴ 식품", specification: "A-01", origin: "" })];
+    const queries = ["", " \t\n", "닭가슴살", "ㄷㄱㅅ", "ᄃᄀᄉ", "닭 가슴살".normalize("NFD"), "살온누리", "1kg국내", "ＡＢＣ", "abc", "100g", "１００Ｇ", "닭·가슴", "닭가슴", "A-01", "a01", "ㄱㄴ", "ㄱㄴㅅ", "없는품목", "product-1"];
+    // Frozen pre-optimization expression is the oracle: notably initials are
+    // extracted before NFKC, and punctuation is retained rather than stripped.
+    const previousNormalize = (value: string) => value.normalize("NFKC").toLocaleLowerCase("ko-KR").replace(/\s+/gu, "");
+    for (const item of items) {
+      const raw = [item.name, item.manufacturer, item.specification, item.origin].join(" ");
+      const prepared = inventorySearchText(item);
+      for (const query of queries) {
+        const expected = previousNormalize(raw).includes(previousNormalize(query)) || previousNormalize(inventoryInitials(raw)).includes(previousNormalize(query));
+        expect(inventorySearchMatcher(query)(prepared), `${item.name}: ${query}`).toBe(expected);
+        expect(matchesInventorySearch(item, query)).toBe(expected);
+      }
+    }
+    expect(inventorySearchMatcher("살온누리")(inventorySearchText(items[0]!))).toBe(true);
+    expect(inventorySearchMatcher("a01")(inventorySearchText(items[2]!))).toBe(false);
+    expect(inventorySearchMatcher("product-1")(inventorySearchText(items[0]!))).toBe(false);
+  });
+  it.each(["name", "manufacturer", "specification", "origin"] as const)("refreshes derived search when %s changes without retaining old matches", (field) => {
+    const original = product({ name: "기본상품", manufacturer: "", specification: "", origin: "", [field]: "변경전" });
+    const before = inventorySearchText(original);
+    const changed = { ...original, [field]: "변경후" };
+    const after = inventorySearchText(changed);
+    expect(inventorySearchMatcher("변경전")(before)).toBe(true);
+    expect(inventorySearchMatcher("변경전")(after)).toBe(false);
+    expect(inventorySearchMatcher("변경후")(after)).toBe(true);
+    expect(inventorySearchMatcher("ㅂㄱㅎ")(after)).toBe(true);
+    expect(original[field]).toBe("변경전");
   });
   it("shows a zero-stock product only at its default location, and every positive additional location", () => {
     expect(inventoryLocationsFor(product())).toEqual(["refrigerated"]);

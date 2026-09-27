@@ -46,8 +46,6 @@
 .catalogMeta :global(.glass-button) { min-height: 44px; padding: 4px 8px; margin-block: -8px; margin-left: auto; color: #50667f; font-size: 12px; }
 .list { composes: list from "../../components/ui/field-list.module.css?inventory"; }
 .productBody { min-width: 0; flex: 1; display: grid; gap: 2px; }
-.thumbnail { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 44px; overflow: hidden; border: 1px solid #e5e8eb; border-radius: 5px; background: #f5f6f8; color: #8b95a1; }
-.thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .cardTitle { font-size: 16px; line-height: 1.35; font-weight: 750; overflow-wrap: anywhere; }
 .cardMeta, .cardDetails { color: #58687c; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .cardDetails { display: flex; flex-wrap: wrap; gap: 1px 8px; }

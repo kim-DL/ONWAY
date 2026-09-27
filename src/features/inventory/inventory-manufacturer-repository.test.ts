@@ -6,10 +6,24 @@ vi.mock("client-only", () => ({}));
 vi.mock("@/lib/firebase/client", () => ({ getFirebaseClientServices: () => mock.services }));
 vi.mock("firebase/functions", () => ({ httpsCallable: (_functions: unknown, name: string) => (input: unknown) => mock.invoke(name, input) }));
 import { inventoryManufacturerRepository } from "./inventory-manufacturer-repository";
+import { subscribeInventoryAccessFailure } from "./inventory-access-boundary";
 
 const product = { ...inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "검증 상품", manufacturer: "정식 제조사", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 1, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 1, stockRevision: 0, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-21T00:00:00.000Z", updatedAt: "2026-09-21T00:00:00.000Z", createdBy: "EMP", updatedBy: "EMP" }), manufacturerId: "manufacturer-one" };
 
 describe("inventory manufacturer repository", () => {
+  it("notifies inventory cleanup on a revoked session without treating business rejection as access loss", async () => {
+    const listener = vi.fn(); const unsubscribe = subscribeInventoryAccessFailure(listener);
+    try {
+      const business = { code: "functions/failed-precondition", message: "사진 업로드를 다시 확인해주세요." };
+      mock.invoke.mockRejectedValueOnce(business);
+      await expect(inventoryManufacturerRepository.reference("product-1")).rejects.toBe(business);
+      expect(listener).not.toHaveBeenCalled();
+      const revoked = { code: "functions/failed-precondition", message: "현재 세션을 확인할 수 없습니다." };
+      mock.invoke.mockRejectedValueOnce(revoked);
+      await expect(inventoryManufacturerRepository.reference("product-1")).rejects.toBe(revoked);
+      expect(listener).toHaveBeenCalledWith(revoked, "employee-1");
+    } finally { unsubscribe(); }
+  });
   beforeEach(() => { mock.invoke.mockReset(); mock.services.auth.currentUser = { uid: "employee-1" }; });
 
   it("uses one bounded list callable and a request-id protected create callable", async () => {

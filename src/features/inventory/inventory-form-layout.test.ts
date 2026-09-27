@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { inventoryLocationMap, inventoryProductSchema, type InventoryContext, type InventoryLot } from "@/domain/inventory";
 
 vi.mock("client-only", () => ({}));
+vi.mock("./use-inventory-editor-ready", () => ({ useInventoryEditorReady: () => true }));
 // Render the sheet contents without its client-only footer portal in this SSR layout test.
 vi.mock("@/components/ui/bottom-sheet", async (original) => ({ ...await original<typeof import("@/components/ui/bottom-sheet")>(), BottomSheet: ({ children }: { children: ReactNode }) => h("section", null, children) }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: {}, inventoryErrorMessage: () => "검증용 오류" }));

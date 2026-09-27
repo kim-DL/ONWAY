@@ -68,6 +68,7 @@ export function prepareStaticInventoryApp(root, runtime, environment) {
   const expectedRuntime = resolve(root, "output/playwright/inventory-runtime");
   assert.equal(resolve(runtime), expectedRuntime);
   const before = productionArtifacts(root);
+  const sourceRoot = environment.INVENTORY_BENCHMARK_SOURCE || root;
   let appRoot;
   let failure;
   try {
@@ -76,11 +77,11 @@ export function prepareStaticInventoryApp(root, runtime, environment) {
     // Explicit source allowlist: no .env, .firebase, .vercel, existing build or
     // credential files are copied. Next and Serwist retain their original config.
     for (const name of ["src", "public", "functions/src"]) {
-      cpSync(join(root, name), join(appRoot, name), { recursive: true,
+      cpSync(join(sourceRoot, name), join(appRoot, name), { recursive: true,
         filter: (path) => !/^sw\.js(?:\.map)?$|^swe-worker-/.test(basename(path)) });
     }
-    for (const name of ["next.config.ts", "postcss.config.mjs", "package.json", "firebase.json"]) cpSync(join(root, name), join(appRoot, name));
-    const tsconfig = JSON.parse(readFileSync(join(root, "tsconfig.json"), "utf8"));
+    for (const name of ["next.config.ts", "postcss.config.mjs", "package.json", "firebase.json"]) cpSync(join(sourceRoot, name), join(appRoot, name));
+    const tsconfig = JSON.parse(readFileSync(join(sourceRoot, "tsconfig.json"), "utf8"));
     writeFileSync(join(appRoot, "tsconfig.json"), JSON.stringify({ ...tsconfig,
       include: ["next-env.d.ts", ".next/types/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
       exclude: ["node_modules", "functions", "public/sw.js", "src/**/*.test.ts", "src/**/*.test.tsx"],
@@ -88,11 +89,15 @@ export function prepareStaticInventoryApp(root, runtime, environment) {
     mkdirSync(join(appRoot, "scripts"));
     cpSync(join(root, "scripts/serve-hosting-local.mjs"), join(appRoot, "scripts/serve-hosting-local.mjs"));
     const buildEnvironment = { ...environment, NODE_ENV: "production" };
+    if (environment.INVENTORY_BENCHMARK_BUILD) {
+      cpSync(environment.INVENTORY_BENCHMARK_BUILD, join(appRoot, "out"), { recursive: true });
+    } else {
     const result = spawnSync(process.execPath, [join(root, "node_modules/next/dist/bin/next"), "build", "--webpack"], {
       cwd: appRoot, env: buildEnvironment, stdio: "inherit", windowsHide: true,
     });
     if (result.error) throw result.error;
     assert.equal(result.status, 0, "Isolated inventory production build failed.");
+    }
     const output = join(appRoot, "out");
     const shipped = files(output);
     const client = shipped.filter((name) => name.endsWith(".js") && name.startsWith(`_next${sep}`))

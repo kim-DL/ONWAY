@@ -2,17 +2,20 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { inventoryLocationMap, inventoryProductSchema, saveInventoryProductInputSchema, type InventoryLotDraft, type InventoryProduct } from "@/domain/inventory";
 
-const harness = vi.hoisted(() => ({ states: [] as unknown[], refs: [] as Array<{ current: unknown }>, stateCursor: 0, refCursor: 0, online: true, save: vi.fn(), upload: vi.fn(), saved: vi.fn(), movement: vi.fn() }));
+const harness = vi.hoisted(() => ({ states: [] as unknown[], refs: [] as Array<{ current: unknown }>, effects: [] as Array<() => void | (() => void)>, services: { auth: { currentUser: { uid: "employee-1" } } }, stateCursor: 0, refCursor: 0, online: true, save: vi.fn(), upload: vi.fn(), saved: vi.fn(), movement: vi.fn() }));
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(),
   useState: (initial: unknown) => { const index = harness.stateCursor++; if (!(index in harness.states)) harness.states[index] = typeof initial === "function" ? initial() : initial; return [harness.states[index], (next: unknown) => { harness.states[index] = typeof next === "function" ? next(harness.states[index]) : next; }]; },
   useRef: (initial: unknown) => { const index = harness.refCursor++; return harness.refs[index] ?? (harness.refs[index] = { current: initial }); },
-  useId: () => "inventory-registration-test", useEffect: () => undefined,
+  useId: () => "inventory-registration-test", useEffect: (effect: () => void | (() => void)) => { harness.effects.push(effect); },
 }));
 vi.mock("client-only", () => ({}));
+vi.mock("./use-inventory-editor-ready", () => ({ useInventoryEditorReady: () => true }));
+vi.mock("@/lib/firebase/client", () => ({ getFirebaseClientServices: () => harness.services }));
 vi.mock("./use-inventory-connection", () => ({ useInventoryConnection: () => harness.online, INVENTORY_OFFLINE_DRAFT_MESSAGE: "연결 후 다시 저장해주세요." }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { save: harness.save, uploadPhoto: harness.upload, movement: harness.movement }, inventoryErrorMessage: () => "다시 확인해주세요." }));
 vi.mock("./inventory-manufacturer-repository", () => ({ inventoryManufacturerRepository: { saveProduct: harness.save } }));
 import { InventoryProductEditorImpl as InventoryProductEditor } from "./inventory-product-editor";
+import { runRegisteredPrivateClientCleanups } from "@/features/auth/private-client-cleanup-registry";
 
 const product = inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "검증용 만두", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 12, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 3, stockRevision: 1, hasHistory: true, quantityByLocation: { ...inventoryLocationMap(0), refrigerated: 29 }, nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1" });
 type Props = Record<string, unknown> & { children?: ReactNode };
@@ -23,7 +26,7 @@ function find(node: ReactNode, predicate: (type: unknown, props: Props) => boole
 }
 const named = (tree: ReactNode, name: string) => find(tree, (type) => typeof type === "function" && type.name === name)!;
 const noop = () => undefined;
-function render(edit: InventoryProduct | null = null, canManageManufacturers = false) { harness.stateCursor = 0; harness.refCursor = 0; return InventoryProductEditor({ product: edit, location: "refrigerated", canManageManufacturers, onClose: noop, onSaved: harness.saved }); }
+function render(edit: InventoryProduct | null = null, canManageManufacturers = false) { harness.stateCursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryProductEditor({ product: edit, location: "refrigerated", canManageManufacturers, onClose: noop, onSaved: harness.saved }); }
 function changeField(tree: ReactNode, label: string, value: string, type = "input") {
   const field = find(tree, (nodeType, props) => nodeType === "label" && (Array.isArray(props.children) ? props.children : [props.children]).some((child) => typeof child === "string" && child.trim().startsWith(label)))!;
   const input = find(field.props.children, (nodeType) => nodeType === type)!;
@@ -46,10 +49,51 @@ function filled() {
   tree = render(); quantity(tree, 29); expiry(tree, "dated", "2026-12-01"); return render();
 }
 async function settle() { for (let index = 0; index < 6; index += 1) await Promise.resolve(); }
-beforeEach(() => { harness.states = []; harness.refs = []; harness.stateCursor = 0; harness.refCursor = 0; harness.online = true; harness.save.mockReset().mockResolvedValue(product); harness.upload.mockReset().mockResolvedValue({}); harness.saved.mockReset(); harness.movement.mockReset(); vi.stubGlobal("navigator", { onLine: true }); });
+class RegistrationFileReader {
+  result: string | null = null;
+  error: unknown = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  readAsDataURL(file: File) {
+    void file.arrayBuffer().then((bytes) => {
+      this.result = `data:${file.type};base64,${Buffer.from(bytes).toString("base64")}`;
+      this.onload?.();
+    }, (cause) => { this.error = cause; this.onerror?.(); });
+  }
+}
+beforeEach(() => vi.stubGlobal("FileReader", RegistrationFileReader));
+beforeEach(() => { harness.states = []; harness.refs = []; harness.effects = []; harness.services.auth.currentUser = { uid: "employee-1" }; harness.stateCursor = 0; harness.refCursor = 0; harness.online = true; harness.save.mockReset().mockResolvedValue(product); harness.upload.mockReset().mockResolvedValue({}); harness.saved.mockReset(); harness.movement.mockReset(); vi.stubGlobal("navigator", { onLine: true }); vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() }); });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("single-submit inventory registration", () => {
+  it.each(["unmount", "private cleanup", "account switch"])("does not upload a prepared photo after %s during Base64 preparation", async (kind) => {
+    const file = new File(["photo"], "product.webp", { type: "image/webp" });
+    let resolve!: (bytes: ArrayBuffer) => void;
+    vi.spyOn(file, "arrayBuffer").mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    let tree = filled(); (named(tree, "InventoryPhotoPicker").props.onChange as (file: File, removed: boolean) => void)(file, false); tree = render();
+    const cleanup = harness.effects[0]!() as () => void;
+    const pending = submit(tree); await settle();
+    if (kind === "unmount") cleanup();
+    else if (kind === "private cleanup") await runRegisteredPrivateClientCleanups();
+    else harness.services.auth.currentUser = { uid: "employee-2" };
+    resolve(new Uint8Array([1, 2, 3]).buffer); await pending;
+    expect(harness.upload).not.toHaveBeenCalled(); expect(harness.save).not.toHaveBeenCalled(); expect(harness.saved).not.toHaveBeenCalled();
+    cleanup();
+  });
+  it.each(["unmount", "private cleanup", "account switch"])("does not save the product after %s during upload", async (kind) => {
+    const file = new File(["photo"], "product.webp", { type: "image/webp" });
+    let resolve!: (value: unknown) => void;
+    harness.upload.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    let tree = filled(); (named(tree, "InventoryPhotoPicker").props.onChange as (file: File, removed: boolean) => void)(file, false); tree = render();
+    const cleanup = harness.effects[0]!() as () => void;
+    const pending = submit(tree); await settle(); expect(harness.upload).toHaveBeenCalledOnce();
+    if (kind === "unmount") cleanup();
+    else if (kind === "private cleanup") await runRegisteredPrivateClientCleanups();
+    else harness.services.auth.currentUser = { uid: "employee-2" };
+    resolve({}); await pending;
+    expect(harness.save).not.toHaveBeenCalled(); expect(harness.saved).not.toHaveBeenCalled(); cleanup();
+  });
   it("commits product and positive initial stock to the chosen location in one call", async () => {
     let tree = filled(); changeField(tree, "기본 보관 장소", "freezer1", "select"); tree = render(); await submit(tree);
     expect(harness.save).toHaveBeenCalledOnce();

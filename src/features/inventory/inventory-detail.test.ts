@@ -24,7 +24,7 @@ function find(node: ReactNode, predicate: (type: unknown, props: Props) => boole
 }
 function text(node: ReactNode): string { return Array.isArray(node) ? node.map(text).join("") : isValidElement<Props>(node) ? text(node.props.children) : typeof node === "string" || typeof node === "number" ? String(node) : ""; }
 const button = (tree: ReactNode, label: string) => find(tree, (type, props) => typeof type === "function" && type.name === "GlassButton" && (props["aria-label"] ?? text(props.children)) === label);
-type Options = { countMode?: boolean; calendarReady?: boolean };
+type Options = { countMode?: boolean; calendarReady?: boolean; initialProduct?: typeof product };
 function render(nextContext = context, options: Options = {}) { harness.cursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryDetail({ productId: product.productId, initialLocation: "refrigerated", context: nextContext, ...options, onClose: harness.close, onSaved: harness.saved }); }
 const detailEffect = () => harness.effects.find(({ deps }) => deps[0] === product.productId)!;
 async function settle() { for (let index = 0; index < 8; index += 1) await Promise.resolve(); }
@@ -33,6 +33,38 @@ function more(tree: ReactNode, nextContext = context, options: Options = {}) { (
 beforeEach(() => { harness.states = []; harness.cursor = 0; harness.refs = []; harness.refCursor = 0; harness.effects = []; harness.detail.mockReset(); harness.saved.mockReset(); harness.close.mockReset(); harness.online = true; });
 
 describe("compact inventory detail actions", () => {
+  it("paints the list snapshot immediately but waits for fresh detail before photos or mutations", async () => {
+    const snapshot = { ...product, photo: { photoId: "bb1ee35c-2e39-4c96-89ce-9b720f58e65f", width: 1280, height: 960 } };
+    const options = { initialProduct: snapshot, countMode: true };
+    let tree = render(context, options);
+    expect(text(tree)).toContain("29봉"); expect(text(tree)).toContain("온누리");
+    expect(text(tree)).toContain("최신 재고를 확인하고 있어요.");
+    expect(find(tree, (_, props) => props.title === product.name)).not.toBeNull();
+    expect(find(tree, (type) => typeof type === "function" && type.name === "InventoryPhoto")).toBeNull();
+    for (const label of ["출고", "입고", "조정", "수량 일치 확인", "품목 정보 수정"]) expect(button(tree, label)?.disabled).toBe(true);
+    tree = more(tree, context, options);
+    for (const label of ["비활성화", "품목 삭제"]) expect(button(tree, label)?.disabled).toBe(true);
+    const latest = { ...detail, product: { ...product, stockRevision: 2, quantityByLocation: { ...product.quantityByLocation, refrigerated: 17 } } };
+    harness.detail.mockResolvedValueOnce(latest); detailEffect().run(); await settle();
+    tree = render(context, options);
+    expect(text(tree)).toContain("17봉"); expect(text(tree)).not.toContain("29봉");
+    expect(button(tree, "입고")?.disabled).toBe(false);
+  });
+
+  it.each(["functions/not-found", "functions/permission-denied", "functions/unauthenticated"])("removes the snapshot after %s and keeps it hidden during retry", async (code) => {
+    const options = { initialProduct: product };
+    harness.detail.mockRejectedValueOnce({ code }); render(context, options); detailEffect().run(); await settle();
+    let tree = render(context, options);
+    expect(text(tree)).not.toContain("29봉"); expect(button(tree, "입고")).toBeNull();
+    (button(tree, "다시 확인")!.onClick as () => void)();
+    tree = render(context, options);
+    expect(text(tree)).not.toContain("29봉"); expect(button(tree, "입고")).toBeNull();
+  });
+
+  it("does not show a snapshot for another product", () => {
+    expect(text(render(context, { initialProduct: { ...product, productId: "other" } }))).not.toContain("29봉");
+  });
+
   it("shows four frequent actions then count/more without exposing history or destructive actions", async () => {
     const tree = await load();
     for (const label of ["출고", "입고", "조정", "수량 일치 확인", "품목 정보 수정", "더보기"]) expect(button(tree, label)).not.toBeNull();

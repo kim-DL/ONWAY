@@ -2,6 +2,9 @@
 /* eslint-disable @next/next/no-img-element -- Private blob URLs already resized by the existing optimizer; never send them to a public image proxy. */
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import dynamic from "next/dynamic";
+import { useAuth } from "@/features/auth/auth-context";
+import { registerPrivateClientCleanup } from "@/features/auth/private-client-cleanup-registry";
+import { inventoryAccessGeneration, subscribeInventoryAccessFailure } from "./inventory-access-boundary";
 import type { InventoryProduct } from "@/domain/inventory";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
@@ -19,30 +22,44 @@ export function inventoryPhotoPreparationMessage(cause: unknown): string {
     : "촬영한 사진을 준비하지 못했어요. 다시 촬영해주세요.";
 }
 
-export function InventoryPhoto({ product, expandable = false, showExpandHint = false }: { product: InventoryProduct; expandable?: boolean; showExpandHint?: boolean }) {
+export function InventoryPhoto({ product, expandable = false }: { product: InventoryProduct; expandable?: boolean }) {
   const origin = useRef<HTMLDivElement>(null);
-  const [url, setUrl] = useState<string | null>(null);
+  const [image, setImage] = useState<{ key: string | null; url?: string; error?: string } | null>(null);
   const [expanded, setExpanded] = useState<{ url: string; origin: HTMLElement | null } | null>(null);
-  const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const photoId = product.photo?.photoId;
+  const { state: auth } = useAuth();
+  const sessionKey = auth.status === "authenticated" ? `${auth.session.uid}:${auth.session.claims.sessionVersion}:${auth.session.claims.permissionsVersion}` : null;
+  const imageKey = sessionKey && photoId ? `${sessionKey}:${product.productId}:${photoId}` : null;
+  const current = image?.key === imageKey ? image : null;
+  const url = current?.url;
+  const error = current?.error;
   useEffect(() => {
-    if (!photoId) return;
+    if (!photoId || !imageKey) return;
+    const generation = inventoryAccessGeneration();
     let cancelled = false;
     let ownedUrl: string | null = null;
+    const clear = () => {
+      cancelled = true;
+      if (ownedUrl) { forgetPrivateBlobUrl(ownedUrl); ownedUrl = null; }
+      setImage(null); setExpanded(null);
+    };
+    const unregister = registerPrivateClientCleanup(clear);
+    const unsubscribe = subscribeInventoryAccessFailure(clear);
     void inventoryRepository.photo(product.productId, photoId).then((photo) => {
-      if (cancelled) return;
+      if (cancelled || inventoryAccessGeneration() !== generation) return;
       const binary = atob(photo.fileBase64);
       if (binary.length !== photo.byteSize) throw new Error("Invalid inventory photo");
-      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
       ownedUrl = URL.createObjectURL(new Blob([bytes], { type: photo.contentType }));
-      registerPrivateBlobUrl(ownedUrl); setUrl(ownedUrl); setError("");
-    }).catch((cause) => { if (!cancelled) setError(inventoryErrorMessage(cause)); });
-    return () => { cancelled = true; if (ownedUrl) forgetPrivateBlobUrl(ownedUrl); };
-  }, [product.productId, photoId, retry]);
+      registerPrivateBlobUrl(ownedUrl); setImage({ key: imageKey, url: ownedUrl });
+    }).catch((cause) => { if (!cancelled) { setImage({ key: imageKey, error: inventoryErrorMessage(cause) }); setExpanded(null); } });
+    return () => { cancelled = true; unregister(); unsubscribe(); if (ownedUrl) forgetPrivateBlobUrl(ownedUrl); };
+  }, [product.productId, photoId, imageKey, retry]);
   if (!photoId) return null;
-  const failed = () => { setExpanded(null); setUrl(null); setError("사진을 표시하지 못했어요. 다시 불러와주세요."); };
-  return <div ref={origin} className={styles.photo}>{url ? <>{expandable ? <button type="button" className={styles.photoOpen} onClick={() => setExpanded({ url, origin: origin.current })} aria-label={`${product.name} 제품 사진 크게 보기`}><img src={url} alt={`${product.name} 제품 사진`} onError={failed} />{showExpandHint ? <span className={styles.photoExpandHint}><Icon name="zoom-in" size={14} /></span> : null}</button> : <img src={url} alt={`${product.name} 제품 사진`} onError={failed} />}{expandable && expanded?.url === url ? <InventoryPhotoViewer url={url} name={product.name} origin={expanded.origin} onClose={() => setExpanded(null)} onImageError={failed} /> : null}</> : error ? <><p role="alert">{error}</p><GlassButton onClick={() => setRetry((value) => value + 1)}>사진 다시 보기</GlassButton></> : <p role="status">사진을 불러오고 있어요.</p>}</div>;
+  const failed = () => { if (url) forgetPrivateBlobUrl(url); setExpanded(null); setImage({ key: imageKey, error: "사진을 표시하지 못했어요. 다시 불러와주세요." }); };
+  return <div ref={origin} className={styles.photo}>{url ? <>{expandable ? <button type="button" className={styles.photoOpen} onClick={() => setExpanded({ url, origin: origin.current })} aria-label={`${product.name} 제품 사진 크게 보기`}><img src={url} alt={`${product.name} 제품 사진`} onError={failed} /><span className={styles.photoExpandHint}><Icon name="zoom-in" size={14} /></span></button> : <img src={url} alt={`${product.name} 제품 사진`} onError={failed} />}{expandable && expanded?.url === url ? <InventoryPhotoViewer url={url} name={product.name} origin={expanded.origin} onClose={() => setExpanded(null)} onImageError={failed} /> : null}</> : error ? <><p role="alert">{error}</p><GlassButton onClick={() => setRetry((value) => value + 1)}>사진 다시 보기</GlassButton></> : <p role="status">사진을 불러오고 있어요.</p>}</div>;
 }
 
 export function InventoryPhotoPicker({ product, file, removed, disabled, onChange, onBusyChange }: {
@@ -89,9 +106,17 @@ export function InventoryPhotoPicker({ product, file, removed, disabled, onChang
   </div>;
 }
 
-export async function inventoryPhotoBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += 8192) binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
-  return btoa(binary);
+export function inventoryPhotoBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Invalid inventory photo"));
+    reader.onabort = () => reject(new DOMException("", "AbortError"));
+    reader.onload = () => {
+      if (typeof reader.result !== "string" || !/^data:[^,]*;base64,/.test(reader.result)) {
+        reject(new Error("Invalid inventory photo")); return;
+      }
+      resolve(reader.result.slice(reader.result.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
 }

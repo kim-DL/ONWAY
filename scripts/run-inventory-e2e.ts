@@ -55,6 +55,14 @@ let exitCode = 1;
 try {
   const response = await fetch(INVENTORY_E2E_ORIGIN, { signal: AbortSignal.timeout(120_000) });
   if (!response.ok) throw new Error(`Inventory E2E app failed to start: HTTP ${response.status}.`);
+  if (process.env.INVENTORY_BENCHMARK === "true") {
+    if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "profile-final") { await import("./inventory-search-profile"); await import("./inventory-editor-profile"); }
+    else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "progressive-check") await import("./inventory-pagination-progressive-check");
+    else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "profile-editor") await import("./inventory-editor-profile");
+    else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "profile-search") await import("./inventory-search-profile");
+    else await import("./inventory-browser-benchmark");
+    exitCode = 0;
+  } else {
   const cli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
   exitCode = await new Promise<number>((resolve, reject) => {
     const child = spawn(process.execPath, [cli, "test", "tests/e2e-auth/inventory-flow.spec.ts", "--config", "playwright.phase3.config.ts", "--output", "output/playwright/inventory-results", "--reporter", "list", ...(process.env.INVENTORY_E2E_DEBUG_OFFLINE === "true" ? ["--grep", "offline registration draft"] : [])], { cwd: process.cwd(), env: process.env, stdio: "inherit", windowsHide: true });
@@ -71,6 +79,7 @@ try {
     child.once("error", reject); child.once("exit", (code) => resolve(code ?? 1));
   });
   if (integrationExitCode !== 0) exitCode = integrationExitCode;
+  }
 } finally {
   await stopApp();
 }

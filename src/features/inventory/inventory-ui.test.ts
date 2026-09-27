@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { inventoryLocationMap, inventoryProductSchema, type InventoryContext, type InventoryLot } from "@/domain/inventory";
 
 vi.mock("client-only", () => ({}));
+vi.mock("./use-inventory-editor-ready", () => ({ useInventoryEditorReady: () => true }));
 vi.mock("@/features/auth/auth-context", () => ({ useAuth: () => ({ state: { status: "unauthenticated" } }) }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: {}, inventoryErrorMessage: () => "검증용 오류" }));
 import { InventoryCard } from "./inventory-card";
@@ -22,6 +23,10 @@ const context: InventoryContext = { today: "2026-09-10", canWrite: true, canAdmi
 const lot: InventoryLot = { lotId: "lot-1", productId: product.productId, locationId: "refrigerated", originLotId: "lot-1", quantity: 29, revision: 1, label: "9월 입고", expiryState: "dated", expiryDate: "2026-09-13", createdAt: product.createdAt, updatedAt: product.updatedAt };
 const noop = () => undefined;
 describe("inventory UI contracts", () => {
+  it("keeps photo-bearing rows identical to rows without photos", () => {
+    const render = (withPhoto: boolean) => renderToStaticMarkup(h(InventoryCard, { product: { ...product, photo: withPhoto ? { photoId: "bb1ee35c-2e39-4c96-89ce-9b720f58e65f", width: 1280, height: 960 } : null }, location: "refrigerated", context, onOpen: noop }));
+    expect(render(true)).toBe(render(false));
+  });
   it("keeps the floating action reachable and reserves room to scroll the final card above it", () => {
     const css = readFileSync(new URL("./inventory.module.css", import.meta.url), "utf8");
     expect(css).toContain(".workspace[data-write-actions] { padding-bottom: calc(var(--inventory-action-inset) + 64px + env(safe-area-inset-bottom)); }");

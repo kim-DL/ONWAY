@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { inventoryLocationMap, type InventoryContext, type InventoryProduct } from "@/domain/inventory";
 import { clearInventoryWorkspaceSnapshot, updateInventoryWorkspaceUi } from "./inventory-workspace-snapshot";
+import { reportInventoryAccessFailure } from "./inventory-access-boundary";
 
 const harness = vi.hoisted(() => ({ states: [] as unknown[], refs: [] as Array<{ current: unknown }>, effects: [] as Array<() => void | (() => void)>, stateCursor: 0, refCursor: 0, online: true, context: vi.fn(), list: vi.fn() }));
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(),
@@ -53,6 +54,40 @@ async function openEditor() {
   return cleanup;
 }
 describe("inventory in-memory draft lifecycle", () => {
+  it.each([
+    { code: "functions/permission-denied" },
+    { code: "functions/unauthenticated" },
+    { code: "appCheck/token-error" },
+    { code: "functions/failed-precondition", message: "현재 세션을 확인할 수 없습니다." },
+  ])("clears all inventory surfaces on a nested request access failure: $code", async (cause) => {
+    const cleanup = await openEditor();
+    harness.states[9] = "private-product"; harness.states[5] = "freezer1"; harness.states[6] = "private query";
+    reportInventoryAccessFailure(cause, session.uid);
+    expect(hasEditor(render())).toBe(false);
+    expect(harness.states[0]).toBeNull(); expect(harness.states[1]).toEqual([]);
+    expect(harness.states[9]).toBeNull(); expect(harness.states[6]).toBe("");
+    windowEvents.get("focus")!(); await settle(); expect(harness.list).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  it("keeps a draft for business validation errors and errors belonging to another account", async () => {
+    const cleanup = await openEditor();
+    reportInventoryAccessFailure({ code: "functions/failed-precondition", message: "현재 실사 기간을 확인해주세요." }, session.uid);
+    expect(hasEditor(render())).toBe(true);
+    reportInventoryAccessFailure({ code: "functions/permission-denied" }, "another-account");
+    expect(hasEditor(render())).toBe(true); cleanup();
+  });
+
+  it("does not republish an in-flight catalog after a nested request loses access", async () => {
+    let finish!: (products: InventoryProduct[]) => void;
+    harness.list.mockImplementationOnce(() => new Promise<InventoryProduct[]>((resolve) => { finish = resolve; }));
+    render(); const cleanup = harness.effects[0]!() as () => void; await settle();
+    reportInventoryAccessFailure({ code: "functions/permission-denied" }, session.uid);
+    finish([{ productId: "late-private" } as InventoryProduct]); await settle();
+    render(); expect(harness.states[0]).toBeNull(); expect(harness.states[1]).toEqual([]);
+    cleanup();
+  });
+
   it("passes backend admin capability to the new-product manufacturer field", async () => {
     harness.context.mockResolvedValue({ ...context, canAdmin: true });
     const cleanup = await openEditor();

@@ -55,9 +55,13 @@ try {
     environment.INVENTORY_E2E_STATIC_APP = appRoot;
     if (process.env.INVENTORY_E2E_TEST_FAIL_CHILD === "true") run(["--eval", "process.exit(23)"]);
   }
+  if (environment.INVENTORY_BENCHMARK_BUILD_ONLY === "true") {
+    if (!appRoot || !/^[a-z0-9-]+$/.test(environment.INVENTORY_BENCHMARK_LABEL ?? "")) throw new Error("A static benchmark build requires a safe label.");
+    cpSync(join(appRoot, "out"), join(root, "output/playwright/inventory-benchmark", `${environment.INVENTORY_BENCHMARK_LABEL}-built`), { recursive: true });
+  } else {
   const functionsRoot = join(runtime, "functions");
   mkdirSync(functionsRoot, { recursive: true });
-  run([join(root, "node_modules", "typescript", "bin", "tsc"), "--outDir", join(functionsRoot, "lib")], join(root, "functions"));
+  run([join(root, "node_modules", "typescript", "bin", "tsc"), "--outDir", join(functionsRoot, "lib")], join(process.env.INVENTORY_BENCHMARK_SOURCE || root, "functions"));
   const manifest = JSON.parse(readFileSync(join(root, "functions", "package.json"), "utf8"));
   writeFileSync(join(functionsRoot, "package.json"), JSON.stringify({ ...manifest, main: "lib/inventory-e2e-index.js" }, null, 2));
   // Export real production callables, not mock implementations. Do not load
@@ -80,6 +84,7 @@ try {
   if (!existsSync(firebaseCli)) throw new Error("Install repository dependencies before running inventory E2E.");
   run([firebaseCli, "emulators:exec", "--only", "auth,firestore,functions,storage", "--project", projectId,
     "--config", configurationPath, `"${process.execPath}" "${runner}"`]);
+  }
 } catch (error) {
   failure = error;
   throw error;

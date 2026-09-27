@@ -102,6 +102,7 @@ export function clearInventoryWorkspaceSnapshot(namespace?: string) {
 
 export function discardInventoryWorkspaceCatalog(namespace: string) {
   if (!entry || entry.namespace !== namespace) return;
+  clearInventorySessionMemory?.();
   entry.coordinator.invalidate();
   entry.reconciler.dispose();
   entry.reconciler = new InventoryListReconciler(namespace);

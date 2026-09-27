@@ -47,7 +47,13 @@ async function variant(
   return { buffer, width: metadata.width, height: metadata.height, bytes: buffer.length };
 }
 
-export async function processSchoolPhoto(input: Buffer): Promise<ProcessedPhoto> {
+const variantSettings = {
+  thumbnail: [400, 300, 76, "cover"],
+  preview: [1440, 1440, 82, "inside"],
+  original: [2560, 2560, 88, "inside"],
+} as const;
+
+async function processPhoto<K extends PhotoVariant>(input: Buffer, variants: readonly K[]): Promise<Record<K, ProcessedPhotoVariant>> {
   if (input.length === 0 || input.length > MAX_PHOTO_UPLOAD_BYTES) {
     throw new InvalidPhotoError("사진은 10MB 이하여야 합니다.");
   }
@@ -58,14 +64,22 @@ export async function processSchoolPhoto(input: Buffer): Promise<ProcessedPhoto>
     if (!metadata.width || !metadata.height || metadata.width * metadata.height > MAX_PHOTO_INPUT_PIXELS) {
       throw new InvalidPhotoError("사진 해상도가 너무 큽니다.");
     }
-    const [thumbnail, preview, original] = await Promise.all([
-      variant(input, 400, 300, 76, "cover"),
-      variant(input, 1440, 1440, 82, "inside"),
-      variant(input, 2560, 2560, 88, "inside"),
-    ]);
-    return { thumbnail, preview, original };
+    const processed = await Promise.all(variants.map(async (name) => {
+      const [width, height, quality, fit] = variantSettings[name];
+      return [name, await variant(input, width, height, quality, fit)] as const;
+    }));
+    return Object.fromEntries(processed) as Record<K, ProcessedPhotoVariant>;
   } catch (error) {
     if (error instanceof InvalidPhotoError) throw error;
     throw new InvalidPhotoError("사진을 안전한 WebP로 변환하지 못했습니다.");
   }
+}
+
+export function processSchoolPhoto(input: Buffer): Promise<ProcessedPhoto> {
+  return processPhoto(input, ["thumbnail", "preview", "original"]);
+}
+
+// Inventory's private read/write contract contains only these two variants.
+export function processInventoryPhoto(input: Buffer) {
+  return processPhoto(input, ["thumbnail", "preview"]);
 }

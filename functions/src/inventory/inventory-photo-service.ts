@@ -4,7 +4,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 import type { z } from "zod";
 
 import { getAdminFirestore, getAdminPhotoBucket } from "../shared/firebase-admin.js";
-import { detectPhotoContentType, InvalidPhotoError, processSchoolPhoto } from "../photo/photo-processor.js";
+import { detectPhotoContentType, InvalidPhotoError, processInventoryPhoto } from "../photo/photo-processor.js";
 import { verifyInventoryTransactionActor, type InventoryActor } from "./inventory-authorization.js";
 import {
   INVENTORY_PHOTO_MAX_BYTES, INVENTORY_PRODUCT_PATH, getInventoryPhotoInputSchema,
@@ -91,7 +91,7 @@ export class InventoryPhotoService {
 
     // Reuse the bounded, orientation-aware decoder used by school/customer photos.
     // No source file, EXIF, public download token or original metadata is retained.
-    const processed = await photoOperation("image-processing", () => processSchoolPhoto(source));
+    const processed = await photoOperation("image-processing", () => processInventoryPhoto(source));
     await photoOperation("storage-write", () => Promise.all((["thumbnail", "preview"] as const).map((variant) =>
       this.bucket.file(inventoryPhotoPath(input.uploadId, variant)).save(processed[variant].buffer, {
         resumable: false, metadata: { contentType: "image/webp", cacheControl: "private, no-store, max-age=0" },

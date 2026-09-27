@@ -8,10 +8,17 @@ export function inventoryInitials(value: string): string {
     return code >= 0 && code <= 11171 ? INITIALS[Math.floor(code / 588)] : character;
   }).join("");
 }
-export function matchesInventorySearch(product: InventoryProduct, query: string): boolean {
+export function inventorySearchText(product: InventoryProduct) {
   const target = [product.name, product.manufacturer, product.specification, product.origin].join(" ");
   // Preserve compatibility jamo before NFKC normalization for Korean initial search.
-  return normalize(target).includes(normalize(query)) || normalize(inventoryInitials(target)).includes(normalize(query));
+  return { text: normalize(target), initials: normalize(inventoryInitials(target)) };
+}
+export function inventorySearchMatcher(query: string) {
+  const normalizedQuery = normalize(query);
+  return (target: ReturnType<typeof inventorySearchText>) => target.text.includes(normalizedQuery) || target.initials.includes(normalizedQuery);
+}
+export function matchesInventorySearch(product: InventoryProduct, query: string): boolean {
+  return inventorySearchMatcher(query)(inventorySearchText(product));
 }
 export function inventoryLocationsFor(product: InventoryProduct): InventoryLocation[] {
   return INVENTORY_LOCATIONS.filter((location) => location === product.defaultLocationId || product.quantityByLocation[location] > 0);
@@ -51,9 +58,9 @@ export function inventoryScopeIsUrgent(product: InventoryProduct, location: Inve
 export const INVENTORY_COUNT_LABELS = { done: "이번 주 확인", changed: "변동 후 미확인", pending: "미확인" } as const;
 /** Products added after this scheduled KST count day are not overdue work. */
 export function inventoryCountEligible(product: InventoryProduct, context: InventoryContext): boolean {
-  const created = new Date(product.createdAt);
-  if (!Number.isFinite(created.valueOf())) return false;
-  const createdDate = new Date(created.valueOf() + 9 * 60 * 60 * 1_000).toISOString().slice(0, 10);
+  const created = Date.parse(product.createdAt);
+  if (!Number.isFinite(created)) return false;
+  const createdDate = new Date(created + 9 * 60 * 60 * 1_000).toISOString().slice(0, 10);
   return createdDate <= context.cycle.startDate;
 }
 export function inventoryCountBadgeState(product: InventoryProduct, location: InventoryLocationFilter, context: InventoryContext | null, countMode = false): InventoryCountState | null {

@@ -6,6 +6,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryLocation, type InventoryLotDraft, type InventoryProduct, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
 import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo";
 import { inventoryRepository } from "./inventory-repository";
+import { useInventoryEditorReady } from "./use-inventory-editor-ready";
 import { FormFooter, LotFields, QuantityFields, blankLot, useInventoryAction, validLotDraft, type InventoryProductEditorProps } from "./inventory-forms";
 import styles from "./inventory.module.css";
 import formStyles from "./inventory-form-design.module.css";
@@ -21,6 +22,7 @@ function PresetChoices({ label, presets, selected, disabled, displayLabel, wideC
 const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "개", unitsPerBox: 1, defaultLocationId: location, urgent: false });
 
 export function InventoryProductEditorImpl({ product, location, canCreateManufacturer = true, canManageManufacturers = false, onClose, onSaved }: InventoryProductEditorProps) {
+  const ready = useInventoryEditorReady();
   const id = useId();
   const [draft, setDraft] = useState<InventoryProductDraft>(() => product ? { name: product.name, manufacturer: product.manufacturer, specification: product.specification, origin: product.origin, note: product.note, unitLabel: product.unitLabel, unitsPerBox: product.unitsPerBox, defaultLocationId: product.defaultLocationId, urgent: product.urgent } : newDraft(location));
   const [file, setFile] = useState<File | null>(null);
@@ -51,13 +53,20 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
     const staged = file ? upload.current : null;
     const photoChange: SaveInventoryProductInput["photoChange"] = staged ? { action: "replace", uploadId: staged.id } : removed ? { action: "remove" } : undefined;
     const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { initialStock: { quantity: initialQuantity, lot: initialLot } } : {}), ...(photoChange ? { photoChange } : {}) };
-    await action.run(input, async (requestId) => {
-      if (staged && !staged.ready) { await inventoryRepository.uploadPhoto({ uploadId: staged.id, contentType: staged.file.type as "image/webp", fileBase64: await inventoryPhotoBase64(staged.file) }); staged.ready = true; }
+    await action.run(input, async (requestId, assertCurrent) => {
+      if (staged && !staged.ready) {
+        const fileBase64 = await inventoryPhotoBase64(staged.file);
+        assertCurrent();
+        await inventoryRepository.uploadPhoto({ uploadId: staged.id, contentType: staged.file.type as "image/webp", fileBase64 });
+        assertCurrent(); staged.ready = true;
+      }
+      assertCurrent();
       const saveInput = { ...input, requestId };
       return manufacturerSave.current ? manufacturerSave.current(saveInput) : inventoryRepository.save(saveInput);
     }, onSaved);
   }
   return <BottomSheet open title={product ? "품목 정보 수정" : "새 품목 등록"} onClose={onClose} dismissible={!busy}>
+    {ready ? <>
     <form id={id} onSubmit={submit} className={`${styles.sheet} ${formStyles.productForm}`} aria-busy={busy}>
       <InventoryPhotoPicker product={product} file={file} removed={removed} disabled={action.busy} onBusyChange={setPhotoBusy} onChange={(next, remove) => { setFile(next); setRemoved(remove); }} />
       <div className={formStyles.productSection}>
@@ -79,5 +88,6 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       {action.error ? <p role="alert" className={styles.error}>{action.error}</p> : null}
     </form><FormFooter id={id} busy={busy} onClose={onClose} label={product ? "변경 저장" : "품목 등록"} />
     {specificationPicker ? <BottomSheet open title="규격 선택" onClose={() => setSpecificationPicker(false)}><PresetChoices label="규격" presets={SPECIFICATION_PRESETS} selected={isCustom("specification", SPECIFICATION_PRESETS) ? null : draft.specification} disabled={busy} onSelect={(value) => { selectPreset("specification", value); setSpecificationPicker(false); }} /></BottomSheet> : null}
+    </> : <p role="status" className={`${styles.sheet} ${styles.muted}`}>품목 입력 화면을 준비하고 있어요.</p>}
   </BottomSheet>;
 }

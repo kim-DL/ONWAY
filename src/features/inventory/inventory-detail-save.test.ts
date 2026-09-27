@@ -6,8 +6,8 @@ type Effect = { effect: () => void | (() => void); deps?: unknown[] | undefined 
 const harness = vi.hoisted(() => ({ states: [] as unknown[], refs: [] as Array<{ current: unknown }>, stateCursor: 0, refCursor: 0,
   effects: [] as Effect[], previous: [] as Array<{ deps?: unknown[] | undefined; cleanup?: (() => void) | undefined }>, detail: vi.fn() }));
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(),
-  useState: (initial: unknown) => { const index = harness.stateCursor++; if (!(index in harness.states)) harness.states[index] = typeof initial === "function" ? initial() : initial;
-    return [harness.states[index], (next: unknown) => { harness.states[index] = typeof next === "function" ? next(harness.states[index]) : next; }]; },
+  useState: (initial: unknown) => { const index = harness.stateCursor++; const states = harness.states; if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+    return [states[index], (next: unknown) => { states[index] = typeof next === "function" ? next(states[index]) : next; }]; },
   useRef: (initial: unknown) => { const index = harness.refCursor++; return harness.refs[index] ?? (harness.refs[index] = { current: initial }); },
   useEffect: (effect: Effect["effect"], deps?: unknown[]) => harness.effects.push({ effect, deps }),
 }));
@@ -36,9 +36,9 @@ function snapshot(quantity = 10, stockRevision = 1): InventoryProductDetail {
     createdAt: "2026-09-13T00:00:00.000Z", updatedAt: "2026-09-13T00:00:00.000Z", createdBy: "EMP", updatedBy: "EMP" });
   return { product, lots: [] };
 }
-function render(callback = onSaved) {
+function render(callback = onSaved, initialProduct?: InventoryProduct) {
   harness.stateCursor = 0; harness.refCursor = 0; harness.effects = [];
-  return InventoryDetail({ productId: "product-1", initialLocation: "refrigerated", context, onSaved: callback, onClose });
+  return InventoryDetail({ productId: initialProduct?.productId ?? "product-1", ...(initialProduct ? { initialProduct } : {}), initialLocation: "refrigerated", context, onSaved: callback, onClose });
 }
 function effects() {
   harness.effects.forEach(({ effect, deps }, index) => {
@@ -57,6 +57,31 @@ function saveHandler(tree: ReactNode) {
 beforeEach(() => { harness.states = []; harness.refs = []; harness.effects = []; harness.previous = []; harness.stateCursor = 0; harness.refCursor = 0; harness.detail.mockReset(); onSaved.mockReset(); onClose.mockReset(); });
 
 describe("inventory detail save reconciliation", () => {
+  it("discards A's delayed initial detail after closing A and opening B", async () => {
+    const a = snapshot(11); const b = { ...snapshot(22), product: { ...snapshot(22).product, productId: "product-B", name: "B 품목" } };
+    const freshB = { ...b, product: { ...b.product, stockRevision: 2, quantityByLocation: { ...b.product.quantityByLocation, refrigerated: 23 } } };
+    let finishA!: (detail: InventoryProductDetail) => void;
+    let finishB!: (detail: InventoryProductDetail) => void;
+    harness.detail.mockReturnValueOnce(new Promise((resolve) => { finishA = resolve; }))
+      .mockReturnValueOnce(new Promise((resolve) => { finishB = resolve; }));
+    render(onSaved, a.product); effects();
+    const aStates = harness.states;
+    // Workspace keys detail by product ID. Closing A disposes its effects;
+    // opening B owns different state/ref cells, as React's keyed mount does.
+    harness.previous.forEach((effect) => effect.cleanup?.());
+    harness.states = []; harness.refs = []; harness.effects = []; harness.previous = [];
+    expect(text(render(onSaved, b.product))).toContain("22봉"); effects();
+    finishB(freshB); await settle();
+    expect(text(render(onSaved, b.product))).toContain("23봉");
+    finishA(a); await settle();
+    const current = render(onSaved, b.product);
+    expect(harness.detail.mock.calls).toEqual([[a.product.productId], [b.product.productId]]);
+    expect(aStates[0]).toBeNull(); expect(aStates[2]).toBe(true);
+    expect(harness.states[0]).toEqual(freshB);
+    expect(text(current)).toContain("23봉"); expect(text(current)).not.toContain("11봉");
+    expect(onSaved).not.toHaveBeenCalled(); expect(onClose).not.toHaveBeenCalled();
+    harness.previous.forEach((effect) => effect.cleanup?.());
+  });
   it("does not report ordinary initial reads as new saves", async () => {
     await open(); expect(harness.detail).toHaveBeenCalledOnce(); expect(onSaved).not.toHaveBeenCalled();
   });

@@ -6,6 +6,7 @@ vi.mock("client-only", () => ({}));
 vi.mock("@/lib/firebase/client", () => ({ getFirebaseClientServices: () => mock.services }));
 vi.mock("firebase/functions", () => ({ httpsCallable: (_functions: unknown, name: string) => (input: unknown) => mock.invoke(name, input) }));
 import { inventoryErrorMessage, inventoryRepository } from "./inventory-repository";
+import { reportInventoryAccessFailure, subscribeInventoryAccessFailure } from "./inventory-access-boundary";
 
 function product(productId = "product-1"): InventoryProduct {
   return inventoryProductSchema.parse({ productId, companyId: "onnuri", name: "검증용 닭가슴살", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 10, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 0, stockRevision: 0, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1" });
@@ -13,6 +14,22 @@ function product(productId = "product-1"): InventoryProduct {
 beforeEach(() => { mock.invoke.mockReset(); mock.services.auth.currentUser = { uid: "employee-1" }; });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("inventory callable boundary", () => {
+  it("notifies the active workspace on access denial and rejects an older successful response", async () => {
+    const listener = vi.fn(); const unsubscribe = subscribeInventoryAccessFailure(listener);
+    try {
+      const cause = { code: "functions/permission-denied" };
+      mock.invoke.mockRejectedValueOnce(cause);
+      await expect(inventoryRepository.detail("product-1")).rejects.toBe(cause);
+      expect(listener).toHaveBeenCalledWith(cause, "employee-1");
+      let resolve!: (result: unknown) => void;
+      mock.invoke.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+      const pending = inventoryRepository.detail("product-1");
+      reportInventoryAccessFailure(cause, "employee-1");
+      resolve({ data: { product: product(), lots: [] } });
+      await expect(pending).rejects.toMatchObject({ code: "unauthenticated" });
+      expect(listener).toHaveBeenCalledTimes(2);
+    } finally { unsubscribe(); }
+  });
   it("requests summaries with detail and metadata writes while accepting legacy products that have no summary yet", async () => {
     mock.invoke.mockResolvedValueOnce({ data: { product: product(), lots: [] } }).mockResolvedValueOnce({ data: product() });
     const result = await inventoryRepository.detail("product-1");

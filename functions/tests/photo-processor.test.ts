@@ -9,9 +9,29 @@ import {
   detectPhotoContentType,
   InvalidPhotoError,
   processSchoolPhoto,
+  processInventoryPhoto,
 } from "../src/photo/photo-processor.js";
 
 describe("Phase 8 photo processing contract", () => {
+  it.each(["jpeg", "png", "webp"] as const)("keeps inventory %s thumbnail/preview byte-identical without generating original", async (format) => {
+    const source = await sharp({ create: { width: 1600, height: 900, channels: 3, background: "#2f7969" } })
+      .toFormat(format).withMetadata({ orientation: 6 }).toBuffer();
+    const baseline = await processSchoolPhoto(source);
+    const inventory = await processInventoryPhoto(source);
+    expect(Object.keys(inventory).sort()).toEqual(["preview", "thumbnail"]);
+    for (const name of ["thumbnail", "preview"] as const) {
+      expect(inventory[name]).toEqual(baseline[name]);
+      const metadata = await sharp(inventory[name].buffer).metadata();
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.orientation).toBeUndefined();
+    }
+  });
+
+  it("preserves inventory invalid-input and byte-size guards", async () => {
+    for (const source of [Buffer.alloc(0), Buffer.from("not-an-image"), Buffer.alloc(MAX_PHOTO_UPLOAD_BYTES + 1)]) {
+      await expect(processInventoryPhoto(source)).rejects.toBeInstanceOf(InvalidPhotoError);
+    }
+  });
   it("normalizes an oriented source into three metadata-free WebP variants", async () => {
     const source = await sharp({
       create: { width: 1_200, height: 800, channels: 3, background: "#2f7969" },
