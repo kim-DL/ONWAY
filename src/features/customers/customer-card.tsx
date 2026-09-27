@@ -80,7 +80,7 @@ export function CustomerCardDirectionsLink({ customer }: { customer: Customer })
 export function CustomerCard({ customer, onSelect, compact = false }: { customer: Customer; onSelect: () => void; compact?: boolean }) {
   const contact = primaryCustomerContact(customer);
   const Heading = compact ? "h4" : "h2";
-  return <article className={`${fieldList.row} ${styles.card}`} data-customer-card data-compact={compact || undefined} data-closed={customer.status === "closed" || undefined}>
+  return <article className={`${fieldList.row} ${styles.card}`} data-customer-card>
     <button type="button" className={styles.cardSelect} onClick={onSelect} aria-label={`${customer.name} 상세 정보`} aria-describedby={compact ? `customer-card-password-${customer.customerId}` : undefined} />
     <div className={styles.cardBody}>
       <div className={styles.cardHeading}><Heading className={styles.cardName}>{customer.name}</Heading><CustomerBadges customer={customer} /><Icon name="chevron-right" size={17} className={styles.cardChevron} /></div>

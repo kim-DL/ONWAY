@@ -27,7 +27,7 @@ function CustomerAdminContent({ session }: { session: AuthenticatedSession }) {
   const clearSensitiveState = useCallback(() => { setEditing(null); setQuery(""); }, []);
   const catalog = useCustomers(session, clearSensitiveState);
   const customers = useMemo(() => query.trim() ? searchCustomers(catalog.customers, query) : [...catalog.customers].sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed") || a.name.localeCompare(b.name, "ko-KR")), [catalog.customers, query]);
-  return <section className={styles.admin} aria-labelledby="customer-admin-heading" data-customer-admin>
+  return <section className={styles.admin} aria-labelledby="customer-admin-heading">
     <header className={styles.heading}><div><h2 id="customer-admin-heading">거래처 관리</h2><p className={styles.muted}>납품 안내 · 출입 정보 · 연락처</p></div><GlassButton compact variant="primary" onClick={() => setEditing("new")} disabled={catalog.status !== "ready"}><Icon name="plus" size={18} />거래처 등록</GlassButton></header>
     <GlassButton onClick={() => setEditing("import")} disabled={catalog.status !== "ready"}>일괄 등록</GlassButton>
     <label className={styles.search}><Icon name="search" size={21} /><input {...searchInputProps} name="admin-customer-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="거래처명 또는 초성 검색" aria-label="관리할 거래처 검색" /></label>
