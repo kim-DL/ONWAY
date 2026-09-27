@@ -55,6 +55,8 @@ jobs:
 
       - name: Production build
         run: npm run build
+        env:
+          NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS: "true"
 
       - name: PWA artifact gate
         run: npm run verify:pwa:build
