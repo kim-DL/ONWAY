@@ -57,6 +57,10 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS: "true"
+          NEXT_PUBLIC_ENABLE_INVENTORY: "true"
+          # Synthetic 32-character key keeps the public map bundle representative
+          # without exposing the production Kakao key to CI or the repository.
+          NEXT_PUBLIC_KAKAO_MAP_JAVASCRIPT_KEY: "8b609fb6a2f7dc3b747711f747136e6a"
 
       - name: PWA artifact gate
         run: npm run verify:pwa:build
