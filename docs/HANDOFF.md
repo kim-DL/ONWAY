@@ -1,9 +1,18 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-27
+기준일: 2026-09-29
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-09-29 iPhone 납품사진 업로드 수정 — production Hosting 배포 완료, iPhone 실기기 확인 대기
+
+- 최신 `origin/main` `8573f94`에서 별도 `codex/iphone-delivery-photo` worktree/branch를 만들었다. 원본 `main`은 깨끗했고 기존 다른 worktree는 수정하지 않았다. 제품 commit `0329302570173a7953f7d8e57cf0b5b592a2616c`를 브랜치와 `main`에 push했다.
+- 코드상 확인된 업로드 전 차단점은 세 가지다. 납품사진 전처리는 iPhone의 HEIC/HEIF 선택을 MIME·파일명·헤더에서 거부했다. Safari가 `canvas.toBlob("image/webp")` 요청에 PNG를 반환하면 WebP 전용 검사에서 실패했다. 파일 선택 뒤 창 focus가 `change`보다 먼저 돌아오면 750ms 타이머가 선택 상태를 폐기했다. 이 경로들은 `createDeliveryPhoto` 호출 전에 끝나므로 Storage·Firestore에 기록이 생기지 않는다. 사용자 iPhone의 OS 버전과 오류 문구는 확인할 수 없었으므로 실제 기기에서 어느 차단점이 발동했는지는 구분하지 못했다.
+- 납품사진 전용 계층에서 실제 바이트로 HEIC/HEIF를 식별해 브라우저 디코더로 열고, 새 캔버스 WebP를 우선 사용하되 WebP 인코딩이 불가능하면 새 JPEG로 전송하도록 수정했다. 서버의 기존 JPEG/WebP 입력 계약과 최종 evidence/thumbnail WebP, 인증 Callable·request ID·감사·Storage 경계는 그대로다. 선택기 focus 기반 취소를 없애고 늦은 `change`를 수용하면서 중복 선택 차단을 유지했다. 고정 날짜의 납품사진 테스트와 Emulator gate는 두 번째 만료 확인 시계를 fixture 기준으로 명시했다. 감사 gate에서 발견된 개발 도구 경로의 High 취약점은 `fast-uri`만 3.1.6→3.1.8로 갱신했다.
+- 납품사진 집중 unit/계약 121/121, 인증 demo Emulator 납품사진 browser 11/11, 서비스 gate PASS. Safari식 PNG 반환과 focus 후 850ms 지연된 카메라·앨범 선택은 Chromium 자동화에서 JPEG 전송→Callable→서버 WebP 저장→기록 1→2장 표시까지 검증했다. 전체 release acceptance 10/10, 내부 Emulator 12/12 PASS (`output/acceptance/phase17-report.json`, 2026-09-29 14:38 KST): unit 1,663 PASS/14 SKIP, 공통 browser 290 PASS, Rules 50 PASS, 사용자 여정 76 PASS/13 SKIP. 최종 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` build와 PWA·성능·Hosting gate PASS; 101개 export/shipped, precache 88개, 납품사진 JS gzip 10,201/10,240B다.
+- `npx firebase deploy --project onnuriway --only hosting`으로 site `onnuriway`의 Hosting만 배포했다. 두 production origin의 Hosting verifier PASS, 후보와 두 origin의 `/sw.js` SHA-256 일치(`ea1f6e0ba0a93603703ce8d85cf2b81f06238d95093918b7e1c894d46dfa2e17`). Functions, Rules, Auth, Storage 설정과 production 업무 데이터는 변경하지 않았다.
+- iPhone 실기기의 실제 카메라 촬영·앨범 선택·PWA 세션 검증은 수행할 수 없었다. 위 HEIC 경로의 자동화는 구성한 파일 헤더와 mock 디코더를 사용했고 실제 iPhone 사진/디코더 시험이 아니다. 상품등록 사진은 별도 `customer-photo-preparation`/`photo-upload-optimizer` 계층을 사용하며 이번 변경으로 영향받지 않는다. 그 계층의 기존 HEIC 거부는 별도 과제로 남는다.
 
 ### 2026-09-27 재고 즉각성 최적화 — 로컬 구현·반복 측정·회귀 검증 완료, 운영 미배포
 
