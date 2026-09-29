@@ -211,7 +211,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     const unsupportedChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "앨범에서 사진 추가" }).click();
     await (await unsupportedChooser).setFiles({ name: "unsupported.heic", mimeType: "image/heic", buffer: Buffer.from("unsupported") });
-    await expect(page.getByText(/HEIC\/HEIF 사진은 지원하지 않아요/u)).toBeVisible();
+    await expect(page.getByText(/사진 파일 형식이 실제 내용과 맞지 않아요/u)).toBeVisible();
     await search.fill("");
 
     const cancelledChooser = page.waitForEvent("filechooser");
@@ -260,6 +260,49 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
   } finally {
     releaseFirst(); await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
+  }
+});
+
+test("Safari-style PNG fallback and late picker change save camera and album photos through the server", async ({ page }) => {
+  await removePilotPhotos([ids[3]!]);
+  const requests: Array<{ contentType: string; source: string; customerId: string }> = [];
+  try {
+    await login(page);
+    await page.evaluate(() => {
+      const native = HTMLCanvasElement.prototype.toBlob;
+      HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+        if (type === "image/webp") return native.call(this, callback, "image/png");
+        return native.call(this, callback, type, quality);
+      };
+    });
+    page.on("request", (request) => {
+      if (request.url().endsWith("/createDeliveryPhoto")) {
+        requests.push((request.postDataJSON() as { data: typeof requests[number] }).data);
+      }
+    });
+    const regular = await sharp({ create: { width: 960, height: 640, channels: 3, background: "#7da6be" } }).jpeg().toBuffer();
+    const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
+    await search.fill("새봄");
+    for (const source of ["camera", "album"] as const) {
+      if (source === "album") await page.getByRole("button", { name: "새봄마트 더보기" }).click();
+      const chooser = page.waitForEvent("filechooser");
+      await page.getByRole("button", { name: source === "camera" ? "새봄마트 카메라 촬영" : "앨범에서 사진 추가" }).click();
+      const picker = await chooser;
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await page.waitForTimeout(850);
+      await picker.setFiles({ name: `${source}.jpg`, mimeType: "image/jpeg", buffer: regular });
+      await expect.poll(() => requests.length).toBe(source === "camera" ? 1 : 2);
+      await expect(page.getByRole("button", { name: "새봄마트 사진 기록" })).toContainText(`사진 ${source === "camera" ? 1 : 2}장`, { timeout: 30_000 });
+    }
+    expect(requests.map(({ customerId, source, contentType }) => ({ customerId, source, contentType }))).toEqual([
+      { customerId: ids[3], source: "camera", contentType: "image/jpeg" },
+      { customerId: ids[3], source: "album", contentType: "image/jpeg" },
+    ]);
+    const stored = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[3]).get();
+    expect(stored.docs).toHaveLength(2);
+    expect(stored.docs.every((photo) => photo.get("evidence.contentType") === "image/webp")).toBe(true);
+  } finally {
+    await removePilotPhotos([ids[3]!]);
   }
 });
 

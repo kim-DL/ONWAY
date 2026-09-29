@@ -5,10 +5,11 @@ export const DELIVERY_PHOTO_TRANSPORT_MAX_EDGE = 2_560;
 // Transport quality is provisional until the Galaxy S20+ field benchmark.
 // The server independently creates the final evidence at WebP quality 88.
 export const DELIVERY_PHOTO_TRANSPORT_WEBP_QUALITY = 0.9;
+export const DELIVERY_PHOTO_TRANSPORT_JPEG_QUALITY = 0.88;
 
 export type PreparedDeliveryPhoto = {
   blob: Blob;
-  contentType: "image/webp";
+  contentType: "image/webp" | "image/jpeg";
   width: number;
   height: number;
 };
@@ -26,11 +27,8 @@ function canonicalDeclaredType(type: string) {
 export function validateDeliveryPhotoSelection(file: File): string | null {
   if (file.size <= 0) return "사진 파일이 비어 있어요. 다시 촬영하거나 선택해주세요.";
   if (file.size > DELIVERY_PHOTO_SOURCE_MAX_BYTES) return "원본 사진은 30MB 이하여야 해요.";
-  if (/^image\/hei[cf]/iu.test(file.type) || /\.hei[cf]$/iu.test(file.name ?? "")) {
-    return "HEIC/HEIF 사진은 지원하지 않아요. JPEG로 다시 촬영하거나 지원되는 사진을 선택해주세요.";
-  }
-  if (!["image/jpeg", "image/jpg", "image/png", "image/webp", "", "application/octet-stream"].includes(file.type)) {
-    return "JPEG, PNG 또는 WebP 사진을 선택해주세요.";
+  if (!["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif", "", "application/octet-stream"].includes(file.type)) {
+    return "JPEG, PNG, WebP 또는 HEIC 사진을 선택해주세요.";
   }
   return null;
 }
@@ -91,20 +89,23 @@ function ascii(bytes: Uint8Array, start: number, end: number) {
   return String.fromCharCode(...bytes.subarray(start, end));
 }
 
-export function detectDeliveryPhotoContentType(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" {
+export function detectDeliveryPhotoContentType(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif" {
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
   if (bytes.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value)) return "image/png";
   if (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP") return "image/webp";
   if (bytes.length >= 16 && ascii(bytes, 4, 8) === "ftyp") {
     const boxSize = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
     if (boxSize >= 16 && boxSize <= bytes.length && boxSize % 4 === 0) {
+      let heic = false;
+      let heif = false;
       for (let offset = 8; offset < boxSize; offset += offset === 8 ? 8 : 4) {
         const brand = ascii(bytes, offset, offset + 4);
-        if (["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)) {
-          throw preparationError("delivery-photo/heic-source");
-        }
         if (brand === "avif" || brand === "avis") throw preparationError("delivery-photo/unsupported-source");
+        if (["heic", "heix", "hevc", "hevx"].includes(brand)) heic = true;
+        if (brand === "mif1" || brand === "msf1") heif = true;
       }
+      if (heic) return "image/heic";
+      if (heif) return "image/heif";
     }
   }
   throw preparationError("delivery-photo/invalid-source");
@@ -117,8 +118,7 @@ export async function materializeDeliveryPhotoSource(file: File, signal?: AbortS
   if (validation) {
     const code = file.size <= 0 ? "delivery-photo/empty-source"
       : file.size > DELIVERY_PHOTO_SOURCE_MAX_BYTES ? "delivery-photo/source-too-large"
-        : /^image\/hei[cf]/iu.test(file.type) || /\.hei[cf]$/iu.test(file.name ?? "") ? "delivery-photo/heic-source"
-          : "delivery-photo/unsupported-source";
+        : "delivery-photo/unsupported-source";
     throw preparationError(code);
   }
   let bytes: ArrayBuffer;
@@ -131,7 +131,9 @@ export async function materializeDeliveryPhotoSource(file: File, signal?: AbortS
   if (signal?.aborted) throw preparationError("delivery-photo/cancelled");
   const contentType = detectDeliveryPhotoContentType(new Uint8Array(bytes));
   const declared = canonicalDeclaredType(file.type);
-  if (declared.startsWith("image/") && declared !== contentType) throw preparationError("delivery-photo/mime-mismatch");
+  if (declared.startsWith("image/") && declared !== contentType
+    && !(declared === "image/heic" || declared === "image/heif")
+    && !(contentType === "image/heic" || contentType === "image/heif")) throw preparationError("delivery-photo/mime-mismatch");
   return new File([bytes], file.name || "delivery-photo", { type: contentType, lastModified: file.lastModified });
 }
 
@@ -162,11 +164,22 @@ async function decodeDeliveryPhoto(file: File): Promise<DecodedDeliveryPhoto> {
   }
 }
 
-function canvasWebp(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => canvas.toBlob((blob) => {
-    if (!blob || blob.type !== "image/webp") reject(preparationError("delivery-photo/webp-unsupported"));
-    else resolve(blob);
-  }, "image/webp", DELIVERY_PHOTO_TRANSPORT_WEBP_QUALITY));
+function canvasBlob(canvas: HTMLCanvasElement, type: "image/webp" | "image/jpeg", quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    try { canvas.toBlob(resolve, type, quality); }
+    catch { resolve(null); }
+  });
+}
+
+async function canvasTransport(canvas: HTMLCanvasElement): Promise<{ blob: Blob; contentType: "image/webp" | "image/jpeg" }> {
+  for (const [type, quality] of [["image/webp", DELIVERY_PHOTO_TRANSPORT_WEBP_QUALITY], ["image/jpeg", DELIVERY_PHOTO_TRANSPORT_JPEG_QUALITY]] as const) {
+    const blob = await canvasBlob(canvas, type, quality);
+    if (!blob || blob.type !== type || blob.size <= 0) continue;
+    try {
+      if (detectDeliveryPhotoContentType(new Uint8Array(await blob.arrayBuffer())) === type) return { blob, contentType: type };
+    } catch { /* The encoder did not return the requested format. */ }
+  }
+  throw preparationError("delivery-photo/encode-failed");
 }
 
 export async function prepareDeliveryPhoto(source: File, signal?: AbortSignal): Promise<PreparedDeliveryPhoto> {
@@ -182,12 +195,10 @@ export async function prepareDeliveryPhoto(source: File, signal?: AbortSignal): 
     context.imageSmoothingEnabled = true; context.imageSmoothingQuality = "high";
     context.fillStyle = "#fff"; context.fillRect(0, 0, target.width, target.height);
     context.drawImage(decoded.source, 0, 0, target.width, target.height);
-    const blob = await canvasWebp(canvas);
+    const { blob, contentType } = await canvasTransport(canvas);
     signal?.throwIfAborted();
     if (blob.size <= 0 || blob.size > DELIVERY_PHOTO_MAX_BYTES) throw preparationError("delivery-photo/output-too-large");
-    const outputBytes = new Uint8Array(await blob.arrayBuffer());
-    if (detectDeliveryPhotoContentType(outputBytes) !== "image/webp") throw preparationError("delivery-photo/invalid-output");
-    return { blob, contentType: "image/webp", width: target.width, height: target.height };
+    return { blob, contentType, width: target.width, height: target.height };
   } finally {
     decoded.close();
     canvas.width = 0; canvas.height = 0;
@@ -196,14 +207,14 @@ export async function prepareDeliveryPhoto(source: File, signal?: AbortSignal): 
 
 export function deliveryPhotoPreparationMessage(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-  if (code === "delivery-photo/heic-source") return "HEIC/HEIF 사진은 지원하지 않아요. JPEG로 다시 촬영하거나 지원되는 사진을 선택해주세요.";
+  if (code === "delivery-photo/decode-failed") return "이 기기에서 사진을 열지 못했어요. 기기에서 JPEG로 변환한 뒤 다시 선택해주세요.";
   if (code === "delivery-photo/empty-source") return "사진 파일이 비어 있어요. 다시 촬영하거나 선택해주세요.";
   if (code === "delivery-photo/source-too-large") return "원본 사진은 30MB 이하여야 해요. 다른 사진을 선택해주세요.";
-  if (code === "delivery-photo/unsupported-source" || code === "delivery-photo/invalid-selection") return "JPEG, PNG 또는 WebP 사진으로 다시 촬영하거나 선택해주세요.";
+  if (code === "delivery-photo/unsupported-source" || code === "delivery-photo/invalid-selection") return "JPEG, PNG, WebP 또는 HEIC 사진으로 다시 촬영하거나 선택해주세요.";
   if (code === "delivery-photo/mime-mismatch" || code === "delivery-photo/invalid-source") return "사진 파일 형식이 실제 내용과 맞지 않아요. 원본을 다시 선택해주세요.";
   if (code === "delivery-photo/source-timeout") return "사진을 가져오는 데 시간이 오래 걸려요. 기기에 저장한 뒤 다시 선택해주세요.";
   if (code === "delivery-photo/source-unreadable") return "사진 원본을 읽지 못했어요. 기기에 저장한 뒤 다시 선택해주세요.";
   if (code === "delivery-photo/output-too-large") return "처리한 사진이 10MB를 넘어요. 다른 사진으로 다시 시도해주세요.";
   if (code === "delivery-photo/cancelled" || code === "AbortError") return "사진 준비가 취소되었습니다.";
-  return "사진을 안전한 WebP로 준비하지 못했어요. 다시 촬영하거나 선택해주세요.";
+  return "사진을 안전한 전송 형식으로 준비하지 못했어요. 다시 촬영하거나 선택해주세요.";
 }

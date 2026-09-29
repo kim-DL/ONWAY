@@ -408,7 +408,7 @@ describe("private delivery photo lifecycle", () => {
     const recent = await state.service.list({ scope: "customer", customerId: "customer-a", limit: 30 }, actor, now);
     expect(recent.photos).toHaveLength(1);
     expect((await state.service.list({ scope: "customer", customerId: "customer-a", limit: 30 }, sales, now)).photos).toHaveLength(1);
-    const download = await state.service.get({ photoId: created.photoId, variant: "evidence" }, actor, now);
+    const download = await state.service.get({ photoId: created.photoId, variant: "evidence" }, actor, now, () => now);
     expect(Buffer.from(download.fileBase64, "base64")).toEqual(state.files.get(deliveryPhotoPath("2026-09-22", created.photoId, attemptToken, "evidence"))!.bytes);
     expect(state.data.get("companies/onnuri/customers/customer-a")).toEqual({ customerId: "customer-a", companyId: "onnuri", status: "active", name: "가 거래처" });
     expect(JSON.stringify(state.data.get(`companies/onnuri/deliveryPhotos/${created.photoId}`))).not.toMatch(/completion|fileBase64|Buffer/);
@@ -991,7 +991,7 @@ describe("private delivery photo lifecycle", () => {
     const state = fixture(); const created = await state.service.create(upload(), actor, now);
     state.data.get("companies/onnuri/customers/customer-a")!.status = "closed";
     expect((await state.service.list({ scope: "customer", customerId: "customer-a", limit: 10 }, viewer, now)).photos).toHaveLength(1);
-    expect((await state.service.get({ photoId: created.photoId, variant: "thumbnail" }, actor, now)).photoId).toBe(created.photoId);
+    expect((await state.service.get({ photoId: created.photoId, variant: "thumbnail" }, actor, now, () => now)).photoId).toBe(created.photoId);
     expect((await state.service.delete({ requestId: randomUUID(), photoId: created.photoId }, actor, now)).photoId).toBe(created.photoId);
   });
 

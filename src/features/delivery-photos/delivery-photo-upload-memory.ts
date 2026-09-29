@@ -38,7 +38,7 @@ function defaultDependencies(): DeliveryPhotoUploadDependencies {
     preparationMessage: (error) => {
       const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
       if (code === "AbortError" || code === "delivery-photo/cancelled") return "사진 준비가 취소되었습니다.";
-      return "사진을 안전한 WebP로 준비하지 못했어요. 다시 촬영하거나 선택해주세요.";
+      return "사진을 안전한 전송 형식으로 준비하지 못했어요. 다시 촬영하거나 선택해주세요.";
     },
     create: deliveryPhotoCreateRepository.create,
     encode: encodeDeliveryPhotoBlob,

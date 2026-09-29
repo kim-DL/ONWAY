@@ -85,7 +85,7 @@ const today = await service.list({ scope: "today" }, actor, now);
 if (today.scope !== "today" || today.photos.length !== 1 || today.customers[0]?.count !== 1) throw new Error("Today aggregation failed.");
 const recent = await service.list({ scope: "customer", customerId: "delivery-photo-a", limit: 30 }, actor, now);
 if (recent.scope !== "customer" || recent.photos.length !== 1) throw new Error("Recent customer list failed.");
-const download = await service.get({ photoId: photo.photoId, variant: "evidence" }, actor, now);
+const download = await service.get({ photoId: photo.photoId, variant: "evidence" }, actor, now, () => now);
 if (!download.fileBase64 || download.contentType !== "image/webp") throw new Error("Private relay failed.");
 
 await db.doc(`authz/${actor.uid}`).update({ active: false });

@@ -18,25 +18,27 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
   const camera = useRef<HTMLInputElement>(null);
   const album = useRef<HTMLInputElement>(null);
   const pending = useRef<PendingPicker | null>(null);
+  const returnedFromPicker = useRef(false);
   const reading = useRef(false);
   const sourceRead = useRef<AbortController | null>(null);
   const localJob = useRef<string | null>(null);
-  const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const releasePicker = () => {
     pending.current = null;
-    if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
-    fallbackTimer.current = null;
+    returnedFromPicker.current = false;
   };
 
   const open = (customerId: string, source: "camera" | "album") => {
-    if (!coordinator || pending.current || coordinator.getCustomerJob(customerId)?.status === "uploading"
+    if (!coordinator || reading.current || (pending.current && !returnedFromPicker.current)
+      || coordinator.getCustomerJob(customerId)?.status === "uploading"
       || coordinator.getCustomerJob(customerId)?.status === "queued"
       || coordinator.getCustomerJob(customerId)?.status === "preparing"
       || coordinator.getCustomerJob(customerId)?.errorCategory === "retryable") return false;
     const input = source === "camera" ? camera.current : album.current;
     if (!input) return false;
+    // A cancelled picker may not emit `cancel` on every WebKit version. Only a
+    // new click after focus returns can replace that stale intent.
     pending.current = { customerId, source };
+    returnedFromPicker.current = false;
     input.value = "";
     input.click();
     return true;
@@ -50,23 +52,18 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
   useEffect(() => {
     const cameraInput = camera.current;
     const albumInput = album.current;
-    const settleCancelledPicker = () => {
-      if (!pending.current || reading.current) return;
-      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
-      fallbackTimer.current = setTimeout(() => { if (!reading.current) releasePicker(); }, 750);
-    };
-    const visible = () => { if (document.visibilityState === "visible") settleCancelledPicker(); };
+    const returned = () => { if (pending.current) returnedFromPicker.current = true; };
+    const visible = () => { if (document.visibilityState === "visible") returned(); };
     const cancelled = () => releasePicker();
-    window.addEventListener("focus", settleCancelledPicker);
+    window.addEventListener("focus", returned);
     document.addEventListener("visibilitychange", visible);
     cameraInput?.addEventListener("cancel", cancelled);
     albumInput?.addEventListener("cancel", cancelled);
     return () => {
-      window.removeEventListener("focus", settleCancelledPicker);
+      window.removeEventListener("focus", returned);
       document.removeEventListener("visibilitychange", visible);
       cameraInput?.removeEventListener("cancel", cancelled);
       albumInput?.removeEventListener("cancel", cancelled);
-      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
       sourceRead.current?.abort();
       if (localJob.current) coordinator?.dismiss(localJob.current);
       releasePicker();
