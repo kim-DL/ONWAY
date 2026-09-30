@@ -2,7 +2,7 @@
 
 작성일: 2026-09-30. 대상 브랜치: `codex/field-speed-phase-one`. 변경 전 비교 기준: `f52442e`.
 
-이 문서는 실사 저장 후 다음 재고로 이동, 신규 품목 등록 후 중복 상세 조회 제거, 거래처 편집의 저장·취소 버튼 개선을 기록한다. 구현과 아래 Chrome DevTools MCP 실험 측정, 변경 범위 검증을 완료했다. 전이 의존성 보안 패치와 최신 콜백 보강 이후 Canonical acceptance 10/10개 gate 및 내부 Emulator 12/12개 gate가 PASS했다. 최신 소스의 별도 재고 통합 검증과 최종 운영 설정 build·PWA·성능·Hosting 검증도 PASS했다. Git과 운영 배포는 대기다. 실험 결과와 실제 기기 체감 확인을 구분한다.
+이 문서는 실사 저장 후 다음 재고로 이동, 신규 품목 등록 후 중복 상세 조회 제거, 거래처 편집의 저장·취소 버튼 개선을 기록한다. 구현과 아래 Chrome DevTools MCP 실험 측정, 변경 범위 검증을 완료했다. 전이 의존성 보안 패치와 최신 콜백 보강 이후 Canonical acceptance 10/10개 gate 및 내부 Emulator 12/12개 gate가 PASS했다. 최신 소스의 별도 재고 통합 검증과 최종 운영 설정 build·PWA·성능·Hosting 검증도 PASS했다. Git commit/push, 대상 Functions·Hosting 운영 배포, 두 운영 주소의 공개 자원과 비로그인 브라우저 검증까지 완료했다. 실험 결과와 실제 기기 체감 확인을 구분한다.
 
 ## 확인한 효과
 
@@ -110,9 +110,9 @@
 | 전체 unit·공통 browser·Rules | 최종 전체 unit 1,690 PASS/15 SKIP, 공통 browser 290 PASS, Firestore·Storage Rules 50/50 PASS |
 | Full user journey | 최종 76 PASS/15 SKIP. guarded inventory launcher 전용 재고 15개는 별도 `final-3`에서 15/15 PASS |
 | 최종 운영 설정 build, PWA·성능·Hosting verifier | `production-build-final.log`·`production-pwa-final.log`·`production-budget-final.log`·`production-hosting-final.log` 모두 PASS. Hosting export/shipped 102개·precache 89개·initial assets 9개 |
-| Git commit/push 및 배포 소스 식별 | 대기 |
-| `saveInventoryProduct` 대상 Functions 배포 | 대기 |
-| Hosting 배포와 두 운영 origin의 자원·worker 대조 | 대기 |
+| Git commit/push 및 배포 소스 식별 | 제품 source `16bc3fd48eb4ae492fd2f4da3d5b727347a7cdaa`를 작업 브랜치와 main에 push. 최종 build 입력 327개 SHA-256 대조에서 변경 없음 |
+| `saveInventoryProduct` 대상 Functions 배포 | 서울 Node22 함수 하나의 update 성공, ACTIVE·revision `saveinventoryproduct-00009-pon` |
+| Hosting 배포와 두 운영 origin의 자원·worker 대조 | live version `fd6dc3961b8aac38`. 두 origin의 canonical verifier·precache 89개 및 public 90개 byte 대조 PASS, 불일치 0. PIN·활성 worker·controlled reload PASS, page error 0 |
 | 이번 변경의 실제 iPhone/설치 PWA 현장 피드백 | 대기 |
 
 등록 fixture를 실제 strict schema 계약에 맞춰 인증된 재고 검증을 실행했다. 최신 소스·의존성의 최종 `final-3`에서 browser 15개·Functions 통합 12개를 모두 통과했다. 이 별도 검증에서는 테스트를 건너뛰거나 단언을 완화하여 통과시키지 않았다.
@@ -135,6 +135,14 @@ Rules 검증은 전역 `VITEST_MAX_WORKERS=6` override를 제거해 기존 `file
 정식 인수 검증의 demo build가 만든 산출물과 구분하기 위해 모든 demo 검증이 끝난 뒤 운영 설정으로 다시 build했다. `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`, `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false`를 적용한 최종 운영 산출물에서 PWA·성능·Hosting gate를 모두 재통과했다. 배포 대상으로 검증한 이 산출물을 사용하고 비밀 값은 기록하지 않는다.
 
 새 프런트엔드의 `includeDetail` 입력은 기존 서버의 strict schema에서 거부될 수 있으므로, 최종 품질 검증 뒤 `firebase deploy --project onnuriway --only functions:saveInventoryProduct`로 해당 Callable을 먼저 배포한다. 성공을 확인한 뒤 검증한 운영 산출물을 `firebase deploy --project onnuriway --only hosting`으로 배포한다. 프로젝트와 대상을 명시하며 다른 Functions·Rules·Auth나 운영 데이터는 검증 목적으로 변경하지 않는다. 배포 완료와 운영 확인은 실제 결과가 생긴 뒤에만 기록한다.
+
+## 운영 배포 결과
+
+- 제품 source: `16bc3fd48eb4ae492fd2f4da3d5b727347a7cdaa`. 검증된 운영 산출물에서 export/shipped 102개, precache 89개, initial assets 9개를 배포했다. 최종 build 입력 327개의 묶음 SHA-256은 `2f6cd56d33a26cff45bfddeca14d61499d763f0cff5f6cdf9cd962d9f236d21c`이며 QA·build·배포 뒤에도 같았다.
+- `firebase deploy --project onnuriway --only functions:saveInventoryProduct --non-interactive` 성공 뒤 `--only hosting`을 배포했다. 함수는 ACTIVE, Node22, revision `saveinventoryproduct-00009-pon`, update time `2026-09-30T12:49:41.500549201Z`다. 다른 Functions·Rules·Auth·비밀 값이나 운영 업무 데이터를 수정·삭제하지 않았다.
+- Hosting live release `1790772595154000`, version `fd6dc3961b8aac38`, release time `2026-09-30T12:49:55.154Z`. 직전 Hosting version `2e95ad3ebb435246`와 함수 revision `saveinventoryproduct-00008-neg`·기존 build 식별자는 배포 전 메타데이터에 보존했다.
+- [운영 주소](https://onnuriway.com)와 [기본 Hosting 주소](https://onnuriway.web.app)의 canonical verifier가 PASS했다. 별도 공개 GET 대조는 origin마다 precache 89개와 worker를 포함한 90개 파일을 SHA-256으로 비교해 불일치 0개다. 두 origin의 `/sw.js` SHA-256은 `583af6e4a7af4262bd7e7053ba07676215685bf99a43c73d78ea9675e3759f19`로 후보와 같다.
+- 새 비로그인 모바일 Chromium context에서 두 origin의 PIN 화면, 가로 overflow 없음, root scope의 activated worker, `registration.update()` 뒤 controlled reload와 PIN 복귀를 확인했다. page error·없는 public asset·업무 Callable 요청은 모두 0개다. 로그인 제출이나 운영 업무 데이터 저장은 하지 않았으므로 인증된 운영 내부 조작과 기존 로그인 유지·실제 iPhone/설치 PWA 체감은 자동 PASS로 표시하지 않는다.
 
 ## 로컬 측정 근거
 

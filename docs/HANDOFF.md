@@ -5,13 +5,13 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-09-30 현장 체감 속도 개선 1차 — 최종 로컬 QA PASS, 운영 승격 대기
+### 2026-09-30 현장 체감 속도 개선 1차 — production Functions·Hosting 배포 완료, 이번 변경의 실기기 확인 대기
 
 - 사용자는 앞선 9/29 iPhone 납품사진 수정의 실제 기기 요청 항목이 모두 해결되어 PASS라고 보고했다. 이번 자동 이동·등록·버튼 개선의 실제 iPhone/PWA 체감은 별도 확인 대상이다.
 - 실사 저장을 서버가 확정하면 현재 검색·필터·장소 순서의 다음 미확인 대상을 같은 상세 창에서 자동으로 연다. 같은 품목의 남은 장소는 확정 상세를 재사용하고, 다른 품목은 최신 상세가 준비될 때까지 쓰기를 막는다. 목록 추가 로딩 중 전체 완료를 주장하지 않는다. 등록은 새 품목 저장에만 opt-in 확정 상세를 반환하여 후속 detail GET 한 번을 없앤다. 거래처의 내 납품처 편집·오늘 순서 편집은 저장/취소를 중앙에 놓고 누름·포커스·비활성 상태와 깊이 있는 버튼 스타일을 적용한다.
 - Chrome DevTools MCP 412×915·CPU4·Slow4G 합성 1,000품목 실험: 사진 없는 등록 click→상세 사용 가능 p50 1,448.4ms(N3)→972.8ms(N10), 약32.8% 감소·추가GET0/10. 실사 저장확정 p50 753.4→813.9ms로 저장 자체의 가속 근거는 없지만 수동 닫기/다음선택 2→0회이며 다음 최신 상세 p50 1,411.9ms다. 실제 현장 시간이나 INP의 보장값이 아니다. 대용량 사진 업로드와 입출고·유통기한·거래처 서버 지연 전반은 이번 변경의 해결 범위 밖이다.
 - 최종 canonical acceptance10/10·내부 Emulator12/12 PASS(`output/field-speed/acceptance-final-5.log`, `output/acceptance/phase17-report.json`). Unit1,690 PASS/15 conditional SKIP, 일반 browser290 PASS, Rules50 PASS. 별도 재고 browser15/15·transaction12/12 PASS(`inventory-e2e-final-3.log`), 거래처 browser11/11 및 두 편집 창 320/360/390/412×글자100/200 레이아웃16개 캡처 PASS다. 저장 실패·요청ID 재시도·revision·늦은 조회·연속 이동·Back·최신 날짜 기준 콜백 경계를 검증했다. 보안 audit는 같은 major patch 후 High0/Moderate8이며 직접 dependencies와 기존 budget/verifier 기준을 변경하지 않았다.
-- Git commit/push 및 운영 배포는 대기 중이다. 모든 demo 검증 뒤 운영 설정으로 다시 build하고 기존 PWA·성능·Hosting gate를 통과한 산출물만 승격한다.
+- 제품 source commit `16bc3fd48eb4ae492fd2f4da3d5b727347a7cdaa`를 브랜치와 `main`에 push했다. 운영 설정 build 후 `--project onnuriway --only functions:saveInventoryProduct`를 먼저 배포하고 `--only hosting`을 배포했다. 해당 함수는 ACTIVE, revision `saveinventoryproduct-00009-pon`다. Hosting live version `fd6dc3961b8aac38`, release `1790772595154000`, release time `2026-09-30T12:49:55.154Z`이며 직전 version `2e95ad3ebb435246`가 rollback 지점이다. 두 origin의 canonical Hosting byte/worker 검증과 비로그인 PIN·활성 worker·controlled reload smoke는 PASS다. 운영 업무 데이터 쓰기·삭제, 다른 Functions·Rules·Auth·비밀 값 변경은 하지 않았다.
 - 자세한 계약·검증·측정 한계는 [현장 체감 속도 개선 1차](field-speed-phase-one.md)를 따른다. 현장 확인은 이번 배포본으로 연속 수량 일치 확인, 등록 직후 다음 조작, 두 편집 창 버튼, 설치 PWA 업데이트 후 로그인 유지를 평가한다.
 
 ### 2026-09-29 iPhone 납품사진 업로드 수정 — production Hosting 배포 완료, iPhone 실기기 확인 대기
