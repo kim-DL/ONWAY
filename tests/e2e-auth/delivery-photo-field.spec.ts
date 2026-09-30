@@ -104,6 +104,106 @@ async function expectImageReady(image: Locator) {
   await expect.poll(() => image.evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0)).toBe(true);
 }
 
+
+async function auditEditorActions(page: Page, trigger: string, title: string, output: string, name: string) {
+  await page.setViewportSize({ width: 360, height: 840 });
+  await page.getByRole("button", { name: trigger, exact: true }).click();
+  const editor = page.getByRole("dialog", { name: title, exact: true });
+  const cancel = editor.getByRole("button", { name: "취소", exact: true });
+  const save = editor.getByRole("button", { name: "저장", exact: true });
+  await expect(save).toBeDisabled();
+  await expect(cancel).toBeEnabled();
+  const disabledAppearance = await save.evaluate((button) => ({ opacity: Number(getComputedStyle(button).opacity), shadow: getComputedStyle(button).boxShadow }));
+  expect(disabledAppearance.opacity).toBeLessThan(1);
+  expect(disabledAppearance.shadow).toBe("none");
+  await editor.getByRole("button", { name: / 위로 이동$/u }).nth(1).click();
+  await expect(save).toBeEnabled();
+  const appearances = await Promise.all([cancel, save].map((button) => button.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, shadow: style.boxShadow, opacity: Number(style.opacity) };
+  })));
+  expect(appearances[0]!.background).toBe("rgb(255, 255, 255)");
+  expect(appearances[1]!.background).not.toBe(appearances[0]!.background);
+  expect(appearances.every((style) => style.shadow !== "none" && style.opacity === 1)).toBe(true);
+  await cancel.focus();
+  await page.keyboard.press("Tab");
+  await expect(save).toBeFocused();
+  expect(await save.evaluate((button) => button.matches(":focus-visible") && Number.parseFloat(getComputedStyle(button).outlineWidth) >= 2)).toBe(true);
+  await page.keyboard.press("Shift+Tab");
+  await expect(cancel).toBeFocused();
+  expect(await cancel.evaluate((button) => button.matches(":focus-visible") && Number.parseFloat(getComputedStyle(button).outlineWidth) >= 2)).toBe(true);
+  const saveBox = await save.boundingBox();
+  expect(saveBox).not.toBeNull();
+  await page.mouse.move(saveBox!.x + saveBox!.width / 2, saveBox!.y + saveBox!.height / 2);
+  await page.mouse.down();
+  try {
+    expect(await save.evaluate((button) => getComputedStyle(button).boxShadow)).not.toBe(appearances[1]!.shadow);
+  } finally {
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+  }
+  await page.evaluate(() => window.getSelection()?.removeAllRanges());
+  await expect(editor).toBeVisible();
+  for (const width of [320, 360, 390, 412]) {
+    await page.setViewportSize({ width, height: 840 });
+    for (const textSize of [100, 200]) {
+      await page.evaluate((value) => { document.documentElement.style.fontSize = String(value) + "%"; }, textSize);
+      const metrics = await editor.evaluate((dialog) => {
+        const buttons = Array.from(dialog.querySelectorAll("button")).filter((button) => ["취소", "저장"].includes(button.textContent?.trim() ?? ""));
+        const outer = dialog.getBoundingClientRect();
+        const boxes = buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return { left: box.left, right: box.right, width: box.width, height: box.height,
+            hit: hit === button || button.contains(hit), textFits: button.scrollWidth <= button.clientWidth + 1 };
+        });
+        return { boxes, centered: Math.abs((boxes[0]!.left + boxes[1]!.right) / 2 - (outer.left + outer.width / 2)),
+          gap: boxes[1]!.left - boxes[0]!.right, dialogFits: dialog.scrollWidth <= dialog.clientWidth + 1,
+          pageFits: document.documentElement.scrollWidth <= innerWidth };
+      });
+      const context = JSON.stringify({ title, width, textSize, metrics });
+      expect(metrics.boxes, context).toHaveLength(2);
+      expect(metrics.centered, context).toBeLessThan(1);
+      expect(metrics.gap, context).toBeGreaterThanOrEqual(8);
+      expect(metrics.dialogFits, context).toBe(true);
+      expect(metrics.pageFits, context).toBe(true);
+      for (const box of metrics.boxes) {
+        expect(Math.abs(box.width - 128), context).toBeLessThan(.5);
+        expect(box.height, context).toBeGreaterThanOrEqual(48);
+        expect(box.hit, context).toBe(true);
+        expect(box.textFits, context).toBe(true);
+      }
+      await page.screenshot({ path: output + "/" + name + "-" + width + "-text-" + textSize + ".png" });
+    }
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = "100%"; });
+  await page.setViewportSize({ width: 390, height: 840 });
+  await editor.getByRole("button", { name: / 아래로 이동$/u }).first().click();
+  await expect(save).toBeDisabled();
+  await cancel.click();
+  await expect(editor).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.history.state?.onnuriwaySheet ?? null)).toBeNull();
+}
+
+async function saveEditorWithBusyAudit(page: Page, editor: Locator, endpoint: string) {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  const pattern = "**/" + endpoint;
+  await page.route(pattern, async (route) => { await pending; await route.continue(); });
+  try {
+    await editor.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(editor.getByRole("button", { name: "저장 중", exact: true })).toBeDisabled();
+    await expect(editor.getByRole("button", { name: "취소", exact: true })).toBeDisabled();
+    await expect(editor.getByRole("button", { name: "닫기", exact: true })).toBeDisabled();
+    expect(await editor.getByRole("button", { name: "저장 중", exact: true }).evaluate((button) => button.closest("[aria-busy]")?.getAttribute("aria-busy"))).toBe("true");
+    release();
+    await expect(editor).toHaveCount(0);
+  } finally {
+    release();
+    await page.unroute(pattern);
+  }
+}
+
 test("field action layout audit and customer detail history use one customer scope", async ({ page }) => {
   await login(page);
   const output = "output/playwright/ui-renewal/customer-photo-field";
@@ -153,6 +253,8 @@ test("field action layout audit and customer detail history use one customer sco
   }
   await page.evaluate(() => { document.documentElement.style.fontSize = "100%"; });
   await page.setViewportSize({ width: 390, height: 840 });
+  await auditEditorActions(page, "내 납품처 편집", "내 납품처 편집", output, "route-editor");
+  await auditEditorActions(page, "오늘 거래처 추가", "오늘 순서 편집", output, "day-editor");
   const customerLists: unknown[] = [];
   page.on("request", (request) => {
     if (request.url().endsWith("/listDeliveryPhotos")) customerLists.push(request.postDataJSON()?.data);
@@ -719,8 +821,7 @@ test("field route, completion, search, today override and reorder survive re-ent
   await page.getByRole("button", { name: "오늘 추가", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "오늘 순서 편집" });
   await expect(editor.getByText("새봄마트")).toBeVisible();
-  await editor.getByRole("button", { name: "저장", exact: true }).click();
-  await expect(editor).toHaveCount(0);
+  await saveEditorWithBusyAudit(page, editor, "saveDeliveryPhotoDay");
   await expect(page.getByText("남음 3곳 · 기록완료 1곳")).toBeVisible();
   await page.getByRole("button", { name: "순서 편집" }).click();
   const reorder = page.getByRole("dialog", { name: "오늘 순서 편집" });
@@ -737,8 +838,7 @@ test("field route, completion, search, today override and reorder survive re-ent
   const routeEditor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await routeEditor.getByRole("searchbox", { name: "거래처 검색" }).fill("테스트거래처1");
   await routeEditor.getByRole("button", { name: "테스트거래처1 내 납품처에 추가", exact: true }).click();
-  await routeEditor.getByRole("button", { name: "저장", exact: true }).click();
-  await expect(routeEditor).toHaveCount(0);
+  await saveEditorWithBusyAudit(page, routeEditor, "saveDeliveryPhotoRoute");
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
   await page.evaluate((recentIds) => {
     localStorage.setItem("onnuriway:private:recent-customers:v1:uid-delivery:1:1", JSON.stringify(recentIds));

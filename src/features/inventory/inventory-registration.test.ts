@@ -67,6 +67,23 @@ beforeEach(() => { harness.states = []; harness.refs = []; harness.effects = [];
 afterEach(() => vi.unstubAllGlobals());
 
 describe("single-submit inventory registration", () => {
+  it("hands the committed first-lot detail to the workspace without mixing it into the catalog product", async () => {
+    const detail = { product, lots: [] };
+    harness.save.mockResolvedValueOnce({ ...product, detail });
+    await submit(filled());
+    expect(harness.save).toHaveBeenCalledOnce();
+    expect(harness.save.mock.calls[0]![0]).toMatchObject({ includeDetail: true, refreshOnReplay: true });
+    expect(harness.saved).toHaveBeenCalledWith(product, detail);
+    expect(harness.saved.mock.calls[0]![0]).not.toHaveProperty("detail");
+  });
+  it("keeps refreshed replay and existing-product saves on the no-detail fallback", async () => {
+    await submit(filled());
+    expect(harness.saved).toHaveBeenCalledWith(product);
+    harness.states = []; harness.refs = [];
+    await submit(render(product));
+    expect(harness.save.mock.calls[1]![0]).not.toHaveProperty("includeDetail");
+    expect(harness.saved.mock.calls[1]).toEqual([product]);
+  });
   it.each(["unmount", "private cleanup", "account switch"])("does not upload a prepared photo after %s during Base64 preparation", async (kind) => {
     const file = new File(["photo"], "product.webp", { type: "image/webp" });
     let resolve!: (bytes: ArrayBuffer) => void;

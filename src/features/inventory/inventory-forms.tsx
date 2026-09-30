@@ -62,7 +62,7 @@ export function FormFooter({ id, busy, disabled = false, label, onClose, childre
   return <BottomSheetActions busy={busy} className={styles.formActions ?? ""}>{!online ? <p role="alert">{INVENTORY_OFFLINE_DRAFT_MESSAGE}</p> : null}{children}<GlassButton disabled={busy} onClick={onClose}>취소</GlassButton><GlassButton variant="primary" type="submit" form={id} disabled={busy || disabled || !online}>{busy ? "저장 중…" : label}</GlassButton></BottomSheetActions>;
 }
 export function validLotDraft(draft: InventoryLotDraft, allowLegacy = false) { return (allowLegacy || draft.expiryState !== "not_applicable") && inventoryLotDraftSchema.safeParse(draft).success && (draft.expiryState !== "dated" || isInventoryInputDate(draft.expiryDate ?? "")); }
-export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; canManageManufacturers?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void };
+export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; canManageManufacturers?: boolean; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void };
 export function InventoryProductEditor(props: InventoryProductEditorProps) {
   // Latch the component type for this form's lifetime. Switching a mounted lazy
   // editor to its resolved component would discard the employee's draft.
@@ -113,7 +113,7 @@ export function InventoryMovementForm({ detail, location, kind, initialLotId, in
   </form><FormFooter id={id} busy={action.busy} disabled={!canSubmit} onClose={onClose} label={title} /></BottomSheet>;
 }
 
-export function InventoryCountForm({ detail, location, context: initialContext, calendarReady = true, countMode = false, onClose, onSaved }: { detail: InventoryProductDetail; location: InventoryLocation; context: InventoryContext; calendarReady?: boolean; countMode?: boolean; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void }) {
+export function InventoryCountForm({ detail, location, context: initialContext, calendarReady = true, countMode = false, continueAfterSave = false, onClose, onSaved }: { detail: InventoryProductDetail; location: InventoryLocation; context: InventoryContext; calendarReady?: boolean; countMode?: boolean; continueAfterSave?: boolean; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void }) {
   const id = useId(); const action = useInventoryAction();
   const [context] = useState(initialContext);
   const cycleChanged = context.cycle.cycleId !== initialContext.cycle.cycleId;
@@ -129,7 +129,7 @@ export function InventoryCountForm({ detail, location, context: initialContext, 
     const input = { productId: detail.product.productId, locationId: location, cycleId: context.cycle.cycleId, expectedStockRevision: detail.product.stockRevision, counts, reason: "", matchOnly: true, includeDetail: true };
     void action.run(input, (requestId) => inventoryRepository.count({ ...input, requestId }), (result) => onSaved(result.product, result.replayed ? undefined : result.detail));
   }
-  return <BottomSheet open title="실물 수량 확인" description={`${detail.product.name} · ${INVENTORY_LOCATION_LABELS[location]} · ${context.cycle.startDate} 실사`} onClose={onClose} dismissible={!action.busy}><form id={id} onSubmit={submit} className={styles.sheet}>
+  return <BottomSheet open title="실물 수량 확인" description={`${detail.product.name} · ${INVENTORY_LOCATION_LABELS[location]} · ${context.cycle.startDate} 실사${continueAfterSave ? " · 저장 후 다음 미확인 재고로 이동" : ""}`} onClose={onClose} dismissible={!action.busy}><form id={id} onSubmit={submit} className={styles.sheet}>
     <p className={formStyles.confirmQuestion}>{lots.length > 1 ? "유통기한별 재고가 실제 수량과 일치하나요?" : "재고 수량과 실제 수량이 일치하나요?"}</p>
     {cycleChanged ? <p role="alert" className={styles.error}>새 실사 기간이 시작됐어요. 이 창을 닫고 실물 확인을 다시 열어주세요.</p> : !countMode ? <p role="alert" className={styles.error}>실사 모드를 켠 뒤 수량 일치를 확인해주세요.</p> : !calendarReady ? <p role="alert" className={styles.error}>날짜 기준을 다시 확인하고 있어요. 확인이 끝나면 저장할 수 있어요.</p> : !quantitiesReady ? <p role="alert" className={styles.error}>최신 재고를 다시 불러온 뒤 확인해주세요.</p> : null}
     {lots.length ? <ul className={formStyles.countList} aria-label="확인할 유통기한별 재고">{lots.map((lot) => <li key={lot.lotId}><span>{inventoryLotDateLabel(lot)}{lot.label ? <small>{lot.label}</small> : null}</span><strong>{lot.quantity.toLocaleString("ko-KR")} <small>{inventoryUnitDisplayLabel(detail.product.unitLabel)}</small></strong></li>)}</ul> : <div className={formStyles.zeroCount}><strong>0 <small>{inventoryUnitDisplayLabel(detail.product.unitLabel)}</small></strong><p>실제 재고도 없는지 확인해주세요.</p></div>}

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { chromium, expect, test, type Locator, type Page, type Request, type TestInfo } from "@playwright/test";
+import { chromium, expect, test, type Locator, type Page, type Request, type Route, type TestInfo } from "@playwright/test";
 import { build } from "esbuild";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -9,7 +9,7 @@ import sharp from "sharp";
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 import { assertInventoryE2EEnvironment, groupInventoryE2EPageSequences, INVENTORY_E2E_ORIGIN, INVENTORY_E2E_PROJECT } from "../../scripts/inventory-e2e-safety";
 import { INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryListPageSchema, inventoryLocationMap, inventoryLotSchema, inventoryProductDetailSchema, inventoryProductSchema, inventorySettingsSchema, type InventoryProduct } from "../../src/domain/inventory";
-import { normalizeInventoryManufacturerName } from "../../src/domain/inventory-manufacturer";
+import { inventoryProductDetailWithManufacturerSchema, normalizeInventoryManufacturerName } from "../../src/domain/inventory-manufacturer";
 
 const productName = "에뮬레이터 검증 만두";
 let productId = "";
@@ -277,7 +277,14 @@ async function submitMutation(page: Page, dialog: Locator, label: string, callab
       expect(snapshot.product).toEqual(inventoryProductSchema.parse(body.result?.product));
     }
     await expect(dialog).toHaveCount(0);
-    if (returnsDetail) {
+    if (callable === "saveInventoryProduct" && input.productId === null) {
+      expect(input.includeDetail).toBe(true);
+      const detailSchema = input.includeManufacturerReference === true ? inventoryProductDetailWithManufacturerSchema : inventoryProductDetailSchema;
+      const snapshot = detailSchema.parse(body.result?.detail);
+      await expect(page.getByRole("dialog", { name: snapshot.product.name, exact: true }).getByRole("button", { name: "입고", exact: true })).toBeEnabled();
+      expect(detailReads, "new registration must use the server-confirmed initial lots").toHaveLength(0);
+    }
+    if (returnsDetail && callable !== "recordInventoryCount") {
       const product = inventoryProductSchema.parse(body.result?.product);
       const parent = page.getByRole("dialog", { name: product.name, exact: true });
       await expect(parent.getByRole("status").filter({ hasText: "최신 재고" })).toHaveCount(0);
@@ -285,6 +292,10 @@ async function submitMutation(page: Page, dialog: Locator, label: string, callab
       // Flush React's committed effects, without adding an arbitrary sleep.
       await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
       expect(detailReads, "a confirmed mutation snapshot must avoid another product-detail RPC").toHaveLength(0);
+    }
+    if (callable === "recordInventoryCount") {
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      expect(detailReads.filter((request) => request.postDataJSON().data.productId === input.productId), "count continuation must not reread the confirmed product").toHaveLength(0);
     }
     return { input, result: body.result };
   } finally { page.off("request", observe); }
@@ -748,6 +759,10 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await capture(page, info, "count-768");
   await page.setViewportSize({ width: 360, height: 800 });
   await submitMutation(page, count, "수량 일치 · 실사 완료", "recordInventoryCount");
+  // Successful count continues or returns to the list; reopen for the remaining
+  // independent stock/lot/history assertions in this broad scenario.
+  if (await page.getByRole("dialog").count()) await page.getByRole("dialog").getByRole("button", { name: "닫기", exact: true }).click();
+  detail = await openProduct(page);
   await expect(detail.getByText("이번 주 확인", { exact: true })).toBeVisible();
   await expect.poll(async () => (await storedProduct()).lastCountByLocation.refrigerated?.changed).toBe(false);
   await expect(page.locator('article[data-count-state="done"]').filter({ hasText: productName })).toHaveAttribute("data-count-indicator", "done");
@@ -1161,6 +1176,8 @@ test("all locations sum one product and require each location's count, with prog
     await expectReadOnlyCount(firstCount, 1);
     await capture(page, info, "single-lot-match-only-360");
     await submitMutation(page, firstCount, "일치 확인", "recordInventoryCount");
+    await expect(detail.getByRole("combobox", { name: "상세 보관 장소", exact: true })).toHaveValue("freezer1");
+    await expect(detail.getByRole("button", { name: "수량 일치 확인", exact: true })).toBeEnabled();
     // Firestore stores Timestamp objects; callable wire timestamps are already
     // schema-validated in submitMutation. Inspect the stored stock/count fields.
     let stored = (await productRef.get()).data() as InventoryProduct;
@@ -1185,7 +1202,12 @@ test("all locations sum one product and require each location's count, with prog
     stored = (await productRef.get()).data() as InventoryProduct;
     expect(stored.lastCountByLocation.freezer1?.cycleId).toBe(`week-${today}`);
     expect(stored.quantityByLocation).toEqual(fixture.quantityByLocation);
-    await detail.getByRole("button", { name: "닫기", exact: true }).click();
+    await expect(detail).toHaveCount(0);
+    if (await page.getByRole("dialog").count()) {
+      await page.goBack();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.getByRole("region", { name: "재고 관리", exact: true })).toBeVisible();
+    }
     await expect(article).toHaveAttribute("data-count-state", "done");
     await expect(article).toHaveAttribute("data-count-indicator", "done");
     await expect(progress).toHaveJSProperty("value", initialComplete + 1);
@@ -1334,6 +1356,147 @@ for (const scenario of [
     else await settingsRef.delete();
   }
 });
+
+for (const scenario of [{ key: "scheduled", scheduled: true }, { key: "personal", scheduled: false }]) {
+test(`confirmed counts continue to the next product without stale writes or extra history: ${scenario.key}`, async ({ page }, info) => {
+  assertInventoryE2EEnvironment();
+  const settingsRef = db().doc(INVENTORY_SETTINGS_PATH);
+  const previousSettings = await settingsRef.get();
+  const today = expiryAfter(0);
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const settings = inventorySettingsSchema.parse({ weekday: scenario.scheduled ? weekday : (weekday + 6) % 7,
+    urgentDays: 100, revision: 0, pendingWeekday: null, effectiveDate: null, pendingCycleStartDate: null, updatedAt: null, updatedBy: null });
+  const prefix = `연속 실사 검증 ${scenario.key} ${randomUUID().slice(0, 8)}`;
+  const oldDate = `${expiryAfter(-10)}T00:00:00.000Z`;
+  const fixtures = [5, 7].map((quantity, index) => inventoryProductSchema.parse({
+    productId: `inventory-continuation-${randomUUID()}`, companyId: "onnuri", name: `${prefix} ${index + 1}`,
+    manufacturer: "연속 실사 검증", specification: "", origin: "", note: "", unitLabel: "봉", unitsPerBox: 1,
+    defaultLocationId: "refrigerated", urgent: false, status: "active", revision: 1, stockRevision: 1, hasHistory: true,
+    quantityByLocation: { ...inventoryLocationMap(0), refrigerated: quantity },
+    nearestExpiryByLocation: { ...inventoryLocationMap(null), refrigerated: expiryAfter(40) },
+    lastCountByLocation: inventoryLocationMap(null), photo: null,
+    lotSummary: { all: { lotCount: 1, expiryCount: 1 }, byLocation: {
+      ...inventoryLocationMap({ lotCount: 0, expiryCount: 0 }), refrigerated: { lotCount: 1, expiryCount: 1 } } },
+    createdAt: oldDate, updatedAt: oldDate, createdBy: "EMP-SALES-A", updatedBy: "EMP-SALES-A",
+  }));
+  const refs = fixtures.map((fixture) => db().doc(`${INVENTORY_PRODUCT_PATH}/${fixture.productId}`));
+  const batch = db().batch(); batch.set(settingsRef, settings);
+  for (const [index, fixture] of fixtures.entries()) {
+    batch.create(refs[index]!, fixture);
+    batch.create(refs[index]!.collection("lots").doc(`${fixture.productId}-lot`), inventoryLotSchema.parse({
+      lotId: `${fixture.productId}-lot`, originLotId: `${fixture.productId}-lot`, productId: fixture.productId,
+      locationId: "refrigerated", label: "", expiryState: "dated", expiryDate: expiryAfter(40),
+      quantity: fixture.quantityByLocation.refrigerated, revision: 1, createdAt: oldDate, updatedAt: oldDate,
+    }));
+  }
+  await batch.commit();
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let nextRequested = false;
+  let failedRequestId = "";
+  const failFirstCount = async (route: Route) => {
+    const request = route.request();
+    if (request.method() === "POST" && !failedRequestId && request.postDataJSON()?.data?.productId === fixtures[0]!.productId) {
+      failedRequestId = request.postDataJSON().data.requestId;
+      // A loopback-only transport failure before reaching the real service.
+      // The retry below passes through the actual authorized transaction.
+      await route.fulfill({ status: 503, contentType: "application/json", headers: { "access-control-allow-origin": INVENTORY_E2E_ORIGIN },
+        body: JSON.stringify({ error: { status: "UNAVAILABLE", message: "Local count retry fixture" } }) });
+    } else await route.continue();
+  };
+  const holdNextDetail = async (route: Route) => {
+    if (route.request().method() === "POST" && route.request().postDataJSON()?.data?.productId === fixtures[1]!.productId) {
+      nextRequested = true; await held;
+    }
+    await route.continue();
+  };
+  await page.route("**/recordInventoryCount", failFirstCount);
+  await page.route("**/getInventoryProduct", holdNextDetail);
+  try {
+    await login(page, PHASE3_TEST_PINS.salesA);
+    const options = await openListOptions(page);
+    await options.getByRole("switch", { name: "재고조사 모드", exact: true }).check();
+    await closeListOptions(options);
+    expect((await settingsRef.get()).data(), "personal mode preserves the team's scheduled day").toEqual(settings);
+    const search = page.getByRole("searchbox", { name: "품목 검색", exact: true });
+    await search.fill(prefix);
+    const cards = page.getByRole("button", { name: new RegExp(`^${prefix} [12], .*상세 보기$`) });
+    await expect(cards).toHaveCount(2);
+    const first = page.getByRole("dialog", { name: fixtures[0]!.name, exact: true });
+    const second = page.getByRole("dialog", { name: fixtures[1]!.name, exact: true });
+    await cards.first().click();
+    await expect(first.getByRole("button", { name: "수량 일치 확인", exact: true })).toBeEnabled();
+    const parentHistory = await page.evaluate(() => history.state?.onnuriwaySheet);
+    expect(typeof parentHistory).toBe("string");
+    await first.getByRole("button", { name: "수량 일치 확인", exact: true }).click();
+    const count = page.getByRole("dialog", { name: "실물 수량 확인", exact: true });
+    const rejected = page.waitForResponse((response) => response.request().method() === "POST"
+      && new URL(response.url()).pathname.endsWith("/recordInventoryCount"));
+    await count.getByRole("button", { name: "일치 확인", exact: true }).click();
+    expect((await rejected).status()).toBe(503);
+    await expect(count.getByRole("alert")).toBeVisible();
+    await expect(count.getByRole("button", { name: "일치 확인", exact: true })).toBeEnabled();
+    await expect(second).toHaveCount(0);
+    expect((await refs[0]!.collection("events").get()).size).toBe(0);
+    expect((await refs[0]!.get()).get("lastCountByLocation.refrigerated")).toBeNull();
+
+    const firstResult = await submitMutation(page, count, "일치 확인", "recordInventoryCount");
+    expect(firstResult.input.requestId, "unchanged retry keeps its command identity").toBe(failedRequestId);
+    await expect(first).toHaveCount(0);
+    await expect(second).toBeVisible();
+    await expect.poll(() => nextRequested).toBe(true);
+    await expect(second.getByText("최신 재고를 확인하고 있어요.", { exact: true })).toBeVisible();
+    for (const action of ["입고", "출고", "조정", "품목 정보 수정", "수량 일치 확인"])
+      await expect(second.getByRole("button", { name: action, exact: true })).toBeDisabled();
+    await expect.poll(() => page.evaluate(() => history.state?.onnuriwaySheet)).toBe(parentHistory);
+    release();
+    await expect(second.getByRole("button", { name: "수량 일치 확인", exact: true })).toBeEnabled();
+    await second.getByRole("button", { name: "수량 일치 확인", exact: true }).click();
+    const secondResult = await submitMutation(page, count, "일치 확인", "recordInventoryCount");
+    expect(secondResult.input.productId).toBe(fixtures[1]!.productId);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => history.state?.onnuriwaySheet ?? null)).toBeNull();
+    await expect(search).toHaveValue(prefix);
+    for (const [index, fixture] of fixtures.entries()) {
+      const stored = (await refs[index]!.get()).data()!;
+      expect(stored.quantityByLocation).toEqual(fixture.quantityByLocation);
+      expect(stored.stockRevision).toBe(fixture.stockRevision);
+      expect(stored.lastCountByLocation.refrigerated.changed).toBe(false);
+      expect(stored.lastCountByLocation.refrigerated.stockChangedSinceCount).toBe(false);
+      const events = await refs[index]!.collection("events").get();
+      expect(events.size).toBe(1);
+      expect(events.docs[0]!.get("kind")).toBe("count_match");
+      expect((await refs[index]!.collection("lots").get()).docs[0]!.get("quantity")).toBe(fixture.quantityByLocation.refrigerated);
+    }
+    // Reopening then one native Back must reveal the list directly. No retired
+    // first-product/count sheet may reappear from the continuation sequence.
+    await cards.last().click(); await expect(second).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(search).toBeVisible();
+    await expect(page.locator("main.workspace-shell")).toHaveAttribute("data-mode", "inventory");
+    await capture(page, info, `count-continuation-${scenario.key}-360`);
+  } finally {
+    release();
+    await page.unroute("**/recordInventoryCount", failFirstCount);
+    await page.unroute("**/getInventoryProduct", holdNextDetail);
+    // Delete only this test's two guarded demo products and their own records.
+    for (const ref of refs) {
+      const [lots, events] = await Promise.all([ref.collection("lots").get(), ref.collection("events").get()]);
+      const cleanup = db().batch();
+      for (const lot of lots.docs) cleanup.delete(lot.ref);
+      for (const event of events.docs) {
+        cleanup.delete(event.ref);
+        cleanup.delete(db().doc(`companies/onnuri/inventoryRequests/${event.id}`));
+        cleanup.delete(db().doc(`auditLogs/inventory-${event.id}`));
+      }
+      cleanup.delete(ref); await cleanup.commit();
+    }
+    if (previousSettings.exists) await settingsRef.set(previousSettings.data()!);
+    else await settingsRef.delete();
+  }
+});
+}
 
 test("a list snapshot paints immediately while authoritative detail gates stock changes", async ({ page }) => {
   const fixtureId = "inventory-immediate-shell-e2e";

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
@@ -9,29 +9,51 @@ import { inventoryRepository, inventoryErrorMessage } from "./inventory-reposito
 import { INVENTORY_COUNT_LABELS, inventoryCountBadgeState, inventoryExpiryLabel, inventoryLocationsFor, inventoryLotDateLabel, inventoryUnitDisplayLabel } from "./inventory-model";
 import { InventoryCountForm, InventoryLotEditor, InventoryMovementForm, InventoryProductEditor, InventoryStatusForm } from "./inventory-forms";
 import { InventoryPhoto } from "./inventory-photo";
-import { InventoryHistory } from "./inventory-history";
 import { useInventoryConnection } from "./use-inventory-connection";
 import styles from "./inventory.module.css";
 
-export function InventoryDetail({ productId, initialProduct, initialLocation, context, calendarReady = true, countMode = false, onClose, onSaved }: { productId: string; initialProduct?: InventoryProduct; initialLocation: InventoryLocation; context: InventoryContext; calendarReady?: boolean; countMode?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void }) {
+const InventoryHistory = lazy(() => import("./inventory-history").then((module) => ({ default: module.InventoryHistory })));
+
+function matchingDetail(product: InventoryProduct | undefined, detail?: InventoryProductDetail): InventoryProductDetail | null {
+  return product && detail?.product.productId === product.productId && detail.product.revision === product.revision && detail.product.stockRevision === product.stockRevision ? detail : null;
+}
+
+export function InventoryDetail({ productId, initialProduct, initialDetail, initialLocation, openingSequence = 0, context, calendarReady = true, countMode = false, onClose, onSaved, onCountSaved }: { productId: string; initialProduct?: InventoryProduct; initialDetail?: InventoryProductDetail; initialLocation: InventoryLocation; openingSequence?: number; context: InventoryContext; calendarReady?: boolean; countMode?: boolean; onClose: () => void; onSaved: (product: InventoryProduct) => void; onCountSaved?: (product: InventoryProduct, location: InventoryLocation, detail: InventoryProductDetail) => void }) {
   const online = useInventoryConnection();
-  const [detail, setDetail] = useState<InventoryProductDetail | null>(null);
+  const seed = matchingDetail(initialProduct, initialDetail);
+  const [storedDetail, setDetail] = useState<InventoryProductDetail | null>(seed);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [storedLoading, setLoading] = useState(!seed);
   const [version, setVersion] = useState(0);
   const [selectedLocation, setLocation] = useState(initialLocation);
   const [action, setAction] = useState<"receive" | "issue" | "adjust" | "count" | "edit" | "status" | "delete" | "history" | "more" | null>(null);
   const [editingLot, setEditingLot] = useState<InventoryLot | null>(null);
   const [movementLotId, setMovementLotId] = useState<string | undefined>(undefined);
+  const openingKey = productId + ":" + initialLocation + ":" + openingSequence;
+  const [openedKey, setOpenedKey] = useState(openingKey);
+  const [readSeed, setReadSeed] = useState(seed);
   const savedCallback = useRef(onSaved);
-  const pendingMutationRefresh = useRef<{ productId: string } | null>(null);
+  const countCallback = useRef(onCountSaved);
+  const pendingMutationRefresh = useRef<{ productId: string; countLocation?: InventoryLocation } | null>(null);
   const readGeneration = useRef(0);
-  useEffect(() => { savedCallback.current = onSaved; }, [onSaved]);
+  const readOpening = useRef(openingKey);
+  const detail = openedKey === openingKey ? storedDetail : seed;
+  const loading = openedKey === openingKey ? storedLoading : !seed;
+  // Keep the same dialog/history slot while retiring the previous product's
+  // private state before any action on the next product can be rendered.
+  if (openedKey !== openingKey) {
+    setReadSeed(seed);
+    setOpenedKey(openingKey); setDetail(seed); setLoading(!seed); setError(""); setVersion(0);
+    setLocation(initialLocation); setAction(null); setEditingLot(null); setMovementLotId(undefined);
+  }
+  useEffect(() => { savedCallback.current = onSaved; countCallback.current = onCountSaved; }, [onSaved, onCountSaved]);
   useEffect(() => {
     let cancelled = false;
     const generation = ++readGeneration.current;
+    if (readOpening.current !== openingKey) { readOpening.current = openingKey; pendingMutationRefresh.current = null; }
     const pending = pendingMutationRefresh.current;
     const current = () => !cancelled && readGeneration.current === generation;
+    if (version === 0 && readSeed?.product.productId === productId) return () => { cancelled = true; };
     void inventoryRepository.detail(productId).then((result) => {
       if (!current()) return;
       if (result.product.productId !== productId) throw new Error("Unexpected inventory product.");
@@ -40,22 +62,26 @@ export function InventoryDetail({ productId, initialProduct, initialLocation, co
       // fresh read to the parent list, and never publish an ordinary opening.
       if (pending?.productId === productId && pendingMutationRefresh.current === pending) {
         pendingMutationRefresh.current = null; savedCallback.current(result.product);
+        if (pending.countLocation) countCallback.current?.(result.product, pending.countLocation, result);
       }
     }).catch((cause) => { if (current()) { setDetail(null); setError(inventoryErrorMessage(cause)); } }).finally(() => { if (current()) setLoading(false); });
     return () => { cancelled = true; };
-  }, [productId, version]);
-  function saved(product: InventoryProduct, confirmedDetail?: InventoryProductDetail) {
+  }, [openingKey, productId, version, readSeed]);
+  function saved(product: InventoryProduct, confirmedDetail?: InventoryProductDetail, countLocation?: InventoryLocation) {
     if (product.productId !== productId) return;
     ++readGeneration.current;
     setAction(null); setEditingLot(null); setMovementLotId(undefined);
-    if (product.status === "deleted") { pendingMutationRefresh.current = null; onSaved(product); onClose(); return; }
+    if (product.status === "deleted") { pendingMutationRefresh.current = null; savedCallback.current(product); onClose(); return; }
     // Apply only a server-confirmed product/lot snapshot. Legacy or replayed
     // responses still recheck current lots before enabling another action.
-    if (confirmedDetail?.product.productId === product.productId && confirmedDetail.product.revision === product.revision && confirmedDetail.product.stockRevision === product.stockRevision) {
+    const confirmed = matchingDetail(product, confirmedDetail);
+    if (confirmed) {
       pendingMutationRefresh.current = null;
-      setDetail(confirmedDetail); setError(""); setLoading(false); onSaved(confirmedDetail.product); return;
+      setDetail(confirmed); setError(""); setLoading(false); savedCallback.current(confirmed.product);
+      if (countLocation) countCallback.current?.(confirmed.product, countLocation, confirmed);
+      return;
     }
-    pendingMutationRefresh.current = { productId };
+    pendingMutationRefresh.current = { productId, ...(countLocation ? { countLocation } : {}) };
     setLoading(true); setVersion((value) => value + 1);
   }
   // List data gives an immediate shell, never authority for a write or photo.
@@ -107,7 +133,7 @@ export function InventoryDetail({ productId, initialProduct, initialLocation, co
     </BottomSheetActions> : null}
   </BottomSheet></div>
     {confirmed && detail && (action === "receive" || action === "issue" || action === "adjust") ? <InventoryMovementForm detail={detail} location={location} kind={action} {...(movementLotId ? { initialLotId: movementLotId } : {})} {...(countMode && calendarReady ? { inspectionCycleId: context.cycle.cycleId } : {})} onClose={() => { setAction(null); setMovementLotId(undefined); }} onSaved={saved} /> : null}
-    {confirmed && detail && action === "count" ? <InventoryCountForm detail={detail} location={location} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setAction(null)} onSaved={saved} /> : null}
+    {confirmed && detail && action === "count" ? <InventoryCountForm detail={detail} location={location} context={context} calendarReady={calendarReady} countMode={countMode} continueAfterSave={!!onCountSaved} onClose={() => setAction(null)} onSaved={(product, next) => saved(product, next, location)} /> : null}
     {confirmed && product && action === "edit" ? <InventoryProductEditor product={product} location={location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setAction(null)} onSaved={saved} /> : null}
     {confirmed && detail && editingLot ? <InventoryLotEditor detail={detail} lot={editingLot} onMovement={openMovement} onClose={() => setEditingLot(null)} onSaved={saved} /> : null}
     {product && action === "more" ? <BottomSheet open title="품목 더보기" onClose={() => setAction(null)}><div className={styles.detailMoreActions}>
@@ -115,6 +141,6 @@ export function InventoryDetail({ productId, initialProduct, initialLocation, co
       {context.canWrite ? <><GlassButton className={styles.detailStatusAction} disabled={!online || loading} onClick={() => setAction("status")}><Icon name={product.status === "active" ? "close" : "refresh"} size={18} /><span>{product.status === "active" ? "비활성화" : "다시 활성화"}</span><Icon name="chevron-right" size={16} /></GlassButton><GlassButton className={styles.detailDeleteAction} variant="danger" disabled={!online || loading} onClick={() => setAction("delete")}><Icon name="trash" size={18} /><span>품목 삭제</span><Icon name="chevron-right" size={16} /></GlassButton></> : null}
     </div></BottomSheet> : null}
     {confirmed && product && (action === "status" || action === "delete") ? <InventoryStatusForm product={product} remove={action === "delete"} onClose={() => setAction(null)} onSaved={saved} /> : null}
-    {action === "history" ? <BottomSheet open title="입출고·실사 기록" onClose={() => setAction(null)}><InventoryHistory productId={productId} /></BottomSheet> : null}
+    {action === "history" ? <BottomSheet open title="입출고·실사 기록" onClose={() => setAction(null)}><Suspense fallback={<p role="status">기록을 준비하고 있어요.</p>}><InventoryHistory productId={productId} /></Suspense></BottomSheet> : null}
   </>;
 }

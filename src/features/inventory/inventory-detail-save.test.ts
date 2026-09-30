@@ -36,9 +36,9 @@ function snapshot(quantity = 10, stockRevision = 1): InventoryProductDetail {
     createdAt: "2026-09-13T00:00:00.000Z", updatedAt: "2026-09-13T00:00:00.000Z", createdBy: "EMP", updatedBy: "EMP" });
   return { product, lots: [] };
 }
-function render(callback = onSaved, initialProduct?: InventoryProduct) {
+function render(callback = onSaved, initialProduct?: InventoryProduct, extra: Partial<Parameters<typeof InventoryDetail>[0]> = {}) {
   harness.stateCursor = 0; harness.refCursor = 0; harness.effects = [];
-  return InventoryDetail({ productId: initialProduct?.productId ?? "product-1", ...(initialProduct ? { initialProduct } : {}), initialLocation: "refrigerated", context, onSaved: callback, onClose });
+  return InventoryDetail({ productId: initialProduct?.productId ?? "product-1", ...(initialProduct ? { initialProduct } : {}), initialLocation: "refrigerated", context, onSaved: callback, onClose, ...extra });
 }
 function effects() {
   harness.effects.forEach(({ effect, deps }, index) => {
@@ -57,6 +57,88 @@ function saveHandler(tree: ReactNode) {
 beforeEach(() => { harness.states = []; harness.refs = []; harness.effects = []; harness.previous = []; harness.stateCursor = 0; harness.refCursor = 0; harness.detail.mockReset(); onSaved.mockReset(); onClose.mockReset(); });
 
 describe("inventory detail save reconciliation", () => {
+  it("opens server-confirmed registered lots without another detail request", async () => {
+    const registered = snapshot(1, 1);
+    const tree = render(onSaved, registered.product, { initialDetail: registered }); effects(); await settle();
+    expect(harness.detail).not.toHaveBeenCalled();
+    expect(find(tree, (props) => text(props.children) === "입고")!.disabled).toBe(false);
+    expect(text(tree)).not.toContain("최신 재고를 확인하고 있어요.");
+  });
+  it("checks current detail when the supplied registration snapshot does not match", async () => {
+    harness.detail.mockResolvedValueOnce(snapshot(4, 3));
+    render(onSaved, snapshot(1, 1).product, { initialDetail: snapshot(2, 2) }); effects(); await settle();
+    expect(harness.detail).toHaveBeenCalledExactlyOnceWith("product-1");
+    expect(harness.states[0]).toEqual(snapshot(4, 3));
+  });
+  it("retires A's private state and delayed read while the same dialog opens B", async () => {
+    const a = snapshot(11); const b = { ...snapshot(22), product: { ...snapshot(22).product, productId: "product-B", name: "B 품목" } };
+    let finishA!: (detail: InventoryProductDetail) => void;
+    let finishB!: (detail: InventoryProductDetail) => void;
+    harness.detail.mockReturnValueOnce(new Promise((resolve) => { finishA = resolve; }))
+      .mockReturnValueOnce(new Promise((resolve) => { finishB = resolve; }));
+    render(onSaved, a.product); effects();
+    render(onSaved, b.product); const waiting = render(onSaved, b.product); effects();
+    expect(text(waiting)).not.toContain("11봉");
+    expect(find(waiting, (props) => text(props.children) === "입고")!.disabled).toBe(true);
+    finishA(a); await settle(); expect(harness.states[0]).toBeNull();
+    finishB(b); await settle(); expect(harness.states[0]).toEqual(b);
+  });
+  it("resets a manually selected location when continuation returns to the original opening location", async () => {
+    const supplied = snapshot(); supplied.product.quantityByLocation.freezer1 = 2;
+    const props = { initialDetail: supplied, countMode: true };
+    let tree = render(onSaved, supplied.product, props); effects();
+    const chooser = find(tree, (p) => p["aria-label"] === "상세 보관 장소")!;
+    (chooser.onChange as (event: { target: { value: string } }) => void)({ target: { value: "freezer1" } });
+    tree = render(onSaved, supplied.product, props); expect(find(tree, (p) => p["aria-label"] === "상세 보관 장소")!.value).toBe("freezer1");
+    render(onSaved, supplied.product, { ...props, openingSequence: 1 });
+    tree = render(onSaved, supplied.product, { ...props, openingSequence: 1 }); effects(); await settle();
+    expect(find(tree, (p) => p["aria-label"] === "상세 보관 장소")!.value).toBe("refrigerated");
+    expect(harness.detail).not.toHaveBeenCalled();
+  });
+  it.each([true, false])("publishes a pending confirmed count to current callbacks when the latest calendarReady=%s", async (calendarReady) => {
+    const initial = snapshot(); const oldSaved = vi.fn(); const oldCount = vi.fn();
+    const originalProps = { initialDetail: initial, countMode: true, onCountSaved: oldCount };
+    let tree = render(oldSaved, initial.product, originalProps); effects();
+    click(tree, "수량 일치 확인");
+    tree = render(oldSaved, initial.product, originalProps); effects();
+    const pendingForm = find(tree, (props) => props.continueAfterSave === true && typeof props.onSaved === "function")!;
+    const finishRequest = pendingForm.onSaved as (product: InventoryProduct, detail?: InventoryProductDetail) => void;
+    const latestSaved = vi.fn(); const advance = vi.fn();
+    // A parent calendar refresh changes the continuation guard while the same
+    // form's server request is pending. Its old success closure must be safe.
+    const latestCount = vi.fn((product: InventoryProduct, location: string, detail: InventoryProductDetail) => {
+      if (calendarReady) advance(product, location, detail);
+    });
+    render(latestSaved, initial.product, { ...originalProps, calendarReady, onCountSaved: latestCount }); effects();
+    const committed = snapshot();
+    committed.product.lastCountByLocation.refrigerated = { cycleId: context.cycle.cycleId,
+      checkedAt: committed.product.updatedAt, checkedBy: "EMP", stockRevision: committed.product.stockRevision,
+      changed: false, stockChangedSinceCount: false };
+    finishRequest(committed.product, committed);
+    expect(oldSaved).not.toHaveBeenCalled(); expect(oldCount).not.toHaveBeenCalled();
+    expect(latestSaved).toHaveBeenCalledExactlyOnceWith(committed.product);
+    expect(latestCount).toHaveBeenCalledExactlyOnceWith(committed.product, "refrigerated", committed);
+    expect(advance).toHaveBeenCalledTimes(calendarReady ? 1 : 0);
+    expect(harness.detail).not.toHaveBeenCalled();
+    expect(harness.states[0]).toEqual(committed);
+  });
+  it("continues a count only from the committed detail, then waits for a replay refresh", async () => {
+    const continueCount = vi.fn();
+    harness.detail.mockResolvedValueOnce(snapshot());
+    render(onSaved, undefined, { countMode: true, onCountSaved: continueCount }); effects(); await settle();
+    click(render(onSaved, undefined, { countMode: true, onCountSaved: continueCount }), "수량 일치 확인");
+    const form = find(render(onSaved, undefined, { countMode: true, onCountSaved: continueCount }), (props) => props.continueAfterSave === true && typeof props.onSaved === "function")!;
+    const countSaved = form.onSaved as (product: InventoryProduct, detail?: InventoryProductDetail) => void;
+    const committed = snapshot(10, 2); countSaved(committed.product, committed);
+    expect(continueCount).toHaveBeenCalledExactlyOnceWith(committed.product, "refrigerated", committed);
+    continueCount.mockClear();
+    let finish!: (detail: InventoryProductDetail) => void;
+    harness.detail.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    countSaved(committed.product); expect(continueCount).not.toHaveBeenCalled();
+    render(onSaved, undefined, { countMode: true, onCountSaved: continueCount }); effects();
+    const latest = snapshot(9, 3); finish(latest); await settle();
+    expect(continueCount).toHaveBeenCalledExactlyOnceWith(latest.product, "refrigerated", latest);
+  });
   it("discards A's delayed initial detail after closing A and opening B", async () => {
     const a = snapshot(11); const b = { ...snapshot(22), product: { ...snapshot(22).product, productId: "product-B", name: "B 품목" } };
     const freshB = { ...b, product: { ...b.product, stockRevision: 2, quantityByLocation: { ...b.product.quantityByLocation, refrigerated: 23 } } };
@@ -128,9 +210,10 @@ describe("inventory detail save reconciliation", () => {
     harness.detail.mockReturnValueOnce(new Promise((done) => { resolve = done; })); save(snapshot(12, 2).product); render(); effects();
     harness.previous.forEach((effect) => effect.cleanup?.()); resolve(snapshot(8, 3)); await settle(); expect(onSaved).not.toHaveBeenCalled();
   });
-  it("immediately removes confirmed deletions without attempting to read a tombstone", async () => {
-    const save = saveHandler(await open()); const deleted = { ...snapshot().product, status: "deleted" as const }; save(deleted);
-    expect(onSaved).toHaveBeenCalledExactlyOnceWith(deleted); expect(onClose).toHaveBeenCalledOnce();
-    expect(harness.detail).toHaveBeenCalledOnce();
+  it("immediately removes confirmed deletions through the current callback without attempting to read a tombstone", async () => {
+    const save = saveHandler(await open()); const latestCallback = vi.fn(); render(latestCallback); effects();
+    const deleted = { ...snapshot().product, status: "deleted" as const }; save(deleted);
+    expect(onSaved).not.toHaveBeenCalled(); expect(latestCallback).toHaveBeenCalledExactlyOnceWith(deleted);
+    expect(onClose).toHaveBeenCalledOnce(); expect(harness.detail).toHaveBeenCalledOnce();
   });
 });

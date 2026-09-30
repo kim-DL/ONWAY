@@ -58,7 +58,7 @@ export const inventoryRepository = {
   list,
   context: () => call("getInventoryContext", {}, contract.inventoryContextSchema),
   detail: (productId: string) => call("getInventoryProduct", contract.getInventoryProductInputSchema.parse({ productId, includeSummary: true }), contract.inventoryProductDetailSchema),
-  save: (input: contract.SaveInventoryProductInput) => call("saveInventoryProduct", contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryProductSchema),
+  save: (input: contract.SaveInventoryProductInput) => call("saveInventoryProduct", contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryProductSaveResultSchema),
   movement: (input: contract.InventoryMovementInput) => call("recordInventoryMovement", contract.inventoryMovementInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryMutationResultSchema),
   count: (input: contract.InventoryCountInput) => call("recordInventoryCount", contract.inventoryCountInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryMutationResultSchema),
   updateLot: (input: contract.UpdateInventoryLotInput) => call("updateInventoryLot", contract.updateInventoryLotInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryMutationResultSchema),

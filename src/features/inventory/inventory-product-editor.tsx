@@ -3,7 +3,7 @@
 import { lazy, Suspense, useId, useRef, useState, type FormEvent } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
-import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryLocation, type InventoryLotDraft, type InventoryProduct, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
+import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryLocation, type InventoryLotDraft, type InventoryProductSaveResult, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
 import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo";
 import { inventoryRepository } from "./inventory-repository";
 import { useInventoryEditorReady } from "./use-inventory-editor-ready";
@@ -35,7 +35,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
   const [clearManufacturerReference, setClearManufacturerReference] = useState(false);
   const [focusCustom, setFocusCustom] = useState<keyof Pick<InventoryProductDraft, "origin" | "specification" | "unitLabel"> | null>(null);
   const upload = useRef<{ file: File; id: string; ready: boolean } | null>(null);
-  const manufacturerSave = useRef<((input: SaveInventoryProductInput) => Promise<InventoryProduct>) | null>(null);
+  const manufacturerSave = useRef<((input: SaveInventoryProductInput) => Promise<InventoryProductSaveResult>) | null>(null);
   const action = useInventoryAction();
   const busy = action.busy || photoBusy;
   const set = <K extends keyof InventoryProductDraft>(key: K, value: InventoryProductDraft[K]) => setDraft((old) => ({ ...old, [key]: value }));
@@ -52,7 +52,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
     if (file && upload.current?.file !== file) upload.current = { file, id: crypto.randomUUID(), ready: false };
     const staged = file ? upload.current : null;
     const photoChange: SaveInventoryProductInput["photoChange"] = staged ? { action: "replace", uploadId: staged.id } : removed ? { action: "remove" } : undefined;
-    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { initialStock: { quantity: initialQuantity, lot: initialLot } } : {}), ...(photoChange ? { photoChange } : {}) };
+    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { includeDetail: true, initialStock: { quantity: initialQuantity, lot: initialLot } } : {}), ...(photoChange ? { photoChange } : {}) };
     await action.run(input, async (requestId, assertCurrent) => {
       if (staged && !staged.ready) {
         const fileBase64 = await inventoryPhotoBase64(staged.file);
@@ -63,7 +63,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       assertCurrent();
       const saveInput = { ...input, requestId };
       return manufacturerSave.current ? manufacturerSave.current(saveInput) : inventoryRepository.save(saveInput);
-    }, onSaved);
+    }, (result) => { const { detail, ...saved } = result; if (detail) onSaved(saved, detail); else onSaved(saved); });
   }
   return <BottomSheet open title={product ? "품목 정보 수정" : "새 품목 등록"} onClose={onClose} dismissible={!busy}>
     {ready ? <>

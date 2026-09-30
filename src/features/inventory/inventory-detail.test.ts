@@ -26,7 +26,12 @@ function text(node: ReactNode): string { return Array.isArray(node) ? node.map(t
 const button = (tree: ReactNode, label: string) => find(tree, (type, props) => typeof type === "function" && type.name === "GlassButton" && (props["aria-label"] ?? text(props.children)) === label);
 type Options = { countMode?: boolean; calendarReady?: boolean; initialProduct?: typeof product };
 function render(nextContext = context, options: Options = {}) { harness.cursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryDetail({ productId: product.productId, initialLocation: "refrigerated", context: nextContext, ...options, onClose: harness.close, onSaved: harness.saved }); }
-const detailEffect = () => harness.effects.find(({ deps }) => deps[0] === product.productId)!;
+const detailEffect = () => harness.effects.find(({ deps }) => deps.includes(product.productId))!;
+function commitChangedDetailEffect(previous: unknown[]) {
+  const effect = detailEffect();
+  // Model React dependency comparison, rather than asserting private positions.
+  if (effect.deps.length !== previous.length || effect.deps.some((value, index) => !Object.is(value, previous[index]))) effect.run();
+}
 async function settle() { for (let index = 0; index < 8; index += 1) await Promise.resolve(); }
 async function load(nextDetail = detail, nextContext = context, options: Options = {}) { harness.detail.mockResolvedValueOnce(nextDetail); render(nextContext, options); harness.effects.forEach(({ run }) => run()); await settle(); return render(nextContext, options); }
 function more(tree: ReactNode, nextContext = context, options: Options = {}) { (button(tree, "더보기")!.onClick as () => void)(); return render(nextContext, options); }
@@ -149,21 +154,37 @@ describe("compact inventory detail actions", () => {
   });
 
   it("applies only a confirmed product+lot snapshot and skips an unnecessary detail fetch", async () => {
-    let tree = await load(); (button(tree, "출고")!.onClick as () => void)(); tree = render();
+    let tree = await load(); const previousRead = detailEffect().deps;
+    (button(tree, "출고")!.onClick as () => void)(); tree = render();
     const movement = find(tree, (type) => typeof type === "function" && type.name === "InventoryMovementForm")!;
     const changed: InventoryProductDetail = { product: { ...product, stockRevision: 2, quantityByLocation: { ...product.quantityByLocation, refrigerated: 25 } }, lots: [{ ...detail.lots[0]!, quantity: 25, revision: 2 }] };
     (movement.onSaved as (product: typeof changed.product, detail: InventoryProductDetail) => void)(changed.product, changed);
-    tree = render(); expect(detailEffect().deps).toEqual([product.productId, 0]);
+    tree = render(); commitChangedDetailEffect(previousRead); await settle(); tree = render();
     expect(harness.detail).toHaveBeenCalledOnce(); expect(text(tree)).toContain("25봉");
     expect(button(tree, "출고")?.disabled).toBe(false); expect(harness.saved).toHaveBeenCalledWith(changed.product);
   });
 
   it("retains the recheck path for legacy responses and keeps actions disabled until it finishes", async () => {
-    let tree = await load(); (button(tree, "입고")!.onClick as () => void)(); tree = render();
+    const options = { countMode: true };
+    let tree = await load(detail, context, options); const previousRead = detailEffect().deps;
+    (button(tree, "입고")!.onClick as () => void)(); tree = render(context, options);
     const movement = find(tree, (type) => typeof type === "function" && type.name === "InventoryMovementForm")!;
     (movement.onSaved as (nextProduct: typeof product) => void)(product);
-    tree = render(); expect(detailEffect().deps).toEqual([product.productId, 1]);
+    tree = render(context, options);
     for (const label of ["출고", "입고", "조정", "수량 일치 확인"]) expect(button(tree, label)?.disabled).toBe(true);
+    expect(harness.saved).not.toHaveBeenCalled();
+    let finish!: (value: InventoryProductDetail) => void;
+    harness.detail.mockImplementationOnce(() => new Promise<InventoryProductDetail>((resolve) => { finish = resolve; }));
+    commitChangedDetailEffect(previousRead); await settle();
+    expect(harness.detail).toHaveBeenCalledTimes(2); expect(harness.detail).toHaveBeenLastCalledWith(product.productId);
+    tree = render(context, options);
+    for (const label of ["출고", "입고", "조정", "수량 일치 확인"]) expect(button(tree, label)?.disabled).toBe(true);
+    const latest = { product: { ...product, stockRevision: 2, quantityByLocation: { ...product.quantityByLocation, refrigerated: 31 } },
+      lots: [{ ...detail.lots[0]!, quantity: 31, revision: 2 }] };
+    finish(latest); await settle(); tree = render(context, options);
+    for (const label of ["출고", "입고", "조정", "수량 일치 확인"]) expect(button(tree, label)?.disabled).toBe(false);
+    expect(text(tree)).toContain("31봉"); expect(text(tree)).not.toContain("29봉");
+    expect(harness.saved).toHaveBeenCalledOnce(); expect(harness.saved).toHaveBeenCalledWith(latest.product);
   });
   it("defaults counting off with a visible reason and requires both mode and the trusted calendar", async () => {
     let tree = await load();

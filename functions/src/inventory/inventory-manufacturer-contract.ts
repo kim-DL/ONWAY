@@ -3,7 +3,7 @@ import {
   deleteInventoryProductInputSchema, getInventoryProductInputSchema, inventoryCountInputSchema,
   inventoryIdSchema, inventoryListInputSchema, inventoryListPageSchema, inventoryMovementInputSchema,
   inventoryMutationResultSchema, inventoryProductDetailSchema, inventoryProductDraftSchema,
-  inventoryProductSchema, saveInventoryProductInputSchema, setInventoryProductStatusInputSchema,
+  inventoryProductSchema, inventoryProductSaveResultSchema, saveInventoryProductInputSchema, setInventoryProductStatusInputSchema,
   updateInventoryLotInputSchema,
 } from "./inventory-contract.js";
 
@@ -54,6 +54,9 @@ export const inventoryListPageWithManufacturerSchema = inventoryListPageSchema.e
   products: z.array(inventoryProductWithManufacturerSchema).max(100),
 });
 export const inventoryProductDetailWithManufacturerSchema = inventoryProductDetailSchema.extend({ product: inventoryProductWithManufacturerSchema });
+export const inventoryProductSaveResultWithManufacturerSchema = inventoryProductSaveResultSchema.extend({
+  manufacturerId: inventoryIdSchema.optional(), detail: inventoryProductDetailWithManufacturerSchema.optional(),
+});
 export const inventoryMutationResultWithManufacturerSchema = inventoryMutationResultSchema.extend({
   product: inventoryProductWithManufacturerSchema, detail: inventoryProductDetailWithManufacturerSchema.optional(),
 });

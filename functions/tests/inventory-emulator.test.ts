@@ -95,6 +95,34 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     expect(detail.product).not.toHaveProperty("inspectionByLot");
   }, 40_000);
 
+  it("returns one committed registration working set under concurrent retries and refreshes later stock without stale lots", async () => {
+    const input: SaveInventoryProductInput = { requestId: randomUUID(), productId: null, expectedRevision: null,
+      includeDetail: true, refreshOnReplay: true,
+      draft: inventoryProductDraftSchema.parse({ name: "등록 상세 한 번 응답 검증", unitLabel: "봉", unitsPerBox: 1,
+        defaultLocationId: "refrigerated", manufacturer: "", specification: "", origin: "", note: "", urgent: false }),
+      initialStock: { quantity: 5, lot: { label: "첫 묶음", expiryState: "dated", expiryDate: "2027-01-01" } } };
+    const results = await Promise.all([service.save(input, member), service.save(input, member)]);
+    const committed = results.find((result) => result.detail)!;
+    const { detail, ...product } = committed;
+    expect(results.filter((result) => result.detail)).toHaveLength(1);
+    expect(results.find((result) => !result.detail)).toEqual(product);
+    expect(detail).toEqual(await service.detail(product.productId, member));
+    expect(detail!.lots).toHaveLength(1);
+    expect(detail!.lots[0]).toMatchObject({ lotId: `${input.requestId}-refrigerated`, quantity: 5, expiryDate: "2027-01-01" });
+    const receiptRef = db.doc(`companies/onnuri/inventoryRequests/${input.requestId}`);
+    const receipt = (await receiptRef.get()).data()!;
+    expect(receipt.result).toEqual(product);
+    expect(receipt.result).not.toHaveProperty("detail");
+    expect(receipt).not.toHaveProperty("expiresAt");
+    const moved = await service.move({ requestId: randomUUID(), productId: product.productId,
+      expectedStockRevision: product.stockRevision, kind: "issue", locationId: "refrigerated",
+      lotId: detail!.lots[0]!.lotId, quantity: 1, reason: "응답 후 재고 변경" }, member);
+    expect(await service.save(input, member)).toEqual(moved.product);
+    expect(await service.save({ ...input, includeDetail: false, refreshOnReplay: false }, member)).toEqual(product);
+    expect((await receiptRef.get()).data()).toEqual(receipt);
+    expect((await service.history(product.productId, null)).events).toHaveLength(2);
+  }, 30_000);
+
   it("atomically registers the product, first expiry stock, photo claim and a single receipt under concurrent retries", async () => {
     const requestId = randomUUID(); const uploadId = randomUUID();
     const now = new Date("2026-09-11T01:00:00Z");

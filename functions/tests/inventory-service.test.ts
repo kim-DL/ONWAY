@@ -186,6 +186,41 @@ describe("inventory wire boundaries and calendar", () => {
 });
 
 describe("inventory transactions", () => {
+  it.each(INVENTORY_LOCATIONS)("returns committed registration detail at %s without another read or a larger permanent receipt", async (locationId) => {
+    const state = fixture();
+    const input = { ...initialStockInput(), includeDetail: true, refreshOnReplay: true, draft: { ...draft, defaultLocationId: locationId } };
+    const { detail, ...product } = await state.service.save(input, actor);
+    expect(detail).toBeDefined();
+    expect(state.reads).toEqual([
+      [`authz/${actor.uid}`, `employees/${actor.employeeId}`], [`companies/onnuri/inventoryRequests/${input.requestId}`],
+      [`${INVENTORY_PRODUCT_PATH}/${product.productId}`],
+    ]);
+    expect(detail).toEqual(await state.service.detail(product.productId, actor));
+    expect(detail!.product).toEqual(product);
+    expect(detail!.lots).toHaveLength(1);
+    expect(detail!.lots[0]).toMatchObject({ locationId, quantity: 19, lotId: `${input.requestId}-${locationId}`, originLotId: input.requestId });
+    const receipt = state.values.get(`companies/onnuri/inventoryRequests/${input.requestId}`)!;
+    expect(receipt.result).toEqual(product);
+    expect(receipt).not.toHaveProperty("expiresAt");
+    const added = await state.service.move({ ...receive(product, 2), locationId }, actor);
+    const before = new Map(state.values);
+    const replay = await state.service.save(input, actor);
+    expect(replay).toEqual(added.product);
+    expect(replay).not.toHaveProperty("detail");
+    expect(state.values).toEqual(before);
+    expect(await state.service.save({ ...input, includeDetail: false, refreshOnReplay: false }, actor)).toEqual(product);
+    expect((await state.service.history(product.productId, null)).events).toHaveLength(2);
+  });
+  it("keeps legacy first registration and opted-in metadata edits free of inferred lots", async () => {
+    const state = fixture(); const input = initialStockInput();
+    const product = await state.service.save(input, actor);
+    expect(product).not.toHaveProperty("detail");
+    const beforeReads = state.reads.length;
+    const result = await state.service.save({ ...createInput(), productId: product.productId, expectedRevision: product.revision,
+      includeDetail: true, draft: { ...draft, note: "metadata only" } }, actor);
+    expect(result).not.toHaveProperty("detail");
+    expect(state.reads.slice(beforeReads)).toHaveLength(3);
+  });
   it("keeps legacy manufacturer strings compatible and snapshots a selected active master without rewriting inactive links", async () => {
     const state = fixture(); const manufacturerId = randomUUID();
     state.values.set(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`, {

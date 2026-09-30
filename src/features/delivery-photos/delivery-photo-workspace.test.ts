@@ -35,7 +35,7 @@ describe("delivery photo field workspace", () => {
   });
 
   it("keeps narrow-screen containers shrinkable and touch controls at least 44px", () => {
-    const css = readFileSync(fileURLToPath(new URL("./delivery-photo.module.css", import.meta.url)), "utf8");
+    const css = readFileSync(fileURLToPath(new URL("./photo.module.css", import.meta.url)), "utf8");
     expect(css).toMatch(/\.workspace\s*\{[^}]*min-width:\s*0/u);
     expect(css).toMatch(/\.list\s*\{[^}]*min-width:0/u);
     expect(css).toContain("min-height:44px");

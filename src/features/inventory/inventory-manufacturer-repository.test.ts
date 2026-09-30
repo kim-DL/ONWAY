@@ -11,6 +11,16 @@ import { subscribeInventoryAccessFailure } from "./inventory-access-boundary";
 const product = { ...inventoryProductSchema.parse({ productId: "product-1", companyId: "onnuri", name: "검증 상품", manufacturer: "정식 제조사", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 1, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 1, stockRevision: 0, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-21T00:00:00.000Z", updatedAt: "2026-09-21T00:00:00.000Z", createdBy: "EMP", updatedBy: "EMP" }), manufacturerId: "manufacturer-one" };
 
 describe("inventory manufacturer repository", () => {
+  it("keeps manufacturer references in both snapshots of committed registration detail", async () => {
+    const detail = { product, lots: [] };
+    mock.invoke.mockResolvedValueOnce({ data: { ...product, detail } });
+    const input = { requestId: "41bd2065-a415-4e30-8b97-3dca1f8a66cc", productId: null, expectedRevision: null, includeDetail: true,
+      draft: { name: product.name, manufacturer: product.manufacturer, manufacturerId: product.manufacturerId, specification: "", origin: "",
+        unitLabel: "봉", unitsPerBox: 1, defaultLocationId: "refrigerated" as const, note: "", urgent: false } };
+    await expect(inventoryManufacturerRepository.saveProduct(input)).resolves.toEqual({ ...product, detail });
+    expect(mock.invoke).toHaveBeenCalledOnce();
+    expect(mock.invoke.mock.calls[0]![1]).toMatchObject({ includeDetail: true, includeSummary: true, includeManufacturerReference: true });
+  });
   it("notifies inventory cleanup on a revoked session without treating business rejection as access loss", async () => {
     const listener = vi.fn(); const unsubscribe = subscribeInventoryAccessFailure(listener);
     try {

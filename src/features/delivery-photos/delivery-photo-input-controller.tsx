@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type ChangeEvent } from "react";
 
 import type { DeliveryPhotoUploadCoordinator } from "./delivery-photo-upload-memory";
-import styles from "./delivery-photo.module.css";
+import styles from "./photo.module.css";
 
 export type DeliveryPhotoInputControllerHandle = {
   openCamera: (customerId: string) => boolean;

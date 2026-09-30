@@ -7,7 +7,7 @@ import { httpsCallable } from "firebase/functions";
 import { inventoryAccessGeneration, inventoryAuthenticationError, reportInventoryAccessFailure } from "./inventory-access-boundary";
 import {
   createInventoryManufacturerInputSchema, inventoryManufacturerListSchema, inventoryManufacturerSchema,
-  inventoryProductDetailWithManufacturerSchema, inventoryProductWithManufacturerSchema,
+  inventoryProductDetailWithManufacturerSchema, inventoryProductSaveResultWithManufacturerSchema,
   getInventoryProductWithManufacturerInputSchema, listInventoryManufacturersInputSchema,
   saveInventoryProductWithManufacturerInputSchema, updateInventoryManufacturerInputSchema,
   type InventoryManufacturer, type UpdateInventoryManufacturerInput,
@@ -43,5 +43,5 @@ export const inventoryManufacturerRepository = {
   create: (input: { requestId: string; name: string }) => call("createInventoryManufacturer", createInventoryManufacturerInputSchema.parse(input), inventoryManufacturerSchema),
   update: (input: UpdateInventoryManufacturerInput) => call("updateInventoryManufacturer", updateInventoryManufacturerInputSchema.parse(input), inventoryManufacturerSchema),
   reference: (productId: string) => call("getInventoryProduct", getInventoryProductWithManufacturerInputSchema.parse({ productId, includeManufacturerReference: true }), inventoryProductDetailWithManufacturerSchema),
-  saveProduct: (input: SaveInventoryProductInput) => call("saveInventoryProduct", saveInventoryProductWithManufacturerInputSchema.parse({ ...input, includeSummary: true, includeManufacturerReference: true }), inventoryProductWithManufacturerSchema),
+  saveProduct: (input: SaveInventoryProductInput) => call("saveInventoryProduct", saveInventoryProductWithManufacturerInputSchema.parse({ ...input, includeSummary: true, includeManufacturerReference: true }), inventoryProductSaveResultWithManufacturerSchema),
 };

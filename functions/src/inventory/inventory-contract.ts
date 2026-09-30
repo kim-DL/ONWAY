@@ -91,6 +91,11 @@ export const inventoryListInputSchema = z.object({ afterId: inventoryIdSchema.nu
 export const inventoryListPageSchema = z.object({ products: z.array(inventoryProductSchema).max(100), nextCursor: inventoryIdSchema.nullable() }).strict();
 export const getInventoryProductInputSchema = z.object({ productId: inventoryIdSchema, includeSummary: z.boolean().optional() }).strict();
 export const inventoryProductDetailSchema = z.object({ product: inventoryProductSchema, lots: z.array(inventoryLotSchema).max(INVENTORY_MAX_LOTS) }).strict();
+export const inventoryProductSaveResultSchema = inventoryProductSchema.extend({
+  // First registration only: the already committed lot working set. Replays
+  // omit it so the browser obtains current quantities instead of stale lots.
+  detail: inventoryProductDetailSchema.optional(),
+});
 export const inventoryInitialStockSchema = z.object({
   quantity: inventoryQuantitySchema.positive(), lot: inventoryLotDraftSchema,
 }).strict();
@@ -100,6 +105,7 @@ export const saveInventoryProductInputSchema = z.object({
   // their one-call response and older clients retain original-receipt replay.
   refreshOnReplay: z.boolean().optional(),
   includeSummary: z.boolean().optional(),
+  includeDetail: z.boolean().optional(),
   draft: inventoryProductDraftSchema,
   // Optional for older clients. New registration commits its first expiry lot
   // and quantity together; editing an existing product must use stock actions.
@@ -201,6 +207,7 @@ export type InventorySettings = z.infer<typeof inventorySettingsSchema>;
 export type InventoryCycle = z.infer<typeof inventoryCycleSchema>;
 export type InventoryContext = z.infer<typeof inventoryContextSchema>;
 export type InventoryProductDetail = Omit<z.infer<typeof inventoryProductDetailSchema>, "product"> & { product: InventoryProduct };
+export type InventoryProductSaveResult = InventoryProduct & { detail?: InventoryProductDetail | undefined };
 export type SaveInventoryProductInput = Omit<z.infer<typeof saveInventoryProductInputSchema>, "draft"> & {
   draft: InventoryProductDraft; includeManufacturerReference?: boolean | undefined; clearManufacturerReference?: boolean | undefined;
 };

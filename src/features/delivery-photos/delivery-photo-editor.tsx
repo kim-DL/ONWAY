@@ -10,7 +10,7 @@ import { searchCustomers } from "@/features/customers/customer-search";
 
 import { addDeliveryPhotoCustomer, moveDeliveryPhotoCustomer, removeDeliveryPhotoCustomer } from "./delivery-photo-domain";
 import { useDeliveryPhotoRecents } from "./use-delivery-photo-recents";
-import styles from "./delivery-photo.module.css";
+import styles from "./photo.module.css";
 
 export type DeliveryPhotoEditorMode = "route" | "day";
 
@@ -74,7 +74,7 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
       {error === "conflict" ? <div role="alert" className={styles.error}>다른 기기에서 목록이 바뀌었습니다. 최신 목록을 확인한 뒤 다시 편집해 주세요.<button type="button" onClick={onClose}>최신 목록 보기</button></div> : null}
       {error === "error" ? <p role="alert" className={styles.error}>저장하지 못했습니다. 다시 시도해 주세요.</p> : null}
     </div>
-    <BottomSheetActions busy={busy}><button type="button" onClick={onClose} disabled={busy}>취소</button><button type="button" onClick={() => void save()} disabled={!dirty || busy || error === "conflict"}>{busy ? "저장 중" : "저장"}</button></BottomSheetActions>
+    <BottomSheetActions className={styles.actions ?? ""} busy={busy}><button type="button" onClick={onClose} disabled={busy}>취소</button><button type="button" onClick={() => void save()} disabled={!dirty || busy || error === "conflict"}>{busy ? "저장 중" : "저장"}</button></BottomSheetActions>
   </BottomSheet>;
 }
 

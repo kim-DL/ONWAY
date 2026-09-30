@@ -14,7 +14,7 @@ import {
   getInventoryProductWithManufacturerInputSchema, inventoryCountWithManufacturerInputSchema,
   inventoryListPageWithManufacturerSchema, inventoryListWithManufacturerInputSchema, inventoryManufacturerListSchema,
   inventoryManufacturerSchema, inventoryMovementWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema,
-  inventoryProductDetailWithManufacturerSchema, inventoryProductWithManufacturerSchema,
+  inventoryProductDetailWithManufacturerSchema, inventoryProductSaveResultWithManufacturerSchema, inventoryProductWithManufacturerSchema,
   listInventoryManufacturersInputSchema, saveInventoryProductWithManufacturerInputSchema,
   setInventoryProductStatusWithManufacturerInputSchema, updateInventoryLotWithManufacturerInputSchema,
   updateInventoryManufacturerInputSchema,
@@ -68,7 +68,7 @@ export const getInventoryContext = onCall(options, handler(empty, inventoryConte
 })));
 export const listInventoryProducts = onCall(options, handler(inventoryListWithManufacturerInputSchema, inventoryListPageWithManufacturerSchema, "read", (input) => new InventoryService().list(input.afterId)));
 export const getInventoryProduct = onCall(options, handler(getInventoryProductWithManufacturerInputSchema, inventoryProductDetailWithManufacturerSchema, "read", (input, actor) => new InventoryService().detail(input.productId, actor)));
-export const saveInventoryProduct = onCall(options, handler(saveInventoryProductWithManufacturerInputSchema, inventoryProductWithManufacturerSchema, "write", (input, actor) => new InventoryService().save(input, actor)));
+export const saveInventoryProduct = onCall(options, handler(saveInventoryProductWithManufacturerInputSchema, inventoryProductSaveResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().save(input, actor)));
 export const recordInventoryMovement = onCall(options, handler(inventoryMovementWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().move(input, actor)));
 export const recordInventoryCount = onCall(options, handler(inventoryCountWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().count(input, actor)));
 export const updateInventoryLot = onCall(options, handler(updateInventoryLotWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().updateLot(input, actor)));

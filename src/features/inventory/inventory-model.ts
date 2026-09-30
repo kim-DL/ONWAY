@@ -52,6 +52,21 @@ export function inventoryScopeCountState(product: InventoryProduct, location: In
   const states = inventoryScope(product, location).locations.map((item) => inventoryCountState(product, item, cycleId));
   return states.every((state) => state === "done") ? "done" : states.includes("changed") ? "changed" : "pending";
 }
+/** Continue the visible count scope, including a product's remaining locations. */
+export function inventoryNextCountTarget(rows: readonly InventoryProduct[], saved: InventoryProduct, checkedLocation: InventoryLocation, scope: InventoryLocationFilter, context: InventoryContext): { productId: string; location: InventoryLocation } | null {
+  const pending = (product: InventoryProduct, exclude?: InventoryLocation) => product.status === "active" && inventoryCountEligible(product, context)
+    ? (scope === "all" ? inventoryLocationsFor(product) : [scope]).find((location) => location !== exclude && inventoryCountState(product, location, context.cycle.cycleId) !== "done") : undefined;
+  const remaining = pending(saved, checkedLocation);
+  if (remaining) return { productId: saved.productId, location: remaining };
+  const current = rows.findIndex((product) => product.productId === saved.productId);
+  for (let offset = 1; offset <= rows.length; offset++) {
+    const item = rows[(current + offset) % rows.length]!;
+    if (item.productId === saved.productId) continue;
+    const location = pending(item);
+    if (location) return { productId: item.productId, location };
+  }
+  return null;
+}
 export function inventoryScopeIsUrgent(product: InventoryProduct, location: InventoryLocationFilter, today: string, urgentDays: number): boolean {
   return inventoryScope(product, location).locations.some((item) => inventoryIsUrgent(product, item, today, urgentDays));
 }

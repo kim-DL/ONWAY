@@ -14,6 +14,18 @@ function product(productId = "product-1"): InventoryProduct {
 beforeEach(() => { mock.invoke.mockReset(); mock.services.auth.currentUser = { uid: "employee-1" }; });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("inventory callable boundary", () => {
+  it("validates opted-in committed registration detail with one Callable and rejects malformed lots", async () => {
+    const saved = product(); const detail = { product: saved, lots: [] };
+    const input = { requestId: "41bd2065-a415-4e30-8b97-3dca1f8a66cc", productId: null, expectedRevision: null, includeDetail: true,
+      draft: { name: saved.name, manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 10,
+        defaultLocationId: "refrigerated" as const, note: "", urgent: false } };
+    mock.invoke.mockResolvedValueOnce({ data: { ...saved, detail } });
+    await expect(inventoryRepository.save(input)).resolves.toEqual({ ...saved, detail });
+    expect(mock.invoke).toHaveBeenCalledOnce();
+    expect(mock.invoke.mock.calls[0]).toEqual(["saveInventoryProduct", { ...input, includeSummary: true }]);
+    mock.invoke.mockResolvedValueOnce({ data: { ...saved, detail: { product: saved, lots: [{ lotId: "invalid" }] } } });
+    await expect(inventoryRepository.save(input)).rejects.toThrow();
+  });
   it("notifies the active workspace on access denial and rejects an older successful response", async () => {
     const listener = vi.fn(); const unsubscribe = subscribeInventoryAccessFailure(listener);
     try {

@@ -49,6 +49,18 @@ beforeEach(() => {
 
 describe("inventory callable confirmation and privacy boundaries", () => {
   it.each([[false, false], [true, false], [false, true], [true, true]])(
+    "filters both committed registration product snapshots for opted-in clients (summary=%s, manufacturer=%s)",
+    async (includeSummary, includeManufacturerReference) => {
+      const expanded = { ...product, manufacturerId: "manufacturer-one", lotSummary: summarizeInventoryLotGroups([]) };
+      fixture.save.mockResolvedValueOnce({ ...expanded, detail: { product: expanded, lots: [] } });
+      const result = await saveInventoryProduct.run(request({ ...input, includeDetail: true, includeSummary, includeManufacturerReference }).value);
+      const expected = { ...product, ...(includeSummary ? { lotSummary: expanded.lotSummary } : {}),
+        ...(includeManufacturerReference ? { manufacturerId: expanded.manufacturerId } : {}) };
+      expect(result).toEqual({ ...expected, detail: { product: expected, lots: [] } });
+      expect(fixture.save.mock.calls[0]![0]).toMatchObject({ includeDetail: true });
+      expect(fixture.authorize.mock.calls.map((call) => call[1])).toEqual(["write", "write"]);
+    });
+  it.each([[false, false], [true, false], [false, true], [true, true]])(
     "adds product fields only for opted-in strict clients (summary=%s, manufacturer=%s)",
     async (includeSummary, includeManufacturerReference) => {
     const expanded = { ...product, manufacturerId: "manufacturer-one", lotSummary: summarizeInventoryLotGroups([]) };

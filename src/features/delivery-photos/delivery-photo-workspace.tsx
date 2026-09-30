@@ -19,7 +19,7 @@ import { useDeliveryPhotoData } from "./use-delivery-photo-data";
 import { useDeliveryPhotoCatalog } from "./use-delivery-photo-catalog";
 import { useDeliveryPhotoUploads } from "./use-delivery-photo-uploads";
 import type { DeliveryPhotoEditorMode } from "./delivery-photo-editor";
-import styles from "./delivery-photo.module.css";
+import styles from "./photo.module.css";
 
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { ssr: false });
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));

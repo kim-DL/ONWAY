@@ -10,7 +10,7 @@ import {
   inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryQuantitySchema, inventorySettingsSchema, inventoryStatusChangeSchema,
   type DeleteInventoryProductInput, type InventoryCountInput, type InventoryEvent, type InventoryLocation,
   type InventoryLot, type InventoryLotChange, type InventoryMovementInput, type InventoryMutationResult, type InventoryProduct, type InventoryStatusChange,
-  type InventorySettings, type SetInventoryProductStatusInput,
+  type InventoryProductSaveResult, type InventorySettings, type SetInventoryProductStatusInput,
   type UpdateInventoryLotInput, type UpdateInventorySettingsInput,
 } from "./inventory-contract.js";
 import {
@@ -164,7 +164,7 @@ export class InventoryService {
       return { product: { ...inventoryProductWire(product), lotSummary: summarizeInventoryLotGroups(lots) }, lots };
     });
   }
-  async save(input: SaveInventoryProductWithManufacturerInput, actor: InventoryActor): Promise<InventoryProduct> {
+  async save(input: SaveInventoryProductWithManufacturerInput, actor: InventoryActor): Promise<InventoryProductSaveResult> {
     return this.mutation("saveInventoryProduct", input, actor, "write", async (transaction, now) => {
       const productId = input.productId ?? input.requestId;
       const snapshot = await transaction.get(this.productRef(productId));
@@ -221,18 +221,18 @@ export class InventoryService {
         // The first receipt, photo claim, product and permanent retry receipt
         // share this transaction. One audit represents the combined creation;
         // writeStock must not also create the same request's second audit ID.
-        const result = this.writeStock(transaction, { requestId: input.requestId, productId, locationId, reason: "신규 상품 초기 입고" },
+        const result = this.writeStock(transaction, { requestId: input.requestId, productId, locationId, reason: "신규 상품 초기 입고", includeDetail: input.includeDetail },
           actor, now, updated, [lot], [lot], "receive",
           [{ lotId: lot.lotId, locationId, before: 0, after: lot.quantity, delta: lot.quantity }], null, undefined,
           { eventType: "INVENTORY_PRODUCT_CREATED", changedFields: [...changedFields, "quantity", "lots"] });
         photo.commit(productId);
-        return result.product;
+        return { ...result.product, ...(result.detail ? { detail: result.detail } : {}) };
       }
       transaction.set(this.productRef(productId), persisted({ ...updated, ...(current?.inspectionByLot ? { inspectionByLot: current.inspectionByLot } : {}) }));
       photo.commit(productId);
       this.audit(transaction, input, actor, now, current ? "INVENTORY_PRODUCT_UPDATED" : "INVENTORY_PRODUCT_CREATED", productId,
         changedFields);
-      return updated;
+      return { ...updated, ...(!current && input.includeDetail ? { detail: { product: updated, lots: [] } } : {}) };
     }, (transaction) => this.replayedProduct(transaction, input.productId ?? input.requestId));
   }
   private writeStock(transaction: Transaction, input: { requestId: string; productId: string; locationId: InventoryLocation; reason: string; includeDetail?: boolean | undefined },
