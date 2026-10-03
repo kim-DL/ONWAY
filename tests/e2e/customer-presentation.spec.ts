@@ -251,24 +251,38 @@ test("corrupt JPEG fails before preview, offers retry and recovers after another
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
-test("HEIC header with JPEG MIME is identified without replacing a valid selection; cancel keeps it", async ({ page }) => {
+test("HEIC header with JPEG MIME is decoded and converted before preview; cancel keeps it", async ({ page }) => {
   await fixture(page, 320, "picker");
   const album = page.getByLabel("거래처 전경사진 선택", { exact: true });
   await album.setInputFiles({ name: "valid.jpg", mimeType: "image/jpeg", buffer: smallJpeg });
   const preview = page.getByRole("img", { name: "선택한 거래처 전경사진 미리보기", exact: true });
   await expect(preview).toBeVisible();
   const previous = await preview.getAttribute("src");
-  // Only a synthetic HEIF container header is needed to exercise format detection.
+  // Model native HEIC decoding in Chromium while keeping byte identification
+  // and the real canvas conversion used by the customer and inventory flows.
+  await page.evaluate((jpeg) => {
+    const native = window.createImageBitmap.bind(window);
+    window.createImageBitmap = (async (source: ImageBitmapSource, options?: ImageBitmapOptions) => {
+      if (source instanceof Blob && source.type === "image/heic") {
+        return native(new Blob([Uint8Array.from(atob(jpeg), (char) => char.charCodeAt(0))], { type: "image/jpeg" }), options);
+      }
+      return native(source, options);
+    }) as typeof createImageBitmap;
+  }, smallJpeg.toString("base64"));
   const heifHeader = Buffer.alloc(32);
   heifHeader.writeUInt32BE(32);
   heifHeader.write("ftypmif1", 4, "ascii");
   heifHeader.write("heic", 16, "ascii");
   await album.setInputFiles({ name: "mislabelled.jpg", mimeType: "image/jpeg", buffer: heifHeader });
-  await expect(page.getByRole("alert")).toContainText("HEIC");
-  await expect(preview).toHaveAttribute("src", previous!);
+  await expect.poll(() => preview.getAttribute("src")).not.toBe(previous);
+  await expect.poll(() => preview.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "사진 저장 준비 확인", exact: true }).click();
+  await expect(page.getByLabel("검증용 사진 준비 결과", { exact: true })).toHaveText(/^image\/webp:\d+$/);
+  const converted = await preview.getAttribute("src");
   await expect(album).toHaveValue("");
   await album.setInputFiles([]);
-  await expect(preview).toHaveAttribute("src", previous!);
+  await expect(preview).toHaveAttribute("src", converted!);
   await expect(page.locator("main")).toHaveAttribute("data-photo-reading", "false");
 });
 

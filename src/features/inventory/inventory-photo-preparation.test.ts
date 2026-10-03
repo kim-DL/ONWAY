@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { prepareCustomerPhoto, readCustomerPhotoSource } from "../customers/customer-photo-preparation";
+import { PHOTO_UPLOAD_MAX_BYTES } from "../school-detail/photo-upload-optimizer";
 
 function heicFile(type = "image/heic", name = "camera.heic") {
   const bytes = new Uint8Array(20);
@@ -79,6 +80,43 @@ describe("inventory's shared photo preparation on iPhone and Android", () => {
     await expect(prepareCustomerPhoto(heicFile())).rejects.toMatchObject({ code: "photo/processing-failed" });
     expect(canvas.toBlob).not.toHaveBeenCalled();
     expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:unsupported-heic");
+  });
+
+  it("re-encodes an oversized Safari PNG as JPEG before accepting it for preview and upload", async () => {
+    const close = vi.fn();
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 2_560, height: 1_920, close }));
+    const { canvas } = installEncoder("image/png");
+    const jpeg = new Uint8Array([255, 216, 255, 224]);
+    canvas.toBlob.mockImplementationOnce((done) => done(new Blob([new Uint8Array(PHOTO_UPLOAD_MAX_BYTES + 1)], { type: "image/png" })))
+      .mockImplementationOnce((done) => done(new Blob([jpeg], { type: "image/jpeg" })));
+    const prepared = await prepareCustomerPhoto(heicFile());
+    expect(canvas.toBlob.mock.calls.map((call) => call.slice(1))).toEqual([["image/webp", 0.82], ["image/jpeg", 0.82]]);
+    expect(prepared.type).toBe("image/jpeg");
+    expect(prepared.name).toBe("camera-optimized.jpg");
+    expect(new Uint8Array(await prepared.arrayBuffer())).toEqual(jpeg);
+    expect(prepared.size).toBeLessThanOrEqual(PHOTO_UPLOAD_MAX_BYTES);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("accepts a PNG exactly at the existing transport boundary without another lossy encode", async () => {
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 2_560, height: 1_920, close: vi.fn() }));
+    const { canvas } = installEncoder("image/png");
+    canvas.toBlob.mockImplementationOnce((done) => done(new Blob([new Uint8Array(PHOTO_UPLOAD_MAX_BYTES)], { type: "image/png" })));
+    const prepared = await prepareCustomerPhoto(heicFile());
+    expect(prepared.type).toBe("image/png");
+    expect(prepared.size).toBe(PHOTO_UPLOAD_MAX_BYTES);
+    expect(canvas.toBlob).toHaveBeenCalledOnce();
+  });
+
+  it.each(["oversized", "wrong-format", "empty"])("rejects %s fallback output during preparation instead of after the user submits", async (failure) => {
+    const close = vi.fn();
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 2_560, height: 1_920, close }));
+    const { canvas } = installEncoder("image/png");
+    canvas.toBlob.mockImplementationOnce((done) => done(new Blob([new Uint8Array(PHOTO_UPLOAD_MAX_BYTES + 1)], { type: "image/png" })))
+      .mockImplementationOnce((done) => done(new Blob([new Uint8Array(failure === "empty" ? 0 : failure === "oversized" ? PHOTO_UPLOAD_MAX_BYTES + 1 : 4)], { type: failure === "wrong-format" ? "image/png" : "image/jpeg" })));
+    await expect(prepareCustomerPhoto(heicFile())).rejects.toMatchObject({ code: "photo/processing-failed" });
+    expect(canvas.toBlob).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("keeps Android's small JPEG capture without an extra encode", async () => {

@@ -1,4 +1,5 @@
 export const PHOTO_SOURCE_MAX_BYTES = 30 * 1024 * 1024;
+export const PHOTO_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const PHOTO_UPLOAD_TARGET_EDGE = 2_560;
 export const PHOTO_UPLOAD_OPTIMIZE_THRESHOLD_BYTES = 1_500_000;
 
@@ -134,18 +135,23 @@ export async function optimizeSchoolPhoto(file: File): Promise<OptimizedSchoolPh
     context.fillRect(0, 0, target.width, target.height);
     context.drawImage(decoded.source, 0, 0, target.width, target.height);
 
-    const blob = await canvasToBlob(canvas, "image/webp", 0.82);
-    const supportedType = ["image/jpeg", "image/png", "image/webp"].includes(blob.type)
-      ? blob.type
-      : "image/png";
-    const optimizedFile = new File([blob], optimizedFileName(file.name, supportedType), {
-      type: supportedType,
+    let blob = await canvasToBlob(canvas, "image/webp", 0.82);
+    // Safari may return lossless PNG for a WebP request. A detailed HEIC
+    // capture can exceed the transport limit even after resizing to 2560px.
+    if (blob.type === "image/png" && blob.size > PHOTO_UPLOAD_MAX_BYTES) {
+      blob = await canvasToBlob(canvas, "image/jpeg", 0.82);
+      if (blob.type !== "image/jpeg") throw new Error("사진을 모바일 전송 크기로 줄이지 못했습니다.");
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(blob.type)) throw new Error("사진을 모바일 전송 크기로 줄이지 못했습니다.");
+    const optimizedFile = new File([blob], optimizedFileName(file.name, blob.type), {
+      type: blob.type,
       lastModified: file.lastModified,
     });
     const mayKeepOriginal = ["image/jpeg", "image/png", "image/webp"].includes(file.type)
-      && file.size <= 10 * 1024 * 1024
+      && file.size <= PHOTO_UPLOAD_MAX_BYTES
       && Math.max(decoded.width, decoded.height) <= PHOTO_UPLOAD_TARGET_EDGE;
     const selectedFile = mayKeepOriginal && optimizedFile.size >= file.size ? file : optimizedFile;
+    if (selectedFile.size <= 0 || selectedFile.size > PHOTO_UPLOAD_MAX_BYTES) throw new Error("사진을 모바일 전송 크기로 줄이지 못했습니다.");
     return {
       file: selectedFile,
       originalBytes: file.size,

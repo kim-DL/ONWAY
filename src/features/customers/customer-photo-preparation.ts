@@ -114,7 +114,6 @@ export function photoPreparationErrorMessage(error: unknown): string | null {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   if (code === "photo/source-unreadable") return "앨범에서 원본 사진을 읽지 못했어요. ‘파일에서 선택’으로 다시 열어주세요. 클라우드 사진이면 먼저 기기에 다운로드해주세요.";
   if (code === "photo/source-timeout") return "사진을 가져오는 데 시간이 오래 걸리고 있어요. ‘파일에서 선택’으로 다시 열어주세요.";
-  if (code === "photo/heic-source") return "고효율 HEIC 사진이에요. JPEG로 변환한 사진을 선택해주세요.";
   if (code === "photo/invalid-source") return "사진 파일의 내용을 확인하지 못했어요. 원본을 다시 선택해주세요.";
   if (code === "photo/processing-failed") return "사진을 준비하지 못했어요. 다시 준비를 누르거나 원본 사진을 다시 선택해주세요.";
   if (code === "photo/invalid-selection") return "지원되는 형식의 30MB 이하 사진을 선택해주세요.";

@@ -582,13 +582,13 @@ test("admin manages manufacturers through the real callable without changing the
   });
 });
 
-for (const safariPngFallback of [false, true]) {
-test(`HEIC product capture converts before authenticated upload (${safariPngFallback ? "Safari PNG" : "WebP"})`, async ({ page }) => {
+for (const output of ["WebP", "Safari PNG", "oversized Safari PNG"] as const) {
+test(`HEIC product capture converts before authenticated upload (${output})`, async ({ page }) => {
   const token = await login(page, PHASE3_TEST_PINS.delivery);
-  const name = `HEIC 변환 검증 ${safariPngFallback ? "PNG" : "WebP"}`;
+  const name = `HEIC 변환 검증 ${output}`;
   // Chromium has no native HEIC decoder. Model only that browser capability;
   // keep the real preparation, canvas encoder, auth, callables and storage.
-  await page.evaluate(({ jpeg, pngFallback }) => {
+  await page.evaluate(({ jpeg, output }) => {
     const nativeDecode = window.createImageBitmap.bind(window);
     window.createImageBitmap = (async (source: ImageBitmapSource, options?: ImageBitmapOptions) => {
       if (source instanceof Blob && source.type === "image/heic") {
@@ -597,13 +597,14 @@ test(`HEIC product capture converts before authenticated upload (${safariPngFall
       }
       return nativeDecode(source, options);
     }) as typeof createImageBitmap;
-    if (pngFallback) {
+    if (output !== "WebP") {
       const nativeEncode = HTMLCanvasElement.prototype.toBlob;
       HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
-        return nativeEncode.call(this, callback, type === "image/webp" ? "image/png" : type, quality);
+        return nativeEncode.call(this, (blob) => callback(blob && type === "image/webp" && output === "oversized Safari PNG"
+          ? new Blob([blob, new Uint8Array(10 * 1024 * 1024)], { type: "image/png" }) : blob), type === "image/webp" ? "image/png" : type, quality);
       };
     }
-  }, { jpeg: firstPhoto.toString("base64"), pngFallback: safariPngFallback });
+  }, { jpeg: firstPhoto.toString("base64"), output });
   const uploads: Array<{ contentType: string; fileBase64: string }> = [];
   page.on("request", (request) => {
     if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/uploadInventoryPhoto")) uploads.push(request.postDataJSON().data);
@@ -618,13 +619,15 @@ test(`HEIC product capture converts before authenticated upload (${safariPngFall
   await editor.getByLabel("제품 사진 직접 촬영").setInputFiles({ name: "camera.heic", mimeType: "image/heic", buffer: bytes });
   const preview = editor.getByRole("img", { name: "저장할 제품 사진 미리보기" });
   await expect(preview).toBeVisible();
-  expect(await preview.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect.poll(() => preview.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   expect(uploads).toHaveLength(0);
   await submitMutation(page, editor, "품목 등록", "saveInventoryProduct");
   expect(uploads).toHaveLength(1);
-  expect(uploads[0]!.contentType).toBe(safariPngFallback ? "image/png" : "image/webp");
+  const contentType = output === "WebP" ? "image/webp" : output === "Safari PNG" ? "image/png" : "image/jpeg";
+  expect(uploads[0]!.contentType).toBe(contentType);
   const uploaded = Buffer.from(uploads[0]!.fileBase64, "base64");
-  expect((await sharp(uploaded).metadata()).format).toBe(safariPngFallback ? "png" : "webp");
+  expect((await sharp(uploaded).metadata()).format).toBe(contentType.slice(6) === "jpeg" ? "jpeg" : contentType.slice(6));
+  expect(uploaded.length).toBeLessThanOrEqual(10 * 1024 * 1024);
   const saved = await db().collection(INVENTORY_PRODUCT_PATH).where("name", "==", name).get();
   expect(saved.size).toBe(1);
   const stored = saved.docs[0]!.data() as InventoryProduct;
