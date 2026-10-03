@@ -89,7 +89,7 @@
     "@serwist/window": "^9.5.12",
     "firebase": "^12.18.0",
     "idb": "^8.0.3",
-    "next": "16.3.3",
+    "next": "16.3.8",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
@@ -97,6 +97,16 @@
   "overrides": {
     "@serwist/next": {
       "browserslist": "4.28.9"
+    },
+    "braces": "file:vendor/braces",
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.13.6"
+    },
+    "get-uri": {
+      "basic-ftp": "6.2.1"
+    },
+    "google-gax": {
+      "@grpc/grpc-js": "1.14.5"
     }
   },
   "devDependencies": {
@@ -107,6 +117,7 @@
     "@types/node": "^22.20.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "braces": "file:vendor/braces",
     "esbuild": "0.28.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.2",

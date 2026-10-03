@@ -1,9 +1,17 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-09-30
+기준일: 2026-10-03
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-03 PR #2 lockfile 및 braces 의존성 복구
+
+- 작업 전 원본 `main`의 clean 상태와 최신 원격 기준 `131e574`를 확인하고 fetch했다. 별도 clean managed worktree에서 PR 브랜치 `codex/phase7-school-editor-sync`의 `1d8644b`를 추적해 수정했다.
+- GitHub Actions `verify`는 `npm ci`에서 실패했다. PR의 `package-lock.json`에는 JSON 대신 잘린 도구 출력이 들어 있었다. 정상 `origin/main` lockfile을 기준으로 기존 버전을 유지하고, 독립 임시 디렉터리에서 npm 10.9.8로 PR의 Next.js·보안 패치·로컬 braces 의존성을 반영한 lockfile v3를 재생성했다.
+- `braces`를 root devDependency로 명시했다. 보안 테스트는 자신의 require와 실제 `micromatch` 소비 경로 모두 `vendor/braces/index.js`로 해석되는지 검증하며, 기존 정상 확장과 깊이 100/101 경계를 유지한다. 로컬 패키지에 복사되어 있던 upstream 개발용 mocha·gulp 등의 의존성과 실행 스크립트를 제거했다.
+- 공유된 간접 의존성에도 패치가 적용되도록 override를 직접 부모 기준으로 지정했다: `@firebase/firestore`→gRPC 1.13.6, `google-gax`→gRPC 1.14.5, `get-uri`→basic-ftp 6.2.1. 기존 Firebase·Firebase CLI 등의 버전은 보존했다.
+- Node 22.23.2 / npm 10.9.8의 `npm ci --engine-strict=true`, lint, app/Functions typecheck, 전체 unit 1,693 PASS/15 conditional SKIP, braces 집중 테스트 3/3 PASS. root/micromatch require의 실제 파일 경로가 동일한 패치 소스임을 확인했다. audit는 High/Critical 0, Moderate 8이며 기존 high gate 기준을 유지한다. 전체 원격 CI의 최종 판정은 PR #2 최신 HEAD의 `Quality Gate / verify` 결과를 따른다. 운영 배포와 운영 데이터 변경은 이번 작업에 포함하지 않는다.
 
 ### 2026-09-30 현장 체감 속도 개선 1차 — production Functions·Hosting 배포 완료, 이번 변경의 실기기 확인 대기
 
