@@ -1,9 +1,19 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-03
+기준일: 2026-10-04
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-04 상품사진 iPhone HEIC 전처리 — 구현 완료, 원격 CI 및 Hosting 승격 대기
+
+- 최신 `origin/main` `b2e435f`에서 별도 `codex/iphone-inventory-photo` worktree/branch를 만들었다. 기존 clean PR #2 checkout의 브랜치와 파일은 보존했다.
+- 재고 `InventoryPhotoPicker`가 사용하는 공통 `customer-photo-preparation`은 HEIC MIME/빈 MIME의 HEIC 파일명과 실제 HEIC/HEIF `ftyp` 헤더를 모두 사전 거부했다. 실패는 preview 및 `uploadInventoryPhoto` 이전이다. 상품등록의 실제 iPhone 실패 화면은 전달되지 않았으므로 코드상 차단과 실기기 관찰을 구분한다.
+- HEIC/HEIF를 파일명 대신 실제 바이트로 식별해 독립된 File로 복사한 뒤 기존 브라우저 decoder/optimizer로 넘긴다. Safari 17의 native HEIC 지원은 [WebKit 공식 문서](https://webkit.org/blog/14445/webkit-features-in-safari-17-0/)에 근거한다. 작은 HEIC도 반드시 변환하며 Safari가 WebP 요청에 PNG를 반환하면 기존 optimizer가 실제 PNG 형식으로 전송한다. 서버는 기존 JPEG/PNG/WebP 계약과 final WebP를 유지한다. native decoder가 지원하지 않는 기기는 준비 오류로 끝나고 HEIC를 서버로 보내지 않는다.
+- 재고의 직접 촬영 전용 UI, Android JPEG의 불필요한 재인코딩 생략, provider bytes 복사 전 input 유지, 30MB 원본/10MB 전송 제한, request ID, revision, 인증/App Check, Rules와 감사 계약을 유지한다. 공통 전처리를 쓰는 거래처 사진도 영향을 받으므로 관련 테스트를 함께 검증한다. 납품사진 전용 전처리는 변경하지 않았다.
+- 로컬 Node 22 clean `npm ci --engine-strict=true`, lint, app/Functions typecheck, 전체 unit 1,701 PASS/15 conditional SKIP 및 사진 집중 73 PASS. audit High/Critical 0, Moderate 8. 기존 성능 검사 본문은 Node `--import tsx`로 실행해 5,000건 검색 p95 1.20ms/50ms PASS(기본 tsx CLI는 이 환경의 Unix socket 제한으로 시작하지 못했다).
+- 새 browser 회귀는 HEIC decoder만 Chromium에서 모델링하고 실제 canvas encoder, PIN 인증, Callable, Storage/Firestore Emulator를 사용해 HEIC→WebP 및 Safari식 PNG 반환을 검증한다. 기존 JPEG 등록·입출고·교체·제거 여정도 함께 선택한다. CI에 `Inventory photo regression` 단계를 추가했고 guarded inventory launcher의 기본 전체 실행은 유지했다. 로컬 인증 E2E는 Functions Emulator의 Unix socket `EPERM` 때문에 실행 환경에서 차단되어 원격 CI 결과를 최종 판정으로 사용한다. 실제 iPhone의 카메라·설치 PWA 검증은 별도 사람 확인이 필요하다.
+- 이번 작업의 Git 반영과 Hosting 배포는 사용자가 승인했다. 최신 운영 앱의 공개 client 설정을 재사용해 배포 후보를 준비하며, 키는 출력/커밋하지 않는다. Firebase 배포 인증은 현재 클라우드에 없고 연결된 Desktop Commander PC는 offline이다. 운영 업무 데이터와 Functions/Rules/Auth는 변경하지 않는다. 배포 완료를 기록하기 전에는 이 수정이 production에 반영됐다고 주장하지 않는다.
 
 ### 2026-10-03 PR #2 main 반영 및 production Hosting 배포 완료
 

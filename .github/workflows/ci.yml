@@ -79,3 +79,9 @@ jobs:
 
       - name: Phase 17 emulator and production journey
         run: npm run test:acceptance:emulator
+
+      - name: Inventory photo regression
+        run: npm run test:e2e:inventory
+        env:
+          INVENTORY_E2E_STATIC: "true"
+          INVENTORY_E2E_GREP: "HEIC product capture|PIN user registers a photographed product"

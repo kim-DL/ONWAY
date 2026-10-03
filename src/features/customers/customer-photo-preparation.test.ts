@@ -141,10 +141,20 @@ describe("one safe customer photo preparation", () => {
     await expect(readCustomerPhotoSource(new File(["pdf"], "document.pdf", { type: "application/pdf" }))).rejects.toMatchObject({ code: "photo/invalid-selection" });
     expect(optimize).not.toHaveBeenCalled();
   });
-  it.each(["image/jpeg", "application/octet-stream", ""])("identifies real HEIC bytes hidden behind %s MIME before creating a broken preview", async (type) => {
+  it.each(["image/heic", "image/heif", "image/jpeg", "application/octet-stream", ""])("copies HEIC bytes declared as %s for native decoding before preview", async (type) => {
     const bytes = ftyp("mif1", ["heic"]);
-    await expect(readCustomerPhotoSource(new File([bytes], "album.jpg", { type }))).rejects.toMatchObject({ code: "photo/heic-source" });
+    const source = await readCustomerPhotoSource(new File([bytes], "album.heic", { type }));
+    expect(source.type).toBe("image/heic");
+    expect(new Uint8Array(await source.arrayBuffer())).toEqual(bytes);
     expect(optimize).not.toHaveBeenCalled();
+  });
+  it.each(["heic", "heif"])("converts a small %s source before it can become a preview or upload file", async (extension) => {
+    const bytes = ftyp(extension === "heic" ? "heic" : "mif1");
+    const converted = new File([jpegBytes], "prepared.jpg", { type: "image/jpeg" });
+    optimize.mockResolvedValue({ file: converted });
+    const input = new File([bytes], `camera.${extension}`, { type: `image/${extension}` });
+    expect(await prepareCustomerPhoto(input)).toBe(converted);
+    expect(optimize.mock.calls[0]![0].type).toBe(`image/${extension}`);
   });
   it("normalizes native AVIF input through the decoder instead of sending AVIF to the server", async () => {
     const bytes = ftyp("avif", ["mif1"]);
@@ -162,7 +172,8 @@ describe("one safe customer photo preparation", () => {
     const bytes = ftyp("mif1", ["heic"]);
     bytes.set(new TextEncoder().encode("avif"), 12);
     const payload = new Uint8Array([...bytes, ...new TextEncoder().encode("avif")]);
-    await expect(readCustomerPhotoSource(new File([payload], "album.jpg", { type: "image/jpeg" }))).rejects.toMatchObject({ code: "photo/heic-source" });
+    const source = await readCustomerPhotoSource(new File([payload], "album.jpg", { type: "image/jpeg" }));
+    expect(source.type).toBe("image/heic");
   });
   it.each([8, 19, 4_294_967_295])("rejects an invalid ftyp box size %s without reading outside the file", async (size) => {
     const bytes = ftyp("avif", ["mif1"]);

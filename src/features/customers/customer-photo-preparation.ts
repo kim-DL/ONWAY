@@ -6,8 +6,7 @@ const materializedSources = new WeakSet<File>();
 
 export function validateCustomerPhotoFile(file: File): string | null {
   if (file.size <= 0 || file.size > CUSTOMER_PHOTO_SOURCE_MAX_BYTES) return "원본 사진은 30MB 이하여야 해요.";
-  if (/^image\/hei[cf]/iu.test(file.type) || (!file.type && /\.hei[cf]$/iu.test(file.name ?? ""))) return "HEIC 사진은 JPEG로 변환하거나 직접 촬영해 등록해주세요.";
-  if (!["image/jpeg", "image/png", "image/webp", "image/avif", "", "application/octet-stream", "image/jpg"].includes(file.type)) return "JPEG, PNG, WebP, AVIF 사진을 선택해주세요.";
+  if (!["image/jpeg", "image/png", "image/webp", "image/avif", "image/heic", "image/heif", "", "application/octet-stream", "image/jpg"].includes(file.type)) return "JPEG, PNG, WebP, AVIF, HEIC 사진을 선택해주세요.";
   return null;
 }
 
@@ -57,15 +56,18 @@ function sourceType(header: Uint8Array): string | null {
   if (header.length >= 16 && text(4, 8) === "ftyp") {
     const boxSize = new DataView(header.buffer, header.byteOffset, header.byteLength).getUint32(0);
     if (boxSize < 16 || boxSize > header.length || boxSize % 4 !== 0) return null;
-    let heif = false;
+    let heif: string | null = null;
     // AVIF may use mif1 as its major brand and avif as a compatible brand.
     // Inspect only four-byte brands inside ftyp; skip the minor-version field.
     for (let offset = 8; offset < boxSize; offset += offset === 8 ? 8 : 4) {
       const brand = text(offset, offset + 4);
       if (brand === "avif" || brand === "avis") return "image/avif";
-      if (["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)) heif = true;
+      if (["heic", "heix", "hevc", "hevx"].includes(brand)) heif = "image/heic";
+      else if (!heif && (brand === "mif1" || brand === "msf1")) heif = "image/heif";
     }
-    if (heif) throw photoError("photo/heic-source");
+    // Safari can decode HEIC/HEIF. The optimizer must convert these sources
+    // before preview or upload; the server's accepted formats stay unchanged.
+    if (heif) return heif;
   }
   return null;
 }
