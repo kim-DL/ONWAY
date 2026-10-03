@@ -84,12 +84,16 @@ describe("private customer photo repository", () => {
     expect(fixture.optimize.mock.calls[0]![0]).toMatchObject({ type: "image/jpeg", name: "mobile.jpg" });
     expect(fixture.call).toHaveBeenCalledWith("uploadCustomerPhoto", { uploadId: photoId, contentType: "image/jpeg", fileBase64: "/9j/" });
   });
-  it("rejects a renamed non-image before decoding or sending and identifies unsupported HEIC", async () => {
+  it("rejects a renamed non-image before decoding or sending regardless of a HEIC filename", async () => {
     const file = new File(["<svg onload='unsafe'/>"], "fake.jpg", { type: "image/jpeg" });
     await expect(customerPhotoRepository.upload(file, photoId)).rejects.toMatchObject({ code: "photo/invalid-source" });
     expect(fixture.optimize).not.toHaveBeenCalled();
     expect(fixture.call).not.toHaveBeenCalled();
-    expect(validateCustomerPhotoFile(new File(["heic"], "camera.heic", { type: "" }))).toContain("HEIC");
+    const fakeHeic = new File(["heic"], "camera.heic", { type: "" });
+    expect(validateCustomerPhotoFile(fakeHeic)).toBeNull();
+    await expect(customerPhotoRepository.upload(fakeHeic, photoId)).rejects.toMatchObject({ code: "photo/invalid-source" });
+    expect(fixture.optimize).not.toHaveBeenCalled();
+    expect(fixture.call).not.toHaveBeenCalled();
     // An OS can convert camera bytes to JPEG while retaining the source name.
     expect(validateCustomerPhotoFile(new File([new Uint8Array([255, 216, 255])], "camera.heic", { type: "image/jpeg" }))).toBeNull();
   });

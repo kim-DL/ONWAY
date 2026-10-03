@@ -65,7 +65,8 @@ try {
   } else {
   const cli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
   exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn(process.execPath, [cli, "test", "tests/e2e-auth/inventory-flow.spec.ts", "--config", "playwright.phase3.config.ts", "--output", "output/playwright/inventory-results", "--reporter", "list", ...(process.env.INVENTORY_E2E_DEBUG_OFFLINE === "true" ? ["--grep", "offline registration draft"] : [])], { cwd: process.cwd(), env: process.env, stdio: "inherit", windowsHide: true });
+    const grep = process.env.INVENTORY_E2E_GREP || (process.env.INVENTORY_E2E_DEBUG_OFFLINE === "true" ? "offline registration draft" : "");
+    const child = spawn(process.execPath, [cli, "test", "tests/e2e-auth/inventory-flow.spec.ts", "--config", "playwright.phase3.config.ts", "--output", "output/playwright/inventory-results", "--reporter", "list", ...(grep ? ["--grep", grep] : [])], { cwd: process.cwd(), env: process.env, stdio: "inherit", windowsHide: true });
     child.once("error", reject); child.once("exit", (code) => resolve(code ?? 1));
   });
   // Use this already-guarded, owned emulator lifetime for transaction/rules

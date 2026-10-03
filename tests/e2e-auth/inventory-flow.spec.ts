@@ -195,6 +195,11 @@ async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, 
   await info.attach(name, { body: JSON.stringify({ viewport: page.viewportSize(), before, after, last, more: moreBox }, null, 2), contentType: "application/json" });
 }
 async function verifyDetailActions(detail: Locator) {
+  // The sheet-rise transform changes viewport coordinates for 260ms. Measure
+  // the fixed actions only after it settles, keeping the same layout tolerance.
+  await expect.poll(() => detail.locator(".bottom-sheet").evaluate((sheet) =>
+    sheet.getAnimations().filter((animation) => animation.playState === "running" || animation.pending).length,
+  )).toBe(0);
   const actions = await Promise.all(["출고", "입고", "조정", "품목 정보 수정"].map(async (name) => {
     const button = detail.getByRole("button", { name, exact: true });
     await expect(button).toBeVisible();
@@ -581,6 +586,63 @@ test("admin manages manufacturers through the real callable without changing the
     eventType: "INVENTORY_MANUFACTURER_UPDATED", targetId: created.manufacturerId, changedFields: ["active"],
   });
 });
+
+for (const output of ["WebP", "Safari PNG", "oversized Safari PNG"] as const) {
+test(`HEIC product capture converts before authenticated upload (${output})`, async ({ page }) => {
+  const token = await login(page, PHASE3_TEST_PINS.delivery);
+  const name = `HEIC 변환 검증 ${output}`;
+  // Chromium has no native HEIC decoder. Model only that browser capability;
+  // keep the real preparation, canvas encoder, auth, callables and storage.
+  await page.evaluate(({ jpeg, output }) => {
+    const nativeDecode = window.createImageBitmap.bind(window);
+    window.createImageBitmap = (async (source: ImageBitmapSource, options?: ImageBitmapOptions) => {
+      if (source instanceof Blob && source.type === "image/heic") {
+        const bytes = Uint8Array.from(atob(jpeg), (char) => char.charCodeAt(0));
+        return nativeDecode(new Blob([bytes], { type: "image/jpeg" }), options);
+      }
+      return nativeDecode(source, options);
+    }) as typeof createImageBitmap;
+    if (output !== "WebP") {
+      const nativeEncode = HTMLCanvasElement.prototype.toBlob;
+      HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+        return nativeEncode.call(this, (blob) => callback(blob && type === "image/webp" && output === "oversized Safari PNG"
+          ? new Blob([blob, new Uint8Array(10 * 1024 * 1024)], { type: "image/png" }) : blob), type === "image/webp" ? "image/png" : type, quality);
+      };
+    }
+  }, { jpeg: firstPhoto.toString("base64"), output });
+  const uploads: Array<{ contentType: string; fileBase64: string }> = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/uploadInventoryPhoto")) uploads.push(request.postDataJSON().data);
+  });
+  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
+  await editor.getByLabel(/품목명/).fill(name);
+  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (낱개)", exact: true }).fill("1");
+  await editor.getByLabel("첫 유통기한 날짜", { exact: true }).fill(expiryAfter(30));
+  const bytes = Buffer.alloc(20);
+  bytes.writeUInt32BE(bytes.length, 0); bytes.write("ftypmif1", 4); bytes.write("heic", 16);
+  await editor.getByLabel("제품 사진 직접 촬영").setInputFiles({ name: "camera.heic", mimeType: "image/heic", buffer: bytes });
+  const preview = editor.getByRole("img", { name: "저장할 제품 사진 미리보기" });
+  await expect(preview).toBeVisible();
+  await expect.poll(() => preview.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  expect(uploads).toHaveLength(0);
+  await submitMutation(page, editor, "품목 등록", "saveInventoryProduct");
+  expect(uploads).toHaveLength(1);
+  const contentType = output === "WebP" ? "image/webp" : output === "Safari PNG" ? "image/png" : "image/jpeg";
+  expect(uploads[0]!.contentType).toBe(contentType);
+  const uploaded = Buffer.from(uploads[0]!.fileBase64, "base64");
+  expect((await sharp(uploaded).metadata()).format).toBe(contentType.slice(6) === "jpeg" ? "jpeg" : contentType.slice(6));
+  expect(uploaded.length).toBeLessThanOrEqual(10 * 1024 * 1024);
+  const saved = await db().collection(INVENTORY_PRODUCT_PATH).where("name", "==", name).get();
+  expect(saved.size).toBe(1);
+  const stored = saved.docs[0]!.data() as InventoryProduct;
+  expect(stored.photo?.photoId).toBeTruthy();
+  const photo = await call("getInventoryPhoto", token, { productId: stored.productId, photoId: stored.photo!.photoId, variant: "preview" });
+  expect(photo.status).toBe(200);
+  expect(photo.body.result).toMatchObject({ contentType: "image/webp" });
+  await expect(page.getByRole("dialog", { name, exact: true }).getByRole("img", { name: `${name} 제품 사진` })).toBeVisible({ timeout: 30_000 });
+});
+}
 
 test.describe("registered product and access controls", () => {
 test.describe.configure({ mode: "serial" });
