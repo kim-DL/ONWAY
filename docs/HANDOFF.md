@@ -5,7 +5,7 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-04 상품사진 iPhone HEIC 전처리 — 구현 완료, 원격 CI 및 Hosting 승격 대기
+### 2026-10-04 상품사진 iPhone HEIC 전처리 — 구현·main 병합 완료, Hosting 인증 대기
 
 - 최신 `origin/main` `b2e435f`에서 별도 `codex/iphone-inventory-photo` worktree/branch를 만들었다. 기존 clean PR #2 checkout의 브랜치와 파일은 보존했다.
 - 재고 `InventoryPhotoPicker`가 사용하는 공통 `customer-photo-preparation`은 HEIC MIME/빈 MIME의 HEIC 파일명과 실제 HEIC/HEIF `ftyp` 헤더를 모두 사전 거부했다. 실패는 preview 및 `uploadInventoryPhoto` 이전이다. 상품등록의 실제 iPhone 실패 화면은 전달되지 않았으므로 코드상 차단과 실기기 관찰을 구분한다.
@@ -16,6 +16,9 @@
 - 이번 작업의 Git 반영과 Hosting 배포는 사용자가 승인했다. 최신 운영 앱의 공개 client 설정을 재사용해 배포 후보를 준비하며, 키는 출력/커밋하지 않는다. Firebase 배포 인증은 현재 클라우드에 없고 연결된 Desktop Commander PC는 offline이다. 운영 업무 데이터와 Functions/Rules/Auth는 변경하지 않는다. 배포 완료를 기록하기 전에는 이 수정이 production에 반영됐다고 주장하지 않는다.
 - PR #3 `f562102` Quality Gate `37142014254`의 첫 시도는 `verify` → `Phase 17 emulator and production journey` → `delivery-photo-field.spec.ts:848`의 새로고침 후 완료 수 assertion(5초)에서 실패했다. 동일 테스트의 독립 실행 및 기존 납품사진 전체 11개는 로컬에서 PASS했고 서버도 저장된 당일 override/완료 1곳을 반환했다. 확정 원인을 얻지 못해 납품사진 운영 코드를 추측 수정하지 않았으며 동일 HEAD를 원격 재실행했다. 로컬 Functions Emulator는 설치된 도구의 내부 통신만 loopback TCP로 바꿔 실행했고, 이 환경 보정은 저장소/배포 코드에 포함하지 않는다.
 - 로컬 신규 재고 회귀에서 HEIC 3개 경로와 실제 Emulator 통합 12개는 PASS했다. 기존 JPEG 전체 여정은 BottomSheet의 260ms `sheet-rise` 도중 좌표를 재서 고정 action의 y가 0.31px 달라지는 실패를 재현했다. `verifyDetailActions`가 실제 sheet 애니메이션 종료를 기본 timeout 안에 확인한 뒤 측정하게 수정했다. 기존 좌표 오차 0.05px, 터치 크기, assertion 및 timeout은 유지한다. 최종 최신 HEAD의 전체 CI 통과 전에 병합하지 않는다.
+- 최종 `5c2ab76f7f6b3ebe2745fe67deb41ac468b7dd8f`의 [Quality Gate #43](https://github.com/kim-DL/ONWAY/actions/runs/37144343949)는 설치·audit·lint·typecheck·unit·Functions/production build·PWA·JS/CSS budget·기존 browser·Deferred sales tools·Phase 17·Inventory photo regression까지 모두 PASS했다. HEIC 3개, 기존 JPEG 전체 여정 1개 및 재고 Emulator 통합 12개는 로컬에서도 PASS했다. 이전 HEAD의 원격 재실행은 Phase 17을 통과한 뒤 동일 좌표 문제(0.27px)에서 실패했으며 최종 HEAD의 애니메이션 측정 동기화로 해결됐다. 납품사진 운영 코드는 변경하지 않았다.
+- 해결된 리뷰 스레드 2개, 최신 Vercel Preview 성공 및 mergeability `clean`을 확인하고 [PR #3](https://github.com/kim-DL/ONWAY/pull/3)을 main `9505bf752aa73d7620b8d0af9931a3880bce34dd`에 병합했다. 이 merge의 Git tree는 검증된 PR HEAD와 동일하다. 이 인수인계 기록을 포함한 최신 main의 [Quality Gate](https://github.com/kim-DL/ONWAY/actions/workflows/ci.yml?query=branch%3Amain)를 종료까지 확인한다.
+- production 후보의 변경 없는 build/PWA/성능/Hosting gate는 PASS했고 export/shipped 100개, 거래처 JS gzip 36,830B, 재고 JS gzip 25,537B다. Hosting 배포 명령은 Firebase CLI 인증 오류로 운영 반영 전에 중단됐다. 두 공개 origin의 worker는 기존 배포 SHA-256 `6811509ea8d9211989f6337626275a3be556b0dfb9b8d654b790d81a76bfd6b9`와 일치한다. 기존 Firebase 로그인 PC의 Desktop Commander 연결은 여전히 offline이며, 이 작업에 대한 Hosting 배포 승인은 유지된다. 인증 연결 후 최신 main의 production 후보를 검증하고 `--project onnuriway --only hosting:onnuriway`로 배포한 뒤 두 origin을 검증해야 한다. 실제 iPhone 촬영·설치 PWA는 아직 사람 확인하지 않았다.
 
 ### 2026-10-03 PR #2 main 반영 및 production Hosting 배포 완료
 
