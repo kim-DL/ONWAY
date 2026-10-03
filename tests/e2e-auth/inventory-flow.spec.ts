@@ -195,6 +195,11 @@ async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, 
   await info.attach(name, { body: JSON.stringify({ viewport: page.viewportSize(), before, after, last, more: moreBox }, null, 2), contentType: "application/json" });
 }
 async function verifyDetailActions(detail: Locator) {
+  // The sheet-rise transform changes viewport coordinates for 260ms. Measure
+  // the fixed actions only after it settles, keeping the same layout tolerance.
+  await expect.poll(() => detail.locator(".bottom-sheet").evaluate((sheet) =>
+    sheet.getAnimations().filter((animation) => animation.playState === "running" || animation.pending).length,
+  )).toBe(0);
   const actions = await Promise.all(["출고", "입고", "조정", "품목 정보 수정"].map(async (name) => {
     const button = detail.getByRole("button", { name, exact: true });
     await expect(button).toBeVisible();
