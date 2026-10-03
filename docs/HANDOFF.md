@@ -5,6 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-03 PR #2 main 반영 및 production Hosting 배포 완료
+
+- PR #2의 최종 source `321431b`는 GitHub Actions `Quality Gate / verify` 전체를 통과했다(`37123859583`). PR을 `main`에 병합한 `4487dbfbacb1f4e1270e516e82d37b5a6560715d`는 검증된 PR HEAD와 파일 내용이 동일하며, 이 source로 운영 빌드했다.
+- `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`, `NEXT_PUBLIC_ENABLE_INVENTORY=true`와 기존 비공개 운영 설정을 사용한 Next.js 16.3.8 build, PWA·성능·Hosting artifact gate PASS. Export/shipped 102개, precache 89개, initial assets 9개다. 기존 용량 기준은 유지했다.
+- 사용자의 명시적 Hosting 배포 요청에 따라 `npx firebase deploy --project onnuriway --only hosting:onnuriway --non-interactive`를 완료했다. Live version `f56636dafdacfe14`, release `1791037353240000`, release time `2026-10-03 23:22:33.240 KST`이며 rollback version은 `fd6dc3961b8aac38`다.
+- `https://onnuriway.com`과 `https://onnuriway.web.app`의 canonical Hosting verifier가 각각 25개 공개 HTTP 검사를 통과했다. 두 origin의 worker가 후보와 SHA-256 `6811509ea8d9211989f6337626275a3be556b0dfb9b8d654b790d81a76bfd6b9`로 일치하며, Hosting API의 새 live version을 확인했다. 로그·후보 manifest·전후 release metadata는 ignored `output/pr2-hosting-release/`에 있다.
+- 이번 배포 대상은 Hosting이다. Functions, Rules, Auth, 운영 업무 데이터는 변경하지 않았다. 설치 PWA의 실제 사용자 업데이트·인증 세션·운영 업무 조작을 자동 검증으로 PASS 처리하지 않는다. 운영 빌드에 임시 복사한 비공개 env 파일은 검증 후 제거하고 원본 설정은 보존한다.
+
 ### 2026-10-03 PR #2 lockfile 및 braces 의존성 복구
 
 - 작업 전 원본 `main`의 clean 상태와 최신 원격 기준 `131e574`를 확인하고 fetch했다. 별도 clean managed worktree에서 PR 브랜치 `codex/phase7-school-editor-sync`의 `1d8644b`를 추적해 수정했다.
