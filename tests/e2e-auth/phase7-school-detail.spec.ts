@@ -117,7 +117,9 @@ test("unified field updates use the callable and stale revisions surface a recov
   await concurrentEditor.getByRole("textbox", { name: "현장 특이사항" }).fill("Phase 7 동시 수정 검증");
   await concurrentEditor.getByRole("button", { name: "변경사항 저장" }).click();
   await expect(concurrentPage.getByText("현장정보를 저장했습니다.")).toBeVisible();
+  await expect(editor).toBeVisible();
   await concurrentPage.close();
+  await page.bringToFront();
 
   await expect(editor).toBeVisible({ timeout: 15_000 });
   await editor.getByLabel("검수 시작").fill("07:35");

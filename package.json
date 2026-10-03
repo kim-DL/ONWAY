@@ -89,7 +89,7 @@
     "@serwist/window": "^9.5.12",
     "firebase": "^12.18.0",
     "idb": "^8.0.3",
-    "next": "16.3.3",
+    "next": "16.3.8",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
@@ -97,6 +97,15 @@
   "overrides": {
     "@serwist/next": {
       "browserslist": "4.28.9"
+    },
+    "braces": "file:vendor/braces",
+    "firebase": {
+      "@firebase/firestore": {
+        "@grpc/grpc-js": "1.13.6"
+      }
+    },
+    "firebase-tools": {
+      "basic-ftp": "6.2.1"
     }
   },
   "devDependencies": {

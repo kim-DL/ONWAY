@@ -19,6 +19,7 @@ export default defineConfig([
     "public/sw.js",
     "public/sw.js.map",
     "public/swe-worker-*.js",
+    "vendor/braces/**",
     "next-env.d.ts",
   ]),
 ]);
