@@ -1,9 +1,20 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-04
+기준일: 2026-10-05
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-05 인증 저장소 일치 수정 운영 Hosting 반영 완료
+
+- 사용자 요청 범위를 새 창 로그인 유지 수정으로 한정했다. 최신 main/source `37cf2e9c972c3acd0f124c5c713d53a1803fe269`와 live `b5b031dbcf146a3b`를 대조해 미반영을 확인했다. 해당 source의 [Quality Gate 37179011488](https://github.com/kim-DL/ONWAY/actions/runs/37179011488)는 전체 SUCCESS다. 아래 10월 4일의 “미배포/실기기 미확인”은 당시 기록이며 이 항목이 최신 상태다.
+- 로컬 설치 Next 16.3.3과 lockfile 16.3.8의 불일치를 발견해 첫 후보를 사용하지 않고 기존 lockfile로 npm ci를 완료했다. Next 16.3.8, 사진/재고 기능 ON, emulator OFF 및 기존 비공개 설정으로 production build와 PWA·성능·Hosting gate PASS. Export/shipped 102개, precache 89개, initial assets 9개다. 제품 코드나 의존성 파일은 추가 변경하지 않았다.
+- 사용자가 명시적으로 승인한 Hosting만 한 번 배포했다(프로젝트 onnuriway, 대상 hosting:onnuriway). Live version `57fef6f82bf25e8d`, release `1791152317653000`, release time **2026-10-05 07:18:37.653 KST**, rollback version `b5b031dbcf146a3b`. Functions·Rules·backend Auth·운영 업무 데이터는 변경하지 않았다.
+- apex와 기본 Hosting origin의 canonical 공개 HTTP 검사 각 25개 PASS. 두 origin의 worker SHA-256은 후보 `b2d41262dc2136dbf78f79de59be726e194dbecd498032c5b4b9457a60fb603f`와 일치한다. www는 HTTPS 301로 apex에 이동한다. 기존 비공개 env 파일의 전후 digest는 동일하다.
+- 실제 운영 apex의 기존 인증 browser session에서 앱의 업데이트 버튼으로 새 버전을 적용하고 로드된 layout/page/webpack 자산이 후보와 일치함을 확인했다. A 창의 빈 거래처 등록 화면에 합성 문자열만 입력한 뒤 B 창을 열어 양쪽 인증 유지와 A 편집 내용 보존을 확인했다. B에도 별도 임시 입력을 넣어 동시 편집 유지 PASS, B 새로고침 뒤 A 입력 유지/B 로그인 복원 PASS, 반대로 A 새로고침 뒤 B 입력 유지/A 로그인 복원 PASS. 저장은 제출하지 않았으며 기존 거래처 수정이나 동시 저장 충돌 검사는 운영에서 실행하지 않았다. 실제 동시 저장 회귀의 근거는 source의 전체 CI다.
+- 마지막 B 임시 입력의 취소 확인창에서 브라우저 도구가 응답하지 않아 사용자에게 해당 확인창 닫기를 요청했다. 따라서 최종 창 정리·console/SW 최종 재검사는 완료로 주장하지 않는다. 핵심 인증/새 창/양방향 새로고침 검증은 이 확인창 전에 통과했다. 업무 화면/개인정보/인증정보는 증거에 저장하지 않는다.
+- 사용자는 실제 iPhone 상품사진 촬영·미리보기·저장, 설치 PWA 및 현장 실사 흐름을 직접 확인했고 모두 PASS라고 보고했다. 이는 사용자 실기기 확인 결과이며 이번 desktop 자동 검증과 구분한다. 해당 기능을 이번 범위에서 수정하거나 다시 검증하지 않았다.
+- 배포·빌드·후보 manifest·공개 HTTP·비식별 browser 판정은 ignored `output/auth-hosting-20261005/`에 보관한다. 이 배포 기록은 docs-only 후속 커밋으로 main에 저장·동기화하며 제품 source는 37cf2e9와 같아 문서 커밋을 중복 배포하지 않는다.
 
 ### 2026-10-04 새 창 로그인 저장소 이동으로 편집 화면이 닫히는 문제 — 로컬 수정 검증
 
