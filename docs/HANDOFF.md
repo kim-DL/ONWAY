@@ -5,7 +5,20 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-04 상품사진 iPhone HEIC 전처리 — 구현·main 병합 완료, Hosting 인증 대기
+### 2026-10-04 Codex·Work Git 정리, 로컬 동기화 및 상품사진 Hosting 배포 완료
+
+- Codex의 납품사진/PR #2 배포 기록과 Work의 PR #2 회귀·audit 및 PR #3 상품사진 작업을 대조했다. PR #3는 main에 병합됐고, 배포 source `10299384ce31a5c14f6984482696841a54637774`의 [Quality Gate `37145617080`](https://github.com/kim-DL/ONWAY/actions/runs/37145617080)는 모든 단계가 성공했다. 클라우드에서 남았던 Hosting 인증 차단을 기존 로컬 Firebase 인증으로 해소했다.
+- 기본 PC 저장소 `C:\Users\HOME\Desktop\onnuriway`에서 `git pull --ff-only origin main`을 완료했다. 작업 시작 시 main은 5커밋 뒤였으나 pull 후 원격과 일치했다. 이 배포 기록 이후의 제품 코드 차이는 없으며, 최종 main은 기록 커밋까지 push/pull해 동기화한다.
+- 6개 등록 worktree를 모두 점검했다. 미커밋 OPT-3B/3C 실험을 각각 `f75763c`(`codex/opt3b-inventory-photo-experiment`), `2aaebb2`(`codex/opt3c-initial-icon-experiment`)로 checkpoint하고 GitHub에 push했다. 이전 거래처 속성 제거 stash `042e243`도 `codex/archive-customer-attributes-20261004`로 원격 보존했다. 원본 stash는 유지한다. 이 세 보관본은 미채택 작업이며 main/운영에는 반영하지 않았다. OPT-3A·baseline과 이전 PR #2 worktree의 파일·ignored 산출물도 보존했다.
+- main에 포함된 것을 확인한 완료 브랜치 field-speed, iphone-delivery-photo, mobile-action-reach, phase7-school-editor-sync의 로컬 4개/원격 4개와 PR #3의 원격 브랜치를 삭제했다. 각 커밋은 main 이력에 남는다. 사용 중인 worktree 브랜치와 미채택 보관 브랜치는 유지한다. 점검한 worktree는 모두 clean이며, 원격 참조에서 도달할 수 없는 로컬 브랜치 커밋은 0개다. 비공개 env·개인정보·빌드/검증 로그는 Git 저장 대상에서 제외한다.
+- source `1029938`에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true`, `NEXT_PUBLIC_ENABLE_INVENTORY=true`, emulator OFF와 기존 비공개 설정으로 운영 빌드했다. 로컬 사진 집중 unit 56/56, app/Functions typecheck, lint, build 및 기존 PWA·성능·Hosting gate PASS. Export/shipped 102개, precache 89개, initial assets 9개이며 거래처 JS gzip 36,830B, 재고 JS gzip 25,537B다. 전체 회귀의 근거는 위 검증된 source의 원격 Quality Gate이며 문서 기록 변경에 대해 전체 회귀를 다시 통과했다고 주장하지 않는다.
+- 기존 Work 채팅의 명시적 배포 승인을 확인하고 `node node_modules/firebase-tools/lib/bin/firebase.js deploy --project onnuriway --only hosting:onnuriway --non-interactive`를 완료했다. Live version `b5b031dbcf146a3b`, release `1791083477808000`, release time **2026-10-04 12:11:17.808 KST**이며 rollback version은 `f56636dafdacfe14`다. Functions, Rules, Auth와 운영 업무 데이터는 변경하지 않았다.
+- `https://onnuriway.com`과 `https://onnuriway.web.app`의 canonical Hosting verifier가 각각 25개 공개 HTTP 검사를 통과했다. 두 origin의 worker는 후보 SHA-256 `d90cdbdcfe34049979011c30467e4bcf4f452dc0fa93f741fb650b05fa080426`와 일치한다. apex/www는 Hosting API에서 HOST/OWNERSHIP/CERT ACTIVE, issue 0이며 www HTTPS는 301로 apex에 이동한다. 후보 manifest·전후 release metadata·로그는 ignored `output/git-hosting-sync-20261004/`에 있다. 기존 비공개 env 파일은 수정하지 않았다.
+- 최신 상품사진 수정의 실제 iPhone 촬영·native decoder·설치 PWA 업데이트/세션 유지는 사람 확인이 남는다. 공개 HTTP 검사나 Chromium/Emulator 회귀를 실기기 검증으로 표현하지 않는다.
+
+### 2026-10-04 상품사진 iPhone HEIC 전처리 — 구현·main 병합 완료, 당시 Hosting 인증 대기 기록
+
+아래 인증 대기는 위 로컬 PC 배포로 해소됐다. 다음 항목들은 구현과 배포 전 검증의 역사적 기록이다.
 
 - 최신 `origin/main` `b2e435f`에서 별도 `codex/iphone-inventory-photo` worktree/branch를 만들었다. 기존 clean PR #2 checkout의 브랜치와 파일은 보존했다.
 - 재고 `InventoryPhotoPicker`가 사용하는 공통 `customer-photo-preparation`은 HEIC MIME/빈 MIME의 HEIC 파일명과 실제 HEIC/HEIF `ftyp` 헤더를 모두 사전 거부했다. 실패는 preview 및 `uploadInventoryPhoto` 이전이다. 상품등록의 실제 iPhone 실패 화면은 전달되지 않았으므로 코드상 차단과 실기기 관찰을 구분한다.
