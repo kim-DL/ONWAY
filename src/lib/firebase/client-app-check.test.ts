@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FirebaseError } from "firebase/app";
 
 const sdk = vi.hoisted(() => ({
   app: {}, appCheck: {},
   getApps: vi.fn(), getToken: vi.fn(), initializeAppCheck: vi.fn(),
-  config: vi.fn(),
+  config: vi.fn(), initializeAuth: vi.fn(), getAuth: vi.fn(),
 }));
 vi.mock("client-only", () => ({}));
 vi.mock("firebase/app", async (original) => ({
@@ -14,7 +15,10 @@ vi.mock("firebase/app-check", () => ({
   getToken: sdk.getToken, initializeAppCheck: sdk.initializeAppCheck,
   ReCaptchaEnterpriseProvider: class {},
 }));
-vi.mock("firebase/auth", () => ({ getAuth: () => ({}), connectAuthEmulator: vi.fn() }));
+vi.mock("firebase/auth", () => ({
+  getAuth: sdk.getAuth, initializeAuth: sdk.initializeAuth, connectAuthEmulator: vi.fn(),
+  browserLocalPersistence: {}, indexedDBLocalPersistence: {}, browserSessionPersistence: {}, browserPopupRedirectResolver: {},
+}));
 vi.mock("firebase/firestore", () => ({
   getFirestore: () => ({}), initializeFirestore: () => ({}),
   memoryLocalCache: vi.fn(), connectFirestoreEmulator: vi.fn(),
@@ -30,11 +34,29 @@ beforeEach(() => {
   sdk.getApps.mockReturnValue([]);
   sdk.config.mockReturnValue({ projectId: "demo-onnuriway" });
   sdk.initializeAppCheck.mockReturnValue(sdk.appCheck);
+  sdk.initializeAuth.mockReset().mockReturnValue({});
+  sdk.getAuth.mockReset().mockReturnValue({});
   sdk.getToken.mockReset().mockResolvedValue({ token: "fixture-not-a-real-token" });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 describe("PIN app verification preflight", () => {
+  it("keeps a previously initialized Auth instance during module recovery", async () => {
+    const auth = {};
+    sdk.initializeAuth.mockImplementationOnce(() => { throw new FirebaseError("auth/already-initialized", "fixture"); });
+    sdk.getAuth.mockReturnValue(auth);
+    const client = await import("./client");
+    expect(client.getFirebaseClientServices()?.auth).toBe(auth);
+  });
+
+  it("surfaces other Auth initialization failures without changing authentication settings", async () => {
+    const error = new FirebaseError("auth/internal-error", "fixture");
+    sdk.initializeAuth.mockImplementationOnce(() => { throw error; });
+    const client = await import("./client");
+    expect(() => client.getFirebaseClientServices()).toThrow(error);
+    expect(sdk.getAuth).not.toHaveBeenCalled();
+  });
+
   it("reuses the SDK token cache and returns no token to callers", async () => {
     const client = await import("./client");
     await expect(client.ensureFirebaseAppCheckReady()).resolves.toBeUndefined();

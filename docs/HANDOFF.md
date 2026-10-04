@@ -5,6 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-04 새 창 로그인 저장소 이동으로 편집 화면이 닫히는 문제 — 로컬 수정 검증
+
+- `e3264ef`의 [Quality Gate `37176011731`](https://github.com/kim-DL/ONWAY/actions/runs/37176011731)는 두 시도 모두 Phase 17의 `phase7-school-detail.spec.ts` 동시 수정 검사에서 실패했다. 두 번째 창의 저장 후 첫 번째 편집 dialog가 없었으며 각 시도는 업무 여정 75 PASS/18 conditional SKIP였다. 앞서 수정한 영업 버튼 접근성 검사는 통과했다. 상품사진 마지막 검사는 선행 실패 때문에 실행되지 않았다.
+- 설치된 Firebase SDK의 `getAuth`는 IndexedDB를 우선하지만 현재 AuthProvider는 browserLocalPersistence를 명시한다. 새 창에서 초기화 중 기존 localStorage 사용자 정보를 IndexedDB로 옮겼다 다시 돌리는 과정이 다른 창에 일시적인 사용자 없음 이벤트를 만들 수 있다. demo 환경에서 그 SDK 저장소 이동을 500ms 지연시키자 기존 창의 PIN 화면 노출·편집 dialog 소실과 같은 실패를 5회 중 4회 재현했다. 단순 CPU4 반복에서는 5회 PASS였으므로 timing 조건을 구분한다.
+- Client는 `initializeAuth`의 저장소 순서를 Local → IndexedDB → Session으로 지정해 기존 AuthProvider와 처음부터 일치시킨다. 기존 IndexedDB/Session 사용자의 복원·이동 경로와 Google popup resolver를 유지하고, 이미 초기화된 인스턴스는 재사용하며 다른 초기화 오류는 숨기지 않는다. AuthProvider의 토큰/권한 검증·App Check·Rules·backend Auth 설정은 바꾸지 않았다.
+- 수정 후 같은 production-mode demo 환경/저장소 이동 지연/CPU4 동시 수정 여정 5회 연속 PASS. 인증·PWA 관련 단위 55 PASS, 전체 lint 및 app/Functions typecheck PASS. 최종 source의 원격 Quality Gate 결과를 별도로 확인한다. 일시적인 probe·CPU 설정·저장소 지연·반복 launcher·진단용 timeout 변경은 최종 diff에서 모두 제거했다. 원래 Phase 7 여정과 모든 assertion/timeout/접근성 규칙/budget을 유지한다.
+- 이 수정은 아직 운영 Hosting에 배포하지 않았다. 현재 live는 아래의 `b5b031dbcf146a3b`이며 재확인한 PIN/worker/reload 결과를 이번 로그인 저장소 수정의 운영 증거로 사용하지 않는다. 사용자는 이번 상품사진의 실제 iPhone 촬영 → 미리보기 → 저장을 아직 확인하지 않았다고 답했다. 설치 iPhone PWA 업데이트도 사람 확인이 남는다.
+
 ### 2026-10-04 공유 인수문서 재개 점검 및 영업 버튼 접근성 검사 안정화
 
 - 공유 `ONWAY-HANDOFF-2026-10-04.md`는 상품사진 Hosting 배포 전의 기록이다. 최신 Git와 Hosting API를 읽기 전용으로 재확인했다. main은 `f217828`까지 동기화돼 있었고 live version `b5b031dbcf146a3b`와 release `1791083477808000`은 아래 배포 기록과 같았다. 두 origin의 canonical HTTP 검사 각 25개가 다시 PASS했다. 상품사진 수정을 중복 배포하지 않았다.

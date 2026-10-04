@@ -8,8 +8,13 @@ import {
   type AppCheck,
 } from "firebase/app-check";
 import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  browserSessionPersistence,
   connectAuthEmulator,
   getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
   type Auth,
 } from "firebase/auth";
 import {
@@ -36,6 +41,20 @@ export interface FirebaseClientServices {
 const emulatorMarker = Symbol.for("onnuriway.firebase-emulators-connected");
 let services: FirebaseClientServices | null | undefined;
 let appCheck: AppCheck | undefined;
+
+function getClientAuth(app: FirebaseApp): Auth {
+  try {
+    // AuthProvider keeps sessions in localStorage. Prefer that same backend
+    // during initialization so opening another tab cannot migrate it away.
+    return initializeAuth(app, {
+      persistence: [browserLocalPersistence, indexedDBLocalPersistence, browserSessionPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch (error) {
+    if (error instanceof FirebaseError && error.code === "auth/already-initialized") return getAuth(app);
+    throw error;
+  }
+}
 
 export function getFirebaseClientServices(): FirebaseClientServices | null {
   if (services !== undefined) {
@@ -74,7 +93,7 @@ export function getFirebaseClientServices(): FirebaseClientServices | null {
 
   services = {
     app,
-    auth: getAuth(app),
+    auth: getClientAuth(app),
     firestore,
     functions: getFunctions(app, "asia-northeast3"),
   };
