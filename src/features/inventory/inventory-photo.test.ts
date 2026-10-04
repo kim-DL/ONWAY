@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("client-only", () => ({}));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { photo: vi.fn() }, inventoryErrorMessage: () => "사진 오류" }));
-import { InventoryPhotoPicker, inventoryPhotoPreparationMessage } from "./inventory-photo";
+import { InventoryPhotoPicker, inventoryPhotoPreparationMessage } from "./inventory-photo-picker";
 
 describe("inventory camera-only photo entry", () => {
   it("exposes one rear-camera input without album or file-selection alternatives", () => {

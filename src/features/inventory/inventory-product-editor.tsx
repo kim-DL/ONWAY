@@ -4,7 +4,7 @@ import { lazy, Suspense, useId, useRef, useState, type FormEvent } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryLocation, type InventoryLotDraft, type InventoryProduct, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
-import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo";
+import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo-picker";
 import { inventoryRepository } from "./inventory-repository";
 import { FormFooter, LotFields, QuantityFields, blankLot, useInventoryAction, validLotDraft, type InventoryProductEditorProps } from "./inventory-forms";
 import styles from "./inventory.module.css";
