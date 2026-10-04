@@ -176,6 +176,13 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   await dialog.getByLabel("학교급").selectOption("elementary");
   await expect(schoolCheckbox).toBeChecked();
 
+  const claimButton = dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기" });
+  await expect(claimButton).toBeEnabled();
+  // Enabling the button starts its opacity transition. Check contrast after
+  // that transition finishes, using the existing assertion timeout and rules.
+  await expect.poll(() => claimButton.evaluate((button) =>
+    button.getAnimations().filter((animation) => animation.playState === "running" || animation.pending).length,
+  )).toBe(0);
   const accessibility = await new AxeBuilder({ page }).include("dialog[open], [role=dialog]").analyze();
   expect(accessibility.violations).toEqual([]);
   const undersizedTargets = await dialog.locator("button:visible, input:not([type=checkbox]):visible, select:visible").evaluateAll((targets) =>
@@ -194,7 +201,7 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
     // Measure UI feedback after the real callable response, not during emulator cold start.
     const [claimResponse] = await Promise.all([
       page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/claimSalesAssignments"), { timeout: 30_000 }),
-      dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기" }).click(),
+      claimButton.click(),
     ]);
     expect(claimResponse.status()).toBe(200);
     expect(await claimResponse.json()).toMatchObject({ result: { createdCount: 1 } });

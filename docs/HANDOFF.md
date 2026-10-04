@@ -5,6 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-04 공유 인수문서 재개 점검 및 영업 버튼 접근성 검사 안정화
+
+- 공유 `ONWAY-HANDOFF-2026-10-04.md`는 상품사진 Hosting 배포 전의 기록이다. 최신 Git와 Hosting API를 읽기 전용으로 재확인했다. main은 `f217828`까지 동기화돼 있었고 live version `b5b031dbcf146a3b`와 release `1791083477808000`은 아래 배포 기록과 같았다. 두 origin의 canonical HTTP 검사 각 25개가 다시 PASS했다. 상품사진 수정을 중복 배포하지 않았다.
+- Codex in-app browser에서 apex의 기존 인증 세션 복원과 controlled reload 후 인증 업무 화면 복원을 확인했다. 기본 origin에서는 PIN 입력 화면 및 reload 후 화면 유지를 확인했다. 두 origin 모두 `/sw.js`가 activated/controller 상태였고 관찰한 console warning/error는 각각 0개였다. PIN 로그인을 새로 제출하거나 운영 업무 데이터를 쓰지 않았다. 이 desktop browser 결과는 실제 iPhone/native HEIC/설치 PWA 업데이트의 증거가 아니다. 비공개 화면·계정·출입정보는 검증 산출물에 저장하지 않는다.
+- 문서 기록 커밋 `f217828`의 [Quality Gate 첫 시도 `37173462612`](https://github.com/kim-DL/ONWAY/actions/runs/37173462612)는 Phase 17의 `phase9-sales-cycle.spec.ts` 학교 일괄 담당 지정 접근성 검사에서 실패했다. 선택 직후 enabled 버튼이 disabled opacity 0.55에서 1로 전환되는 170ms 중에 axe가 측정해 흰 글자/합성 배경 `#82aaeb` 대비 2.35를 보고했다. 배포 source `1029938`과 제품 코드는 같았다. 로컬 진단에서도 enabled=true 직후 opacity 0.679065와 running animation을 확인했고 종료 후 opacity는 1이었다.
+- 해당 E2E는 담당 지정 버튼이 enabled인지 단언하고 실제 실행 중/대기 중 CSS transition이 0이 된 뒤 기존 axe 및 터치 크기 검사를 수행하도록 최소 수정했다. 접근성 규칙·assertion·timeout·CSS·제품 코드·budget은 변경하지 않았다. 일시적인 진단 출력·반복 launcher 변경은 최종 diff에서 제거했다. 기존 CSS가 만드는 전환 중간 상태와 검사 시점의 경합을 해결하며 버튼의 최종 색 대비 검사는 그대로 유지한다.
+- production-mode demo Emulator 집중 여정 5회 연속 PASS, 집중 lint와 app/Functions typecheck PASS. 기존 main의 같은 HEAD 원격 재실행과 이번 기록/테스트 변경을 포함한 [main Quality Gate](https://github.com/kim-DL/ONWAY/actions/workflows/ci.yml?query=branch%3Amain)를 별도로 확인한다. 최종 판정은 해당 HEAD의 실제 CI 결과다. 로컬 첫 시도는 함수 발견의 10초 초기화 제한으로 로그인 전에 막혔으며 도구의 `FUNCTIONS_DISCOVERY_TIMEOUT=60`만 세션 환경에 설정해 재실행했다. 이 환경 조정과 5회 반복/기존 demo build 재사용 설정은 저장소에 포함하지 않았다.
+- 새 테스트 검증은 별도 managed worktree의 demo 프로젝트와 demo export에서 실행해 기본 PC의 운영 export·기존 비공개 env를 보존했다. 로그는 ignored `output/git-hosting-sync-20261004/contrast-*.log`, `resume-*.json`에 있다. 실제 iPhone 촬영·native decoder·설치 PWA 및 Android 실기기 회귀는 사람 확인이 남는다.
+
 ### 2026-10-04 Codex·Work Git 정리, 로컬 동기화 및 상품사진 Hosting 배포 완료
 
 - Codex의 납품사진/PR #2 배포 기록과 Work의 PR #2 회귀·audit 및 PR #3 상품사진 작업을 대조했다. PR #3는 main에 병합됐고, 배포 source `10299384ce31a5c14f6984482696841a54637774`의 [Quality Gate `37145617080`](https://github.com/kim-DL/ONWAY/actions/runs/37145617080)는 모든 단계가 성공했다. 클라우드에서 남았던 Hosting 인증 차단을 기존 로컬 Firebase 인증으로 해소했다.
