@@ -1,6 +1,7 @@
+import { setPrivateCallableResponse } from "../shared/private-callable-response.js";
 import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
-import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 
 import { KakaoLocalClient, KakaoLocalClientError } from "../sync/kakao-local-client.js";
@@ -17,10 +18,6 @@ const kakaoRestApiKey = defineSecret("KAKAO_REST_API_KEY");
 const options = { enforceAppCheck: !emulator, maxInstances: 10, region: "asia-northeast3" as const };
 const locationOptions = { ...options, timeoutSeconds: 30, secrets: emulator ? [] : [kakaoRestApiKey] };
 
-function preventCaching(request: CallableRequest<unknown>) {
-  request.rawRequest.res?.setHeader("Cache-Control", "private, no-store, max-age=0");
-  request.rawRequest.res?.setHeader("Pragma", "no-cache");
-}
 
 function safeCustomerError(error: unknown): HttpsError {
   if (error instanceof HttpsError) return error;
@@ -36,7 +33,7 @@ function safeCustomerError(error: unknown): HttpsError {
 }
 
 export const listCustomers = onCall(options, async (request) => {
-  preventCaching(request);
+  setPrivateCallableResponse(request);
   try {
     await requireCustomerActor(request);
     const parsed = customerListInputSchema.safeParse(request.data);
@@ -50,7 +47,7 @@ export const listCustomers = onCall(options, async (request) => {
 });
 
 export const saveCustomer = onCall(options, async (request) => {
-  preventCaching(request);
+  setPrivateCallableResponse(request);
   try {
     const actor = await requireCustomerActor(request);
     const parsed = saveCustomerInputSchema.safeParse(request.data);
@@ -66,7 +63,7 @@ function locationClient() {
 }
 
 export const searchCustomerLocations = onCall(locationOptions, async (request) => {
-  preventCaching(request);
+  setPrivateCallableResponse(request);
   try {
     await requireCustomerActor(request);
     const parsed = z.object({ query: z.string().trim().min(2).max(200) }).strict().safeParse(request.data);
@@ -97,7 +94,7 @@ export const searchCustomerLocations = onCall(locationOptions, async (request) =
 });
 
 export const reverseCustomerLocation = onCall(locationOptions, async (request) => {
-  preventCaching(request);
+  setPrivateCallableResponse(request);
   try {
     await requireCustomerActor(request);
     const parsed = customerPointSchema.safeParse(request.data);

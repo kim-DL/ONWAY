@@ -125,9 +125,8 @@ export function SalesWorkspace({
     if (!workspace) return null;
     const schools = new Map(workspace.schools.map((school) => [school.schoolId, school]));
     const employees = new Map(workspace.employees.map((employee) => [employee.employeeId, employee.displayName]));
-    const ownedIds = new Set(workspace.assignments
-      .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
-      .map((assignment) => assignment.schoolId));
+    const ownAssignments = workspace.assignments.filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId));
+    const ownedIds = new Set(ownAssignments.map((assignment) => assignment.schoolId));
     const usableActiveRoute = activeRoute?.result.cycleId === workspace.selectedCycleId
       && activeRoute.orderedSchoolIds.every((schoolId) => {
         const school = schools.get(schoolId);
@@ -138,9 +137,7 @@ export function SalesWorkspace({
     const routeRank = usableActiveRoute
       ? new Map(usableActiveRoute.orderedSchoolIds.map((schoolId, index) => [schoolId, index]))
       : null;
-    const scopeAssignments = workspace.assignments.filter((assignment) =>
-      scope === "all" || assignment.assigneeIds.includes(session.claims.employeeId)
-    );
+    const scopeAssignments = scope === "all" ? workspace.assignments : ownAssignments;
     const visibleAssignments = scopeAssignments
       .flatMap((assignment) => {
         const school = schools.get(assignment.schoolId);
@@ -168,8 +165,7 @@ export function SalesWorkspace({
       return school ? [school] : [];
     }), district);
     const assignedSchoolIds = new Set(workspace.assignments.map((assignment) => assignment.schoolId));
-    const ownRouteCandidates = workspace.assignments
-      .filter((assignment) => assignment.assigneeIds.includes(session.claims.employeeId))
+    const ownRouteCandidates = ownAssignments
       .flatMap((assignment) => {
         const school = schools.get(assignment.schoolId);
         return school ? [{ assignment, school }] : [];

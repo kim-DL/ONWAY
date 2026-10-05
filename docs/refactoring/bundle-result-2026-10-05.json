@@ -1,0 +1,533 @@
+{
+  "generatedAt": "2026-10-05T09:37:27.342Z",
+  "budgets": {
+    "initialRawBytes": 532480,
+    "initialGzipBytes": 163840,
+    "largestJavascriptGzipBytes": 92160,
+    "legacyStylesheetRawBytes": 240640,
+    "legacyStylesheetGzipBytes": 45568,
+    "adminInterfaceRawBytes": 65536,
+    "adminInterfaceGzipBytes": 10240,
+    "photoMorphRawBytes": 6912,
+    "photoMorphGzipBytes": 1984,
+    "combinedSchoolStylesheetRawBytes": 244224,
+    "combinedSchoolStylesheetGzipBytes": 47232,
+    "customerStylesheetRawBytes": 49152,
+    "customerStylesheetGzipBytes": 9984,
+    "customerJavascriptGzipBytes": 36864,
+    "deliveryPhotoStylesheetRawBytes": 6144,
+    "deliveryPhotoStylesheetGzipBytes": 2048,
+    "deliveryPhotoJavascriptGzipBytes": 10240,
+    "deliveryPhotoHistoryStylesheetRawBytes": 5632,
+    "deliveryPhotoHistoryStylesheetGzipBytes": 1792,
+    "deliveryPhotoHistoryJavascriptGzipBytes": 3584,
+    "deliveryPhotoHistoryDatesStylesheetRawBytes": 1024,
+    "deliveryPhotoHistoryDatesStylesheetGzipBytes": 512,
+    "deliveryPhotoHistoryDatesJavascriptGzipBytes": 2304,
+    "deliveryPhotoViewerJavascriptGzipBytes": 3072,
+    "deliveryPhotoDeleteJavascriptGzipBytes": 1792,
+    "deliveryPhotoUploadJavascriptGzipBytes": 5120,
+    "deliveryPhotoPreparationJavascriptGzipBytes": 3072,
+    "salesWorkspaceGzipBytes": 14336,
+    "inventoryStylesheetRawBytes": 29184,
+    "inventoryStylesheetGzipBytes": 6656,
+    "inventoryJavascriptGzipBytes": 25600,
+    "inventoryViewerJavascriptGzipBytes": 2304
+  },
+  "measurements": {
+    "initialAssetCount": 6,
+    "initialRawBytes": 468169,
+    "initialGzipBytes": 139889,
+    "largestJavascriptGzipBytes": 67128,
+    "dynamicBoundaryCount": 42,
+    "dynamicAssetCount": 57,
+    "stylesheetRawBytes": 397280,
+    "stylesheetGzipBytes": 77405,
+    "legacyStylesheetRawBytes": 231969,
+    "legacyStylesheetGzipBytes": 45135,
+    "adminInterfaceRawBytes": 64415,
+    "adminInterfaceGzipBytes": 9377,
+    "photoMorphRawBytes": 6711,
+    "photoMorphGzipBytes": 1928,
+    "customerStylesheetRawBytes": 48132,
+    "customerStylesheetGzipBytes": 9437,
+    "customerJavascriptGzipBytes": 36829,
+    "deliveryPhotoStylesheetRawBytes": 6123,
+    "deliveryPhotoStylesheetGzipBytes": 1804,
+    "deliveryPhotoJavascriptGzipBytes": 10189,
+    "deliveryPhotoHistoryStylesheetRawBytes": 5569,
+    "deliveryPhotoHistoryStylesheetGzipBytes": 1433,
+    "deliveryPhotoHistoryJavascriptGzipBytes": 2747,
+    "deliveryPhotoHistoryDatesStylesheetRawBytes": 1013,
+    "deliveryPhotoHistoryDatesStylesheetGzipBytes": 482,
+    "deliveryPhotoHistoryDatesJavascriptGzipBytes": 2091,
+    "deliveryPhotoViewerJavascriptGzipBytes": 2918,
+    "deliveryPhotoDeleteJavascriptGzipBytes": 1662,
+    "deliveryPhotoViewerAdditionalStylesheetRawBytes": 0,
+    "deliveryPhotoViewerAdditionalStylesheetGzipBytes": 0,
+    "deliveryPhotoUploadJavascriptGzipBytes": 3000,
+    "deliveryPhotoPreparationJavascriptGzipBytes": 2640,
+    "salesWorkspaceGzipBytes": 14323,
+    "inventoryStylesheetRawBytes": 28777,
+    "inventoryStylesheetGzipBytes": 6649,
+    "inventoryJavascriptGzipBytes": 25537,
+    "inventoryWorkspaceJavascriptGzipBytes": 23306,
+    "inventoryViewerJavascriptGzipBytes": 2231,
+    "inventoryManufacturerJavascriptGzipBytes": 5222,
+    "inventoryManufacturerFieldJavascriptGzipBytes": 805,
+    "inventoryManufacturerStylesheetRawBytes": 4571,
+    "inventoryManufacturerStylesheetGzipBytes": 1160,
+    "inventorySharedPhotoStylesheetRawBytes": 6711,
+    "inventorySharedPhotoStylesheetGzipBytes": 1928,
+    "inventoryWithPhotoStylesheetRawBytes": 35488,
+    "inventoryWithPhotoStylesheetGzipBytes": 8577
+  },
+  "inventoryAssetAccounting": {
+    "workspaceAssets": [
+      "static/css/5e9463e890ea994f.css",
+      "static/chunks/6820.1c982b0eb947c0d2.js",
+      "static/chunks/7989.f328502587b35b1c.js"
+    ],
+    "viewerAdditionalAssets": [
+      {
+        "asset": "static/css/72d5daebc5fa40da.css",
+        "rawBytes": 6711,
+        "gzipBytes": 1928
+      },
+      {
+        "asset": "static/chunks/1427.ea5ec384a4db8d7f.js",
+        "rawBytes": 4984,
+        "gzipBytes": 2231
+      }
+    ],
+    "exclusiveStylesheets": [
+      {
+        "asset": "static/css/5e9463e890ea994f.css",
+        "rawBytes": 28777,
+        "gzipBytes": 6649
+      }
+    ],
+    "sharedPhotoStylesheets": [
+      {
+        "asset": "static/css/72d5daebc5fa40da.css",
+        "rawBytes": 6711,
+        "gzipBytes": 1928
+      }
+    ],
+    "manufacturerPickerAssets": [
+      {
+        "asset": "static/css/a829b2b5e47401b7.css",
+        "rawBytes": 4571,
+        "gzipBytes": 1160
+      },
+      {
+        "asset": "static/chunks/5965.e59500776dd353f3.js",
+        "rawBytes": 16082,
+        "gzipBytes": 5222
+      }
+    ],
+    "manufacturerFieldAssets": [
+      {
+        "asset": "static/chunks/8803.d2a098f01847ff07.js",
+        "rawBytes": 1342,
+        "gzipBytes": 805
+      }
+    ],
+    "note": "Shared photo styles count once in global totals; inventoryWithPhoto measurements describe the complete visited flow, not an additional budget charge."
+  },
+  "initial": [
+    {
+      "asset": "static/chunks/webpack-1a6c593e185319d8.js",
+      "rawBytes": 6170,
+      "gzipBytes": 3214
+    },
+    {
+      "asset": "static/chunks/4bd1b696-d327213a749c538a.js",
+      "rawBytes": 201055,
+      "gzipBytes": 63298
+    },
+    {
+      "asset": "static/chunks/9373-447829822380630e.js",
+      "rawBytes": 245718,
+      "gzipBytes": 67128
+    },
+    {
+      "asset": "static/chunks/main-app-1942a1976f8501d5.js",
+      "rawBytes": 2319,
+      "gzipBytes": 1083
+    },
+    {
+      "asset": "static/chunks/app/layout-77291fb15fd301ce.js",
+      "rawBytes": 5485,
+      "gzipBytes": 2342
+    },
+    {
+      "asset": "static/chunks/app/page-787d9e077aaf3feb.js",
+      "rawBytes": 7422,
+      "gzipBytes": 2824
+    }
+  ],
+  "dynamicEntries": [
+    {
+      "boundary": "features/admin/admin-workspace.tsx -> @/features/customers/customer-admin",
+      "files": [
+        "static/css/2fdcde2eded5eed6.css",
+        "static/chunks/6903.7c1362baeaf49d5e.js",
+        "static/chunks/5829.dc8cc8f40560f4aa.js"
+      ]
+    },
+    {
+      "boundary": "features/admin/admin-workspace.tsx -> @/features/inventory/inventory-workspace",
+      "files": [
+        "static/css/5e9463e890ea994f.css",
+        "static/chunks/6820.1c982b0eb947c0d2.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/admin/admin-workspace",
+      "files": [
+        "static/css/f5f4f19010f0cc5e.css",
+        "static/chunks/6619.afa4b17bc12abe1e.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/customers/customer-workspace",
+      "files": [
+        "static/css/2fdcde2eded5eed6.css",
+        "static/chunks/6903.7c1362baeaf49d5e.js",
+        "static/chunks/4750.02c9238157263e39.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/delivery-photos/delivery-photo-workspace",
+      "files": [
+        "static/css/359591d742d7c092.css",
+        "static/chunks/3808.0e14c3006674757b.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/inventory/inventory-workspace",
+      "files": [
+        "static/css/5e9463e890ea994f.css",
+        "static/chunks/6820.1c982b0eb947c0d2.js",
+        "static/chunks/7989.f328502587b35b1c.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/sales-cycle/sales-activity-workspace",
+      "files": [
+        "static/css/cb381b05113c839c.css",
+        "static/chunks/9780.a6ec7c656e58ad6a.js",
+        "static/chunks/9503.4e9bd762711b745f.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/sales-cycle/sales-workspace",
+      "files": [
+        "static/css/cb381b05113c839c.css",
+        "static/chunks/9780.a6ec7c656e58ad6a.js",
+        "static/chunks/2171.1e8296ae2a8cb0a8.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/school-detail/school-detail",
+      "files": [
+        "static/css/cb381b05113c839c.css",
+        "static/chunks/786.399af9a495094c75.js"
+      ]
+    },
+    {
+      "boundary": "features/app-shell/app-shell.tsx -> @/features/search/school-search",
+      "files": [
+        "static/chunks/4729.62633b1911aec66f.js"
+      ]
+    },
+    {
+      "boundary": "features/auth/auth-application-loader.tsx -> ./auth-application",
+      "files": [
+        "static/chunks/0e142730.80665a62ededaecd.js",
+        "static/chunks/32f9209a.e9e8ec75f7b50037.js",
+        "static/chunks/f9bd3b46.264844cf2078efb6.js",
+        "static/chunks/7310.9a1b5958732e6431.js",
+        "static/chunks/8361.58e280e9a0895e96.js"
+      ]
+    },
+    {
+      "boundary": "features/auth/auth-gate.tsx -> @/features/app-shell/app-shell",
+      "files": [
+        "static/css/b51f68000b2f42b1.css",
+        "static/chunks/4200.db157c796ae90368.js"
+      ]
+    },
+    {
+      "boundary": "features/auth/private-client-state.ts -> @/features/delivery-photos/delivery-photo-memory",
+      "files": [
+        "static/chunks/7809.49b4e85d47a30ff7.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-admin.tsx -> ./customer-editor",
+      "files": [
+        "static/css/695e02eb223fb947.css",
+        "static/chunks/5937.ea9a83f01a35648b.js",
+        "static/chunks/2880.fb56b839670e9bfd.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-admin.tsx -> ./customer-import",
+      "files": [
+        "static/chunks/888.61928f1b7d4d3f69.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-detail.tsx -> ./customer-map",
+      "files": [
+        "static/css/fd0fb2cfea3ab2e3.css",
+        "static/chunks/4919.f9441b3a6b4bcb37.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-detail.tsx -> @/features/delivery-photos/delivery-photo-customer-section",
+      "files": [
+        "static/chunks/1554.e92a1d1f51a29110.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-editor.tsx -> ./customer-map",
+      "files": [
+        "static/css/fd0fb2cfea3ab2e3.css",
+        "static/chunks/4919.f9441b3a6b4bcb37.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-overview-photo.tsx -> ./customer-photo-viewer",
+      "files": [
+        "static/css/72d5daebc5fa40da.css",
+        "static/chunks/8511.afb535d48c7ac919.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/customer-workspace.tsx -> ./customer-editor",
+      "files": [
+        "static/css/695e02eb223fb947.css",
+        "static/chunks/5937.ea9a83f01a35648b.js",
+        "static/chunks/2880.fb56b839670e9bfd.js"
+      ]
+    },
+    {
+      "boundary": "features/customers/use-customer-photo.ts -> ./customer-photo-repository",
+      "files": [
+        "static/chunks/5937.ea9a83f01a35648b.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-history-dates.tsx -> ./delivery-photo-viewer",
+      "files": [
+        "static/css/72d5daebc5fa40da.css",
+        "static/chunks/8574.3ae07148a537da10.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-history-loader.tsx -> ./delivery-photo-history",
+      "files": [
+        "static/css/6310cb2b7659da16.css",
+        "static/chunks/3572.00c4db4e61535913.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-history.tsx -> ./delivery-photo-history-dates",
+      "files": [
+        "static/css/9dfeaafcbe7268c6.css",
+        "static/chunks/9088.d1098330f2baedba.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-input-controller.tsx -> ./delivery-photo-preparation",
+      "files": [
+        "static/chunks/1755.32430878a612bfeb.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-upload-memory.ts -> ./delivery-photo-preparation",
+      "files": [
+        "static/chunks/1755.32430878a612bfeb.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-viewer.tsx -> ./delivery-photo-delete-action",
+      "files": [
+        "static/chunks/3116.f5239b58152f8f0b.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-workspace.tsx -> ./delivery-photo-editor",
+      "files": [
+        "static/chunks/9966.ceeef1697f3c8b44.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/delivery-photo-workspace.tsx -> ./delivery-photo-more-menu",
+      "files": [
+        "static/chunks/2585.94383ae25ab123ab.js"
+      ]
+    },
+    {
+      "boundary": "features/delivery-photos/use-delivery-photo-uploads.ts -> ./delivery-photo-upload-memory",
+      "files": [
+        "static/chunks/1629.e7213ae588c61e13.js"
+      ]
+    },
+    {
+      "boundary": "features/inventory/inventory-detail.tsx -> ./inventory-history",
+      "files": [
+        "static/chunks/8445.2611359e02d65a8c.js"
+      ]
+    },
+    {
+      "boundary": "features/inventory/inventory-editor-loader.ts -> ./inventory-product-editor",
+      "files": [
+        "static/chunks/388.6e23fe9d3c4d4613.js"
+      ]
+    },
+    {
+      "boundary": "features/inventory/inventory-manufacturer-field.tsx -> ./inventory-manufacturer-picker",
+      "files": [
+        "static/css/a829b2b5e47401b7.css",
+        "static/chunks/5965.e59500776dd353f3.js"
+      ]
+    },
+    {
+      "boundary": "features/inventory/inventory-photo.tsx -> ./inventory-photo-viewer",
+      "files": [
+        "static/css/72d5daebc5fa40da.css",
+        "static/chunks/1427.ea5ec384a4db8d7f.js"
+      ]
+    },
+    {
+      "boundary": "features/inventory/inventory-product-editor.tsx -> ./inventory-manufacturer-field",
+      "files": [
+        "static/chunks/8803.d2a098f01847ff07.js"
+      ]
+    },
+    {
+      "boundary": "features/pwa/pwa-provider.tsx -> @serwist/window",
+      "files": []
+    },
+    {
+      "boundary": "features/sales-cycle/sales-workspace.tsx -> ./sales-claim-picker",
+      "files": [
+        "static/chunks/1275.93a03742ac3ebef3.js"
+      ]
+    },
+    {
+      "boundary": "features/sales-cycle/sales-workspace.tsx -> @/features/sales-route/sales-route-planner",
+      "files": [
+        "static/css/cc092152875bac46.css",
+        "static/chunks/4559.69cefbb7a72e327d.js"
+      ]
+    },
+    {
+      "boundary": "features/school-detail/school-detail.tsx -> ./school-photo-gallery",
+      "files": [
+        "static/css/72d5daebc5fa40da.css",
+        "static/chunks/2736.140cc9caa1e98b05.js"
+      ]
+    },
+    {
+      "boundary": "features/school-detail/school-detail.tsx -> @/features/sales-history/sales-collaboration",
+      "files": [
+        "static/chunks/3905.0eb423b94c9caa60.js"
+      ]
+    },
+    {
+      "boundary": "features/school-detail/school-detail.tsx -> @/features/sales-history/sales-history-timeline",
+      "files": [
+        "static/chunks/5781.1eb416d75d76b91c.js"
+      ]
+    },
+    {
+      "boundary": "features/school-detail/school-detail.tsx -> @/features/sales-visit/sales-visit-sheet",
+      "files": [
+        "static/chunks/4592.0d2eaca340b079e8.js"
+      ]
+    }
+  ],
+  "stylesheets": [
+    {
+      "asset": "static/css/0c61b2132c5c23dd.css",
+      "rawBytes": 4095,
+      "gzipBytes": 955
+    },
+    {
+      "asset": "static/css/2fdcde2eded5eed6.css",
+      "rawBytes": 39116,
+      "gzipBytes": 6883
+    },
+    {
+      "asset": "static/css/359591d742d7c092.css",
+      "rawBytes": 6123,
+      "gzipBytes": 1804
+    },
+    {
+      "asset": "static/css/3b3c5e16aab87386.css",
+      "rawBytes": 194717,
+      "gzipBytes": 36435
+    },
+    {
+      "asset": "static/css/5e9463e890ea994f.css",
+      "rawBytes": 28777,
+      "gzipBytes": 6649
+    },
+    {
+      "asset": "static/css/6310cb2b7659da16.css",
+      "rawBytes": 5569,
+      "gzipBytes": 1433
+    },
+    {
+      "asset": "static/css/695e02eb223fb947.css",
+      "rawBytes": 6649,
+      "gzipBytes": 1737
+    },
+    {
+      "asset": "static/css/72d5daebc5fa40da.css",
+      "rawBytes": 6711,
+      "gzipBytes": 1928
+    },
+    {
+      "asset": "static/css/9dfeaafcbe7268c6.css",
+      "rawBytes": 1013,
+      "gzipBytes": 482
+    },
+    {
+      "asset": "static/css/a829b2b5e47401b7.css",
+      "rawBytes": 4571,
+      "gzipBytes": 1160
+    },
+    {
+      "asset": "static/css/b51f68000b2f42b1.css",
+      "rawBytes": 17860,
+      "gzipBytes": 4058
+    },
+    {
+      "asset": "static/css/cb381b05113c839c.css",
+      "rawBytes": 11554,
+      "gzipBytes": 2792
+    },
+    {
+      "asset": "static/css/cc092152875bac46.css",
+      "rawBytes": 3743,
+      "gzipBytes": 895
+    },
+    {
+      "asset": "static/css/f5f4f19010f0cc5e.css",
+      "rawBytes": 64415,
+      "gzipBytes": 9377
+    },
+    {
+      "asset": "static/css/fd0fb2cfea3ab2e3.css",
+      "rawBytes": 2367,
+      "gzipBytes": 817
+    }
+  ],
+  "status": "passed"
+}

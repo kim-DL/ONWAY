@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readStylesheet } from "../helpers/read-stylesheet";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, type Page } from "@playwright/test";
@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { GlassButton } from "../../src/components/ui/glass-button";
 import { SmartChip } from "../../src/components/ui/smart-chip";
 
-const css = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
+const css = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
 type Context = "delivery" | "sales" | "admin";
 
 async function fixture(page: Page, context: Context) {

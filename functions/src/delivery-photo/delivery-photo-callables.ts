@@ -1,3 +1,4 @@
+import { setPrivateCallableResponse } from "../shared/private-callable-response.js";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -32,10 +33,6 @@ export function deliveryPhotoCreateCallableOptions(isEmulator: boolean) {
 }
 const options = deliveryPhotoCallableOptions(emulator);
 
-function privateResponse(request: CallableRequest<unknown>) {
-  request.rawRequest.res?.setHeader("Cache-Control", "private, no-store, max-age=0");
-  request.rawRequest.res?.setHeader("Pragma", "no-cache");
-}
 
 function safeError(error: unknown, operation: string): HttpsError {
   if (error instanceof HttpsError) return error;
@@ -52,7 +49,7 @@ function safeError(error: unknown, operation: string): HttpsError {
 }
 
 async function run<T>(request: CallableRequest<unknown>, operation: string, action: (service: DeliveryPhotoService, actor: Awaited<ReturnType<typeof requireCustomerActor>>) => Promise<T>) {
-  privateResponse(request);
+  setPrivateCallableResponse(request);
   try {
     const actor = await requireCustomerActor(request);
     return await action(new DeliveryPhotoService(), actor);

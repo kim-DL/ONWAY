@@ -1,3 +1,4 @@
+import { readStylesheet } from "../../../tests/helpers/read-stylesheet";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -81,7 +82,7 @@ describe("shell header", () => {
   });
 
   it("exports actual component markup and scoped styles for serverless browser layout verification", () => {
-    const globalCss = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
+    const globalCss = readStylesheet(new URL("../../app/globals.css", import.meta.url));
     const rawCss = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
     const scopedCss = rawCss.replace(/:global\(([^)]+)\)/g, "$1")
       .replace(/\.(header|controls|modeFrame|modeControl|modeButton|singleMode|segmentedFrame|compactFrame|modeTrigger|pickerOption|triggerIcon|triggerChevron|triggerCopy|currentLabel|pickerList|optionIcon|optionCopy|currentMarker|optionChevron)\b/g, (_, name: string) => `.${styles[name]}`);

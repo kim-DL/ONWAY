@@ -5,6 +5,24 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-05 동작 보존 리팩토링 — 적용·자동 검증 완료 / 미커밋·미배포
+
+- 사용자의 예상 효과 보고 후 구현 지시에 따라 관리자 페이지·폼, 학교 현장정보 patch/editor, 서버 재고 codec·lot 계산·실사 projection, 네 Callable 모듈의 동일 private 응답 헤더를 분리했다. UI 영업 방문 입력의 동일 shape/refinement를 공유하고 담당학교 필터를 재사용했다. 관리자 진입점은 2,790→180행, 전역 CSS는 같은 순서의 12개 파일과 14행 진입점으로 분리했다. 전체 변경·보존 계약은 [실행 결과](refactoring/result-2026-10-05.md)를 참고한다.
+- **범위 조정:** 재고 catalog/calendar hook 분리와 영업 모델 파일 분리는 압축 예산을 초과해 보류했다. 재고 workspace 제품 코드는 HEAD와 완전히 동일하며 관찰형 lifecycle 검증을 24→30개로 보강했다. 영업은 기존 `useMemo` 안의 중복 필터 제거만 유지한다. 추가된 파일이 많거나 작은 파일이 됐다는 이유만으로 성능 개선을 주장하지 않는다.
+- **현재 후보 PASS:** lint, 앱·Functions typecheck, Functions build, unit **1,716 PASS / 15 기존 SKIP**, 성능 unit 18 PASS, CI 안전 설정 static build·PWA·모든 기존 JS/CSS budget. 검색 5,000개 index 70.31ms, p95 1.83ms, 입력 중 요청 0회다. 일반 browser 286 PASS / 4 기존 SKIP, demo acceptance 12 gates PASS(Rules 50 PASS, NEIS 3 PASS, 업무 browser 76 PASS / 재고 전용 18 SKIP), 별도 재고 static browser 18 PASS와 transaction integration 12 PASS다.
+- 일반 unit의 Emulator 15 SKIP과 acceptance의 재고 18 SKIP은 전용 runner에서 모두 실제 실행·통과했다. 일반 browser의 개인 PC JPEG 부재 4개만 미실행이다. 원본 동일 HEAD도 독립 worktree에서 동일 종합 검증을 통과했으며, 최초 생성 HTML 누락과 motion 간헐 사례까지 [기준선](refactoring/baseline-2026-10-05.md)에 기록했다. assertion·timeout·skip·예산은 완화하지 않았다.
+- 최종 안전 설정 gzip: initial JS **139,889B**, 영업 workspace assets **14,323B**, inventory JS **25,537B**, inventory CSS **6,649B**, customer JS **36,829B**. CSS 15개 산출물은 원본과 byte 내용이 같다. [번들 결과](refactoring/bundle-result-2026-10-05.json)에 모든 경계와 한도를 보존했다. byte 여유가 여전히 작으므로 다음 변경도 실측해야 한다.
+- source base는 `28af4c5764860fb1305d5d8e6ea69e921db65ca5`이고 변경본 648파일 manifest SHA-256은 `e4927f1b6c458e9542b1cf6961b05e6878052657f5d2ef62bc2a048d04ccff68`다. 제품·테스트·스크립트·설정을 포함하고 문서는 제외한다. 현재 작업 트리에 저장했으며 commit/push/배포는 수행하지 않았다. 현재 `out`은 마지막 demo acceptance 설정의 검증용 결과이므로 운영에 배포하면 안 된다.
+- **릴리스 전 남음:** 실제 운영 설정으로 다시 build 후 PWA·성능·Hosting gate를 수행해야 한다. 이번 `verify:hosting:build`와 실기기/운영 smoke는 미실행이다. 의존성·lockfile·Rules·DB schema는 그대로다. audit moderate 8/high 0/critical 0 중 신규 `ip-address` 개발 의존 항목은 기존 기한부 예외에 자동 편입하지 않고 별도 보안 작업으로 남겼다. [실행 계획](superpowers/plans/2026-10-05-onnuriway-refactoring.md)의 완료·보류 표기와 인가/receipt/계약 소유권 문서를 먼저 읽고 후속 작업을 진행한다.
+
+### 2026-10-05 리팩토링 사전 준비 — 스킬 설치·읽기 감사·계획 완료
+
+- 아래는 위 실행 기록 이전의 사전 준비 당시 상태다. 기준 HEAD는 `28af4c5764860fb1305d5d8e6ea69e921db65ca5`이며 시작 작업 트리는 clean이었다. 당시 산출물은 준비 문서와 스킬 설치 정보였으며 이후 실제 적용 결과는 위 항목을 따른다.
+- OpenAI·Anthropic·xAI 공식 출처를 우선 조사한 뒤 Superpowers 3개(OpenAI 카탈로그 배포, 원작자 obra), Vercel React 2개, Firebase Rules auditor를 현재 클라우드의 `/home/agent/.agents/skills/`에 설치했다. 6개/112개 파일의 고정 commit·SHA-256을 검증했다. 자동 스킬 목록 반영은 미확인이며 파일을 직접 읽어 적용한다. [선정·설치 기록](refactoring/skills-review-2026-10-05.md)과 [잠금 정보](refactoring/skills-lock.json)를 참고한다.
+- 공식 Node 22.23.2/npm 10.9.8과 기존 lockfile로 의존성을 준비했다. lint·app/Functions typecheck·Functions build, unit 1,708 PASS/15 SKIP, 성능 18 PASS, CI 안전 설정의 Next16.3.8 production-mode build·PWA·JS/CSS gate PASS. audit는 moderate 8/high 0/critical 0이다. 과거 예외 7개와의 차이는 Firebase CLI 개발 의존성 `ip-address@10.5.0`으로 확인했다. 정적 조사에서 production 실행 경로는 미발견이나 기존 예외에 자동 포함하지 않고 조치/수용 결정은 별도로 남긴다.
+- bundle 여유가 재고 CSS gzip 7B, 영업 workspace gzip 12B, 거래처 JS gzip 35B, 재고 JS gzip 63B로 작다. 구조 이동마다 기존 상한을 유지한 전후 측정이 필요하다. 이 산출물은 운영 Firebase 설정의 release candidate가 아니며 Hosting gate·Emulator/Rules·브라우저·실기기 검증은 이번에 실행하지 않았다. [현재 기준선](refactoring/baseline-2026-10-05.md)에 측정과 제한을 구분했다.
+- 다음 작업은 [리팩토링 실행 계획](superpowers/plans/2026-10-05-onnuriway-refactoring.md)의 R0/R1 잔여 계약·demo 여정 고정 후 관리자 읽기 화면(R2)과 동일 응답 헤더(R3)부터 작게 진행한다. 인증·사진 lease·receipt 정책을 무리하게 공통화하지 않는다. 프런트/백엔드 독립 감사와 단계별 검증·되돌리기 조건을 계획에 연결했다.
+
 ### 2026-10-05 모바일 재고 디자인 — Git 저장 및 운영 Hosting 반영 완료
 
 - 사용자의 Git 저장·Hosting 배포 요청에 따라 최종 제품 source `99afbc13d794731308da36472368a643692c28a4`를 main에 push하고 배포했다. 아래 개발 미리보기의 “운영 미반영”은 당시 기록이며 이 항목이 최신 상태다. 보관 장소는 마지막 선택인 플로팅형 + 화이트, 제조사/규격은 분홍색 공통 버튼과 중앙 정렬, 선택 항목은 노랑/검정, 신규 기본 단위는 봉이다. 기존 품목 단위와 이력 보호를 유지한다.

@@ -1,3 +1,4 @@
+import { readStylesheet } from "../../../tests/helpers/read-stylesheet";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -122,7 +123,7 @@ describe("inventory UI contracts", () => {
     function scoped(relative: string, names: Record<string, string>) {
       return readFileSync(new URL(relative, import.meta.url), "utf8").replace(/:global\(([^)]+)\)/g, "$1").replace(/\.([a-zA-Z][\w-]*)/g, (match, name: string) => names[name] ? `.${names[name]}` : match);
     }
-    const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8") + scoped("../../components/ui/field-list.module.css", fieldList) + scoped("./inventory.module.css", styles) + scoped("../app-shell/app-shell-header.module.css", headerStyles) + scoped("../app-shell/app-brand.module.css", brandStyles);
+    const css = readStylesheet(new URL("../../app/globals.css", import.meta.url)) + scoped("../../components/ui/field-list.module.css", fieldList) + scoped("./inventory.module.css", styles) + scoped("../app-shell/app-shell-header.module.css", headerStyles) + scoped("../app-shell/app-brand.module.css", brandStyles);
     const fixtureCards = Array.from({ length: 4 }, (_, index) => h(InventoryCard, {
       key: index, product: { ...product, productId: `fixture-${index}`, name: index ? `${product.name} ${index + 1}` : product.name }, location: "all", context, onOpen: noop,
     }));

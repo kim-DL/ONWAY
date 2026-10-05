@@ -1,3 +1,4 @@
+import { readStylesheet } from "../helpers/read-stylesheet";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -13,7 +14,7 @@ test.beforeAll(async () => {
 });
 
 async function liveMotionFixture(page: Page, kind = "header") {
-  const globals = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
+  const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
   await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({ contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)) }));
   await page.setContent(`<!doctype html><html lang="ko" data-fixture="${kind}"><head><base href="http://header.fixture/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>헤더 모션 검증</title><style>${globals}</style><style>${motionCss}</style></head><body><div id="root"></div></body></html>`);
   await page.addScriptTag({ content: motionScript });

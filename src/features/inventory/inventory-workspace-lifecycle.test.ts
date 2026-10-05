@@ -2,7 +2,7 @@ import { isValidElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { inventoryLocationMap, type InventoryContext, type InventoryProduct } from "@/domain/inventory";
-import { clearInventoryWorkspaceSnapshot, updateInventoryWorkspaceUi } from "./inventory-workspace-snapshot";
+import { clearInventoryWorkspaceSnapshot, getInventoryWorkspaceSession, updateInventoryWorkspaceUi } from "./inventory-workspace-snapshot";
 import { reportInventoryAccessFailure } from "./inventory-access-boundary";
 
 const harness = vi.hoisted(() => ({ states: [] as unknown[], refs: [] as Array<{ current: unknown }>, effects: [] as Array<() => void | (() => void)>, stateCursor: 0, refCursor: 0, online: true, context: vi.fn(), list: vi.fn() }));
@@ -33,10 +33,21 @@ function textContent(node: ReactNode): string {
   if (Array.isArray(node)) return node.map(textContent).join("");
   return isValidElement<Props>(node) ? textContent(node.props.children) : "";
 }
-function render(admin = false) { harness.stateCursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryWorkspace({ session, admin }); }
+function render(admin = false, activeSession = session) { harness.stateCursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryWorkspace({ session: activeSession, admin }); }
 function resetMountedInstance() { harness.states = []; harness.refs = []; harness.effects = []; }
 async function settle() { for (let index = 0; index < 12; index += 1) await Promise.resolve(); }
 const hasEditor = (tree: ReactNode) => find(tree, (type) => typeof type === "function" && type.name === "InventoryProductEditor") !== null;
+const catalog = () => getInventoryWorkspaceSession("employee-1:1:1").snapshot.catalog;
+const isLoading = () => find(render(), (_type, props) => props.role === "status" && props.children === "재고를 불러오고 있어요.") !== null;
+const searchField = () => find(render(), (type, props) => type === "input" && props["aria-label"] === "품목 검색")!;
+const card = (productId: string) => find(render(), (type, props) => typeof type === "function" && type.name === "InventoryCard" && (props.product as InventoryProduct).productId === productId);
+function expectNoPrivateSurfaces() {
+  const tree = render();
+  expect(catalog()).toBeNull();
+  expect(tree.props["data-write-actions"]).toBeUndefined();
+  expect(find(tree, (type) => typeof type === "function" && ["InventoryCard", "InventoryDetail", "InventoryProductEditor", "InventorySettingsForm"].includes(type.name))).toBeNull();
+}
+
 beforeEach(() => {
   clearInventoryWorkspaceSnapshot();
   harness.states = []; harness.refs = []; harness.effects = []; harness.online = true; windowEvents.clear(); documentEvents.clear();
@@ -61,11 +72,20 @@ describe("inventory in-memory draft lifecycle", () => {
     { code: "functions/failed-precondition", message: "현재 세션을 확인할 수 없습니다." },
   ])("clears all inventory surfaces on a nested request access failure: $code", async (cause) => {
     const cleanup = await openEditor();
-    harness.states[9] = "private-product"; harness.states[5] = "freezer1"; harness.states[6] = "private query";
+    const product = { productId: "private-product", name: "private query", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "freezer1", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
+    const editor = find(render(), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
+    (editor.onSaved as (product: InventoryProduct) => void)(product);
+    expect(find(render(), (type) => typeof type === "function" && type.name === "InventoryDetail")).not.toBeNull();
+    (find(render(), (type, props) => type === "button" && props.children === "냉동1")!.onClick as () => void)();
+    (searchField().onChange as (event: { target: { value: string } }) => void)({ target: { value: "private query" } });
+    (find(render(), (_type, props) => props["aria-label"] === "새 품목 등록")!.onClick as () => void)();
     reportInventoryAccessFailure(cause, session.uid);
     expect(hasEditor(render())).toBe(false);
-    expect(harness.states[0]).toBeNull(); expect(harness.states[1]).toEqual([]);
-    expect(harness.states[9]).toBeNull(); expect(harness.states[6]).toBe("");
+    expectNoPrivateSurfaces();
+    expect(searchField().value).toBe("");
+    expect(find(render(), (type, props) => type === "button" && props.children === "전체")?.["aria-pressed"]).toBe(true);
     windowEvents.get("focus")!(); await settle(); expect(harness.list).toHaveBeenCalledOnce();
     cleanup();
   });
@@ -83,8 +103,10 @@ describe("inventory in-memory draft lifecycle", () => {
     harness.list.mockImplementationOnce(() => new Promise<InventoryProduct[]>((resolve) => { finish = resolve; }));
     render(); const cleanup = harness.effects[0]!() as () => void; await settle();
     reportInventoryAccessFailure({ code: "functions/permission-denied" }, session.uid);
-    finish([{ productId: "late-private" } as InventoryProduct]); await settle();
-    render(); expect(harness.states[0]).toBeNull(); expect(harness.states[1]).toEqual([]);
+    finish([{ productId: "late-private", name: "권한 폐기 뒤 늦은 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct]); await settle();
+    expectNoPrivateSurfaces();
     cleanup();
   });
 
@@ -109,20 +131,91 @@ describe("inventory in-memory draft lifecycle", () => {
       finish = () => { push([first, second], { pageCount: 2, complete: true }); resolve([first, second]); };
     }));
 
-    render(); const firstCleanup = harness.effects[0]!() as () => void; await settle();
-    expect(harness.states[1]).toEqual([first]);
-    expect(harness.states[2]).toBe(false);
+    render(); expect(isLoading()).toBe(true);
+    const firstCleanup = harness.effects[0]!() as () => void; await settle();
+    expect(catalog()?.products).toEqual([first]);
+    expect(card(first.productId)?.product).toEqual(first);
+    expect(isLoading()).toBe(false);
     firstCleanup();
 
     resetMountedInstance();
     render();
-    expect(harness.states[1]).toEqual([first]);
-    expect(harness.states[2]).toBe(false);
+    expect(catalog()?.products).toEqual([first]);
+    expect(card(first.productId)?.product).toEqual(first);
+    expect(isLoading()).toBe(false);
     const secondCleanup = harness.effects[0]!() as () => void; await settle();
     expect(harness.list).toHaveBeenCalledOnce();
     finish(); await settle();
-    expect(harness.states[1]).toEqual([first, second]);
+    expect(catalog()?.products).toEqual([first, second]);
+    expect(card(second.productId)?.product).toEqual(second);
+    expect(isLoading()).toBe(false);
     secondCleanup();
+  });
+
+  it("preserves committed edits, new products and deletions while later catalog pages are pending", async () => {
+    const product = (productId: string, revision = 1): InventoryProduct => ({ productId, name: productId, unitLabel: "봉", status: "active", revision, stockRevision: revision,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct);
+    const first = product("first"), second = product("second"), deleted = product("deleted");
+    let finish!: (products: InventoryProduct[]) => void;
+    harness.list.mockImplementationOnce((onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) => {
+      onProgress([first, deleted], { pageCount: 1, complete: false });
+      return new Promise<InventoryProduct[]>((resolve) => { finish = resolve; });
+    });
+    const cleanup = await openEditor();
+    const editor = find(render(), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
+    const saved = product("first", 2), added = product("added");
+    for (const write of [saved, added, { ...deleted, status: "deleted" as const, revision: 2 }]) {
+      (editor.onSaved as (product: InventoryProduct) => void)(write);
+    }
+    finish([first, second, deleted]); await settle();
+    expect(catalog()?.products).toEqual([saved, second, added]);
+    expect(card(saved.productId)?.product).toEqual(saved);
+    expect(card(added.productId)?.product).toEqual(added);
+    expect(card(deleted.productId)).toBeNull();
+    expect(harness.list).toHaveBeenCalledOnce(); cleanup();
+  });
+
+  it("queues one settings reread when its forced refresh joins a pending catalog load", async () => {
+    const product = { productId: "old", name: "이전 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
+    harness.context.mockResolvedValue({ ...context, canAdmin: true });
+    let finish!: (products: InventoryProduct[]) => void;
+    harness.list.mockImplementationOnce((onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) => {
+      onProgress([product], { pageCount: 1, complete: false });
+      return new Promise<InventoryProduct[]>((resolve) => { finish = resolve; });
+    });
+    render(); const firstCleanup = harness.effects[0]!() as () => void; await settle();
+    (find(render(), (_type, props) => props["aria-label"] === "재고 설정")!.onClick as () => void)();
+    const settings = find(render(), (type) => typeof type === "function" && type.name === "InventorySettingsForm")!;
+    (settings.onSaved as () => void)(); firstCleanup();
+    render(); const secondCleanup = harness.effects[0]!() as () => void; await settle();
+    expect(harness.list).toHaveBeenCalledOnce();
+    finish([product]); await settle(); await settle();
+    expect(harness.list).toHaveBeenCalledTimes(2);
+    expect(harness.context).toHaveBeenCalledTimes(2);
+    expect(catalog()?.products).toEqual([]); expect(card(product.productId)).toBeNull();
+    expect(isLoading()).toBe(false); secondCleanup();
+  });
+
+  it("does not restore an old private response after the permission namespace changes", async () => {
+    const product = (productId: string): InventoryProduct => ({ productId, name: productId, unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct);
+    let finish!: (products: InventoryProduct[]) => void;
+    harness.list.mockImplementationOnce(() => new Promise<InventoryProduct[]>((resolve) => { finish = resolve; }));
+    render(); const firstCleanup = harness.effects[0]!() as () => void; await settle(); firstCleanup();
+    resetMountedInstance();
+    const nextSession = { ...session, claims: { ...session.claims, permissionsVersion: 2 } };
+    const nextProduct = product("new-permission"); harness.list.mockResolvedValueOnce([nextProduct]);
+    render(false, nextSession); const secondCleanup = harness.effects[0]!() as () => void; await settle();
+    finish([product("old-private")]); await settle();
+    const tree = render(false, nextSession);
+    expect(getInventoryWorkspaceSession("employee-1:1:2").snapshot.catalog?.products).toEqual([nextProduct]);
+    expect(find(tree, (type, props) => typeof type === "function" && type.name === "InventoryCard" && (props.product as InventoryProduct).productId === "old-private")).toBeNull();
+    expect(find(tree, (type) => typeof type === "function" && type.name === "InventoryCard")?.product).toEqual(nextProduct);
+    secondCleanup(); expect(windowEvents.size).toBe(0); expect(documentEvents.size).toBe(0);
   });
 
   it("keeps a published first page when a later page fails", async () => {
@@ -135,9 +228,10 @@ describe("inventory in-memory draft lifecycle", () => {
     });
 
     render(); const cleanup = harness.effects[0]!() as () => void; await settle();
-    expect(harness.states[1]).toEqual([first]);
-    expect(harness.states[2]).toBe(false);
-    expect(harness.states[18]).toMatchObject({ status: "stale-error" });
+    expect(catalog()?.products).toEqual([first]);
+    expect(card(first.productId)?.product).toEqual(first);
+    expect(isLoading()).toBe(false);
+    expect(find(render(), (_type, props) => props["data-freshness"] === "stale-error")).not.toBeNull();
     cleanup();
   });
 
@@ -151,9 +245,8 @@ describe("inventory in-memory draft lifecycle", () => {
     });
 
     render(); const cleanup = harness.effects[0]!() as () => void; await settle();
-    expect(harness.states[0]).toBeNull();
-    expect(harness.states[1]).toEqual([]);
-    expect(harness.states[2]).toBe(false);
+    expectNoPrivateSurfaces();
+    expect(isLoading()).toBe(false);
     cleanup();
   });
 
@@ -167,8 +260,9 @@ describe("inventory in-memory draft lifecycle", () => {
 
     resetMountedInstance();
     render();
-    expect(harness.states[1]).toEqual([product]);
-    expect(harness.states[2]).toBe(false);
+    expect(catalog()?.products).toEqual([product]);
+    expect(card(product.productId)?.product).toEqual(product);
+    expect(isLoading()).toBe(false);
     const warmCleanup = harness.effects[0]!() as () => void; await settle();
     expect(harness.list).toHaveBeenCalledTimes(1);
     warmCleanup();
@@ -176,7 +270,8 @@ describe("inventory in-memory draft lifecycle", () => {
     now.mockReturnValue(161_000);
     resetMountedInstance();
     render();
-    expect(harness.states[1]).toEqual([product]);
+    expect(catalog()?.products).toEqual([product]);
+    expect(card(product.productId)?.product).toEqual(product);
     const staleCleanup = harness.effects[0]!() as () => void; await settle();
     expect(harness.list).toHaveBeenCalledTimes(2);
     staleCleanup(); now.mockRestore();
@@ -196,10 +291,70 @@ describe("inventory in-memory draft lifecycle", () => {
 
     resetMountedInstance();
     render();
-    expect(harness.states[1]).toEqual([saved]);
-    expect(harness.states.slice(5, 9)).toEqual(["freezer1", "최신", true, 180]);
-    expect(harness.states[12]).toBe(true);
+    expect(catalog()?.products).toEqual([saved]);
+    expect(searchField().value).toBe("최신");
+    expect(find(render(), (type, props) => type === "button" && props.children === "냉동1")?.["aria-pressed"]).toBe(true);
+    for (const label of ["임박 상품만 보기", "비활성 품목 보기"]) {
+      const option = find(render(), (type, props) => type === "label" && textContent(props.children).includes(label))!;
+      expect(find(option.children, (type) => type === "input")?.checked).toBe(true);
+    }
   });
+  it("restores the saved page size before a warm screen starts any effects", async () => {
+    const products = Array.from({ length: 181 }, (_, index) => ({ productId: `restored-${index}`, name: `품목 ${index}`, unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct));
+    harness.list.mockResolvedValue(products);
+    render(); const cleanup = harness.effects[0]!() as () => void; await settle();
+    updateInventoryWorkspaceUi("employee-1:1:1", { limit: 180 }); cleanup();
+    resetMountedInstance();
+    const tree = render();
+    expect(find(tree, (type) => type === "ul")?.children).toHaveLength(180);
+    expect(find(tree, (_type, props) => props.children === "품목 더 보기")).not.toBeNull();
+    expect(harness.list).toHaveBeenCalledOnce();
+  });
+  it("updates the snapshot and resets the personal count preference at the KST date boundary without rereading products", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-13T14:59:59Z"));
+    const product = { productId: "calendar-kept", name: "날짜 갱신 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
+    harness.list.mockResolvedValue([product]);
+    const catalogCleanup = await openEditor();
+    const toggle = find(render(), (_type, props) => props["aria-label"] === "재고조사 모드")!;
+    (toggle.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
+    expect(find(render(), (_type, props) => props["aria-label"] === "재고조사 모드")?.checked).toBe(true);
+    const nextContext = { ...context, today: "2026-09-14", cycle: { ...context.cycle, cycleId: "week-2026-09-14", startDate: "2026-09-14", nextDate: "2026-09-21" } };
+    harness.context.mockResolvedValue(nextContext);
+    const calendarCleanup = harness.effects[1]!() as () => void;
+    await vi.advanceTimersByTimeAsync(1_250);
+    expect(catalog()).toMatchObject({ context: nextContext, products: [product], observedDate: "2026-09-14" });
+    expect(card(product.productId)?.context).toEqual(nextContext);
+    expect(find(render(), (_type, props) => props["aria-label"] === "재고조사 모드")?.checked).toBe(false);
+    expect(find(render(), (_type, props) => props.role === "status" && props.children === "유통기한과 이번 주 실사 기준을 갱신했어요.")).not.toBeNull();
+    expect(harness.list).toHaveBeenCalledOnce(); expect(harness.context).toHaveBeenCalledTimes(2);
+    calendarCleanup(); catalogCleanup(); expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clears private surfaces on a calendar authorization failure while preserving the existing list controls", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-13T14:59:59Z"));
+    const product = { productId: "calendar-private", name: "calendar draft", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "freezer1", quantityByLocation: inventoryLocationMap(0),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
+    harness.list.mockResolvedValue([product]);
+    const catalogCleanup = await openEditor();
+    (searchField().onChange as (event: { target: { value: string } }) => void)({ target: { value: "calendar draft" } });
+    (find(render(), (type, props) => type === "button" && props.children === "냉동1")!.onClick as () => void)();
+    expect(card(product.productId)?.product).toEqual(product);
+    render(); const calendarCleanup = harness.effects[1]!() as () => void;
+    harness.context.mockRejectedValueOnce({ code: "functions/permission-denied" });
+    await vi.advanceTimersByTimeAsync(1_250);
+    expectNoPrivateSurfaces();
+    expect(searchField().value).toBe("calendar draft");
+    expect(find(render(), (type, props) => type === "button" && props.children === "냉동1")?.["aria-pressed"]).toBe(true);
+    expect(find(render(), (_type, props) => props.role === "alert")).not.toBeNull();
+    expect(harness.list).toHaveBeenCalledOnce();
+    calendarCleanup(); catalogCleanup(); expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("keeps count mode off until this employee enables it and disables toggling while offline", async () => {
     const cleanup = await openEditor();
     const toggle = () => find(render(), (_type, props) => props.role === "switch" && props["aria-label"] === "재고조사 모드");
@@ -316,7 +471,8 @@ describe("inventory in-memory draft lifecycle", () => {
     now.mockReturnValue(161_000); documentEvents.get("visibilitychange")!(); await settle();
     const tree = render();
     expect(find(tree, (_type, props) => props["data-freshness"] === "stale-error")?.children).toContain("갱신 실패 · 기존 정보 표시");
-    expect(harness.states[1]).toEqual([product]);
+    expect(catalog()?.products).toEqual([product]);
+    expect(card(product.productId)?.product).toEqual(product);
     cleanup(); now.mockRestore();
   });
   it("reuses the shell page gutter only outside the already-padded administrator layout", () => {
@@ -329,7 +485,7 @@ describe("inventory in-memory draft lifecycle", () => {
   it("keeps an open editor mounted across a temporary disconnect and an online refresh", async () => {
     const cleanup = await openEditor();
     harness.online = false; Object.assign(navigator, { onLine: false }); windowEvents.get("offline")!();
-    expect(hasEditor(render())).toBe(true); expect(harness.states[0]).toEqual(context);
+    expect(hasEditor(render())).toBe(true); expect(catalog()?.context).toEqual(context);
     harness.online = true; Object.assign(navigator, { onLine: true }); windowEvents.get("online")!(); await settle();
     expect(hasEditor(render())).toBe(true); expect(harness.list).toHaveBeenCalledTimes(2); cleanup();
   });
@@ -347,6 +503,6 @@ describe("inventory in-memory draft lifecycle", () => {
     harness.online = false; Object.assign(navigator, { onLine: false }); windowEvents.get("offline")!();
     harness.online = true; Object.assign(navigator, { onLine: true });
     harness.context.mockRejectedValueOnce({ code: "functions/permission-denied" }); windowEvents.get("online")!(); await settle();
-    expect(hasEditor(render())).toBe(false); expect(harness.states[0]).toBeNull(); cleanup();
+    expect(hasEditor(render())).toBe(false); expectNoPrivateSurfaces(); cleanup();
   });
 });

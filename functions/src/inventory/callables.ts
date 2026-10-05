@@ -1,3 +1,4 @@
+import { setPrivateCallableResponse } from "../shared/private-callable-response.js";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -25,10 +26,6 @@ import { InventoryService } from "./inventory-service.js";
 import { inventorySummaryResponse } from "./inventory-stock-summary.js";
 
 const options = { enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true", region: "asia-northeast3" as const, maxInstances: 6 };
-function privateResponse(request: CallableRequest<unknown>) {
-  request.rawRequest.res?.setHeader("Cache-Control", "private, no-store, max-age=0");
-  request.rawRequest.res?.setHeader("Pragma", "no-cache");
-}
 function safeInventoryError(error: unknown): HttpsError {
   if (error instanceof HttpsError) return error;
   if (error instanceof InvalidPhotoError) return new HttpsError("invalid-argument", error.message);
@@ -43,7 +40,7 @@ function safeInventoryError(error: unknown): HttpsError {
 function handler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, access: InventoryAccess,
   action: (input: T, actor: InventoryActor) => Promise<R>, filterProductCompatibility = true) {
   return async (request: CallableRequest<unknown>): Promise<R> => {
-    privateResponse(request);
+    setPrivateCallableResponse(request);
     try {
       const actor = await requireInventoryActor(request, access);
       const input = inputSchema.safeParse(request.data);

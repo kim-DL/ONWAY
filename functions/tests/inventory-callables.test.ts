@@ -122,8 +122,11 @@ describe("inventory callable confirmation and privacy boundaries", () => {
   it("does not call the stock service after the preflight authorization is denied", async () => {
     const { HttpsError } = await import("firebase-functions/v2/https");
     fixture.authorize.mockRejectedValueOnce(new HttpsError("permission-denied", "권한 없음"));
-    await expect(saveInventoryProduct.run(request(input).value)).rejects.toMatchObject({ code: "permission-denied" });
+    const { value, headers } = request(input);
+    await expect(saveInventoryProduct.run(value)).rejects.toMatchObject({ code: "permission-denied" });
     expect(fixture.save).not.toHaveBeenCalled();
+    expect(headers).toHaveBeenCalledWith("Cache-Control", "private, no-store, max-age=0");
+    expect(headers).toHaveBeenCalledWith("Pragma", "no-cache");
   });
   it("does not release private data if authority is revoked while the write is in progress", async () => {
     const { HttpsError } = await import("firebase-functions/v2/https");

@@ -76,7 +76,10 @@ describe("delivery photo Callable boundary", () => {
   it("does not enter the service after authentication/session rejection", async () => {
     const { HttpsError } = await import("firebase-functions/v2/https");
     fixture.authorize.mockRejectedValueOnce(new HttpsError("failed-precondition", "세션 만료"));
-    await expect(callables.listDeliveryPhotos.run(request({ scope: "today" }).value)).rejects.toMatchObject({ code: "failed-precondition" });
+    const { value, headers } = request({ scope: "today" });
+    await expect(callables.listDeliveryPhotos.run(value)).rejects.toMatchObject({ code: "failed-precondition" });
     expect(fixture.list).not.toHaveBeenCalled();
+    expect(headers).toHaveBeenCalledWith("Cache-Control", "private, no-store, max-age=0");
+    expect(headers).toHaveBeenCalledWith("Pragma", "no-cache");
   });
 });

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readStylesheet } from "../helpers/read-stylesheet";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -7,7 +7,7 @@ import { build } from "esbuild";
 import { installCustomerMapMock } from "./fixtures/customer-map-mock";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const globals = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
+const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
 let script = "";
 let moduleCss = "";
 

@@ -3,6 +3,47 @@ import { describe, expect, it } from "vitest";
 import { recordSalesVisitInputSchema, todayInSeoul, updateSalesVisitInputSchema, visitDateWindowForCycle } from "./sales-visit-contract";
 
 describe("sales visit client contract", () => {
+  it.each([
+    ["record", recordSalesVisitInputSchema, {}],
+    ["update", updateSalesVisitInputSchema, { visitId: "VISIT-001", expectedVisitRevision: 1, expectedSalesRevision: 1 }],
+  ] as const)("keeps %s form validation and legacy input boundaries", (_operation, schema, revisions) => {
+    const visit = {
+      cycleId: "2026-08",
+      schoolId: "SCH-001",
+      expectedAssignmentRevision: 1,
+      visitedDate: "2026-08-24",
+      visitedBy: "EMP-SALES-A",
+      brochureStatus: "delivered",
+      sample: { status: "delivered", items: [{ productName: "현미 스낵" }] },
+      interestScore: 60,
+      activityTagIds: ["ACT-SAMPLE"],
+      summary: "샘플 반응을 확인했습니다.",
+      followUp: { required: false, dueDate: null, summary: null },
+      requestId: "553dfe93-6b62-4ed7-8395-e3246397eaa6",
+      appVersion: "contract-test",
+      ...revisions,
+    };
+    expect(schema.safeParse(visit).success).toBe(true);
+
+    const cases = [
+      [{ sample: { status: "delivered", items: [{ productName: "Rice" }, { productName: " rice " }] } }, ["sample", "items"], "같은 샘플 제품명은 한 번만 입력해주세요."],
+      [{ sample: { status: "delivered", items: [] } }, ["sample", "items"], "전달한 샘플 제품명을 입력해주세요."],
+      [{ sample: { status: "notDelivered", items: [{ productName: "현미 스낵" }] } }, ["sample", "items"], "미전달 샘플에는 제품을 남길 수 없습니다."],
+      [{ activityTagIds: ["ACT-SAMPLE", "ACT-SAMPLE"] }, ["activityTagIds"], "활동 태그는 중복 선택할 수 없습니다."],
+      [{ followUp: { required: true, dueDate: null, summary: null } }, ["followUp"], "후속 날짜와 내용을 입력해주세요."],
+      [{ followUp: { required: false, dueDate: "2026-08-25", summary: "다음 방문" } }, ["followUp"], "후속이 없으면 날짜와 내용을 비워주세요."],
+    ] as const;
+    for (const [patch, path, message] of cases) {
+      const result = schema.safeParse({ ...visit, ...patch });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues).toEqual([
+        expect.objectContaining({ path: [...path], message }),
+      ]);
+    }
+    expect(schema.safeParse({ ...visit, sample: { status: "delivered", items: [{ productId: "PRODUCT-001", quantity: 1 }] } }).success).toBe(false);
+    expect(schema.safeParse({ ...visit, visitedDate: undefined, visitedAt: "2026-08-24T05:30:00.000Z" }).success).toBe(false);
+  });
+
   it("uses Seoul today and exposes the seven-day next-cycle recording window", () => {
     const now = new Date("2026-08-24T05:30:00.000Z");
     expect(todayInSeoul(now)).toBe("2026-08-24");

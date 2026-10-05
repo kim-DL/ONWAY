@@ -1,3 +1,4 @@
+import { readStylesheet } from "../../../tests/helpers/read-stylesheet";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -7,7 +8,7 @@ import { ADMIN_NAVIGATION, AdminNavigation } from "./admin-navigation";
 
 describe("administrator navigation contract", () => {
   it("keeps administrator styles scoped while preserving the account avatar and shared brand styles", () => {
-    const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
+    const css = readStylesheet(new URL("../../app/globals.css", import.meta.url));
     const workspaceCss = readFileSync(new URL("./admin-workspace.module.css", import.meta.url), "utf8");
     expect(css).not.toMatch(/\.admin-(?:sidebar|brand|main|content|topbar|page|metric|table|session-card)(?:\b|__)/);
     expect(workspaceCss).toContain(".workspace :global(.admin-main)");

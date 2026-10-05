@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readStylesheet } from "../helpers/read-stylesheet";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { build } from "esbuild";
@@ -18,7 +19,7 @@ test.beforeAll(async () => {
           : "export const customerPhotoRepository={load:()=>{throw Error('Unexpected fixture request')}};" }));
   } }] });
   script = result.outputFiles.find((file) => file.path.endsWith(".js"))!.text;
-  css = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8") + result.outputFiles.find((file) => file.path.endsWith(".css"))!.text;
+  css = readStylesheet(new URL("../../src/app/globals.css", import.meta.url)) + result.outputFiles.find((file) => file.path.endsWith(".css"))!.text;
 });
 async function fixture(page: Page, mode: string) {
   await page.setViewportSize({ width: 360, height: 840 });

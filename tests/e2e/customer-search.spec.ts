@@ -1,11 +1,12 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readStylesheet } from "../helpers/read-stylesheet";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { build } from "esbuild";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const globals = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
+const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
 let script = "";
 let css = "";
 test.beforeAll(async () => {

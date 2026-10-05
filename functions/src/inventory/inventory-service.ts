@@ -3,11 +3,11 @@ import { FieldPath, Timestamp, type DocumentData, type Firestore, type Transacti
 import { HttpsError } from "firebase-functions/v2/https";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { verifyInventoryTransactionActor, type InventoryAccess, type InventoryActor } from "./inventory-authorization.js";
-import { defaultInventorySettings, inventoryCycle, inventoryToday, nextInventorySettings } from "./inventory-calendar.js";
+import { inventoryCycle, inventoryToday, nextInventorySettings } from "./inventory-calendar.js";
 import {
   INVENTORY_COMPANY_ID, INVENTORY_CYCLE_PATH, INVENTORY_LOCATIONS, INVENTORY_MAX_LOTS,
   INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryEventSchema, inventoryInitialStockSchema, inventoryLocationMap, inventoryLotSchema,
-  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryQuantitySchema, inventorySettingsSchema, inventoryStatusChangeSchema,
+  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryStatusChangeSchema,
   type DeleteInventoryProductInput, type InventoryCountInput, type InventoryEvent, type InventoryLocation,
   type InventoryLot, type InventoryLotChange, type InventoryMovementInput, type InventoryMutationResult, type InventoryProduct, type InventoryStatusChange,
   type InventoryProductSaveResult, type InventorySettings, type SetInventoryProductStatusInput,
@@ -20,27 +20,16 @@ import {
 } from "./inventory-manufacturer-contract.js";
 import { resolveInventoryPhotoChange } from "./inventory-photo-store.js";
 import { inventoryProductRecord, inventoryProductWire, summarizeInventoryLotGroups,
-  type InventoryLotChecks, type InventoryProductRecord } from "./inventory-stock-summary.js";
+  type InventoryProductRecord } from "./inventory-stock-summary.js";
+
+import { datesFromDocument, inventoryLotFromDocument, inventoryProductFromDocument, persisted, settingsFromDocument } from "./inventory-document-codec.js";
+import { projectInventoryInspection } from "./inventory-inspection-projection.js";
+import { activeSortedLots, ensureQuantity, summarizeInventoryLots } from "./inventory-lot-calculations.js";
+
+export { inventoryLotFromDocument, inventoryProductFromDocument } from "./inventory-document-codec.js";
+export { summarizeInventoryLots } from "./inventory-lot-calculations.js";
 
 const REQUEST_PATH = "companies/onnuri/inventoryRequests";
-function timestampToIso(value: unknown) { return value instanceof Timestamp ? value.toDate().toISOString() : value; }
-function datesFromDocument(value: DocumentData) {
-  return { ...value, ...(value.createdAt !== undefined ? { createdAt: timestampToIso(value.createdAt) } : {}),
-    ...(value.updatedAt !== undefined ? { updatedAt: timestampToIso(value.updatedAt) } : {}) };
-}
-function persisted(value: Record<string, unknown>) {
-  return { ...value, ...(typeof value.createdAt === "string" ? { createdAt: Timestamp.fromDate(new Date(value.createdAt)) } : {}),
-    ...(typeof value.updatedAt === "string" ? { updatedAt: Timestamp.fromDate(new Date(value.updatedAt)) } : {}) };
-}
-export function inventoryProductFromDocument(data: DocumentData): InventoryProduct { return inventoryProductWire(inventoryProductRecord(datesFromDocument(data))); }
-export function inventoryLotFromDocument(data: DocumentData): InventoryLot { return inventoryLotSchema.parse(datesFromDocument(data)); }
-function settingsFromDocument(data: DocumentData | undefined): InventorySettings {
-  return data ? inventorySettingsSchema.parse(datesFromDocument(data)) : defaultInventorySettings();
-}
-function activeSortedLots(lots: InventoryLot[]) {
-  return lots.filter((lot) => lot.quantity > 0).sort((a, b) => a.locationId.localeCompare(b.locationId)
-    || (a.expiryDate ?? "9999").localeCompare(b.expiryDate ?? "9999") || a.lotId.localeCompare(b.lotId));
-}
 function withoutMutationDetail<T>(result: T) {
   return result && typeof result === "object" && "detail" in result
     ? Object.fromEntries(Object.entries(result).filter(([key]) => key !== "detail")) : result;
@@ -53,23 +42,6 @@ function checkStockRevision(product: InventoryProduct, revision: number) {
   if (product.stockRevision !== revision) conflict(product);
   if (product.status !== "active") throw new HttpsError("failed-precondition", "사용 중인 상품의 재고만 변경할 수 있습니다.", { reason: "inventory-inactive" });
 }
-function ensureQuantity(quantity: number): number {
-  const parsed = inventoryQuantitySchema.safeParse(quantity);
-  if (!parsed.success) throw new HttpsError("failed-precondition", "재고가 부족하거나 허용 수량을 초과합니다.", { reason: "inventory-quantity" });
-  return parsed.data;
-}
-export function summarizeInventoryLots(lots: InventoryLot[]) {
-  const quantityByLocation = inventoryLocationMap(0);
-  const nearestExpiryByLocation = inventoryLocationMap<string | null>(null);
-  for (const lot of lots) {
-    if (lot.quantity <= 0) continue;
-    quantityByLocation[lot.locationId] = ensureQuantity(quantityByLocation[lot.locationId] + lot.quantity);
-    const current = nearestExpiryByLocation[lot.locationId];
-    if (lot.expiryDate && (!current || lot.expiryDate < current)) nearestExpiryByLocation[lot.locationId] = lot.expiryDate;
-  }
-  return { quantityByLocation, nearestExpiryByLocation };
-}
-
 export class InventoryService {
   constructor(private readonly db: Firestore = getAdminFirestore(), private readonly now: () => Date = () => new Date()) {}
   private productRef(productId: string) { return this.db.doc(`${INVENTORY_PRODUCT_PATH}/${productId}`); }
@@ -240,41 +212,9 @@ export class InventoryService {
     kind: InventoryEvent["kind"], lines: InventoryEvent["lines"], cycleId: string | null = null,
     lotMetadataChange?: InventoryEvent["lotMetadataChange"],
     auditOverride?: { eventType: string; changedFields: string[] }): InventoryMutationResult {
-    const quantityChanged = lines.some((line) => line.delta !== 0);
-    // Metadata edits can change the nearest expiry without changing quantity.
-    const stockRevision = product.stockRevision + (quantityChanged || kind === "lot_update" ? 1 : 0);
-    const lastCountByLocation = { ...product.lastCountByLocation };
-    for (const location of new Set(lines.filter((line) => line.delta !== 0).map((line) => line.locationId))) {
-      const previous = lastCountByLocation[location];
-      if (previous) lastCountByLocation[location] = { ...previous, stockChangedSinceCount: true };
-    }
-    const inspectionByLot: InventoryLotChecks = { ...product.inspectionByLot };
-    // Migrate a legacy full-location confirmation lazily inside a stock write.
-    // Use BEFORE quantities, otherwise a newly received lot would be falsely
-    // inherited as checked merely because the old location was complete.
-    if (product.inspectionByLot === undefined) for (const lot of lots) {
-      const before = lines.find((line) => line.lotId === lot.lotId)?.before ?? lot.quantity;
-      const summary = product.lastCountByLocation[lot.locationId];
-      if (before > 0 && summary && !summary.stockChangedSinceCount) inspectionByLot[lot.lotId] = {
-        cycleId: summary.cycleId, quantity: before, checkedAt: summary.checkedAt, checkedBy: summary.checkedBy, changed: summary.changed,
-      };
-    }
-    for (const line of lines) {
-      if (line.delta !== 0) delete inspectionByLot[line.lotId];
-      if (cycleId) inspectionByLot[line.lotId] = { cycleId, quantity: line.after,
-        checkedAt: now.toISOString(), checkedBy: actor.employeeId, changed: line.delta !== 0 };
-    }
-    if (cycleId) for (const location of new Set([input.locationId, ...lines.map((line) => line.locationId)])) {
-      const positive = lots.filter((lot) => lot.locationId === location && lot.quantity > 0);
-      if (positive.every((lot) => inspectionByLot[lot.lotId]?.cycleId === cycleId && inspectionByLot[lot.lotId]?.quantity === lot.quantity)) {
-        lastCountByLocation[location] = { cycleId, checkedAt: now.toISOString(), checkedBy: actor.employeeId, stockRevision,
-          changed: quantityChanged || positive.some((lot) => inspectionByLot[lot.lotId]?.changed), stockChangedSinceCount: false };
-      }
-    }
-    // Exhausted lots retain their append-only events; the bounded working-set
-    // confirmation map does not accumulate one entry per historical batch.
-    const positiveIds = new Set(lots.filter((lot) => lot.quantity > 0).map((lot) => lot.lotId));
-    for (const id of Object.keys(inspectionByLot)) if (!positiveIds.has(id)) delete inspectionByLot[id];
+    const { quantityChanged, stockRevision, lastCountByLocation, inspectionByLot } = projectInventoryInspection({
+      product, lots, lines, kind, locationId: input.locationId, cycleId, now, employeeId: actor.employeeId,
+    });
     const next = inventoryProductWithManufacturerSchema.parse({ ...inventoryProductWire(product), ...summarizeInventoryLots(lots), stockRevision,
       lotSummary: summarizeInventoryLotGroups(lots),
       hasHistory: true, updatedAt: now.toISOString(), updatedBy: actor.employeeId,

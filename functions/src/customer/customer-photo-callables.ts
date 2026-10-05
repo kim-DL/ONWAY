@@ -1,5 +1,6 @@
+import { setPrivateCallableResponse } from "../shared/private-callable-response.js";
 import { logger } from "firebase-functions";
-import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { InvalidPhotoError } from "../photo/photo-processor.js";
 import { requireCustomerActor } from "./customer-authorization.js";
@@ -8,10 +9,6 @@ import { CustomerPhotoService } from "./customer-photo-service.js";
 import { customerPhotoErrorDiagnostic } from "./customer-photo-errors.js";
 
 const options = { enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true", region: "asia-northeast3" as const, maxInstances: 10 };
-function privateResponse(request: CallableRequest<unknown>) {
-  request.rawRequest.res?.setHeader("Cache-Control", "private, no-store, max-age=0");
-  request.rawRequest.res?.setHeader("Pragma", "no-cache");
-}
 function safePhotoError(error: unknown, operation: "upload" | "download"): HttpsError {
   if (error instanceof HttpsError) return error;
   if (error instanceof InvalidPhotoError) {
@@ -23,7 +20,7 @@ function safePhotoError(error: unknown, operation: "upload" | "download"): Https
   return new HttpsError("unavailable", "거래처 사진을 처리하지 못했어요. 잠시 후 다시 시도해주세요.");
 }
 export const uploadCustomerPhoto = onCall({ ...options, maxInstances: 4, memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
-  privateResponse(request);
+  setPrivateCallableResponse(request);
   try {
     const actor = await requireCustomerActor(request);
     const input = uploadCustomerPhotoInputSchema.safeParse(request.data);
@@ -34,7 +31,7 @@ export const uploadCustomerPhoto = onCall({ ...options, maxInstances: 4, memory:
   } catch (error) { throw safePhotoError(error, "upload"); }
 });
 export const getCustomerPhoto = onCall(options, async (request) => {
-  privateResponse(request);
+  setPrivateCallableResponse(request);
   try {
     const actor = await requireCustomerActor(request);
     const input = getCustomerPhotoInputSchema.safeParse(request.data);

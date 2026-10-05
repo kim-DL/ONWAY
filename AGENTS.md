@@ -25,3 +25,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 캐시·PWA·성능 경계: `급식길 PWA 검색·캐시·성능 설계서.md`
 - Firebase Hosting/도메인 상태: `docs/phase-45-hosting-migration-status.md`
 - 재고 UX·실사 최신 결정: `docs/phase-46-inventory-field-experience.md`부터 `docs/phase-49-inventory-count-mode.md`
+- 리팩토링 순서·보존 계약·검증 기준: `docs/superpowers/plans/2026-10-05-onnuriway-refactoring.md`
+- 리팩토링 스킬의 실제 설치 범위·버전·프로젝트 적용 제한: `docs/refactoring/skills-review-2026-10-05.md`. 외부 스킬의 일반 조언으로 위 보안·동작·검증 계약을 변경하지 않는다.
