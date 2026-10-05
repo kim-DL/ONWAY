@@ -5,6 +5,16 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-05 모바일 재고 디자인 — Git 저장 및 운영 Hosting 반영 완료
+
+- 사용자의 Git 저장·Hosting 배포 요청에 따라 최종 제품 source `99afbc13d794731308da36472368a643692c28a4`를 main에 push하고 배포했다. 아래 개발 미리보기의 “운영 미반영”은 당시 기록이며 이 항목이 최신 상태다. 보관 장소는 마지막 선택인 플로팅형 + 화이트, 제조사/규격은 분홍색 공통 버튼과 중앙 정렬, 선택 항목은 노랑/검정, 신규 기본 단위는 봉이다. 기존 품목 단위와 이력 보호를 유지한다.
+- 정확한 source의 [Quality Gate 37265827098](https://github.com/kim-DL/ONWAY/actions/runs/37265827098)는 **2026-10-05 14:21:08 KST 전체 SUCCESS**다. audit·lint·typecheck·unit·검색/캐시 성능·Functions/production build·PWA·기존 JS/CSS budget·Safe configuration browser·Deferred sales·Phase 17·Inventory 상품사진 회귀까지 통과했다. 검사·성능 budget·의존성 값을 변경하지 않았다.
+- 로컬 재고/Functions 단위 511 PASS, PWA 단위 17 PASS, 전체 lint 및 app/Functions typecheck PASS. Next 16.3.8 production build와 PWA·성능·Hosting artifact gate PASS. Export 102개/precache 89개/initial assets 9개이며 inventory CSS 28,777B raw/6,649B gzip으로 기존 gate를 통과했다. 배포 직전 source/main 일치, clean worktree와 후보 파일 digest를 확인했다.
+- `--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting만 한 번 배포했다. Live version `e5ca163b724d3239`, release `1791177902201000`, release time **2026-10-05 14:25:02.201 KST** (`2026-10-05T05:25:02.201Z`), rollback version `57fef6f82bf25e8d`다. Functions·Rules·backend Auth·운영 업무 데이터는 변경하지 않았고 비공개 env 파일의 전후 digest도 동일하다.
+- apex와 기본 Hosting origin의 canonical 공개 HTTP 검사 각 25개 PASS. 두 origin의 공개 worker/배포 자산이 후보와 일치하며 worker SHA-256은 `9c964818a08fed6cfb04aa8ff94d7433acdd62b168c505ebc7a717b94b0fd7c8`다. www는 HTTPS 301로 apex에 이동한다.
+- Codex 운영 브라우저의 별도 창에서 앱의 업데이트 버튼을 적용한 뒤 기존 인증 복원, 후보에 포함된 로드 자산 11개, controlled reload 뒤 로그인 유지와 console warning/error 0개를 확인했다. 390px에서 보관 장소 48px/화이트 선택, 등록 버튼 50px/16px/700/중앙 정렬/공통 분홍색, 신규 봉의 노랑/검정 선택, 가로 넘침 없음 PASS. 빈 등록 화면은 저장하지 않고 닫았고 기존 사용자 창은 수정하지 않았다. 320px 레이아웃·규격/제조사 picker의 선택색 검증은 앞선 demo 개발 브라우저 결과와 구분한다.
+- 이번 디자인의 실제 기기·설치 PWA 체감 확인은 사용자가 배포본으로 진행한다. 앞선 사진·PWA·실사 기능에 대한 사용자 PASS를 이번 새 디자인의 실기기 PASS로 사용하지 않는다. 기록은 docs-only 후속 커밋으로 main에 저장·로컬 동기화하며 제품 내용이 같으므로 문서 커밋을 중복 배포하지 않는다. 비공개 값을 제외한 release metadata·후보·검증 결과와 빈 등록 화면 캡처는 ignored `output/design-hosting-20261005/`에 있다.
+
 ### 2026-10-05 주석 기반 디자인 작업 — 개발 미리보기
 
 - 운영 설정을 연결했던 localhost PIN 화면은 App Check의 정식 앱 주소 안내로 막혔다. 디자인 작업용 화면을 `http://127.0.0.1:3000`의 Next dev + `demo-onnuriway` Auth/Firestore/Functions/Storage Emulator로 전환했다. 기존 `.env.local`/운영 설정을 수정하지 않고 프로세스 환경으로 demo 설정을 지정한다. 운영 PIN 대신 저장소의 샘플 계정으로 로그인 및 새로고침 후 인증 복원을 확인했다. 운영 데이터/보안 설정/Hosting은 변경하지 않았다.
