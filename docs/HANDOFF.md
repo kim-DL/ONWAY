@@ -5,6 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-05 리팩토링 — main 저장 및 운영 Hosting 배포 완료
+
+- 제품 source `c8fbea7aad7206e6897669ae9ddbabc11eda320f`를 main에 push하고 기존 배포 PC의 clean main도 같은 커밋으로 fast-forward했다. 아래의 미커밋·미배포 표기는 구현 완료 당시 기록이다. [Quality Gate 37293442115](https://github.com/kim-DL/ONWAY/actions/runs/37293442115)는 **2026-10-05 19:19:25 KST 전체 SUCCESS**다. audit·lint·typecheck·unit·검색/캐시 성능·Functions build·정적 build·PWA·기존 JS/CSS budget·일반 browser·Deferred sales·Phase 17·Inventory photo regression을 통과했다.
+- 배포 PC의 기존 비공개 운영 설정과 Node 22.23.2/npm 10.9.8로 다시 빌드했다. 사진·재고 flag ON, Emulator OFF, PWA revision은 위 source다. build·PWA·성능·Hosting artifact gate PASS이며 export/shipped 102개, precache 89개, initial assets 9개다. 운영 gzip은 initial JS 139,925B, 영업 workspace 14,323B, inventory JS 25,537B/CSS 6,649B, customer JS 36,830B로 기존 한도를 유지했다. 클라우드 안전 설정 `out`은 배포하지 않았다.
+- `--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting만 한 번 배포했다. Live version `663003d922fb2290`, release `1791195640851000`, release time **2026-10-05 19:20:40.851 KST** (`2026-10-05T10:20:40.851Z`), 직전 rollback version `e5ca163b724d3239`다. 서버 리팩토링은 Git에 포함되지만 Functions는 이번 Hosting 요청에 따라 배포하지 않았다. Rules·Auth·운영 업무 데이터도 변경하지 않았다.
+- `https://onnuriway.com`과 `https://onnuriway.web.app`에서 canonical 공개 HTTP 검사 각각 25개 PASS. 공개 worker는 후보 SHA-256 `20aa159d3a9aeca9f142ab0ade71a6cca170d03a9587d1545463421c40294c44`와 일치하며 www HTTPS는 301로 apex에 이동한다. 비공개 env 파일의 전후 digest는 동일하고 작업 트리는 clean이었다. 배포 후보 102파일 manifest·전후 release metadata·검증 로그는 배포 PC의 ignored `output/refactor-hosting-20261005/`에 보존했다.
+- 이번 운영 검증은 공개 GET/HEAD 검사다. 실제 계정 로그인·App Check·Kakao 지도·현장 기기의 설치 PWA 업데이트/오프라인/세션 유지는 이번 배포에서 직접 검증하지 않았으며 자동 회귀 결과와 구분한다. 기록은 docs-only 후속 커밋으로 main과 PC에 동기화하며 제품 소스가 같으므로 중복 배포하지 않는다.
+
 ### 2026-10-05 동작 보존 리팩토링 — 적용·자동 검증 완료 / 미커밋·미배포
 
 - 사용자의 예상 효과 보고 후 구현 지시에 따라 관리자 페이지·폼, 학교 현장정보 patch/editor, 서버 재고 codec·lot 계산·실사 projection, 네 Callable 모듈의 동일 private 응답 헤더를 분리했다. UI 영업 방문 입력의 동일 shape/refinement를 공유하고 담당학교 필터를 재사용했다. 관리자 진입점은 2,790→180행, 전역 CSS는 같은 순서의 12개 파일과 14행 진입점으로 분리했다. 전체 변경·보존 계약은 [실행 결과](refactoring/result-2026-10-05.md)를 참고한다.
