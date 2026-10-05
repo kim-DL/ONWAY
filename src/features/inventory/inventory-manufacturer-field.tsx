@@ -6,7 +6,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import type { InventoryProduct, SaveInventoryProductInput } from "@/domain/inventory";
 import { useAuth } from "@/features/auth/auth-context";
-import formStyles from "./inventory-form-design.module.css";
+import formStyles from "./inventory-form.module.css";
 
 const InventoryManufacturerPicker = lazy(() => import("./inventory-manufacturer-picker")
   .then((module) => ({ default: module.InventoryManufacturerPicker })));
@@ -25,7 +25,7 @@ export function InventoryManufacturerField({ name, manufacturerId, productId, al
   const sessionNamespace = auth.state.status === "authenticated"
     ? `${auth.state.session.uid}:${auth.state.session.claims.sessionVersion}:${auth.state.session.claims.permissionsVersion}` : "signed-out";
   const [open, setOpen] = useState(false);
-  return <><GlassButton className={formStyles.manufacturerSelect} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(true)}><span>{name || "제조사 선택하기"}</span><Icon name="chevron-right" size={16} /></GlassButton>
+  return <><GlassButton className={formStyles.select} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(true)}><span>{name || "제조사 선택하기"}</span><Icon name="chevron-right" size={16} /></GlassButton>
     {open ? <Suspense fallback={<BottomSheet open title="제조사 선택" onClose={() => setOpen(false)}><p role="status">선택 목록을 준비하고 있어요.</p></BottomSheet>}><InventoryManufacturerPicker current={{ name, ...(manufacturerId ? { manufacturerId } : {}) }} {...(productId ? { productId } : {})} sessionNamespace={sessionNamespace} allowCreate={allowCreate} canAdmin={canAdmin} onSelect={(manufacturer, saveProduct) => { onSelect(manufacturer, saveProduct); setOpen(false); }} onClear={(saveProduct) => { onClear(saveProduct); setOpen(false); }} onClose={() => setOpen(false)} /></Suspense> : null}
   </>;
 }

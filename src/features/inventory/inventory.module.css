@@ -5,12 +5,11 @@
 .row, .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .muted { color: var(--shell-soft-ink, #4e5968); font-size: 13px; line-height: 1.65; margin: 4px 0 0; }
 .locations { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; padding: 5px; border: 1px solid #dbe4ee; border-radius: 14px; background: #e9eef5; box-shadow: inset 0 1px 0 #fff; }
-.locations button { min-width: 0; min-height: 48px; padding: 8px 1px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #586b80; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.35; letter-spacing: -.02em; cursor: pointer; transition: transform 130ms ease, box-shadow 130ms ease, background-color 130ms ease, border-color 130ms ease, color 130ms ease; }
+.locations button { min-width: 0; min-height: 48px; padding: 8px 1px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #586b80; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.35; cursor: pointer; transition: 130ms; }
 .locations button[aria-pressed="true"] { border-color: #788a9d; background: #fff; color: #27394f; font-weight: 750; box-shadow: inset 0 1px 0 #fff, 0 2px 4px #2b4d7521; }
 @media (hover: hover) and (pointer: fine) { .locations button:not([aria-pressed="true"]):hover { background: #ffffffbf; color: #27394f; } }
-.locations button:active { transform: translateY(1px) scale(.98); background: #e0e8f0; box-shadow: inset 0 1px 3px #2b4d7521; }
-.locations button[aria-pressed="true"]:active { background: #f1f4f8; box-shadow: inset 0 1px 3px #2b4d7521; }
-.workspace :is(button, input, select, textarea):focus-visible, .sheet :is(button, input, select, textarea):focus-visible { outline: 3px solid #3182f6; outline-offset: 3px; }
+.locations button:active { transform: translateY(1px) scale(.98); background: #f1f4f8; box-shadow: inset 0 1px 3px #2b4d7521; }
+:is(.workspace, .sheet) :is(button, input, select, textarea):focus-visible { outline: 3px solid #3182f6; outline-offset: 3px; }
 .progressCard { display: grid; gap: 6px; padding: 9px 11px; border: 1px solid #e9cf9d; border-radius: 7px; background: #fffaf0; }
 .progressCard > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
 .progressCard > div > span { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; color: #536174; }
@@ -79,19 +78,19 @@
 .detailSecondaryActions > :only-child { grid-column: 1 / -1; }
 .detailActions :global(.glass-button) { min-width: 0; min-height: 44px; padding: 6px 3px; border-radius: 7px; font-size: 12px; gap: 5px; box-shadow: none; }
 .detailSecondaryActions :global(.glass-button) { background: #f2f5f8; color: #4c6076; border-color: #d4dfe8; }
-.detailStockActions .detailEditAction { background: #e5eff1; color: #365e69; border-color: #c5d9dd; }
+.detailEditAction:global(.glass-button) { background: #e5eff1; color: #365e69; border-color: #c5d9dd; }
 .detailStockActions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .detailStockActions :global(.glass-button) { min-height: 48px; flex-direction: column; gap: 2px; line-height: 1.2; }
-.detailStockActions > .detailActionIssue { background: #ffeadc; color: #914522; border-color: #eec8af; }
-.detailStockActions > .detailActionReceive { background: #deedff; color: #225b9b; border-color: #b8d0ed; }
-.detailStockActions > .detailActionAdjust { background: #ece4f7; color: #694699; border-color: #d2c3e9; }
-.detailSecondaryActions > .detailActionCount { background: #d9f1e6; color: #216e50; border-color: #aad7c4; }
-.detailSecondaryActions > .detailActionCount:disabled { opacity: 1; background: #edf1f4; color: #607184; border-color: #d4dfe8; }
+.detailActionIssue:global(.glass-button) { background: #ffeadc; color: #914522; border-color: #eec8af; }
+.detailActionReceive:global(.glass-button) { background: #deedff; color: #225b9b; border-color: #b8d0ed; }
+.detailActionAdjust:global(.glass-button) { background: #ece4f7; color: #694699; border-color: #d2c3e9; }
+.detailActionCount:global(.glass-button) { background: #d9f1e6; color: #216e50; border-color: #aad7c4; }
+.detailActionCount:global(.glass-button):disabled { opacity: 1; background: #edf1f4; color: #607184; border-color: #d4dfe8; }
 .detailActionLabel { display: grid; gap: 2px; line-height: 1.25; }
 .detailActionLabel small { font-size: 10px; font-weight: 500; }
 .detailMoreIcon { font-size: 23px; line-height: .7; letter-spacing: 1px; }
 .field { display: flex; flex-direction: column; gap: 6px; color: #4e5968; font-size: 13px; font-weight: 650; min-width: 0; position: relative; }
-.field input, .field select, .field textarea { box-sizing: border-box; min-width: 0; width: 100%; min-height: 48px; border: 1px solid #d1d6db; border-radius: 10px; padding: 12px; color: #191f28; background: #fff; font: inherit; font-size: 16px; font-weight: 450; }
+.field :is(input, select, textarea) { box-sizing: border-box; min-width: 0; width: 100%; min-height: 48px; border: 1px solid #d1d6db; border-radius: 10px; padding: 12px; color: #191f28; background: #fff; font: inherit; font-size: 16px; font-weight: 450; }
 .field textarea { resize: vertical; line-height: 1.6; }
 .field :disabled { background: #f2f4f6; color: #6b7684; }
 .required { font-size: 11px; color: #1b64da; position: absolute; right: 0; top: 0; }
@@ -133,28 +132,28 @@
 .detailMoreActions { display: grid; gap: 8px; padding-block: 2px 8px; }
 .detailMoreActions :global(.glass-button) { justify-content: flex-start; min-width: 0; min-height: 52px; font-size: 14px; padding: 10px 12px; border-radius: 8px; box-shadow: none; background: #f1f5f8; color: #465d76; border-color: #d5dfe8; }
 .detailMoreActions :global(.glass-button) > span { flex: 1; text-align: left; }
-.detailMoreActions .detailDeleteAction { background: #fff2f3; color: #973b50; border-color: #edcbd3; }
-.detailMoreActions .detailStatusAction { background: #eff1f5; color: #4b586f; border-color: #d5dbe5; }
+.detailDeleteAction:global(.glass-button) { background: #fff2f3; color: #973b50; border-color: #edcbd3; }
+.detailStatusAction:global(.glass-button) { background: #eff1f5; color: #4b586f; border-color: #d5dbe5; }
 .sheet details > summary { cursor: pointer; min-height: 44px; align-content: center; font-size: 13px; font-weight: 600; color: #657386; }
 .sheet details[open] > summary { margin-bottom: 10px; }
 .photo { display: grid; place-items: center; border-radius: 12px; background: #f2f4f6; overflow: hidden; padding: 0; margin-bottom: 10px; min-height: 80px; }
 .photo img { width: 100%; max-height: 300px; object-fit: contain; display: block; }
 .photoOpen { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: zoom-in; }
-.photoOpen > span, .photoExpandHint { position: absolute; right: 5px; bottom: 5px; display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid #ffffffb3; border-radius: 6px; color: #3c566e; background: #ffffffdf; }
+.photoExpandHint { position: absolute; right: 5px; bottom: 5px; display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid #ffffffb3; border-radius: 6px; color: #3c566e; background: #ffffffdf; }
 .photoPicker { display: grid; gap: 7px; }
 .photoPicker[data-selected] { grid-template-columns: 72px minmax(0, 1fr); align-items: center; }
-.photoPicker > p, .photoPicker > :global(.glass-button) { grid-column: 1 / -1; margin: 0; }
+.photoPicker > :is(p, :global(.glass-button)) { grid-column: 1 / -1; margin: 0; }
 .photoPicker > .photo { width: 72px; height: 72px; min-height: 0; margin: 0; border-radius: 7px; }
-.photoPicker .photo img { height: 100%; object-fit: cover; }
-.photoPicker > .buttonRow { display: grid; align-items: center; gap: 6px; }
+.photoPicker img { height: 100%; object-fit: cover; }
+.buttonRow { display: grid; align-items: center; gap: 6px; }
 .photoPicker .buttonRow :global(.glass-button) { min-width: 0; min-height: 44px; padding: 6px; border-radius: 7px; font-size: 12px; }
-.photoPicker .buttonRow .photoCapture { justify-content: start; gap: 9px; min-height: 72px; padding: 8px; color: #334d68; background: linear-gradient(120deg, #eef3f8, #f8fafbcc); border: 1px solid #c9d4df; box-shadow: inset 0 1px #fff; text-align: left; }
+.photoPicker .photoCapture:global(.glass-button) { justify-content: start; gap: 9px; min-height: 72px; padding: 8px; color: #334d68; background: linear-gradient(120deg, #eef3f8, #f8fafbcc); border: 1px solid #c9d4df; box-shadow: inset 0 1px #fff; text-align: left; }
 .photoCaptureIcon { display: grid; place-items: center; width: 42px; height: 44px; flex-shrink: 0; border: 1px solid #d1dce6; border-radius: 10px; background: linear-gradient(#ffffff, #e0e9f2); box-shadow: 0 2px 5px #546d8612; color: #547393; }
 .photoCapture strong { font-size: 15px; }
 .photoCapture small { display: block; font-size: 10px; color: #647589; font-weight: 500; margin-top: 3px; }
 .photoCapture > svg:last-child { margin-left: auto; flex-shrink: 0; }
 .photoPicker[data-selected] > .buttonRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.photoPicker[data-selected] .buttonRow .photoCapture { min-height: 44px; justify-content: center; padding: 5px; gap: 5px; }
+.photoPicker[data-selected] .photoCapture:global(.glass-button) { min-height: 44px; justify-content: center; padding: 5px; gap: 5px; }
 .photoPicker[data-selected] .photoCapture strong { font-size: 12px; }
 .photoPicker[data-selected] .photoCaptureIcon { width: 20px; height: 24px; border: 0; background: none; box-shadow: none; }
 .photoPicker[data-selected] .photoCaptureIcon svg { width: 18px; }

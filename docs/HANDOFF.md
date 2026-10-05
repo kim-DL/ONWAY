@@ -12,6 +12,7 @@
 - 최신 사용자 주석에 따라 제조사/규격 버튼을 #FF467A 배경, #351529 글자, 16px/700 중앙 정렬과 얕은 입체 그림자로 통일했다. 제조사 미선택 문구는 “제조사 선택하기”다. 원산지·단위·유통기한 및 규격 picker의 선택 radio, 제조사 목록/최근 사용의 선택 항목은 #FFD444 배경/검정 글자로 표시한다. 규격 미선택 문구는 “규격 선택하기”, 선택 후에는 기존 “규격 · 값”으로 표시한다. 단위는 봉→낱개→팩→병→직접입력 순서이며 신규 등록 기본값도 봉이다. 기존 품목 수정 시 저장된 단위와 이력 보호는 유지한다.
 - 관련 form/manufacturer picker 테스트 40 PASS 뒤 배포 전 inventory/Functions 단위 511 PASS, PWA 단위 17 PASS, 전체 lint 및 app/Functions typecheck PASS. 실제 Codex 개발 브라우저에서 지정한 두 배경색/글자색, 신규 봉 기본 선택, 규격 목록 열기와 1000g 선택 반영을 확인했다. 기존 registration/E2E의 신규 단위·버튼 문구 기대값을 갱신하고 단위 변경 후 focus 검증은 낱개→봉의 명시적 전환으로 유지했다. 사용자 요청으로 Git 저장과 Hosting 배포를 준비하며 아직 운영 반영 전이다.
 - 보관 장소 디자인은 공식 Mantine/Radix·Material·shadcn/ui를 참고한 모바일 비교 후보를 제시한 뒤, 사용자의 마지막 선택인 **플로팅형 + 화이트**를 적용했다. 슬레이트 트레이 #E9EEF5, 선택 배경 #FFFFFF/글자 #27394F/1px 테두리 #788A9D이며 선택 버튼에만 얕은 내부 하이라이트/그림자를 둔다. 선택 글자 대비 11.77:1, 비선택 글자 대비 4.70:1. 터치 높이는 48px이고 눌림은 1px 이동/0.98배 축소 및 내부 그림자로 표현한다. 기존 aria-pressed/focus-visible/reduced-motion 처리는 유지한다. 실제 Codex 개발 브라우저의 320px/390px에서 다섯 버튼의 48px 높이, 글자 잘림·가로 넘침 없음을 확인했다. 앞선 맑은 블루 시안은 마지막 화이트 선택으로 대체했다.
+- 첫 candidate `ff886e0`의 production/PWA/Hosting build는 통과했지만 inventory CSS가 기존 28.5KiB budget을 초과해 배포하지 않았다. 후속 수정은 제조사/규격 공통 버튼 클래스, 선택색 CSS 변수, 동일한 버튼 대상/특이도의 짧은 선택자와 중복 제거로 스타일을 정리하고 CSS module 이름을 `inventory-form.module.css`로 간결하게 했다. 기능·권한·budget·의존성은 변경하지 않는다. 동일한 form/Functions 단위 511 PASS 및 lint/typecheck를 재검증하며 최종 candidate build/CI 결과는 별도 기록한다.
 
 ### 2026-10-05 인증 저장소 일치 수정 운영 Hosting 반영 완료
 

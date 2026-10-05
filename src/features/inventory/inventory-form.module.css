@@ -1,4 +1,5 @@
 .productForm { gap: 10px; }
+.productForm, .presetChoices { --choice-bg: #ffd444; --choice-ink: #000; --choice-border: #b58a00; }
 .productSection { display: grid; gap: 10px; min-width: 0; padding: 12px; border: 1px solid #d9e1e8b3; border-radius: 9px; background: #ffffffa8; }
 .divider { height: 1px; margin: 2px 0; border: 0; background: linear-gradient(90deg, #c4d2df1a, #b6c8dcb3 18%, #b6c8dcb3 82%, #c4d2df1a); }
 .expiryFields { display: grid; gap: 8px; }
@@ -6,8 +7,8 @@
 .expiryStatus legend { margin-bottom: 6px; padding: 0; color: #344154; font-size: 13px; font-weight: 600; }
 .expiryStatus > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .expiryStatus label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px; gap: 7px; border: 1px solid #d5dfe8; border-radius: 7px; background: #f6f9fc; color: #5c6e82; font-size: 13px; font-weight: 600; cursor: pointer; }
-.expiryStatus label:has(input:checked) { border-color: #a3c5e3; background: #e7f1fb; color: #285b87; }
-.expiryStatus input { margin: 0; width: 16px; height: 16px; accent-color: #3975a8; }
+.expiryStatus label:has(input:checked) { border-color: var(--choice-border, #a3c5e3); background: var(--choice-bg, #e7f1fb); color: var(--choice-ink, #285b87); }
+.expiryStatus input { margin: 0; width: 16px; height: 16px; accent-color: var(--choice-ink, #3975a8); }
 .expiryStatus label:has(input:focus-visible) { outline: 3px solid #3182f6; outline-offset: 2px; }
 .expiryStatus:disabled label { opacity: .55; cursor: default; }
 .presetChoices:has(label:nth-child(5)) > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -27,9 +28,9 @@
 .lotActions p { margin: 0; font-size: 12px; color: #856335; }
 .lotActions > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .lotActions :global(.glass-button) { min-width: 0; min-height: 44px; padding: 8px 4px; gap: 6px; font-size: 13px; border-radius: 7px; box-shadow: none; }
-.lotActions .issue { background: #ffeadc; color: #914522; border-color: #eec8af; }
-.lotActions .receive { background: #deedff; color: #225b9b; border-color: #b8d0ed; }
-.lotActions .adjust { background: #ede4ff; color: #65419a; border-color: #d3c0ed; }
+.issue:global(.glass-button) { background: #ffeadc; color: #914522; border-color: #eec8af; }
+.receive:global(.glass-button) { background: #deedff; color: #225b9b; border-color: #b8d0ed; }
+.adjust:global(.glass-button) { background: #ede4ff; color: #65419a; border-color: #d3c0ed; }
 .dateField { display: grid; gap: 6px; min-width: 0; color: #344154; font-size: 13px; font-weight: 600; }
 .dateInputRow { display: flex; gap: 8px; min-width: 0; }
 .dateInputRow > input { flex: 1; width: 100%; min-width: 0; min-height: 46px; padding: 10px 12px; border: 1px solid #cfd9e5; border-radius: 7px; background: #fffffff0; color: #263449; font: inherit; font-size: 16px; font-weight: 500; }
@@ -53,11 +54,7 @@
 .calendarHelp { margin: 12px 0 0; font-size: 12px; color: #5b6e85; text-align: center; }
 
 
-:is(.manufacturerSelect, .specificationSelect):global(.glass-button.glass-button--glass) { position: relative; justify-content: center; width: 100%; min-height: 50px; padding: 12px 36px; background: #ff467a; color: #351529; border: 1px solid #c62d59; border-radius: 12px; font-size: 16px; font-weight: 700; line-height: 1.4; text-align: center; box-shadow: inset 0 1px 0 #ffffff80, inset 0 -2px 0 #be244c55, 0 3px 0 #bd2c56, 0 5px 9px #76203b24; }
-:is(.manufacturerSelect, .specificationSelect):global(.glass-button.glass-button--glass):hover:not(:disabled) { background: #ff467a; box-shadow: inset 0 1px 0 #ffffff80, inset 0 -2px 0 #be244c55, 0 3px 0 #bd2c56, 0 6px 10px #76203b30; }
-:is(.manufacturerSelect, .specificationSelect):global(.glass-button.glass-button--glass):active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 1px 2px #76203b30, 0 1px 0 #bd2c56; }
-:is(.manufacturerSelect, .specificationSelect):global(.glass-button.glass-button--glass):focus-visible { outline: 3px solid #3182f6; outline-offset: 4px; }
-.manufacturerSelect > svg { position: absolute; right: 14px; }
-.manufacturerSelect > span { min-width: 0; overflow-wrap: anywhere; }
-.productForm .expiryStatus label:has(input:checked), .presetChoices label:has(input:checked) { border-color: #b58a00; background: #ffd444; color: #000; }
-.productForm .expiryStatus input:checked, .presetChoices input:checked { accent-color: #000; }
+.select:global(.glass-button.glass-button--glass) { position: relative; justify-content: center; width: 100%; min-height: 50px; padding: 12px 36px; background: #ff467a; color: #351529; border: 1px solid #c62d59; border-radius: 12px; font-size: 16px; font-weight: 700; line-height: 1.4; text-align: center; box-shadow: inset 0 1px 0 #ffffff80, inset 0 -2px 0 #be244c55, 0 3px 0 #bd2c56, 0 5px 9px #76203b24; }
+.select:global(.glass-button.glass-button--glass):active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 1px 2px #76203b30, 0 1px 0 #bd2c56; }
+.select > svg { position: absolute; right: 14px; }
+.select > span { min-width: 0; overflow-wrap: anywhere; }

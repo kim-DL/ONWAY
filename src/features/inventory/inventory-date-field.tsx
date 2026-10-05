@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { BottomSheet, useBottomSheetClose } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
-import styles from "./inventory-form-design.module.css";
+import styles from "./inventory-form.module.css";
 
 const DAY = 86_400_000;
 const MIN_DATE = "0001-01-01";

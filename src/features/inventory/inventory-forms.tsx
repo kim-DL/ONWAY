@@ -9,7 +9,7 @@ import { inventoryRepository, inventoryErrorMessage } from "./inventory-reposito
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
 import { InventoryDateField, isInventoryInputDate } from "./inventory-date-field";
 import styles from "./inventory.module.css";
-import formStyles from "./inventory-form-design.module.css";
+import formStyles from "./inventory-form.module.css";
 import { getLoadedInventoryProductEditor, loadInventoryProductEditor } from "./inventory-editor-loader";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
 import { inventoryAccessGeneration, inventoryAuthenticationError } from "./inventory-access-boundary";

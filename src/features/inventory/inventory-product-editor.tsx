@@ -9,7 +9,7 @@ import { inventoryRepository } from "./inventory-repository";
 import { useInventoryEditorReady } from "./use-inventory-editor-ready";
 import { FormFooter, LotFields, QuantityFields, blankLot, useInventoryAction, validLotDraft, type InventoryProductEditorProps } from "./inventory-forms";
 import styles from "./inventory.module.css";
-import formStyles from "./inventory-form-design.module.css";
+import formStyles from "./inventory-form.module.css";
 
 const InventoryManufacturerField = lazy(() => import("./inventory-manufacturer-field")
   .then((module) => ({ default: module.InventoryManufacturerField })));
@@ -76,7 +76,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       <div className={styles.field}><span>제조사</span><Suspense fallback={<span className={styles.muted} role="status">제조사 선택 준비 중…</span>}><InventoryManufacturerField name={draft.manufacturer} {...(draft.manufacturerId ? { manufacturerId: draft.manufacturerId } : {})} {...(product ? { productId: product.productId } : {})} allowCreate={canCreateManufacturer} canAdmin={canManageManufacturers} disabled={busy} onSelect={(manufacturer, saveProduct) => { manufacturerSave.current = saveProduct; setDraft((old) => ({ ...old, manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name })); setClearManufacturerReference(false); }} onClear={(saveProduct) => { manufacturerSave.current = saveProduct; setDraft((old) => { const next = { ...old, manufacturer: "" }; delete next.manufacturerId; return next; }); setClearManufacturerReference(true); }} /></Suspense></div>
       <PresetChoices label="원산지" presets={ORIGIN_PRESETS} selected={isCustom("origin", ORIGIN_PRESETS) ? null : draft.origin} disabled={busy} onSelect={(value) => selectPreset("origin", value)} />
       {isCustom("origin", ORIGIN_PRESETS) ? customInput("원산지 직접입력", "origin") : null}
-      <GlassButton className={formStyles.specificationSelect} aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>{draft.specification ? `규격 · ${draft.specification}` : "규격 선택하기"}</GlassButton>
+      <GlassButton className={formStyles.select} aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>{draft.specification ? `규격 · ${draft.specification}` : "규격 선택하기"}</GlassButton>
       {isCustom("specification", SPECIFICATION_PRESETS) ? customInput("규격 직접입력", "specification") : null}
       <PresetChoices label="기준 단위 (필수)" presets={UNIT_PRESETS} selected={customUnit ? null : unitPreset} disabled={busy || !!product?.hasHistory} displayLabel={(value) => value === "개" ? "낱개" : value} wideCustom onSelect={(value) => selectPreset("unitLabel", value)} />
       {customUnit ? customInput("기준 단위 직접입력", "unitLabel", 20, true) : null}
