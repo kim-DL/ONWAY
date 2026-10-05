@@ -5,6 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-05 주석 기반 디자인 작업 — 개발 미리보기
+
+- 운영 설정을 연결했던 localhost PIN 화면은 App Check의 정식 앱 주소 안내로 막혔다. 디자인 작업용 화면을 `http://127.0.0.1:3000`의 Next dev + `demo-onnuriway` Auth/Firestore/Functions/Storage Emulator로 전환했다. 기존 `.env.local`/운영 설정을 수정하지 않고 프로세스 환경으로 demo 설정을 지정한다. 운영 PIN 대신 저장소의 샘플 계정으로 로그인 및 새로고침 후 인증 복원을 확인했다. 운영 데이터/보안 설정/Hosting은 변경하지 않았다.
+- 실행 중인 개발 서버와 Emulator는 이번 세션용이다. 재시작 시 Functions build → `node scripts/firebase-emulators.mjs start` → demo 전용 `scripts/seed-emulator.ts` → ignored `output/design-preview/start-preview.ps1` 순서로 준비한다. Seed는 demo 데이터를 초기화하므로 작업 중인 Emulator에 임의로 다시 실행하지 않는다. PIN/키는 문서나 로그에 출력하지 않는다.
+- 최신 사용자 주석에 따라 제조사/규격 버튼을 #FF467A 배경, #351529 글자, 16px/700 중앙 정렬과 얕은 입체 그림자로 통일했다. 제조사 미선택 문구는 “제조사 선택하기”다. 원산지·단위·유통기한 및 규격 picker의 선택 radio, 제조사 목록/최근 사용의 선택 항목은 #FFD444 배경/검정 글자로 표시한다. 규격 미선택 문구는 “규격 선택하기”, 선택 후에는 기존 “규격 · 값”으로 표시한다. 단위는 봉→낱개→팩→병→직접입력 순서이며 신규 등록 기본값도 봉이다. 기존 품목 수정 시 저장된 단위와 이력 보호는 유지한다.
+- 관련 form/manufacturer picker 테스트 40 PASS 뒤 배포 전 inventory/Functions 단위 511 PASS, PWA 단위 17 PASS, 전체 lint 및 app/Functions typecheck PASS. 실제 Codex 개발 브라우저에서 지정한 두 배경색/글자색, 신규 봉 기본 선택, 규격 목록 열기와 1000g 선택 반영을 확인했다. 기존 registration/E2E의 신규 단위·버튼 문구 기대값을 갱신하고 단위 변경 후 focus 검증은 낱개→봉의 명시적 전환으로 유지했다. 사용자 요청으로 Git 저장과 Hosting 배포를 준비하며 아직 운영 반영 전이다.
+- 보관 장소 디자인은 공식 Mantine/Radix·Material·shadcn/ui를 참고한 모바일 비교 후보를 제시한 뒤, 사용자의 마지막 선택인 **플로팅형 + 화이트**를 적용했다. 슬레이트 트레이 #E9EEF5, 선택 배경 #FFFFFF/글자 #27394F/1px 테두리 #788A9D이며 선택 버튼에만 얕은 내부 하이라이트/그림자를 둔다. 선택 글자 대비 11.77:1, 비선택 글자 대비 4.70:1. 터치 높이는 48px이고 눌림은 1px 이동/0.98배 축소 및 내부 그림자로 표현한다. 기존 aria-pressed/focus-visible/reduced-motion 처리는 유지한다. 실제 Codex 개발 브라우저의 320px/390px에서 다섯 버튼의 48px 높이, 글자 잘림·가로 넘침 없음을 확인했다. 앞선 맑은 블루 시안은 마지막 화이트 선택으로 대체했다.
+
 ### 2026-10-05 인증 저장소 일치 수정 운영 Hosting 반영 완료
 
 - 사용자 요청 범위를 새 창 로그인 유지 수정으로 한정했다. 최신 main/source `37cf2e9c972c3acd0f124c5c713d53a1803fe269`와 live `b5b031dbcf146a3b`를 대조해 미반영을 확인했다. 해당 source의 [Quality Gate 37179011488](https://github.com/kim-DL/ONWAY/actions/runs/37179011488)는 전체 SUCCESS다. 아래 10월 4일의 “미배포/실기기 미확인”은 당시 기록이며 이 항목이 최신 상태다.

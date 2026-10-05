@@ -15,11 +15,11 @@ const InventoryManufacturerField = lazy(() => import("./inventory-manufacturer-f
   .then((module) => ({ default: module.InventoryManufacturerField })));
 const ORIGIN_PRESETS = ["국내산", "수입산", "미확인"];
 const SPECIFICATION_PRESETS = ["100g", "200g", "300g", "500g", "700g", "1000g", "1200g", "1500g", "2000g", "5000g"];
-const UNIT_PRESETS = ["개", "봉", "팩", "병"];
+const UNIT_PRESETS = ["봉", "개", "팩", "병"];
 function PresetChoices({ label, presets, selected, disabled, displayLabel, wideCustom = false, onSelect }: { label: string; presets: readonly string[]; selected: string | null; disabled: boolean; displayLabel?: (value: string) => string; wideCustom?: boolean; onSelect: (value: string | null) => void }) {
   return <fieldset className={`${formStyles.expiryStatus} ${formStyles.presetChoices}`} disabled={disabled}><legend>{label}</legend><div>{[...presets, null].map((option) => <label key={option ?? label} className={!option && wideCustom ? formStyles.presetWide : undefined}><input type="radio" name={label} checked={option === selected} onChange={() => onSelect(option)} />{option ? displayLabel?.(option) ?? option : "직접입력"}</label>)}</div></fieldset>;
 }
-const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "개", unitsPerBox: 1, defaultLocationId: location, urgent: false });
+const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "봉", unitsPerBox: 1, defaultLocationId: location, urgent: false });
 
 export function InventoryProductEditorImpl({ product, location, canCreateManufacturer = true, canManageManufacturers = false, onClose, onSaved }: InventoryProductEditorProps) {
   const ready = useInventoryEditorReady();
@@ -76,7 +76,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       <div className={styles.field}><span>제조사</span><Suspense fallback={<span className={styles.muted} role="status">제조사 선택 준비 중…</span>}><InventoryManufacturerField name={draft.manufacturer} {...(draft.manufacturerId ? { manufacturerId: draft.manufacturerId } : {})} {...(product ? { productId: product.productId } : {})} allowCreate={canCreateManufacturer} canAdmin={canManageManufacturers} disabled={busy} onSelect={(manufacturer, saveProduct) => { manufacturerSave.current = saveProduct; setDraft((old) => ({ ...old, manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name })); setClearManufacturerReference(false); }} onClear={(saveProduct) => { manufacturerSave.current = saveProduct; setDraft((old) => { const next = { ...old, manufacturer: "" }; delete next.manufacturerId; return next; }); setClearManufacturerReference(true); }} /></Suspense></div>
       <PresetChoices label="원산지" presets={ORIGIN_PRESETS} selected={isCustom("origin", ORIGIN_PRESETS) ? null : draft.origin} disabled={busy} onSelect={(value) => selectPreset("origin", value)} />
       {isCustom("origin", ORIGIN_PRESETS) ? customInput("원산지 직접입력", "origin") : null}
-      <GlassButton aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>규격 · {draft.specification || "선택"}</GlassButton>
+      <GlassButton className={formStyles.specificationSelect} aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>{draft.specification ? `규격 · ${draft.specification}` : "규격 선택하기"}</GlassButton>
       {isCustom("specification", SPECIFICATION_PRESETS) ? customInput("규격 직접입력", "specification") : null}
       <PresetChoices label="기준 단위 (필수)" presets={UNIT_PRESETS} selected={customUnit ? null : unitPreset} disabled={busy || !!product?.hasHistory} displayLabel={(value) => value === "개" ? "낱개" : value} wideCustom onSelect={(value) => selectPreset("unitLabel", value)} />
       {customUnit ? customInput("기준 단위 직접입력", "unitLabel", 20, true) : null}

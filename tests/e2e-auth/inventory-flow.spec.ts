@@ -496,7 +496,7 @@ test("admin manages manufacturers through the real callable without changing the
 
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
-  await editor.getByRole("button", { name: "제조사 선택", exact: true }).click();
+  await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
   const search = picker.getByRole("combobox", { name: "제조사 검색", exact: true });
   await search.fill(originalName);
@@ -516,7 +516,7 @@ test("admin manages manufacturers through the real callable without changing the
   await expect(management).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(management).toHaveCount(0); await expect(picker).toBeVisible();
-  await expect(editor.getByRole("button", { name: "제조사 선택", exact: true })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "제조사 선택하기", exact: true })).toBeVisible();
 
   await manage.click(); management = page.getByRole("dialog", { name: "제조사 관리", exact: true });
   await expect(management).toBeVisible();
@@ -542,7 +542,7 @@ test("admin manages manufacturers through the real callable without changing the
   expect(updateRequest).toMatchObject({ manufacturerId: created.manufacturerId, expectedRevision: created.revision, name: renamedName });
   const renameRequestId = updateRequest!.requestId;
   await expect(picker.getByRole("status").filter({ hasText: "기존 품목의 제조사명은 그대로 유지됩니다." })).toBeVisible();
-  await expect(editor.getByRole("button", { name: "제조사 선택", exact: true })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "제조사 선택하기", exact: true })).toBeVisible();
 
   const oldReservation = await db().doc(`companies/onnuri/inventoryManufacturerNames/${manufacturerReservationId(created.normalizedName)}`).get();
   const newNormalizedName = normalizeInventoryManufacturerName(renamedName);
@@ -578,7 +578,7 @@ test("admin manages manufacturers through the real callable without changing the
   expect(updateRequest).toMatchObject({ manufacturerId: created.manufacturerId, expectedRevision: 2, active: false });
   await expect(deactivateSheet).toHaveCount(0);
   await expect(picker.getByRole("button", { name: `${renamedName} 관리`, exact: true })).toHaveCount(0);
-  await expect(editor.getByRole("button", { name: "제조사 선택", exact: true })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "제조사 선택하기", exact: true })).toBeVisible();
   expect((await db().doc(`companies/onnuri/inventoryManufacturers/${created.manufacturerId}`).get()).data()).toMatchObject({
     name: renamedName, active: false, revision: 3,
   });
@@ -617,7 +617,7 @@ test(`HEIC product capture converts before authenticated upload (${output})`, as
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(name);
-  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (낱개)", exact: true }).fill("1");
+  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (봉)", exact: true }).fill("1");
   await editor.getByLabel("첫 유통기한 날짜", { exact: true }).fill(expiryAfter(30));
   const bytes = Buffer.alloc(20);
   bytes.writeUInt32BE(bytes.length, 0); bytes.write("ftypmif1", 4); bytes.write("heic", 16);
@@ -657,7 +657,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await editor.getByLabel(/품목명/).fill(productName);
   let manufacturerListRequests = 0;
   page.on("request", (request) => { if (new URL(request.url()).pathname.endsWith("/listInventoryManufacturers")) manufacturerListRequests += 1; });
-  await editor.getByRole("button", { name: "제조사 선택", exact: true }).click();
+  await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
   let manufacturerPicker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
   const manufacturerSearch = manufacturerPicker.getByRole("combobox", { name: "제조사 검색", exact: true });
   await expect(manufacturerSearch).toBeVisible();
@@ -684,8 +684,8 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   const unitChoices = editor.getByRole("group", { name: "기준 단위 (필수)", exact: true });
   await expect(originChoices.getByRole("radio")).toHaveCount(4);
   await expect(unitChoices.getByRole("radio")).toHaveCount(5);
-  await expect(unitChoices.getByRole("radio", { name: "낱개", exact: true })).toBeChecked();
-  await expect(unitChoices.getByRole("radio", { name: "봉", exact: true })).toBeVisible();
+  await expect(unitChoices.getByRole("radio", { name: "봉", exact: true })).toBeChecked();
+  await expect(unitChoices.getByRole("radio", { name: "낱개", exact: true })).toBeVisible();
   await expect(unitChoices.getByRole("radio", { name: "팩", exact: true })).toBeVisible();
   const bottleUnit = unitChoices.getByRole("radio", { name: "병", exact: true });
   const customUnit = unitChoices.getByRole("radio", { name: "직접입력", exact: true });
@@ -701,9 +701,10 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await originChoices.getByRole("radio", { name: "국내산", exact: true }).check();
   await expect(customOrigin).toHaveCount(0);
   await expect(editor.getByLabel("원산지 직접입력", { exact: true })).toHaveCount(0);
+  await unitChoices.getByRole("radio", { name: "낱개", exact: true }).check();
   await unitChoices.getByRole("radio", { name: "봉", exact: true }).check();
   await expect(unitChoices.getByRole("radio", { name: "봉", exact: true })).toBeFocused();
-  await editor.getByRole("button", { name: "규격 · 선택", exact: true }).click();
+  await editor.getByRole("button", { name: "규격 선택하기", exact: true }).click();
   const specificationPicker = page.getByRole("dialog", { name: "규격 선택", exact: true });
   await expect(specificationPicker.getByRole("textbox")).toHaveCount(0);
   await expect(specificationPicker.getByRole("radio")).toHaveCount(11);
@@ -979,7 +980,7 @@ test("a staff member deactivates, reactivates and deletes stock with history whi
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(name);
-  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (낱개)", exact: true }).fill("20");
+  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (봉)", exact: true }).fill("20");
   await editor.getByLabel("첫 유통기한 날짜", { exact: true }).fill(expiryAfter(30));
   await submitMutation(page, editor, "품목 등록", "saveInventoryProduct");
   const detail = page.getByRole("dialog", { name, exact: true });
@@ -1039,7 +1040,7 @@ test("an offline registration draft stays in memory and saves only after an expl
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(draftName);
-  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (낱개)", exact: true }).fill("1");
+  await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (봉)", exact: true }).fill("1");
   const expiryChoices = editor.getByRole("group", { name: "유통기한 상태", exact: true });
   await expiryChoices.getByRole("radio", { name: "미확인", exact: true }).check();
   await expect(expiryChoices.getByRole("radio")).toHaveCount(2);

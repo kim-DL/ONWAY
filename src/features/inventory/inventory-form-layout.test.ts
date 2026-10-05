@@ -48,8 +48,8 @@ describe("compact date-first inventory forms", () => {
     expect(html).not.toContain("수량은 품목 등록 후");
     expect(html).not.toContain("입고 묶음");
     expect(html).not.toContain("박스");
-    expect(html).toContain('aria-label="초기 수량 (필수) (낱개)"');
-    expect(html).toContain("규격 · 선택");
+    expect(html).toContain('aria-label="초기 수량 (필수) (봉)"');
+    expect(html).toContain("규격 선택하기");
     expect(html).not.toContain("원산지 직접입력<input");
     expect(html).not.toContain("규격 직접입력<input");
     expect(html).not.toContain("기준 단위 직접입력");

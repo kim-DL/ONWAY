@@ -237,11 +237,11 @@ describe("single-submit inventory registration", () => {
     expect(harness.save.mock.calls[0]![0].draft).toMatchObject({ unitLabel, unitsPerBox: 1 });
   });
 
-  it("keeps the new-product unit default at 개", () => {
+  it("keeps the new-product unit default at 봉", () => {
     const units = find(render(), (type, props) => typeof type === "function" && type.name === "PresetChoices" && props.label === "기준 단위 (필수)")!;
-    expect(units.props).toMatchObject({ presets: ["개", "봉", "팩", "병"], selected: "개", wideCustom: true });
+    expect(units.props).toMatchObject({ presets: ["봉", "개", "팩", "병"], selected: "봉", wideCustom: true });
     expect((units.props.displayLabel as (value: string) => string)("개")).toBe("낱개");
-    expect((named(render(), "QuantityFields").props.product as { unitLabel: string }).unitLabel).toBe("개");
+    expect((named(render(), "QuantityFields").props.product as { unitLabel: string }).unitLabel).toBe("봉");
   });
 
   it("stores the visible 낱개 preset with the canonical 개 value", async () => {
