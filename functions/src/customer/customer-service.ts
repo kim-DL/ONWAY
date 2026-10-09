@@ -3,6 +3,8 @@ import { FieldPath, Timestamp, type DocumentData, type Firestore } from "firebas
 
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { formatPhoneNumber } from "../shared/phone-number.js";
+import { z } from "zod";
+import { customerNameMatcher } from "./customer-name-search.js";
 import { verifyCustomerTransactionActor, type CustomerActor } from "./customer-authorization.js";
 import { resolveCustomerPhotoChange } from "./customer-photo-store.js";
 import { boundedScan, type ScanOptions } from "../shared/bounded-scan.js";
@@ -16,6 +18,11 @@ import {
 export class CustomerRevisionConflict extends Error {}
 export class CustomerRequestCollision extends Error {}
 export class CustomerNotFound extends Error {}
+
+const customerSearchSchema = z.object({ customerId: customerSchema.shape.customerId,
+  name: customerSchema.shape.name, normalizedName: customerSchema.shape.normalizedName,
+  choseongName: customerSchema.shape.choseongName, status: customerSchema.shape.status,
+  district: customerSchema.shape.district, administrativeDong: customerSchema.shape.administrativeDong });
 
 export function customerFromDocument(data: DocumentData): Customer {
   return customerSchema.parse({
@@ -87,14 +94,24 @@ export class CustomerService {
     };
   }
 
+  /** MCP search never downloads contacts, access passwords, addresses or photo fields. */
+  async listSearch(afterId: string | null) {
+    let query = this.db.collection(CUSTOMER_COLLECTION_PATH).orderBy(FieldPath.documentId()).limit(251)
+      .select(...Object.keys(customerSearchSchema.shape));
+    if (afterId) query = query.startAfter(afterId);
+    const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
+    const docs = snapshot.docs.slice(0, 250);
+    return { customers: docs.map((document) => customerSearchSchema.parse(document.data())),
+      nextCursor: snapshot.docs.length > 250 ? docs.at(-1)!.id : null };
+  }
+
   async search(query: string, options: ScanOptions = {}) {
-    const normalized = normalizeCustomerName(query);
-    const initials = getCustomerChoseong(query);
+    const matches = customerNameMatcher(query);
     return boundedScan(async (cursor) => {
-      const page = await this.list(cursor);
+      const page = await this.listSearch(cursor);
       return { items: page.customers, nextCursor: page.nextCursor };
     }, (customer) => customer.customerId, (customer) => customer.status === "active"
-      && (customer.normalizedName.includes(normalized) || customer.choseongName.includes(initials)), options);
+      && matches(customer), options);
   }
 
   async read(customerId: string, actor: CustomerActor, includeClosed = false) {

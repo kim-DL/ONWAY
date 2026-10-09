@@ -4,7 +4,7 @@ import { inventoryCycleSchema, inventoryEventSchema, inventoryIdSchema, inventor
 import { deliveryDateKeySchema, deliveryPhotoMetadataSchema } from "../delivery-photo/delivery-photo-contract.js";
 import { inventoryQuantityMatchSchema } from "../inventory/inventory-quantity-match.js";
 
-export const MCP_VERSION = "1.8.0";
+export const MCP_VERSION = "1.9.0";
 export const MCP_TOOL_NAMES = ["search_customers", "search_inventory_products", "get_inventory_product", "list_low_stock",
   "list_delivery_records", "get_delivery_photo", "get_inventory_photo", "get_inventory_products", "list_inventory_alerts", "get_customer_delivery_summary", "get_delivery_gallery", "search_delivery_records", "get_latest_employee_delivery_gallery", "get_inventory_overview", "search_inventory_records", "preview_inventory_change", "commit_inventory_change"] as const;
 export type McpToolName = typeof MCP_TOOL_NAMES[number];
@@ -78,9 +78,20 @@ export const deliverySummaryResult = z.object({ ...envelope, resolution: z.enum(
   customer: customerSchema.nullable(), candidates: z.array(customerSchema).max(100), searchPage: pageSchema.nullable(),
   searchNextCursor: inventoryIdSchema.nullable(), records: deliveryResult.omit({ status: true, retrievedAt: true, timezone: true }).nullable(), note: z.string() }).strict();
 export const photoResult = z.object({ ...envelope, photoId: z.uuid(), variant: z.enum(["thumbnail", "evidence"]), contentType: z.literal("image/webp") }).strict();
-export const galleryResult = z.object({ ...envelope, customerId: inventoryIdSchema, employeeId: inventoryIdSchema.nullable().optional(), date: deliveryDateKeySchema.nullable(),
-  photoIds: z.array(z.uuid()).max(100), nextCursor: photoCursorSchema.nullable(), page: pageSchema,
-  retentionHours: z.literal(168), evidence: z.string() }).strict();
+export const galleryInput = z.object({ customerId: inventoryIdSchema.optional(),
+  query: z.string().trim().min(1).max(120).optional().describe("거래처 이름만 알면 바로 전달. 등록명과 추가 업종 호칭도 확인하며 여러 후보는 임의 선택하지 않음."),
+  employeeId: inventoryIdSchema.optional(), date: deliveryDateKeySchema.optional(),
+  limit: z.number().int().min(1).max(100).default(50), after: photoCursorSchema.optional(),
+  afterId: inventoryIdSchema.nullable().default(null),
+}).strict().refine((input) => Boolean(input.customerId) !== Boolean(input.query), "거래처 ID 또는 이름 중 하나만 지정해주세요.")
+  .refine((input) => !input.after || Boolean(input.customerId), "사진 커서는 확인된 거래처 ID와 함께 지정해주세요.")
+  .refine((input) => !input.afterId || Boolean(input.query), "검색 커서는 거래처 이름과 함께 지정해주세요.");
+export const galleryResult = z.object({ ...envelope,
+  resolution: z.enum(["resolved", "ambiguous", "not_found", "incomplete_search"]),
+  customerId: inventoryIdSchema.nullable(), customerName: z.string().nullable(), employeeId: inventoryIdSchema.nullable(), date: deliveryDateKeySchema.nullable(),
+  photoIds: z.array(z.uuid()).max(100), nextCursor: photoCursorSchema.nullable(), page: pageSchema.nullable(),
+  candidates: z.array(customerSchema).max(100), searchPage: pageSchema.nullable(), searchNextCursor: inventoryIdSchema.nullable(),
+  retentionHours: z.literal(168), timeBasis: z.literal("photo_registered_at"), evidence: z.string(), note: z.string() }).strict();
 export const employeeIdentitySchema = z.object({ employeeId: inventoryIdSchema, displayName: z.string() }).strict();
 const customerReference = z.object({ customerId: inventoryIdSchema, name: z.string().nullable() }).strict();
 const deliveryResolution = {
@@ -97,7 +108,9 @@ export const recordSearchResult = z.object({ ...envelope, ...deliveryResolution,
   records: z.array(deliveryRecordSchema).max(100), page: pageSchema.nullable(), nextCursor: photoCursorSchema.nullable() }).strict();
 export const latestEmployeeGalleryResult = z.object({ ...envelope, ...deliveryResolution, latestRecord: deliveryRecordSchema.nullable(),
   recordsPage: pageSchema.nullable(), nextCursor: photoCursorSchema.nullable(),
-  gallery: galleryResult.omit({ status: true, retrievedAt: true, timezone: true }).extend({ customerName: z.string().nullable() }).nullable() }).strict();
+  gallery: galleryResult.omit({ status: true, retrievedAt: true, timezone: true, resolution: true, candidates: true,
+    searchPage: true, searchNextCursor: true, timeBasis: true, note: true }).extend({ customerId: inventoryIdSchema,
+      page: pageSchema, customerName: z.string().nullable() }).nullable() }).strict();
 const staffFilter = { employeeName: z.string().trim().min(2).max(100).optional().describe("현재 등록 직원 이름 또는 이름 앞부분. 예: 이름만으로 직함이 붙은 등록 이름 검색. 동명이인은 후보 확인."),
   employeeId: inventoryIdSchema.optional().describe("이미 확인한 직원 ID. employeeName과 동시에 지정하지 마세요.") };
 export const recordSearchInput = z.object({ ...staffFilter,

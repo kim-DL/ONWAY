@@ -5,6 +5,17 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-09 MCP 1.9.0 — 거래처 이름으로 납품사진 한 번 조회
+
+- 실제 요청명에 업종 호칭이 덧붙어 짧은 등록명을 찾지 못하는 경우와 검색/요약 → 갤러리 메타데이터 → 이미지의 여러 단계가 문제였다. 운영 업무 요청 로그는 성공이었으며 인증/Storage 장애로 판단하지 않는다. `get_delivery_gallery`에 `query` 또는 확인된 `customerId`를 받도록 기존 도구를 확장했다. 이름 해석·목록·첫 인증 thumbnail을 같은 응답에 포함하며 최초 UI 추가 호출0이다. 날짜가 없는 요청은 최근168시간으로 조회하고 이전 대화 날짜를 임의 적용하지 않도록 도구 설명/서버 지침을 수정했다. 도구 수는16개 모델 공개/1개 UI 전용 그대로다.
+- 기존 `CustomerService.search`의 부분명/초성 검색을 유지하면서 명시적 법인 표기와 한 번 덧붙인 업종 접미 표현만 처리한다. 접미 제거 후 두 글자 이상인 전체 등록명이 일치해야 하며 다른 이름/오타를 추정하지 않는다. 전체 검색 완료·처음부터 검색·후보1개 조건을 모두 만족할 때만 자동 선택한다. 중복/없는/불완전/후속 페이지 결과는 후보와 정확한 커서를 반환한다. 이름 검색은 기존 bounded scan의5페이지/5초 경계를 유지하고 이름·검색 필드·상태·지역7필드만 projection으로 읽는다. 문서 읽기 건수 자체를 인덱스로 줄인 것은 아니며 새 DB/별칭/인덱스/backfill/권한 캐시는 없다.
+- 기존 `DeliveryPhotoService.getWithMetadata`와 사진 UI의 최초 이미지 경로를 재사용한다. 조회한 거래처·직원과 실제 이미지 메타데이터의 일치를 검사한다. UI v9는 업체 등록명·등록시각·기록자, 모바일 독립 툴바·전환·확대·핀치·드래그를 유지한다. 사진 전환/큰 보기는 해당 이미지의 직원 인가·삭제·만료를 다시 확인하며 페이지 추가는 이미지 선다운로드 없이 같은 필터/커서를 유지한다. 표준 image와 widget metadata 두 경로의 이미지 전송은 호환을 위해 보존한다. 168시간 보관과 사진 등록시각/실제 납품완료시각 구분은 그대로다.
+- app/Functions typecheck·lint PASS, 전체 unit **1,804 PASS /79 조건부 SKIP**, demo Auth/Firestore/Storage/Functions/Hosting+공식 MCP SDK **24 PASS**, Chromium/WebKit **39 PASS /1 CDP 전용 SKIP**. 접미/법인/초성/유사명 거절·최소 필드 읽기·후보/부분 검색·최초 image·커서·권한 취소·사진 삭제/만료·직원 최신 갤러리·재고 사진/승인을 검사했다. 통합 검사에서 기존 직원 최신 갤러리의 nested schema 회귀를 찾아 배포 전에 수정했다. 이전 PR CI의 브라우저5초 시간 초과와 승인 메시지 도착 전 assertion은 브라우저만30초 제한 및 실제 메시지 대기로 보완했다. 재시도/검사 생략/승인 권한 완화는 없다.
+- Next build·PWA·기존 JS/CSS 예산·두 MCP 합성 benchmark PASS. 운영 frontend 설정이 없는 검증 out은 Hosting gate가 정상 차단했으며 미배포다. **functions:employeeMcp만** 배포해 ACTIVE **employeemcp-00022-jod**, updateTime `2026-10-09T10:32:57.735768716Z` 확인. 기존71 Functions/PWA Hosting/MCP Hosting `392f487ef50a6a9c`, runtime SA·allowlist1·PIN secret2·max3/concurrency4를 유지했다. HTTPS/OAuth discovery/401/Origin/no-store probe PASS. 업무 문서/Rules/IAM/Storage/인덱스를 변경하지 않았다.
+- 실제 연결된 새 ChatGPT 앱에서 도구 갱신 후 별도 검증 대화의 **거래처 이름만으로 납품사진 요청**은 `get_delivery_gallery` **1회**로 등록명을 해석하고 유효 사진 **2장**과 첫 thumbnail을 한 카드에 표시했다. 서버1,569ms/관측246문서/Firestore19회/Storage1회/이미지29,208B/응답80,445B/returnedCount2다. 다음 사진은 `get_delivery_photo`1회1,226ms(28,006B), 큰 보기는1회1,348ms(445,794B)로 성공했다. 실제 이미지 load·1/2→2/2·evidence load·100→125→100% 맞춤·닫기 후 thumbnail 복귀를 UIA와 로그로 확인했다. 배율/맞춤/닫기 추가 호출0이며 원본 거래처1문서와 사진2문서의 필드/updateTime이 전후 동일했다. 이 시간은 서버 handler 시간이며 ChatGPT 추론/호스트/네트워크 총시간이나 항상1회/SLO 보장이 아니다.
+- 도구 갱신 화면에는 기존 `commit_inventory_change` 비공개 도구 경고가 남지만 실제 새 대화에서1.9 계약을 사용하고 갤러리를 렌더링했다. 경고 제거를 위해 UI 전용 commit을 모델에 공개하거나 인증을 다시 만들지 않았다. 이전 삭제 앱에 연결된 Codex 커넥터의 upstream 인증 실패와 현재 새 ChatGPT 앱의 연결은 구분한다. 기존 앱 ID/로고/PIN OAuth를 유지했다. 실물 Android/iPhone 원격 환경이 없어 모바일 엔진 검증과 Windows ChatGPT 실제 검증을 구분한다.
+- 검증용 Chrome 탭만 닫고 기존 사용자 탭과 작성 중 내용을 보존했다. 실제 업체/직원 식별자·원본 사진·token·PIN·비공개 검증 산출물은 Git 저장 범위에서 제외한다. 기존 공개 ONWAY의 `codex/mcp-1.8.0` 브랜치와 초안 PR #4에 변경을 보관하며 main은 병합하지 않는다. 이전1.8 소스 보관 커밋은 `813b19d`이며 아래 기록은 이전 단계다.
+
 ### 2026-10-09 MCP 소스 Git 저장 사전 점검
 
 - 기존 `https://github.com/kim-DL/ONWAY`에서 MCP와 기존 서비스 계층을 함께 관리한다. 확인 당시 원격 main과 로컬 기준은 `04272ec`로 동일했고 작업 브랜치 `codex/mcp-1.8.0`을 생성했다. 이번 저장 범위는 MCP1.8.0까지의 누적 구현·기존 서비스 재사용 변경·회귀 검사·문서·회사 로고다. 별도 업무 백엔드/저장소 복제나 main 직접 변경 없이 초안 PR 검토 경계를 사용한다.

@@ -165,16 +165,29 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
     expect(errors).toEqual([]);
   });
 
-  async function galleryReady(page: Page, options: { nextCursor?: Cursor; empty?: boolean } = {}) {
+  async function galleryReady(page: Page, options: { nextCursor?: Cursor; empty?: boolean; initial?: boolean } = {}) {
     const second = { ...thumbnail, photoId: otherId, createdAt: "2026-10-07T05:30:00Z", createdByName: "다른 합성 직원" };
     await page.evaluate((photos) => { window.photoTest.photos = photos; }, [thumbnail, evidence, second, { ...second, variant: "evidence", data: evidence.data }]);
     const group: Gallery = { customerId: thumbnail.customerId, customerName: thumbnail.customerName, date: "2026-10-07",
       photos: options.empty ? [] : [thumbnail, second].map(({ photoId, createdAt, createdByName }) => ({ photoId, createdAt, createdByName })),
       after: null, nextCursor: options.nextCursor ?? null };
-    await deliver(page, { _meta: { deliveryGallery: group } });
+    await deliver(page, { _meta: { deliveryGallery: group, ...(options.initial ? { deliveryPhoto: thumbnail } : {}) } });
     if (!options.empty) await page.frameLocator("#view").locator("#photo:not([hidden])").waitFor();
     return group;
   }
+
+  it("shows an included first photo with zero calls and rechecks each user-selected gallery image", async () => {
+    const { page, frame, requests, errors } = await mount(); await galleryReady(page, { initial: true });
+    expect(await frame.locator("#counter").innerText()).toBe("1 / 2");
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(0);
+    await frame.locator("#next").click(); await frame.locator("#photo:not([hidden])").waitFor();
+    expect(await frame.locator("#counter").innerText()).toBe("2 / 2");
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(1);
+    await frame.locator("#prev").click(); await frame.locator("#photo:not([hidden])").waitFor();
+    expect(await frame.locator("#counter").innerText()).toBe("1 / 2");
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(2);
+    expect(requests).toEqual([]); expect(errors).toEqual([]);
+  });
 
   it("shows several photos in one gallery, loads only the selection and zooms/pans without another request", async () => {
     const { page, frame, requests, errors } = await mount(); await galleryReady(page);

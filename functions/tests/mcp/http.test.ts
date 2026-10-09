@@ -30,7 +30,11 @@ async function start(toolTimeoutMs = 20_000) {
   const low = vi.spyOn(queries, "lowStock").mockResolvedValue(emptyLowStock);
   vi.spyOn(queries, "photo").mockResolvedValue({ photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "thumbnail",
     contentType: "image/webp", customerId: "synthetic-company", customerName: "합성 납품업체", createdByEmployeeId: "MCP-TEST", byteSize: 4, fileBase64: "UklGRg==", createdAt: "2026-10-07T03:56:00.000Z", createdByName: "합성 직원" });
-  const gallery = vi.spyOn(queries, "gallery").mockResolvedValue({
+  const gallery = vi.spyOn(queries, "customerGallery").mockResolvedValue({
+    resolution: "resolved", candidates: [], searchPage: null, searchNextCursor: null, timeBasis: "photo_registered_at", employeeId: null,
+    note: "합성 갤러리", initialPhoto: { photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "thumbnail", contentType: "image/webp",
+      customerId: "synthetic-company", customerName: "합성 납품업체", createdByEmployeeId: "MCP-TEST", byteSize: 4, fileBase64: "UklGRg==",
+      createdAt: "2026-10-07T03:56:00.000Z", createdByName: "합성 직원" },
     customerId: "synthetic-company", customerName: "합성 납품업체", date: "2026-10-07", after: null,
     photos: [{ photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", createdAt: "2026-10-07T03:56:00.000Z", createdByName: "합성 직원" }],
     nextCursor: null, page: { ...emptyLowStock.page, returnedCount: 1, recordsScanned: 1 }, retentionHours: 168, evidence: "합성 기준",
@@ -221,7 +225,9 @@ describe("Remote MCP over real HTTP", () => {
       expect(gallery.isError).not.toBe(true);
       expect(gallery.structuredContent).toMatchObject({ photoIds: ["c3bc6631-22fb-4f14-b622-bb852652c891"], page: { complete: true, returnedCount: 1 } });
       expect(gallery._meta).toMatchObject({ deliveryGallery: { customerName: "합성 납품업체", date: "2026-10-07", photos: [{ createdByName: "합성 직원" }] } });
-      expect(JSON.stringify(gallery.content)).not.toMatch(/image|합성 직원|합성 납품업체/);
+      expect(gallery.content).toContainEqual({ type: "image", data: "UklGRg==", mimeType: "image/webp" });
+      expect(JSON.stringify(gallery.structuredContent)).not.toMatch(/fileBase64|UklGRg/);
+      expect(JSON.stringify(gallery.content.filter((item) => item.type === "text"))).not.toMatch(/합성 직원|합성 납품업체/);
       const invalidDate = await client.callTool({ name: "get_delivery_gallery", arguments: { customerId: "synthetic-company", date: "2026-02-30" } });
       expect(invalidDate.isError).toBe(true);
       expect(f.gallery).toHaveBeenCalledTimes(1);

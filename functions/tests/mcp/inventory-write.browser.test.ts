@@ -45,6 +45,7 @@ for (const engine of ["chromium", "webkit"] as const) describe.skipIf(process.en
       await frame.locator('#approve').evaluate((button) => (button as HTMLButtonElement).click());
       expect(await page.evaluate(() => (window as unknown as {approvalTest:{calls:unknown[]}}).approvalTest.calls.length)).toBe(0);
       await frame.locator('#approve').click(); await expectBrowser(frame.locator('#approve')).toBeDisabled();
+      await page.waitForFunction(() => (window as unknown as {approvalTest:{calls:unknown[]}}).approvalTest.calls.length === 1);
       const calls = await page.evaluate(() => (window as unknown as {approvalTest:{calls:Array<{params:unknown}>}}).approvalTest.calls);
       expect(calls).toHaveLength(1); expect(calls[0]!.params).toEqual({ name:'commit_inventory_change',arguments:{planId:'a0b82772-0457-4b3e-8e85-9e4c97a8dcac',approvalToken:'a'.repeat(43)} });
       expect(network).toEqual([]); expect(errors).toEqual([]);

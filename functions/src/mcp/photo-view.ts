@@ -1,5 +1,5 @@
 /** Private bytes/metadata arrive only in authenticated tool results; no browser network fetch. */
-export const PHOTO_VIEW_URI = "ui://geupsikgil/delivery-photo-v8.html";
+export const PHOTO_VIEW_URI = "ui://geupsikgil/delivery-photo-v9.html";
 export const PHOTO_VIEW_HTML = String.raw`<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
@@ -357,7 +357,7 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
       if (gallery && group.customerId === gallery.customerId && group.date === gallery.date && (group.employeeId ?? null) === (gallery.employeeId ?? null)) return;
       clearAll(); gallery = group; captions(); navigation();
       if (group.photos.length && result._meta?.deliveryPhoto) {
-        // The employee lookup includes the first authenticated thumbnail: zero follow-up calls to display it.
+        // Both name/customer and employee lookups include the first checked thumbnail.
         const initial = extract(result);
         index = 0; current = group.photos[0]; card.hidden = false; opener.disabled = true; captions();
         if (initial?.variant === 'thumbnail' && initial.photoId === current.photoId && initial.customerId === group.customerId

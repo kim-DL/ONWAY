@@ -32,7 +32,7 @@ runtime은 해당 경로의 알려진 파일을 읽을 수 있으며 새 list/cr
 
 ## 배포·검증
 
-배포 대상은 `functions:employeeMcp` 하나다. 기존 PWA/Callable/Rules/인덱스/사진 데이터 변경은 없다. 기존 앱에서 도구를 새로 고친 뒤 새 대화에서 사용한다. 현재 ChatGPT에서는 **설정 → 플러그인 → 온누리종합식품 → 페이지 하단 개발자 → 도구 새로 고침**에 있다. 하단이 안 보이면 설정 검색의 “개발자”로 이동하거나 해당 영역을 스크롤한다. 일반 플러그인 상세의 ZIP 업로드나 OAuth 계정 다시 연결은 도구 갱신 절차가 아니다. UI resource는 v8이며 기존 납품사진 갤러리와 동일한 모바일 뷰어를 재사용한다. [공식 갱신 안내](https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata).
+배포 대상은 `functions:employeeMcp` 하나다. 기존 PWA/Callable/Rules/인덱스/사진 데이터 변경은 없다. 기존 앱에서 도구를 새로 고친 뒤 새 대화에서 사용한다. 현재 ChatGPT에서는 **설정 → 플러그인 → 온누리종합식품 → 페이지 하단 개발자 → 도구 새로 고침**에 있다. 하단이 안 보이면 설정 검색의 “개발자”로 이동하거나 해당 영역을 스크롤한다. 일반 플러그인 상세의 ZIP 업로드나 OAuth 계정 다시 연결은 도구 갱신 절차가 아니다. 공용 UI resource는 MCP1.9.0에서 v9이며 기존 납품사진 갤러리와 동일한 모바일 뷰어를 재사용한다. 아래 상품 사진 검증 표본은1.8.0 당시 기록이다. [공식 갱신 안내](https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata).
 
 전체 unit 1,791 PASS, demo Firebase/공식 SDK24 PASS, Chromium/WebKit38 PASS/1 CDP 전용 SKIP. 상품 사진의 첫 응답·중복/없는 상품·교체·삭제·권한 취소·7일 이전 attached·메타데이터 변경·Strict PWA 호환·320px/가로 회전·확대·닫기를 검증했다. build/typecheck/lint/PWA/성능 예산을 검사했다. 운영 frontend 설정이 없는 검증 산출물은 Hosting gate가 차단하며 배포하지 않는다.
 

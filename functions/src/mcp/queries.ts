@@ -14,7 +14,7 @@ import type { McpPrincipal } from "./authorization.js";
 import type { ScanStop } from "../shared/bounded-scan.js";
 import { InventoryPhotoService } from "../inventory/inventory-photo-service.js";
 import type { z } from "zod";
-import type { inventoryPhotoInput } from "./contracts.js";
+import type { inventoryPhotoInput, galleryInput } from "./contracts.js";
 
 const STOCK_BASIS = "모든 보관장소(샘플 포함)의 합계가 threshold 이하. 상품별 안전재고/수요 기준은 등록되어 있지 않습니다. 단위는 각 상품의 unitLabel입니다.";
 export const STOCKTAKE_BASIS = "lastStocktakeAt은 제품별 수량일치 확인 버튼이 남긴 마지막 count_match 로그의 createdAt입니다. 기록자는 lastStocktake.actorName으로 답하세요. 원본 actorEmployeeId로 현재 직원 명부에서 조회한 이름이며 당시 이름 스냅샷은 아닙니다. actorName이 null이면 기록자 정보 없음이며 현재 로그인 사용자나 상품 수정자로 추정하지 마세요. 원본 로그 필드는 lastStocktake에 있으며 해당 로그의 장소에서 확인한 시각입니다. 다른 장소의 실사 완료 여부와 무관하고 입출고/수량조정은 포함하지 않습니다. null은 해당 버튼 로그 없음입니다. stocktakeByLocation과 현황의 실사 상태는 입출고도 반영하는 기존 PWA 완료 요약으로 버튼 로그와 구분하세요. updatedAt은 상품 문서 수정시각입니다. 수량과 로그는 별도 읽기이며 같은 시점 스냅샷을 보장하지 않습니다.";
@@ -119,7 +119,7 @@ export class McpQueries {
   async searchCustomers(query: string, afterId: string | null, limit = 50) {
     const result = await this.customers.search(query, { afterId, limit });
     return { customers: result.items.map(customerProjection), query, nextCursor: result.nextCursor, page: result.page,
-      note: "동명이면 customerId를 확인하세요. page.complete가 false면 검색이 끝나지 않았습니다. 여러 페이지는 동일 시점의 스냅샷이 아닙니다." };
+      note: "등록 이름·초성과 추가 업종 호칭을 확인했습니다. 여러 후보면 customerId를 확인하세요. page.complete가 false면 검색이 끝나지 않았습니다. 여러 페이지는 동일 시점의 스냅샷이 아닙니다." };
   }
   async searchProducts(query: string, afterId: string | null, limit = 50) {
     const result = await this.inventory.search(query, { afterId, limit });
@@ -226,6 +226,37 @@ export class McpQueries {
     return { ...records, customerId: input.customerId, customerName: customer?.name ?? null, employeeId: input.employeeId ?? null,
       photos: records.photos.map(({ photoId, createdAt, createdByName }) => ({ photoId, createdAt, createdByName })),
       after: input.after ?? null };
+  }
+  /** Name resolution, one gallery and its first checked thumbnail in one tool operation. */
+  async customerGallery(input: z.infer<typeof galleryInput>, actor: McpPrincipal) {
+    const search = input.query ? await this.searchCustomers(input.query, input.afterId, 100) : null;
+    const base = { candidates: search?.customers ?? [], searchPage: search?.page ?? null,
+      searchNextCursor: search?.nextCursor ?? null, timeBasis: "photo_registered_at" as const };
+    const customerId = input.customerId ?? (search?.page.complete && search.page.startedFromBeginning
+      && search.customers.length === 1 ? search.customers[0]!.customerId : null);
+    if (!customerId) return { ...base, resolution: search && (!search.page.complete || !search.page.startedFromBeginning)
+      ? "incomplete_search" as const : search?.customers.length ? "ambiguous" as const : "not_found" as const,
+      customerId: null, customerName: null, employeeId: input.employeeId ?? null, date: input.date ?? null,
+      photos: [], nextCursor: null, page: null, after: null, retentionHours: 168 as const, evidence: DELIVERY_BASIS,
+      initialPhoto: null, note: search && (!search.page.complete || !search.page.startedFromBeginning)
+        ? "검색 범위를 모두 확인하지 못했습니다. 검색 커서로 계속하거나 확인된 거래처 ID를 지정해 주세요."
+        : search?.customers.length ? "거래처 후보가 여러 곳입니다. 등록명과 지역을 확인한 뒤 선택한 customerId로 요청해 주세요."
+          : "일치하는 활성 거래처가 없습니다. 등록명을 확인해 주세요. 다른 거래처 사진으로 대신하지 않습니다." };
+    const gallery = await this.gallery({ customerId, employeeId: input.employeeId, date: input.date,
+      limit: input.limit, after: input.after }, actor);
+    // Pagination is UI-only metadata: do not download another first image for every page.
+    const first = !input.after ? gallery.photos[0] : null;
+    const checked = first ? await this.delivery.getWithMetadata({ photoId: first.photoId, variant: "thumbnail" }, actor) : null;
+    if (checked && (checked.customerId !== customerId || checked.download.photoId !== first!.photoId
+      || input.employeeId && checked.createdByEmployeeId !== input.employeeId)) {
+      throw new HttpsError("aborted", "Photo records changed during gallery lookup");
+    }
+    return { ...base, ...gallery, resolution: "resolved" as const,
+      initialPhoto: checked ? { ...checked.download, customerId, customerName: gallery.customerName,
+        createdAt: checked.createdAt, createdByName: checked.createdByName, createdByEmployeeId: checked.createdByEmployeeId } : null,
+      note: gallery.photos.length ? "등록명으로 확인한 거래처의 납품사진 갤러리입니다. 첫 썸네일은 응답에 포함하며 추가 모델 호출은 불필요합니다. 나머지 사진·확대·페이지는 UI에서 조회합니다."
+        : gallery.page.complete ? "최근168시간·지정 날짜에 조회 가능한 사진 등록 기록이 없습니다. 삭제·만료·미등록은 미납품을 뜻하지 않습니다."
+          : "이 구간에 유효한 사진이 없습니다. 같은 거래처와 nextCursor로 사진 더 보기를 사용하세요." };
   }
   private async resolveDeliveryFilters(input: DeliveryRecordFilters, actor: McpPrincipal) {
     const [staff, customerSearch, customerById] = await Promise.all([

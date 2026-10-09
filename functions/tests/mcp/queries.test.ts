@@ -5,6 +5,7 @@ import { InventoryService } from "../../src/inventory/inventory-service.js";
 import { inventoryProductSchema, type InventoryProduct } from "../../src/inventory/inventory-contract.js";
 import { DeliveryPhotoService } from "../../src/delivery-photo/delivery-photo-service.js";
 import { McpQueries } from "../../src/mcp/queries.js";
+import { galleryInput } from "../../src/mcp/contracts.js";
 import { principal } from "./fixture.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -34,7 +35,7 @@ function fixture(products: InventoryProduct[] = [], customers: Customer[] = []) 
     const page = paged(products, (row) => row.productId, 100, cursor);
     return { products: page.items.filter((row) => row.status !== "deleted"), nextCursor: page.nextCursor };
   });
-  vi.spyOn(customerService, "list").mockImplementation(async (cursor) => {
+  vi.spyOn(customerService, "listSearch").mockImplementation(async (cursor) => {
     const page = paged(customers, (row) => row.customerId, 250, cursor);
     return { customers: page.items, nextCursor: page.nextCursor };
   });
@@ -42,6 +43,39 @@ function fixture(products: InventoryProduct[] = [], customers: Customer[] = []) 
   return { queries: new McpQueries(customerService, inventory, delivery), customerService, delivery, photos, productList };
 }
 describe("MCP service composition", () => {
+  it("resolves an added business suffix and returns two photos plus the first checked image in one operation", async () => {
+    const f = fixture([], [customer("school", "합성")]);
+    vi.spyOn(f.customerService, "read").mockResolvedValue(customer("school", "합성"));
+    const first = { photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", customerId: "school", deliveryDateKey: "2026-10-07",
+      source: "camera" as const, createdAt: "2026-10-07T03:56:00.000Z", createdByEmployeeId: "MCP-TEST",
+      createdByName: "합성 직원", expiresAt: "2026-10-14T03:56:00.000Z", thumbnail: { width: 40, height: 40 } };
+    f.photos.mockResolvedValue({ photos: [first, { ...first, photoId: "d3bc6631-22fb-4f14-b622-bb852652c891" }], nextCursor: null, recordsScanned: 2 });
+    const image = vi.spyOn(f.delivery, "getWithMetadata").mockResolvedValue({ customerId: "school", createdAt: first.createdAt,
+      createdByName: first.createdByName, createdByEmployeeId: first.createdByEmployeeId,
+      download: { photoId: first.photoId, variant: "thumbnail", contentType: "image/webp", byteSize: 4, fileBase64: "UklGRg==" } });
+    const result = await f.queries.customerGallery(galleryInput.parse({ query: "합성유통" }), principal);
+    expect(result).toMatchObject({ resolution: "resolved", customerName: "합성", date: null,
+      page: { returnedCount: 2 }, initialPhoto: { photoId: first.photoId, variant: "thumbnail", customerName: "합성" } });
+    expect(image).toHaveBeenCalledTimes(1); expect(f.photos).toHaveBeenCalledTimes(1);
+    expect(f.photos.mock.calls[0]![0]).not.toHaveProperty("date", expect.any(String));
+    expect(JSON.stringify(result)).not.toContain("DO-NOT-EXPORT");
+    await f.queries.customerGallery(galleryInput.parse({ customerId: "school", after: { photoId: first.photoId, createdAt: first.createdAt } }), principal);
+    expect(image).toHaveBeenCalledTimes(1);
+    image.mockResolvedValueOnce({ ...result.initialPhoto!, customerId: "different", download: { photoId: first.photoId, variant: "thumbnail", contentType: "image/webp", byteSize: 4, fileBase64: "UklGRg==" } });
+    await expect(f.queries.customerGallery(galleryInput.parse({ customerId: "school" }), principal)).rejects.toMatchObject({ code: "aborted" });
+  });
+  it("never downloads photos or guesses a customer for ambiguous, absent or incomplete name searches", async () => {
+    for (const rows of [[customer("one", "합성"), customer("two", "합성유통")], [],
+      Array.from({ length: 1251 }, (_, i) => customer(String(i).padStart(4, "0"), i === 0 ? "합성" : "다른업체"))]) {
+      const f = fixture([], rows); const image = vi.spyOn(f.delivery, "getWithMetadata");
+      const result = await f.queries.customerGallery(galleryInput.parse({ query: "합성유통" }), principal);
+      expect(result.resolution).toBe(rows.length > 100 ? "incomplete_search" : rows.length ? "ambiguous" : "not_found");
+      expect(result.initialPhoto).toBeNull(); expect(f.photos).not.toHaveBeenCalled(); expect(image).not.toHaveBeenCalled();
+    }
+    for (const bad of [{}, { query: "합성", customerId: "one" }, { query: "합성", after: { photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", createdAt: "2026-10-07T00:00:00Z" } }]) {
+      expect(galleryInput.safeParse(bad).success).toBe(false);
+    }
+  });
   it("composes a metadata-only gallery through the existing dated/cursored service and excludes unrelated private fields", async () => {
     const f = fixture();
     const read = vi.spyOn(f.customerService, "read").mockResolvedValue({ ...customer("school", "합성 업체"), status: "closed" });

@@ -216,7 +216,16 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
       expect(gallery.isError).not.toBe(true);
       expect(gallery.structuredContent).toMatchObject({ page: { complete: false, returnedCount: 1 } });
       expect(gallery._meta?.deliveryGallery).toMatchObject({ customerId, customerName: "합성 한빛초" });
-      expect(JSON.stringify(gallery.content)).not.toMatch(/image|never-export-this-field|합성 MCP 직원/);
+      expect(gallery.content.some((item) => item.type === "image")).toBe(true);
+      expect(gallery._meta?.deliveryPhoto).toMatchObject({ variant: "thumbnail", customerId });
+      expect(JSON.stringify(gallery.structuredContent)).not.toMatch(/fileBase64|never-export-this-field/);
+      expect(JSON.stringify(gallery.content.filter((item) => item.type === "text"))).not.toMatch(/never-export-this-field|합성 MCP 직원/);
+      const namedGallery = await client.callTool({ name: "get_delivery_gallery", arguments: { query: "합성 한빛초유통", limit: 50 } });
+      expect(namedGallery.isError).not.toBe(true);
+      expect(namedGallery.structuredContent).toMatchObject({ resolution: "resolved", customerName: "합성 한빛초", date: null,
+        photoIds: expect.arrayContaining([photoId, secondPhotoId]), page: { returnedCount: 2, complete: true } });
+      expect(namedGallery._meta?.deliveryPhoto).toMatchObject({ variant: "thumbnail", customerId });
+      expect(namedGallery.content.filter((item) => item.type === "image")).toHaveLength(1);
       const next = await client.callTool({ name: "get_delivery_gallery", arguments: { customerId, limit: 1, after: gallery.structuredContent!.nextCursor } });
       expect(next.isError).not.toBe(true);
       expect(next.structuredContent).toMatchObject({ page: { complete: true, returnedCount: 1, startedFromBeginning: false } });
