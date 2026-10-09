@@ -26,6 +26,27 @@ function fixture(rows: Customer[] = [customer()]) {
   return { queries: new McpQueries(service), list, read };
 }
 describe("MCP current customer details", () => {
+  it.each(["한빛", " 한 빛 "])("resolves exact name %s despite initial and partial collisions without extra search", async (query) => {
+    const f = fixture([customer("one", "한별"), customer("two", "한빛유통"), customer("three", "한빛")]);
+    const result = await f.queries.customerDetails(customerDetailsInput.parse({ query }), principal);
+    expect(result).toMatchObject({ resolution: "resolved", candidates: [], customer: { customerId: "three", name: "한빛" } });
+    expect(f.list).toHaveBeenCalledOnce(); expect(f.read).toHaveBeenCalledExactlyOnceWith("three", principal, false);
+  });
+  it("does not choose between duplicate exact names, including explicitly requested closed records", async () => {
+    const f = fixture([customer("one", "한빛"), { ...customer("two", "한빛"), status: "closed" }, customer("three", "한빛유통")]);
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ query: "한빛" }), principal))
+      .toMatchObject({ resolution: "resolved", customer: { customerId: "one" } });
+    f.read.mockClear();
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ query: "한빛", includeClosed: true }), principal))
+      .toMatchObject({ resolution: "ambiguous", customer: null });
+    expect(f.read).not.toHaveBeenCalled();
+  });
+  it("keeps an exact match unresolved when a later duplicate may exist beyond the scan budget", async () => {
+    const f = fixture(Array.from({ length: 1251 }, (_, i) => customer(String(i).padStart(4, "0"), i === 0 || i === 1250 ? "한빛" : "다른업체")));
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ query: "한빛" }), principal))
+      .toMatchObject({ resolution: "incomplete_search", customer: null });
+    expect(f.read).not.toHaveBeenCalled();
+  });
   it("resolves a name plus current details in one operation and never exports an unrequested door password or audit IDs", async () => {
     const f = fixture();
     const current = { ...customer(), revision: 2, updatedAt: "2026-10-08T00:00:00Z", deliveryAddress: "최신 하차 주소" };
@@ -74,7 +95,7 @@ describe("MCP current customer details", () => {
     { customerId: "synthetic", companyId: "other" },
   ])("rejects invalid or conflicting input %#", (input) => expect(customerDetailsInput.safeParse(input).success).toBe(false));
   it("never reads a detail for ambiguous, absent, incomplete or subsequent single-candidate name searches", async () => {
-    for (const rows of [[customer("one"), customer("two", "합성유통")], [],
+    for (const rows of [[customer("one", "합성유통"), customer("two", "합성유통")], [],
       Array.from({ length: 1251 }, (_, i) => customer(String(i).padStart(4, "0"), i === 0 ? "합성" : "다른업체"))]) {
       const f = fixture(rows);
       const result = await f.queries.customerDetails(customerDetailsInput.parse({ query: "합성유통" }), principal);

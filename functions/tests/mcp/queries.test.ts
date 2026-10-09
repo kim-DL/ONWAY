@@ -43,6 +43,20 @@ function fixture(products: InventoryProduct[] = [], customers: Customer[] = []) 
   return { queries: new McpQueries(customerService, inventory, delivery), customerService, delivery, photos, productList };
 }
 describe("MCP service composition", () => {
+  it("uses the exact registered name consistently for galleries, summaries and delivery record filters", async () => {
+    const rows = [customer("one", "한별"), customer("two", "한빛유통"), customer("three", "한빛")];
+    const f = fixture([], rows);
+    vi.spyOn(f.customerService, "read").mockResolvedValue(rows[2]!);
+    const direct = vi.spyOn(f.delivery, "searchPage").mockResolvedValue({ photos: [], nextCursor: null, recordsScanned: 0 });
+    expect(await f.queries.customerGallery(galleryInput.parse({ query: "한빛" }), principal))
+      .toMatchObject({ resolution: "resolved", customerId: "three" });
+    expect(await f.queries.customerDeliverySummary({ query: "한빛", limit: 5 }, principal))
+      .toMatchObject({ resolution: "resolved", customer: { customerId: "three" } });
+    expect(await f.queries.searchDeliveryRecords({ customerName: "한빛", limit: 5 }, principal))
+      .toMatchObject({ resolution: "resolved", filters: { customerId: "three" } });
+    expect(f.photos.mock.calls.every(([input]) => input.customerId === "three")).toBe(true);
+    expect(direct).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ customerId: "three" }), principal, expect.anything());
+  });
   it("resolves an added business suffix and returns two photos plus the first checked image in one operation", async () => {
     const f = fixture([], [customer("school", "합성")]);
     vi.spyOn(f.customerService, "read").mockResolvedValue(customer("school", "합성"));
@@ -65,7 +79,7 @@ describe("MCP service composition", () => {
     await expect(f.queries.customerGallery(galleryInput.parse({ customerId: "school" }), principal)).rejects.toMatchObject({ code: "aborted" });
   });
   it("never downloads photos or guesses a customer for ambiguous, absent or incomplete name searches", async () => {
-    for (const rows of [[customer("one", "합성"), customer("two", "합성유통")], [],
+    for (const rows of [[customer("one", "합성유통"), customer("two", "합성유통")], [],
       Array.from({ length: 1251 }, (_, i) => customer(String(i).padStart(4, "0"), i === 0 ? "합성" : "다른업체"))]) {
       const f = fixture([], rows); const image = vi.spyOn(f.delivery, "getWithMetadata");
       const result = await f.queries.customerGallery(galleryInput.parse({ query: "합성유통" }), principal);

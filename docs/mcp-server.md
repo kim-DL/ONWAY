@@ -1,6 +1,6 @@
 # 급식길 사내 Remote MCP
 
-현재 구현: **1.11.0 거래처 상세 조회·원문 카드**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
+현재 구현: **1.11.1 정확한 거래처 등록명 우선 조회**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
 
 MCP URL은 `https://onnuriway-mcp.web.app/mcp`, 플러그인 이름은 **온누리종합식품**이다. 기존 직원 PIN·허용 직원·조회 token을 유지하며 사진 UI는 v9이다. 납품사진의168시간 보관과 상품 대표 사진의 기존 보관 정책을 구분한다. 저장에는 `geupsikgil:inventory.write` 추가 동의와 사용자 카드 승인이 필요하며 기존 read 토큰을 자동 승격하지 않는다. 모델 공개 도구17개와 UI 전용 실행1개다. 정상 조회의 요청 인증/응답 전 재인가, 제품별 count_match 시각·현재 명부 기록자 의미를 유지한다. 실물 모바일 기기는 별도 검증하지 않았다.
 

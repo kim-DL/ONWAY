@@ -5,6 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-09 MCP 1.11.1 — 정확한 등록명의 잘못된 다중 후보 처리 수정
+
+- 원인: 기존 이름 검색은 일반 이름에서도 같은 초성의 업체를 후보에 포함한다. MCP 상세/갤러리/요약/기록 필터가 후보 수만 확인해 정확한 전체 등록명1개도 모호하다고 반환했다. 운영 최소 필드 조회에서 활성220거래처 중 해당 입력의 정확 일치1·문자 부분 일치1·초성 후보3을 확인했다. 업체명/ID·주소 원문은 검증 로그/Git에 저장하지 않았다.
+- 공용 `selectCustomerCandidate`는 처음부터 완료한 검색에서 정규화된 전체 등록명이 하나면 우선 선택한다. 정규화된 동명 중복이면 자동 선택하지 않고, 정확 일치가 없으면 기존 유일 후보만 선택한다. 불완전 검색·후속 페이지는 정확 일치가 보여도 선택하지 않는다. 기존 목록 검색의 부분명·초성/업종 호칭/법인 표기 후보와 검색 예산은 유지한다. 같은 규칙을 상세·갤러리·납품 요약·기록 필터에 적용하고 확정 결과의 후보 목록을 비웠다. 불완전 요약 결과를 모호함보다 먼저 분류하며 사용자에게 내부 ID를 요구하던 모호함 안내도 개선했다. 추가 쿼리/인덱스/캐시/업무 쓰기는 없다.
+- app/Functions typecheck·lint PASS, 전체 unit **1,830 PASS /86 조건부 SKIP**, demo Firebase+공식 SDK **25 PASS**. 단위 검사는 초성/부분명 충돌·전체명 우선·정규화·동명·명시적 폐업 포함·1251번째 중복/검색 예산·후속 페이지·여러 도구 일관성을 검사한다. demo에는 같은 초성/부분명의 다른 업체를 실제 생성해 상세·갤러리·요약·기록 필터가 정확한 원본만 선택함을 검사했다. Functions/Next build·PWA·성능 예산·합성 benchmark3개 PASS. 운영 frontend 설정이 없는 out은 Hosting gate에서 차단됐으며 미배포다. 카드/사진 UI 자체는 변경하지 않았다.
+- **functions:employeeMcp만** 배포해 ACTIVE **employeemcp-00026-ric**, updateTime `2026-10-09T12:29:15.801880517Z` 확인. 직전 기준선의 기존71 Functions/PWA Hosting/MCP Hosting `392f487ef50a6a9c`·runtime SA·allowlist1·PIN secret2·max3/concurrency4 동일. HTTPS/OAuth discovery/PKCE/401/Origin/no-store probe PASS. Rules/IAM/Storage/업무 데이터 변경 없음.
+- 실제 새 ChatGPT 대화에서 사용자가 문제를 제기한 **정확한 등록명**으로 자연어 상세 조회를 수행했다. **get_customer_details1회/성공/결과1/서버1,080ms/관측234문서/Firestore12회/Auth2/Storage0/응답2,517B/서버 재시도0**다. 다중 후보 카드 없이 상세 카드1개가 표시됐고 현재 등록명·납품주소의 비식별 hash가 원본과 일치하며 실제 가시성도 확인했다. 원본 updateTime hash는 전후 동일이다. 서버 시간은 ChatGPT 추론/네트워크 총시간이나 SLO가 아니다. 기존 OAuth로 인증 갱신 없이 검증했고 사용한 Chrome 탭만 닫아 원래1탭으로 복귀했다. 기존 ONWAY 작업 브랜치/초안 PR #4에 보관하고 main은 병합하지 않는다.
+
 ### 2026-10-09 MCP 1.11.0 — 거래처 상세 조회·원문 카드 배포 완료
 
 - `get_customer_details`를 추가해 모델 공개17개/UI 전용1개, 총18도구다. 이름(query) → 기존 검색 → 현재 상세정보를 한 호출로 지원하며 확인된 ID의 후속 요청은 카탈로그를 생략한다. `CustomerService.read`의 canonical 직원·권한 transaction을 그대로 재사용한다. 등록명/지역/상태/revision/등록·수정시각/전경사진 참조 여부와 주소·연락처·납품 안내·변경 안내를 반환한다. 사진 바이트·납품/재고/실사 기록은 자동 조회하지 않으며 PWA Callable 계약을 바꾸지 않았다. 상세 사용법은 `docs/mcp-customer-details.md`.

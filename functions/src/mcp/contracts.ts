@@ -5,7 +5,7 @@ import { deliveryDateKeySchema, deliveryPhotoMetadataSchema } from "../delivery-
 import { inventoryQuantityMatchSchema } from "../inventory/inventory-quantity-match.js";
 import { customerDetailsSchema, customerSections } from "./customer-details.js";
 
-export const MCP_VERSION = "1.11.0";
+export const MCP_VERSION = "1.11.1";
 export const MCP_TOOL_NAMES = ["search_customers", "get_customer_details", "search_inventory_products", "get_inventory_product", "list_low_stock",
   "list_delivery_records", "get_delivery_photo", "get_inventory_photo", "get_inventory_products", "list_inventory_alerts", "get_customer_delivery_summary", "get_delivery_gallery", "search_delivery_records", "get_latest_employee_delivery_gallery", "get_inventory_overview", "search_inventory_records", "preview_inventory_change", "commit_inventory_change"] as const;
 export type McpToolName = typeof MCP_TOOL_NAMES[number];

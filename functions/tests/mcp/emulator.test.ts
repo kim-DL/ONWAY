@@ -15,6 +15,7 @@ import { deliveryPhotoPath } from "../../src/delivery-photo/delivery-photo-store
 import { McpQueries } from "../../src/mcp/queries.js";
 import { InventoryService } from "../../src/inventory/inventory-service.js";
 import { CustomerService } from "../../src/customer/customer-service.js";
+import { normalizeCustomerName, getCustomerChoseong } from "../../src/customer/customer-contract.js";
 import { DeliveryPhotoService, deliveryDateKeyInSeoul } from "../../src/delivery-photo/delivery-photo-service.js";
 import type { McpPrincipal } from "../../src/mcp/authorization.js";
 import { newReadObservation, withReadObservation } from "../../src/shared/read-observation.js";
@@ -58,6 +59,13 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
         contacts: [{ id: "synthetic-contact", name: "합성 연락처", role: "납품 담당", phoneNumber: "01012345678", isPrimary: true }],
         status: "active", noticeType: "none", changeNote: "" } }, actor);
     customerId = customer.customerId;
+    // Demo-only collisions: a substring match and a different name sharing initials.
+    const customerSeed = (await db.doc(`companies/onnuri/customers/${customerId}`).get()).data()!;
+    for (const name of ["합성 한빛초 납품", "합성 한별초"]) {
+      const ref = db.collection("companies/onnuri/customers").doc();
+      await ref.set({ ...customerSeed, customerId: ref.id, name,
+        normalizedName: normalizeCustomerName(name), choseongName: getCustomerChoseong(name) });
+    }
     const bytes = await sharp({ create: { width: 640, height: 960, channels: 3, background: "#336699" } }).jpeg().toBuffer();
     await new InventoryPhotoService().upload({ uploadId: inventoryPhotoId, contentType: "image/jpeg", fileBase64: bytes.toString("base64") }, actor);
     const product = await new InventoryService().save({ requestId: randomUUID(), productId: null, expectedRevision: null,
@@ -99,6 +107,7 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
     const before = (await db.doc(`companies/onnuri/inventoryProducts/${productId}`).get()).data();
     const customer = await queries.searchCustomers("한빛", null);
     expect(customer.customers.map((c) => c.customerId)).toContain(customerId);
+    expect(customer.customers).toHaveLength(3);
     expect(JSON.stringify(customer)).not.toContain("never-export-this-field");
     const product = await queries.product(productId, actor);
     expect(product.product.totalQuantity).toBe(19);
@@ -186,7 +195,7 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
     try {
       const tools = (await client.listTools()).tools;
       expect(tools).toHaveLength(18);
-      const detail = await client.callTool({ name: "get_customer_details", arguments: { query: "합성 한빛초유통", sections: ["addresses", "contacts"] } });
+      const detail = await client.callTool({ name: "get_customer_details", arguments: { query: "합성 한빛초", sections: ["addresses", "contacts"] } });
       expect(detail.isError).not.toBe(true);
       expect(detail.structuredContent).toMatchObject({ resolution: "resolved", customer: { customerId,
         addresses: { preferredAddress: "합성 하차 주소" }, contacts: [{ phoneNumber: "010-1234-5678" }], delivery: null } });
@@ -243,7 +252,7 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
       expect(gallery._meta?.deliveryPhoto).toMatchObject({ variant: "thumbnail", customerId });
       expect(JSON.stringify(gallery.structuredContent)).not.toMatch(/fileBase64|never-export-this-field/);
       expect(JSON.stringify(gallery.content.filter((item) => item.type === "text"))).not.toMatch(/never-export-this-field|합성 MCP 직원/);
-      const namedGallery = await client.callTool({ name: "get_delivery_gallery", arguments: { query: "합성 한빛초유통", limit: 50 } });
+      const namedGallery = await client.callTool({ name: "get_delivery_gallery", arguments: { query: "합성 한빛초", limit: 50 } });
       expect(namedGallery.isError).not.toBe(true);
       expect(namedGallery.structuredContent).toMatchObject({ resolution: "resolved", customerName: "합성 한빛초", date: null,
         photoIds: expect.arrayContaining([photoId, secondPhotoId]), page: { returnedCount: 2, complete: true } });
