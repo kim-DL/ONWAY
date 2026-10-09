@@ -6,6 +6,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { createMcpHttpApp } from "../../src/mcp/http.js";
 import { McpQueries } from "../../src/mcp/queries.js";
+import { CUSTOMER_DETAILS_BASIS } from "../../src/mcp/customer-details.js";
+import { CUSTOMER_VIEW_URI } from "../../src/mcp/customer-view.js";
 import { fixture } from "./fixture.js";
 import { PHOTO_VIEW_URI } from "../../src/mcp/photo-view.js";
 import { INVENTORY_WRITE_VIEW_URI } from "../../src/mcp/inventory-write-view.js";
@@ -44,6 +46,41 @@ async function start(toolTimeoutMs = 20_000) {
   return { ...f, origin, low, gallery, metrics, queries };
 }
 describe("Remote MCP over real HTTP", () => {
+  it("returns customer details once through the SDK, supports compact/JSON sections, and suppresses data revoked before release", async () => {
+    const f = await start(), { exchange } = await f.setup(), tokens = await f.oauth.token(exchange);
+    const detail = vi.spyOn(f.queries, "customerDetails").mockResolvedValue({ resolution: "resolved", candidates: [],
+      searchPage: null, searchNextCursor: null, sectionsIncluded: ["contacts"], basis: CUSTOMER_DETAILS_BASIS, note: "합성 조회 완료",
+      customer: { customerId: "synthetic", name: "합성", status: "active", district: "합성구", administrativeDong: "합성동",
+        revision: 1, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-08T00:00:00Z", hasOverviewPhoto: false,
+        addresses: null, delivery: null, notes: null, contacts: [{ name: "합성 담당", role: "납품", phoneNumber: "010-1234-5678", isPrimary: true }] } });
+    const client = new Client({ name: "customer-details", version: "1" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${f.origin}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${tokens.access_token}` } } }) as Transport);
+    try {
+      const tool = (await client.listTools()).tools.find((row) => row.name === "get_customer_details")!;
+      expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+      expect(tool._meta).toMatchObject({ "openai/outputTemplate": CUSTOMER_VIEW_URI });
+      expect((await client.readResource({ uri: CUSTOMER_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
+      const result = await client.callTool({ name: "get_customer_details", arguments: { query: "합성유통", sections: ["contacts"] } });
+      expect(result.isError).not.toBe(true); expect(detail).toHaveBeenCalledOnce();
+      expect(result.structuredContent).toMatchObject({ resolution: "resolved", sectionsIncluded: ["contacts"], customer: { name: "합성", contacts: [{ phoneNumber: "010-1234-5678" }] } });
+      expect(JSON.stringify(result.content)).not.toMatch(/010-1234-5678|합성 담당/);
+      expect(JSON.stringify(result.structuredContent)).not.toContain("accessPassword");
+      await vi.waitFor(() => expect(f.metrics.find((row) => row.tool === "get_customer_details")).toMatchObject({ returnedCount: 1, complete: true }));
+      expect(JSON.stringify(f.metrics)).not.toMatch(/010-1234-5678|합성 담당/);
+      const json = await client.callTool({ name: "get_customer_details", arguments: { customerId: "synthetic", sections: ["contacts"], responseFormat: "json" } });
+      expect(JSON.parse((json.content[0] as { text: string }).text)).toEqual(json.structuredContent);
+      const count = detail.mock.calls.length;
+      expect((await client.callTool({ name: "get_customer_details", arguments: { query: "*" } })).isError).toBe(true);
+      expect(detail.mock.calls).toHaveLength(count);
+      detail.mockImplementationOnce(async () => {
+        f.identity.verify.mockRejectedValueOnce(new Error("revoked"));
+        return detail.mock.results[0]!.value;
+      });
+      const revoked = await client.callTool({ name: "get_customer_details", arguments: { customerId: "synthetic", sections: ["contacts"] } });
+      expect(revoked.isError).toBe(true); expect(revoked._meta).toMatchObject({ error: { code: "AUTH_REQUIRED" } });
+      expect(JSON.stringify(revoked)).not.toMatch(/010-1234-5678|합성 담당/);
+    } finally { await client.close(); }
+  });
   it("returns an inventory photo through the official SDK with small metadata and the shared viewer", async () => {
     const f = await start(), { exchange } = await f.setup(), tokens = await f.oauth.token(exchange);
     const photo = vi.spyOn(f.queries, "inventoryPhoto").mockResolvedValue({
@@ -203,7 +240,7 @@ describe("Remote MCP over real HTTP", () => {
       expect(client.getServerVersion()).toMatchObject({ title: "온누리종합식품",
         icons: [{ src: `${f.origin}/onnuri-icon-v1.png`, mimeType: "image/png", sizes: ["1254x1254"] }] });
       const listed = await client.listTools();
-      expect(listed.tools).toHaveLength(17);
+      expect(listed.tools).toHaveLength(18);
       expect(listed.tools.every((tool) => tool.outputSchema?.type === "object")).toBe(true);
       expect(listed.tools.filter((tool) => !["preview_inventory_change", "commit_inventory_change"].includes(tool.name)).every((tool) => tool.annotations?.readOnlyHint === true && tool.annotations.destructiveHint === false)).toBe(true);
       expect(listed.tools.find((tool) => tool.name === "get_delivery_photo")?._meta).toMatchObject({

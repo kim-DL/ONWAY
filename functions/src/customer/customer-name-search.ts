@@ -7,6 +7,7 @@ function withoutCorporateNotation(value: string) {
 /** Only an added business suffix may match a complete registered name; no fuzzy guesses. */
 export function customerNameMatcher(query: string) {
   const normalized = normalizeCustomerName(query), initials = getCustomerChoseong(query);
+  if (!normalized) return () => false;
   const corporate = normalizeCustomerName(withoutCorporateNotation(query));
   const root = corporate.replace(/(?:종합식품|식자재|유통|식품|푸드|상사|마트)$/u, "");
   const fallback = root !== corporate && /^[가-힣a-z0-9]{2,}$/u.test(root) ? root : null;

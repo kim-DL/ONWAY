@@ -15,6 +15,7 @@ import type { ScanStop } from "../shared/bounded-scan.js";
 import { InventoryPhotoService } from "../inventory/inventory-photo-service.js";
 import type { z } from "zod";
 import type { inventoryPhotoInput, galleryInput } from "./contracts.js";
+import { customerDetailsProjection, CUSTOMER_DETAILS_BASIS, type customerDetailsInput } from "./customer-details.js";
 
 const STOCK_BASIS = "모든 보관장소(샘플 포함)의 합계가 threshold 이하. 상품별 안전재고/수요 기준은 등록되어 있지 않습니다. 단위는 각 상품의 unitLabel입니다.";
 export const STOCKTAKE_BASIS = "lastStocktakeAt은 제품별 수량일치 확인 버튼이 남긴 마지막 count_match 로그의 createdAt입니다. 기록자는 lastStocktake.actorName으로 답하세요. 원본 actorEmployeeId로 현재 직원 명부에서 조회한 이름이며 당시 이름 스냅샷은 아닙니다. actorName이 null이면 기록자 정보 없음이며 현재 로그인 사용자나 상품 수정자로 추정하지 마세요. 원본 로그 필드는 lastStocktake에 있으며 해당 로그의 장소에서 확인한 시각입니다. 다른 장소의 실사 완료 여부와 무관하고 입출고/수량조정은 포함하지 않습니다. null은 해당 버튼 로그 없음입니다. stocktakeByLocation과 현황의 실사 상태는 입출고도 반영하는 기존 PWA 완료 요약으로 버튼 로그와 구분하세요. updatedAt은 상품 문서 수정시각입니다. 수량과 로그는 별도 읽기이며 같은 시점 스냅샷을 보장하지 않습니다.";
@@ -120,6 +121,30 @@ export class McpQueries {
     const result = await this.customers.search(query, { afterId, limit });
     return { customers: result.items.map(customerProjection), query, nextCursor: result.nextCursor, page: result.page,
       note: "등록 이름·초성과 추가 업종 호칭을 확인했습니다. 여러 후보면 customerId를 확인하세요. page.complete가 false면 검색이 끝나지 않았습니다. 여러 페이지는 동일 시점의 스냅샷이 아닙니다." };
+  }
+  async customerDetails(input: z.infer<typeof customerDetailsInput>, actor: McpPrincipal) {
+    const search = input.query ? await this.customers.search(input.query,
+      { afterId: input.afterId, limit: 100, includeClosed: input.includeClosed }) : null;
+    const base = { candidates: search?.items.map((customer) => ({ ...customerProjection(customer), status: customer.status })) ?? [],
+      searchPage: search?.page ?? null, searchNextCursor: search?.nextCursor ?? null,
+      sectionsIncluded: input.sections, basis: CUSTOMER_DETAILS_BASIS };
+    const customerId = input.customerId ?? (search?.page.complete && search.page.startedFromBeginning
+      && search.items.length === 1 ? search.items[0]!.customerId : null);
+    if (!customerId) return { ...base, customer: null,
+      resolution: search && (!search.page.complete || !search.page.startedFromBeginning) ? "incomplete_search" as const
+        : search?.items.length ? "ambiguous" as const : "not_found" as const,
+      note: search && (!search.page.complete || !search.page.startedFromBeginning)
+        ? "전체 검색을 마치지 못했습니다. searchNextCursor를 같은 이름의 afterId로 전달하거나 확인된 customerId를 사용하세요. 후속 페이지 하나만 보고 자동 선택하지 않습니다."
+        : search?.items.length ? "여러 거래처가 일치합니다. 후보의 등록명·지역·상태로 대상을 확인하고 customerId를 지정해 주세요."
+          : "일치하는 거래처가 없습니다. 기본은 활성 거래처이며 등록명 또는 명시적으로 요청한 폐업 포함 조건을 확인해 주세요." };
+    // Always read the current source with canonical membership checks, including after name resolution.
+    const customer = await this.customers.read(customerId, actor, input.includeClosed);
+    if (customer && customer.customerId !== customerId) throw new HttpsError("failed-precondition", "Customer identity mismatch");
+    return { ...base, candidates: [], resolution: customer ? "resolved" as const : "not_found" as const,
+      customer: customer ? customerDetailsProjection(customer, input) : null,
+      note: !customer ? "거래처가 없거나 폐업 처리되어 조회 조건에 맞지 않습니다. 기존 검색 결과로 상세정보를 추정하지 마세요."
+        : customer.status === "closed" ? "폐업 처리된 거래처의 현재 저장 정보입니다. 방문·납품 전 확인하세요."
+          : "거래처 상세정보를 확인했습니다. 요청한 항목만 답하고 이후 같은 거래처는 customerId를 재사용하세요. 추가 검색·사진·실사 조회는 필요하지 않습니다." };
   }
   async searchProducts(query: string, afterId: string | null, limit = 50) {
     const result = await this.inventory.search(query, { afterId, limit });

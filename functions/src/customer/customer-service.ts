@@ -105,12 +105,12 @@ export class CustomerService {
       nextCursor: snapshot.docs.length > 250 ? docs.at(-1)!.id : null };
   }
 
-  async search(query: string, options: ScanOptions = {}) {
+  async search(query: string, options: ScanOptions & { includeClosed?: boolean } = {}) {
     const matches = customerNameMatcher(query);
     return boundedScan(async (cursor) => {
       const page = await this.listSearch(cursor);
       return { items: page.customers, nextCursor: page.nextCursor };
-    }, (customer) => customer.customerId, (customer) => customer.status === "active"
+    }, (customer) => customer.customerId, (customer) => (customer.status === "active" || options.includeClosed === true)
       && matches(customer), options);
   }
 

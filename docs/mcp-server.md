@@ -1,8 +1,8 @@
 # 급식길 사내 Remote MCP
 
-현재 구현: **1.9.0 거래처 이름 → 납품사진 갤러리 한 번 조회**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [상품 사진 가이드](mcp-inventory-photos.md)와 [재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
+현재 구현: **1.11.0 거래처 상세 조회·원문 카드**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
 
-MCP URL은 `https://onnuriway-mcp.web.app/mcp`, 플러그인 이름은 **온누리종합식품**이다. 기존 직원 PIN·허용 직원·조회 token을 유지하며 사진 UI는 v9이다. 납품사진의168시간 보관과 상품 대표 사진의 기존 보관 정책을 구분한다. 저장에는 `geupsikgil:inventory.write` 추가 동의와 사용자 카드 승인이 필요하며 기존 read 토큰을 자동 승격하지 않는다. 모델 공개 도구16개와 UI 전용 실행1개다. 정상 조회의 요청 인증/응답 전 재인가, 제품별 count_match 시각·현재 명부 기록자 의미를 유지한다. 실물 모바일 기기는 별도 검증하지 않았다.
+MCP URL은 `https://onnuriway-mcp.web.app/mcp`, 플러그인 이름은 **온누리종합식품**이다. 기존 직원 PIN·허용 직원·조회 token을 유지하며 사진 UI는 v9이다. 납품사진의168시간 보관과 상품 대표 사진의 기존 보관 정책을 구분한다. 저장에는 `geupsikgil:inventory.write` 추가 동의와 사용자 카드 승인이 필요하며 기존 read 토큰을 자동 승격하지 않는다. 모델 공개 도구17개와 UI 전용 실행1개다. 정상 조회의 요청 인증/응답 전 재인가, 제품별 count_match 시각·현재 명부 기록자 의미를 유지한다. 실물 모바일 기기는 별도 검증하지 않았다.
 
 ## Git 저장과 배포 경계
 
@@ -29,6 +29,7 @@ MCP 소스는 기존 [ONWAY 저장소](https://github.com/kim-DL/ONWAY)에서 �
 | `preview_inventory_change` | 기존 재고 계산으로 변경 전후를 표시. 업무 자료는 저장하지 않고 UI 승인 capability 발급 |
 | `commit_inventory_change` | UI 전용. write scope·승인 capability·transaction 재인가·동시 변경 검사 후 기존 서비스로 저장 |
 | `search_customers` | `companies/onnuri/customers`, 업체/학교 이름·초성 검색. ID·이름·지역만 반환. 출입 비밀번호·전화번호·메모 제외 |
+| `get_customer_details` | 이름(query) 또는 확인된 ID → 현재 주소·전체 연락처·납품/출입 안내·변경 안내와 원문 상세 카드. 선택 항목/경량 응답, 폐업 명시 포함. 출입 비밀번호는 명시 요청 시만 제공 |
 | `search_inventory_products` | 기존 상품명/제조사/규격/원산지/초성 검색과 현재 수량·실사 시각. `query` 또는 최대10개 `queries`를 한 번의 활성 상품 순회로 검색 |
 | `get_inventory_product` | 기존 transaction 상세 조회. `includeLots:false`이면 장소별/전체 수량·실사 시각만 조회해 묶음 읽기 생략. 기본값true는 기존 상세 계약 유지 |
 | `list_low_stock` | 활성 상품의 모든 장소(샘플 포함) 수량 합계 ≤ threshold. 기본 0. **안전재고·수요 기준이 DB에 없어 그 기준의 부족 여부는 판단하지 않음** |

@@ -20,6 +20,7 @@ import type { McpPrincipal } from "../../src/mcp/authorization.js";
 import { newReadObservation, withReadObservation } from "../../src/shared/read-observation.js";
 import { PHOTO_VIEW_URI } from "../../src/mcp/photo-view.js";
 import { InventoryPhotoService } from "../../src/inventory/inventory-photo-service.js";
+import { customerDetailsInput } from "../../src/mcp/customer-details.js";
 
 const enabled = process.env.MCP_EMULATOR_TEST === "true";
 describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
@@ -52,9 +53,10 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
       failedAttemptCount: 0, lockedUntil: null, sessionVersion: 1 });
     await db.doc(`pinIndexes/${createPinLookupKey(pin, lookup)}`).set({ employeeId: actor.employeeId });
     const customer = await new CustomerService().save({ requestId: randomUUID(), customerId: null, expectedRevision: null, clearNotice: false,
-      draft: { name: "합성 한빛초", district: "합성구", administrativeDong: "합성동", officialAddress: "", deliveryAddress: "",
-        accessPassword: "never-export-this-field", accessPasswordState: "registered", deliveryLocationDescription: "", deliveryPoint: null,
-        contacts: [], status: "active", noticeType: "none", changeNote: "" } }, actor);
+      draft: { name: "합성 한빛초", district: "합성구", administrativeDong: "합성동", officialAddress: "합성 공식 주소", deliveryAddress: "합성 하차 주소",
+        accessPassword: "never-export-this-field", accessPasswordState: "registered", deliveryLocationDescription: "합성 후면 창고", deliveryPoint: null,
+        contacts: [{ id: "synthetic-contact", name: "합성 연락처", role: "납품 담당", phoneNumber: "01012345678", isPrimary: true }],
+        status: "active", noticeType: "none", changeNote: "" } }, actor);
     customerId = customer.customerId;
     const bytes = await sharp({ create: { width: 640, height: 960, channels: 3, background: "#336699" } }).jpeg().toBuffer();
     await new InventoryPhotoService().upload({ uploadId: inventoryPhotoId, contentType: "image/jpeg", fileBase64: bytes.toString("base64") }, actor);
@@ -113,6 +115,22 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
     expect(summary.records?.photos).toHaveLength(2);
     expect((await db.doc(`companies/onnuri/inventoryProducts/${productId}`).get()).data()).toEqual(before);
   });
+  it("reads a current customer in three canonical documents with no photos, writes or cached authority", async () => {
+    const ref = db.doc(`companies/onnuri/customers/${customerId}`), before = await ref.get();
+    const observed = newReadObservation();
+    const details = await withReadObservation(observed, () => queries.customerDetails(customerDetailsInput.parse({ customerId }), actor));
+    expect(details).toMatchObject({ resolution: "resolved", customer: { customerId, addresses: { preferredAddress: "합성 하차 주소" },
+      contacts: [{ name: "합성 연락처", phoneNumber: "010-1234-5678" }], delivery: { accessPassword: null, accessPasswordIncluded: false } } });
+    expect(JSON.stringify(details)).not.toContain("never-export-this-field");
+    expect(observed.documentReads).toBe(3); expect(observed.documentWrites).toBe(0); expect(observed.operations.storage ?? 0).toBe(0);
+    expect((await ref.get()).updateTime).toEqual(before.updateTime);
+    const explicit = await queries.customerDetails(customerDetailsInput.parse({ customerId, sections: ["delivery"], includeAccessPassword: true }), actor);
+    expect(explicit.customer?.delivery?.accessPassword).toBe("never-export-this-field");
+    const employee = db.doc(`employees/${actor.employeeId}`);
+    await employee.update({ roleScopes: ["viewer"] });
+    try { await expect(queries.customerDetails(customerDetailsInput.parse({ customerId }), actor)).rejects.toMatchObject({ code: "permission-denied" }); }
+    finally { await employee.update({ roleScopes: actor.roleScopes }); }
+  });
   it("reads the existing inventory attachment through one thumbnail download with no source changes", async () => {
     const ref = db.doc(`companies/onnuri/inventoryProducts/${productId}`), before = await ref.get();
     const observed = newReadObservation();
@@ -167,7 +185,12 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
     }) as Transport);
     try {
       const tools = (await client.listTools()).tools;
-      expect(tools).toHaveLength(17);
+      expect(tools).toHaveLength(18);
+      const detail = await client.callTool({ name: "get_customer_details", arguments: { query: "합성 한빛초유통", sections: ["addresses", "contacts"] } });
+      expect(detail.isError).not.toBe(true);
+      expect(detail.structuredContent).toMatchObject({ resolution: "resolved", customer: { customerId,
+        addresses: { preferredAddress: "합성 하차 주소" }, contacts: [{ phoneNumber: "010-1234-5678" }], delivery: null } });
+      expect(JSON.stringify(detail)).not.toContain("never-export-this-field");
       expect(tools.every((tool) => tool.outputSchema?.type === "object")).toBe(true);
       const view = await client.readResource({ uri: PHOTO_VIEW_URI });
       expect(view.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");

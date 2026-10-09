@@ -11,6 +11,7 @@ describe("registered customer name matching", () => {
     ["합성유통", "합성상사", false], ["합성유통", "다른합성", false], ["한유통", "한", false],
     ["합성유통유통", "합성", false], ["합성", "합성유통", true], ["ㅎㅂㅊ", "한빛초", true],
     ["합셩유통", "합성", false],
+    ["*", "합성", false], [" ", "합성", false],
   ])("query %s / registered %s matches=%s", (query, name, expected) => {
     expect(Boolean(customerNameMatcher(query)(named(name)))).toBe(expected);
   });

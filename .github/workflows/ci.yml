@@ -53,12 +53,13 @@ jobs:
       - name: Functions build
         run: npm run functions:build
 
-      - name: MCP inventory response and read budgets (synthetic)
+      - name: MCP response and read budgets (synthetic)
         run: |
           node scripts/benchmark-mcp-inventory.mjs
           node scripts/benchmark-mcp-records.mjs
+          node scripts/benchmark-mcp-customers.mjs
 
-      - name: MCP OAuth, photo viewer and inventory approval browsers
+      - name: MCP OAuth, photo viewer, customer card and inventory approval browsers
         run: npm run test:mcp:browser
 
       - name: MCP Firebase integration (demo only)
