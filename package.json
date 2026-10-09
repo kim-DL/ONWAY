@@ -82,7 +82,11 @@
     "emulators": "node scripts/firebase-emulators.mjs start",
     "seed": "tsx scripts/seed-emulator.ts",
     "seed:verify": "node scripts/firebase-emulators.mjs seed",
-    "audit": "npm audit --audit-level=high"
+    "audit": "npm audit --audit-level=high",
+    "test:mcp": "vitest run functions/tests/mcp functions/tests/login-service.test.ts functions/tests/pin-crypto.test.ts",
+    "test:mcp:emulator": "node scripts/test-mcp-emulator.mjs",
+    "verify:mcp:remote": "node scripts/verify-mcp-remote.mjs",
+    "test:mcp:browser": "node scripts/test-mcp-browser.mjs"
   },
   "dependencies": {
     "@serwist/next": "^9.5.12",

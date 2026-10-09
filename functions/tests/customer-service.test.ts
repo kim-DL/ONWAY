@@ -113,6 +113,15 @@ describe("customer trusted mutation contract", () => {
 });
 
 describe("customer atomic storage", () => {
+  it("includes closed customers only when explicitly requested for historical evidence and still enforces membership", async () => {
+    const fixture = database(); const service = new CustomerService(fixture.db);
+    const created = await service.save({ ...input, draft: { ...draft, status: "closed" } }, actor);
+    expect(await service.read(created.customerId, actor)).toBeNull();
+    expect(await service.read(created.customerId, actor, true)).toMatchObject({ name: draft.name, status: "closed" });
+    expect(await service.read("missing", actor, true)).toBeNull();
+    fixture.values.get("authz/uid-admin")!.active = false;
+    await expect(service.read(created.customerId, actor, true)).rejects.toMatchObject({ code: "permission-denied" });
+  });
   it("uses canonical employee roles with a version-only authz document and rejects role changes without a version bump", async () => {
     const staff: CustomerActor = { ...actor, uid: "uid-staff", employeeId: "EMP-STAFF", isAdmin: false, roleScopes: ["delivery"] };
     const fixture = database(staff); const service = new CustomerService(fixture.db);

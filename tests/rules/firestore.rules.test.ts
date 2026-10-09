@@ -467,3 +467,15 @@ describe("Firestore direct-write and red-team boundary", () => {
     await assertFails(getDoc(doc(unauthenticated, "schools", "SCH-001")));
   });
 });
+
+
+describe("MCP private OAuth namespace", () => {
+  it("denies direct reads, lists and writes for anonymous, employee and approved admin clients", async () => {
+    for (const db of [modularFirestore(testEnvironment.unauthenticatedContext()),
+      firestoreFor(IDENTITIES.delivery), firestoreFor(IDENTITIES.admin)]) {
+      await assertFails(getDoc(doc(db, "mcpPrivate/access-test")));
+      await assertFails(getDocs(collection(db, "mcpPrivate")));
+      await assertFails(setDoc(doc(db, "mcpPrivate/access-test"), { expiresAt: 9999999999999 }));
+    }
+  });
+});

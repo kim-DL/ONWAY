@@ -15,6 +15,9 @@ import {
   INVENTORY_MANUFACTURER_PATH, saveInventoryProductWithManufacturerInputSchema, type SaveInventoryProductWithManufacturerInput,
 } from "../src/inventory/inventory-manufacturer-contract.js";
 import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lot-summary.js";
+import { newReadObservation, withReadObservation } from "../src/shared/read-observation.js";
+import { EmployeeDirectory } from "../src/employee/employee-directory.js";
+import { McpQueries } from "../src/mcp/queries.js";
 
 const actor: InventoryActor = { uid: "uid-staff", employeeId: "EMP-STAFF", roleScopes: ["delivery"], sessionVersion: 1, permissionsVersion: 1, isAdmin: false };
 const admin: InventoryActor = { uid: "uid-admin", employeeId: "EMP-ADMIN", roleScopes: ["admin"], sessionVersion: 1, permissionsVersion: 1, isAdmin: true };
@@ -25,7 +28,7 @@ const draft = inventoryProductDraftSchema.parse({ name: "냉동 만두", manufac
 const initialNow = new Date("2026-09-11T01:00:00Z");
 
 type RecordValue = Record<string, unknown>;
-type QuerySpec = { path: string; filters: Array<[string, string, unknown]>; orders: Array<[string, string]>; maximum: number; after: string | null };
+type QuerySpec = { path: string; filters: Array<[string, string, unknown]>; orders: Array<[string, string]>; maximum: number; after: string | null; fields?: string[] };
 function fixture() {
   const values = new Map<string, RecordValue>();
   const reads: string[][] = [];
@@ -42,7 +45,7 @@ function fixture() {
   };
   for (const member of [actor, admin, viewer, sales]) {
     values.set(`authz/${member.uid}`, { employeeId: member.employeeId, active: true, sessionVersion: 1, permissionsVersion: 1 });
-    values.set(`employees/${member.employeeId}`, { employeeId: member.employeeId, firebaseUid: member.uid, roleScopes: member.roleScopes, status: "active" });
+    values.set(`employees/${member.employeeId}`, { employeeId: member.employeeId, firebaseUid: member.uid, roleScopes: member.roleScopes, status: "active", displayName: "합성 버튼 기록자" });
   }
   let currentTime = initialNow;
   let serial = Promise.resolve();
@@ -64,7 +67,9 @@ function fixture() {
       const index = rows.findIndex(([path]) => path.split("/").at(-1) === spec.after);
       rows = index >= 0 ? rows.slice(index + 1) : rows.filter(([path]) => path.split("/").at(-1)! > spec.after!);
     }
-    return { docs: rows.slice(0, spec.maximum).map(([path]) => snapshot(path)) };
+    return { docs: rows.slice(0, spec.maximum).map(([path]) => spec.fields
+      ? { ...snapshot(path), data: () => Object.fromEntries(spec.fields!.map((field) => [field, values.get(path)![field]])) }
+      : snapshot(path)) };
   };
   const query = (spec: QuerySpec) => ({
     querySpec: spec,
@@ -72,10 +77,12 @@ function fixture() {
     where: (field: string, op: string, value: unknown) => query({ ...spec, filters: [...spec.filters, [field, op, value]] }),
     orderBy: (field: unknown, direction = "asc") => query({ ...spec, orders: [...spec.orders, [typeof field === "string" ? field : "__name__", direction]] }),
     limit: (maximum: number) => query({ ...spec, maximum }),
+    select: (...fields: string[]) => query({ ...spec, fields }),
     startAfter: (cursor: string | { id: string }) => query({ ...spec, after: typeof cursor === "string" ? cursor : cursor.id }),
-    get: async () => select(spec),
+    get: async () => spec.fields ? read([spec.path], () => select(spec)) : select(spec),
   });
   const db = {
+    getAll: async (...targets: Array<{ path?: string; fieldMask?: string[] }>) => read(targets.filter((t) => t.path).map((t) => t.path!), () => targets.filter((t) => t.path).map((t) => snapshot(t.path!))),
     doc: ref, collection: (path: string) => query({ path, filters: [], orders: [], maximum: Infinity, after: null }),
     async runTransaction<T>(action: (transaction: unknown) => Promise<T>) {
       // Serialized commits model Firestore retrying transactions after a
@@ -131,6 +138,110 @@ async function stocked() {
   const first = await state.service.move(receive(product), actor);
   return { ...state, product: first.product, lotId: first.event.lines[0]!.lotId };
 }
+
+describe("shared inventory batch reads", () => {
+  it("reads the actual quantity-match button event despite newer movements, summaries or incomplete other locations", async () => {
+    const state = await stocked(), queries = new McpQueries(undefined, state.service, undefined, new EmployeeDirectory(state.db));
+    const id = state.product.productId, path = `${INVENTORY_PRODUCT_PATH}/${id}`;
+    // Stock received on count day already marks this location complete, without a button press.
+    expect(state.product.lastCountByLocation.freezer1).not.toBeNull();
+    expect((await queries.product(id, actor, false)).product.lastStocktakeAt).toBeNull();
+    state.time("2026-09-11T02:00:00Z");
+    const matched = await state.service.count({ ...countInput(state.product, [{ lotId: state.lotId, quantity: 10 }]), matchOnly: true }, actor);
+    state.time("2026-09-11T03:00:00Z");
+    const moved = await state.service.move(receive(matched.product, 2), actor);
+    expect(moved.product.lastCountByLocation.freezer1?.checkedAt).toBe("2026-09-11T03:00:00.000Z");
+    const stored = state.values.get(path)!;
+    stored.quantityByLocation = { ...moved.product.quantityByLocation, freezer2: 5 };
+    stored.lastCountByLocation = { ...moved.product.lastCountByLocation, freezer2: null };
+    // General history can be long; a later count_adjust is also not the button log.
+    for (let i = 0; i < 150; i++) {
+      const eventId = randomUUID();
+      state.values.set(`${path}/events/${eventId}`, { ...state.values.get(`${path}/events/${moved.event.eventId}`), eventId,
+        kind: i === 0 ? "count_adjust" : "receive", createdAt: Timestamp.fromDate(new Date("2026-09-12T01:00:00Z")) });
+    }
+    const before = JSON.stringify([...state.values]), observation = newReadObservation();
+    const result = await withReadObservation(observation, () => queries.product(id, actor, false));
+    expect(result.product).toMatchObject({ lastStocktakeAt: matched.event.createdAt, lastStocktake: { eventId: matched.event.eventId,
+      kind: "count_match", createdAt: matched.event.createdAt, locationId: "freezer1" }, stocktakeByLocation: { freezer2: null } });
+    expect(observation.documentReads).toBe(5); expect(observation.documentWrites).toBe(0);
+    expect(result.product.lastStocktake).toMatchObject({ actorEmployeeId: actor.employeeId, actorName: "합성 버튼 기록자", actorNameSource: "current_employee_directory" });
+    expect(JSON.stringify(result)).not.toMatch(/checkedBy|firebaseUid|reason/);
+    expect(JSON.stringify([...state.values])).toBe(before);
+  });
+  it("keeps source timestamps and breaks equal-time ties by event ID, never by product modification time", async () => {
+    const state = fixture(), id = "synthetic-log-product", path = `${INVENTORY_PRODUCT_PATH}/${id}/events`;
+    const ids = ["10000000-0000-4000-8000-000000000000", "20000000-0000-4000-8000-000000000000"];
+    for (const eventId of ids) state.values.set(`${path}/${eventId}`, { eventId, productId: id, kind: "count_match", locationId: "sample",
+      cycleId: "week-2026-09-11", stockRevision: 0, createdAt: Timestamp.fromDate(new Date("2026-09-11T01:00:00.001Z")), actorEmployeeId: "PRIVATE" });
+    expect((await state.service.lastQuantityMatches([id])).get(id)).toMatchObject({ eventId: ids[1], createdAt: "2026-09-11T01:00:00.001Z" });
+    state.values.get(`${path}/${ids[1]}`)!.productId = "wrong-product";
+    await expect(state.service.lastQuantityMatches([id])).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+  it("bounds latest-event concurrency, validates identifiers and performs no reads for empty results", async () => {
+    const state = fixture(), ids = Array.from({ length: 25 }, (_, index) => `synthetic-${index}`);
+    expect((await state.service.lastQuantityMatches(ids)).size).toBe(25);
+    expect(state.reads).toHaveLength(25);
+    expect(state.maxConcurrentReads()).toBeGreaterThan(1); expect(state.maxConcurrentReads()).toBeLessThanOrEqual(8);
+    state.resetReadMetrics();
+    expect(await state.service.lastQuantityMatches([])).toEqual(new Map());
+    for (const invalid of [["a", "a"], ["invalid/path"], Array.from({ length: 101 }, (_, i) => `p${i}`)]) {
+      await expect(state.service.lastQuantityMatches(invalid)).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(state.reads).toEqual([]);
+  });
+  it("uses the active index for MCP scans while preserving the PWA catalog, and avoids 200 lot reads for a summary", async () => {
+    const state = await stocked();
+    const path = `${INVENTORY_PRODUCT_PATH}/${state.product.productId}`, record = state.values.get(path)!;
+    for (let i = 0; i < 110; i++) {
+      const id = `inactive-${String(i).padStart(3, "0")}`;
+      state.values.set(`${INVENTORY_PRODUCT_PATH}/${id}`, { ...record, productId: id, status: "inactive" });
+    }
+    const activeReads = newReadObservation(), catalogReads = newReadObservation();
+    const active = await withReadObservation(activeReads, () => state.service.listActive(null));
+    const catalog = await withReadObservation(catalogReads, () => state.service.list(null));
+    expect(active.products.map((product) => product.productId)).toEqual([state.product.productId]);
+    expect(activeReads.documentReads).toBe(1); expect(catalogReads.documentReads).toBe(101);
+    expect(catalog.products.some((product) => product.status === "inactive")).toBe(true);
+    const original = state.values.get(`${path}/lots/${state.lotId}`)!;
+    for (let i = 0; i < 199; i++) state.values.set(`${path}/lots/lot-${i}`, { ...original, lotId: `lot-${i}`, quantity: 1 });
+    const before = JSON.stringify([...state.values]), queries = new McpQueries(undefined, state.service, undefined, new EmployeeDirectory(state.db));
+    const summaryReads = newReadObservation(), detailReads = newReadObservation();
+    const summary = await withReadObservation(summaryReads, () => queries.product(state.product.productId, viewer, false));
+    const detail = await withReadObservation(detailReads, () => queries.product(state.product.productId, viewer, true));
+    expect(summary.lots).toBeNull(); expect(detail.lots).toHaveLength(200);
+    expect(summaryReads.documentReads).toBe(3); expect(detailReads.documentReads).toBe(203);
+    expect(summary.product).toEqual(detail.product);
+    expect(JSON.stringify([...state.values])).toBe(before);
+  });
+  it("reads multiple summaries in one authorized transaction without loading their lots", async () => {
+    const state = await stocked();
+    const second = await state.service.save(initialStockInput(), actor);
+    const before = JSON.stringify([...state.values]);
+    state.resetReadMetrics();
+    const measured = newReadObservation();
+    const batch = await withReadObservation(measured, () => state.service.readProducts([second.productId, "missing", state.product.productId], viewer));
+    expect(batch.products.map((product) => product.productId)).toEqual([second.productId, state.product.productId]);
+    expect(batch.missingProductIds).toEqual(["missing"]);
+    expect(batch.products.map((product) => product.quantityByLocation.freezer1)).toEqual([19, 10]);
+    expect(state.reads).toHaveLength(2); // One canonical membership read + one batched product read.
+    expect(state.reads.flat().some((path) => path.includes("/lots"))).toBe(false);
+    expect(measured.documentReads).toBe(5);
+    expect(measured.documentWrites).toBe(0);
+    expect(JSON.stringify([...state.values])).toBe(before);
+  });
+  it("omits deleted summaries and rejects revoked membership before reading products", async () => {
+    const state = await stocked();
+    const path = `${INVENTORY_PRODUCT_PATH}/${state.product.productId}`;
+    state.values.set(path, { ...state.values.get(path), status: "deleted" });
+    expect((await state.service.readProducts([state.product.productId], viewer)).missingProductIds).toEqual([state.product.productId]);
+    state.values.set(`authz/${viewer.uid}`, { ...state.values.get(`authz/${viewer.uid}`), active: false });
+    state.resetReadMetrics();
+    await expect(state.service.readProducts([state.product.productId], viewer)).rejects.toMatchObject({ code: "permission-denied" });
+    expect(state.reads.flat()).not.toContain(path);
+    await expect(state.service.readProducts(["same", "same"], actor)).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+});
 
 describe("inventory wire boundaries and calendar", () => {
   it("accepts a bounded initial receipt only on new-product registration and keeps legacy registration compatible", () => {
@@ -1009,5 +1120,38 @@ describe("inventory transactions", () => {
     expect(state.values.get(INVENTORY_SETTINGS_PATH)?.updatedAt).toBeInstanceOf(Timestamp);
     await expect(state.service.updateSettings({ requestId: randomUUID(), expectedRevision: 0, weekday: 2, urgentDays: 3 }, admin)).rejects.toMatchObject({ code: "aborted" });
     expect((await state.service.context()).cycle.cycleId).toBe("week-2026-09-11");
+  });
+});
+
+describe("shared inventory stock command preview", () => {
+  it("runs real movement validation and predictions without any business writes, then commits exactly once", async () => {
+    const f = fixture(); const product = await f.service.save(initialStockInput(), actor);
+    const lot = (await f.service.detail(product.productId, actor)).lots[0]!;
+    const command = { operation: "movement" as const, input: inventoryMovementInputSchema.parse({ requestId: randomUUID(),
+      productId: product.productId, expectedStockRevision: product.stockRevision, kind: "issue", locationId: lot.locationId,
+      lotId: lot.lotId, quantity: 3, reason: "합성 출고" }) };
+    const before = JSON.stringify([...f.values]);
+    const preview = await f.service.stockCommand(command, actor, { preview: true, before: async () => {} });
+    expect(preview.event.lines[0]).toMatchObject({ before: 19, after: 16, delta: -3 });
+    expect(JSON.stringify([...f.values])).toBe(before);
+    const saved = await f.service.stockCommand(command, actor, { before: async () => {} });
+    expect(saved.product.quantityByLocation).toEqual(preview.product.quantityByLocation);
+    const after = JSON.stringify([...f.values]);
+    expect((await f.service.stockCommand(command, actor, { before: async (_tx, replay) => { expect(replay).toBe(true); } })).replayed).toBe(true);
+    expect(JSON.stringify([...f.values])).toBe(after);
+  });
+  it("uses the same role, quantity and transaction guard failures for previews and execution", async () => {
+    const f = fixture(); const product = await f.service.save(initialStockInput(), actor);
+    const lot = (await f.service.detail(product.productId, actor)).lots[0]!;
+    const input = inventoryMovementInputSchema.parse({ requestId: randomUUID(), productId: product.productId,
+      expectedStockRevision: product.stockRevision, kind: "issue", locationId: lot.locationId, lotId: lot.lotId, quantity: 20, reason: "" });
+    const before = JSON.stringify([...f.values]);
+    for (const preview of [true, false]) {
+      await expect(f.service.stockCommand({ operation: "movement", input }, viewer, { preview, before: async () => {} })).rejects.toThrow();
+      await expect(f.service.stockCommand({ operation: "movement", input }, actor, { preview, before: async () => {} })).rejects.toThrow();
+      await expect(f.service.stockCommand({ operation: "movement", input: { ...input, quantity: 1 } }, actor,
+        { preview, before: async () => { throw new Error("revoked approval"); } })).rejects.toThrow("revoked approval");
+    }
+    expect(JSON.stringify([...f.values])).toBe(before);
   });
 });

@@ -5,6 +5,8 @@ import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { formatPhoneNumber } from "../shared/phone-number.js";
 import { verifyCustomerTransactionActor, type CustomerActor } from "./customer-authorization.js";
 import { resolveCustomerPhotoChange } from "./customer-photo-store.js";
+import { boundedScan, type ScanOptions } from "../shared/bounded-scan.js";
+import { observeRead } from "../shared/read-observation.js";
 import {
   CUSTOMER_COLLECTION_PATH, CUSTOMER_COMPANY_ID, customerDraftSchema, customerSchema,
   getCustomerChoseong, normalizeCustomerName,
@@ -77,12 +79,47 @@ export class CustomerService {
   async list(afterId: string | null, includeOverviewPhoto = false) {
     let query = this.db.collection(CUSTOMER_COLLECTION_PATH).orderBy(FieldPath.documentId()).limit(251);
     if (afterId) query = query.startAfter(afterId);
-    const snapshot = await query.get();
+    const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
     const docs = snapshot.docs.slice(0, 250);
     return {
       customers: docs.map((document) => customerResponse(customerFromDocument(document.data()), includeOverviewPhoto)),
       nextCursor: snapshot.docs.length > 250 ? docs.at(-1)!.id : null,
     };
+  }
+
+  async search(query: string, options: ScanOptions = {}) {
+    const normalized = normalizeCustomerName(query);
+    const initials = getCustomerChoseong(query);
+    return boundedScan(async (cursor) => {
+      const page = await this.list(cursor);
+      return { items: page.customers, nextCursor: page.nextCursor };
+    }, (customer) => customer.customerId, (customer) => customer.status === "active"
+      && (customer.normalizedName.includes(normalized) || customer.choseongName.includes(initials)), options);
+  }
+
+  async read(customerId: string, actor: CustomerActor, includeClosed = false) {
+    return this.db.runTransaction(async (transaction) => {
+      await verifyCustomerTransactionActor(this.db, transaction, actor);
+      const snapshot = await observeRead("firestore", () => transaction.get(this.db.doc(`${CUSTOMER_COLLECTION_PATH}/${customerId}`)));
+      if (!snapshot.exists) return null;
+      const customer = customerFromDocument(snapshot.data()!);
+      return customer.status === "active" || includeClosed ? customer : null;
+    });
+  }
+
+  /** Names for an already selected, bounded set of photo records; one transaction, no catalog scan. */
+  async readNames(customerIds: string[], actor: CustomerActor) {
+    const ids = [...new Set(customerIds)];
+    if (ids.length > 100) throw new Error("Customer name batch limit exceeded");
+    return this.db.runTransaction(async (transaction) => {
+      await verifyCustomerTransactionActor(this.db, transaction, actor);
+      if (!ids.length) return [];
+      const snapshots = await observeRead("firestore", () => transaction.getAll(...ids.map((id) => this.db.doc(`${CUSTOMER_COLLECTION_PATH}/${id}`))), (value) => value.length);
+      return snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => {
+        const customer = customerFromDocument(snapshot.data()!);
+        return { customerId: customer.customerId, name: customer.name };
+      });
+    });
   }
 
   async save(input: SaveCustomerInput, actor: CustomerActor): Promise<Customer> {

@@ -71,10 +71,10 @@ function isIdentityEligible(identity: LoginIdentity) {
   );
 }
 
-export class EmployeeLoginService {
+export class EmployeePinService {
   private readonly now: () => Date;
 
-  constructor(private readonly dependencies: LoginServiceDependencies) {
+  constructor(private readonly dependencies: Omit<LoginServiceDependencies, "issueCustomToken">) {
     this.now = dependencies.now ?? (() => new Date());
   }
 
@@ -120,7 +120,7 @@ export class EmployeeLoginService {
     throw new LoginRejectedError("invalid");
   }
 
-  async login(input: EmployeeLoginInput): Promise<EmployeeLoginResult> {
+  async authenticate<T>(input: EmployeeLoginInput, issue: (uid: string, claims: Record<string, unknown>) => Promise<T>): Promise<T> {
     const now = this.now();
     const sourceKey = createOpaqueKey(
       input.sourceFingerprint,
@@ -211,7 +211,7 @@ export class EmployeeLoginService {
       permissionsVersion: identity.authz.permissionsVersion,
       roleScopes: identity.authz.roleScopes,
     };
-    const customToken = await this.dependencies.issueCustomToken(
+    const result = await issue(
       identity.employee.firebaseUid,
       claims,
     );
@@ -231,7 +231,17 @@ export class EmployeeLoginService {
       now,
     );
 
-    return { customToken };
+    return result;
+  }
+}
+
+/** Keep the existing Firebase custom-token login contract; MCP shares only PIN verification. */
+export class EmployeeLoginService extends EmployeePinService {
+  constructor(private readonly loginDependencies: LoginServiceDependencies) { super(loginDependencies); }
+  async login(input: EmployeeLoginInput): Promise<EmployeeLoginResult> {
+    return this.authenticate(input, async (uid, claims) => ({
+      customToken: await this.loginDependencies.issueCustomToken(uid, claims),
+    }));
   }
 }
 

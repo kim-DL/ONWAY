@@ -1,28 +1,9 @@
 import { INVENTORY_LOCATIONS, INVENTORY_MAX_QUANTITY, inventoryExpiryDays, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryProduct } from "@/domain/inventory";
 
-const INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
-function normalize(value: string) { return value.normalize("NFKC").toLocaleLowerCase("ko-KR").replace(/\s+/gu, ""); }
-export function inventoryInitials(value: string): string {
-  return Array.from(value, (character) => {
-    const code = character.charCodeAt(0) - 0xac00;
-    return code >= 0 && code <= 11171 ? INITIALS[Math.floor(code / 588)] : character;
-  }).join("");
-}
-export function inventorySearchText(product: InventoryProduct) {
-  const target = [product.name, product.manufacturer, product.specification, product.origin].join(" ");
-  // Preserve compatibility jamo before NFKC normalization for Korean initial search.
-  return { text: normalize(target), initials: normalize(inventoryInitials(target)) };
-}
-export function inventorySearchMatcher(query: string) {
-  const normalizedQuery = normalize(query);
-  return (target: ReturnType<typeof inventorySearchText>) => target.text.includes(normalizedQuery) || target.initials.includes(normalizedQuery);
-}
-export function matchesInventorySearch(product: InventoryProduct, query: string): boolean {
-  return inventorySearchMatcher(query)(inventorySearchText(product));
-}
-export function inventoryLocationsFor(product: InventoryProduct): InventoryLocation[] {
-  return INVENTORY_LOCATIONS.filter((location) => location === product.defaultLocationId || product.quantityByLocation[location] > 0);
-}
+export { inventoryInitials, inventorySearchText, inventorySearchMatcher, matchesInventorySearch } from "../../../functions/src/inventory/inventory-search";
+import { inventoryLocationsFor, inventoryCountState, inventoryCountEligible } from "../../../functions/src/inventory/inventory-inspection-status";
+export { inventoryLocationsFor, inventoryCountState, inventoryCountEligible, type InventoryCountState } from "../../../functions/src/inventory/inventory-inspection-status";
+import type { InventoryCountState } from "../../../functions/src/inventory/inventory-inspection-status";
 export type InventoryLocationFilter = InventoryLocation | "all";
 
 export function inventoryUnitDisplayLabel(unitLabel: string): string {
@@ -39,14 +20,6 @@ export function inventoryOpeningLocation(product: InventoryProduct, location: In
   if (location !== "all") return location;
   return product.quantityByLocation[product.defaultLocationId] > 0 ? product.defaultLocationId
     : INVENTORY_LOCATIONS.find((item) => product.quantityByLocation[item] > 0) ?? product.defaultLocationId;
-}
-export type InventoryCountState = "done" | "changed" | "pending";
-export function inventoryCountState(product: InventoryProduct, location: InventoryLocation, cycleId: string): InventoryCountState {
-  const count = product.lastCountByLocation[location];
-  if (!count || count.cycleId !== cycleId) return "pending";
-  // A corrected physical count is still complete. Only stock movements that
-  // happened after that confirmation require another check at this location.
-  return count.stockChangedSinceCount ? "changed" : "done";
 }
 export function inventoryScopeCountState(product: InventoryProduct, location: InventoryLocationFilter, cycleId: string): InventoryCountState {
   const states = inventoryScope(product, location).locations.map((item) => inventoryCountState(product, item, cycleId));
@@ -71,13 +44,6 @@ export function inventoryScopeIsUrgent(product: InventoryProduct, location: Inve
   return inventoryScope(product, location).locations.some((item) => inventoryIsUrgent(product, item, today, urgentDays));
 }
 export const INVENTORY_COUNT_LABELS = { done: "이번 주 확인", changed: "변동 후 미확인", pending: "미확인" } as const;
-/** Products added after this scheduled KST count day are not overdue work. */
-export function inventoryCountEligible(product: InventoryProduct, context: InventoryContext): boolean {
-  const created = Date.parse(product.createdAt);
-  if (!Number.isFinite(created)) return false;
-  const createdDate = new Date(created + 9 * 60 * 60 * 1_000).toISOString().slice(0, 10);
-  return createdDate <= context.cycle.startDate;
-}
 export function inventoryCountBadgeState(product: InventoryProduct, location: InventoryLocationFilter, context: InventoryContext | null, countMode = false): InventoryCountState | null {
   if (!context || product.status !== "active") return null;
   const state = inventoryScopeCountState(product, location, context.cycle.cycleId);

@@ -32,8 +32,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Dependency audit (high and critical)
         run: npm run audit
@@ -52,6 +52,17 @@ jobs:
 
       - name: Functions build
         run: npm run functions:build
+
+      - name: MCP inventory response and read budgets (synthetic)
+        run: |
+          node scripts/benchmark-mcp-inventory.mjs
+          node scripts/benchmark-mcp-records.mjs
+
+      - name: MCP OAuth, photo viewer and inventory approval browsers
+        run: npm run test:mcp:browser
+
+      - name: MCP Firebase integration (demo only)
+        run: npm run test:mcp:emulator
 
       - name: Production build
         run: npm run build
