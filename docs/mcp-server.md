@@ -1,6 +1,6 @@
 # 급식길 사내 Remote MCP
 
-현재 구현: **1.11.1 정확한 거래처 등록명 우선 조회**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
+현재 구현: **1.12.0 거래처 이름/초성 분리·고유 약칭 자동 확정**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
 
 MCP URL은 `https://onnuriway-mcp.web.app/mcp`, 플러그인 이름은 **온누리종합식품**이다. 기존 직원 PIN·허용 직원·조회 token을 유지하며 사진 UI는 v9이다. 납품사진의168시간 보관과 상품 대표 사진의 기존 보관 정책을 구분한다. 저장에는 `geupsikgil:inventory.write` 추가 동의와 사용자 카드 승인이 필요하며 기존 read 토큰을 자동 승격하지 않는다. 모델 공개 도구17개와 UI 전용 실행1개다. 정상 조회의 요청 인증/응답 전 재인가, 제품별 count_match 시각·현재 명부 기록자 의미를 유지한다. 실물 모바일 기기는 별도 검증하지 않았다.
 
@@ -28,7 +28,7 @@ MCP 소스는 기존 [ONWAY 저장소](https://github.com/kim-DL/ONWAY)에서 �
 | `search_inventory_records` | 직원·상품·창고·최대93일 기간의 원본 실사/변동 이력을 인덱스로 직접 검색. 건수만 필요하면 includeRecords=false |
 | `preview_inventory_change` | 기존 재고 계산으로 변경 전후를 표시. 업무 자료는 저장하지 않고 UI 승인 capability 발급 |
 | `commit_inventory_change` | UI 전용. write scope·승인 capability·transaction 재인가·동시 변경 검사 후 기존 서비스로 저장 |
-| `search_customers` | `companies/onnuri/customers`, 업체/학교 이름·초성 검색. ID·이름·지역만 반환. 출입 비밀번호·전화번호·메모 제외 |
+| `search_customers` | `companies/onnuri/customers`, 업체/학교 이름·초성 검색. ID·이름·지역·매칭 근거를 반환. 출입 비밀번호·전화번호·메모 제외 |
 | `get_customer_details` | 이름(query) 또는 확인된 ID → 현재 주소·전체 연락처·납품/출입 안내·변경 안내와 원문 상세 카드. 선택 항목/경량 응답, 폐업 명시 포함. 출입 비밀번호는 명시 요청 시만 제공 |
 | `search_inventory_products` | 기존 상품명/제조사/규격/원산지/초성 검색과 현재 수량·실사 시각. `query` 또는 최대10개 `queries`를 한 번의 활성 상품 순회로 검색 |
 | `get_inventory_product` | 기존 transaction 상세 조회. `includeLots:false`이면 장소별/전체 수량·실사 시각만 조회해 묶음 읽기 생략. 기본값true는 기존 상세 계약 유지 |
@@ -69,7 +69,7 @@ MCP 소스는 기존 [ONWAY 저장소](https://github.com/kim-DL/ONWAY)에서 �
 ### 사진 갤러리 사용법
 
 - 이름만 알면 `get_delivery_gallery({query:"합성업체유통"})`로 바로 요청한다. `search_customers`나 납품 요약을 먼저 조회할 필요가 없다. 이미 확인한 ID는 `customerId`로 재사용한다. 이름과 ID를 동시에 지정하지 않는다. 날짜를 말하지 않았다면 `date`를 생략하고 이전 대화의 날짜를 임의 적용하지 않는다.
-- 요청명에 덧붙인 유통·식품 등 업종 접미 표현은 두 글자 이상인 전체 등록명과 일치할 때만 후보로 인정한다. 법인 표기·초성 검색도 지원한다. 일반 오타/비슷한 이름을 자동 선택하지 않으며 전체 검색을 끝내고 후보가 하나인 경우만 사진을 가져온다. `ambiguous/incomplete_search/not_found`는 사용자 확인/검색 계속/등록명 확인이 필요하다. 화면에는 현재 등록명을 표시한다.
+- 요청명에 덧붙인 유통·식품 등 업종 접미 표현은 두 글자 이상인 전체 등록명과 일치할 때만 후보로 인정한다. 일반 이름과 초성만 입력한 검색은 분리한다. 전체 검색을 끝내고 정확한 등록명을 우선하며, 이름/명시적 저장 별칭과 충돌하지 않는 의미 있는 고유 접두어도 자동 확정한다. 초성·중간 문자열·흔한 단어·짧은 검색어·오타를 임의 확정하지 않는다. 상세 기준과 match 응답은 거래처 상세 가이드를 따른다. `ambiguous/incomplete_search/not_found`는 사용자 확인/검색 계속/등록명 확인이 필요하다. 화면에는 현재 등록명을 표시한다.
 - 첫 썸네일은 도구 응답에 포함되어 초기 UI 추가 호출0이다. 사진별 모델 호출을 반복하지 않는다. 사용자가 사진을 전환·확대하면 해당 사진만 인증된 도구로 다시 확인한다. 페이지 추가는 같은 거래처 ID·직원·날짜·커서를 유지하며 썸네일을 미리 다운로드하지 않는다.
 
 - **“트윈스푸드의 2026년 10월 7일 납품사진 보여줘”**처럼 요청하면 거래처를 확인하고 `get_delivery_gallery`를 한 번 호출한다. 같은 업체·날짜의 사진을 한 갤러리에서 **←/→ 또는 가로 스와이프**로 넘긴다. 현재 위치와 사진 수를 표시하며 첫 장만 내려받는다. 사진이 많으면 **사진 더 보기** 또는 마지막 사진의 다음 버튼으로 같은 UI에 이어 불러온다. `50+` 표시는 아직 남은 페이지가 있다는 뜻이다. 사진은 최신 등록순이다.

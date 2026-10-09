@@ -1,4 +1,5 @@
-export const CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v1.html";
+export const LEGACY_CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v1.html";
+export const CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v2.html";
 export const CUSTOMER_VIEW_META = { ui: { csp: { connectDomains: [], resourceDomains: [] } },
   "openai/widgetCSP": { connect_domains: [], resource_domains: [] }, "openai/widgetPrefersBorder": true,
   "openai/widgetDescription": "현재 거래처의 주소·연락처·납품 안내를 조회 원문 그대로 표시합니다. 미조회/미등록·폐업 상태를 구분합니다." };
@@ -21,11 +22,18 @@ if(value.structuredContent)return value.structuredContent;if(value.status==='ok'
 value=value.mcp_tool_result??value.toolResult??value.tool_result??value.result??value.toolOutput??value.toolResponseMetadata;}return null;}
 function row(dl,label,value,id){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=typeof value==='string'&&value.length?value:'미등록';if(id)dd.id=id;dl.append(dt,dd);}
 function section(title){const heading=document.createElement('h3'),dl=document.createElement('dl');heading.textContent=title;el('details').append(heading,dl);return dl;}
+function matchRows(dl,match){if(!match||match.matchedField==='customerId')return;
+const types={exact:'정확 일치',prefix:'앞부분 일치',substring:'중간 문자열 일치',initials:'초성 일치',corporate_exact:'법인 표기 제외 일치',business_suffix:'업종 호칭 제외 일치'};
+row(dl,'일치 근거',(match.matchedField==='aliases'?'저장된 별칭':'등록명')+' · '+(types[match.matchType]??'이름 일치'));
+row(dl,'일치한 값',match.matchedValue);
+if(match.blockedReason)row(dl,'확인 필요',({common_term:'흔한 검색어',short_query:'짧은 검색어',weak_match:'약한 부분 일치'})[match.blockedReason]??'대상 확인');}
 function clear(){el('details').replaceChildren();el('updated').textContent='';el('retrieved').textContent='';el('state').textContent='';el('name').textContent='거래처 상세정보';}
 function render(raw){if(disposed)return;const result=unwrap(raw);if(!result)return;clear();
 if(result.isError||result.status==='error'){el('status').textContent='상세정보를 표시하지 못했습니다. 연결과 조회 조건을 확인해 주세요.';resize();return;}
 el('status').textContent=result.resolution==='resolved'?'':String(result.note??'조회 대상을 확인해 주세요.').slice(0,600);
-const customer=result.customer;if(result.resolution!=='resolved'||!customer){resize();return;}
+const customer=result.customer;if(result.resolution!=='resolved'||!customer){
+for(const candidate of (result.candidates??[]).slice(0,100)){const dl=section(candidate.name);row(dl,'지역',[candidate.district,candidate.administrativeDong].filter(Boolean).join(' '));row(dl,'상태',candidate.status==='closed'?'폐업':'활성');matchRows(dl,candidate.match);}resize();return;}
+if(result.match&&result.match.matchType!=='id'&&result.match.matchType!=='exact')matchRows(section('검색 근거'),result.match);
 el('name').textContent=customer.name;el('state').textContent=customer.status==='closed'?'폐업 거래처 · 방문/납품 전 확인':'조회한 등록 정보';el('state').classList.toggle('warning',customer.status==='closed');
 if(customer.addresses){const dl=section('주소');row(dl,'납품주소',customer.addresses.deliveryAddress,'delivery-address');row(dl,'공식주소',customer.addresses.officialAddress,'official-address');
 if(customer.addresses.preferredAddressSource==='official')row(dl,'표시 기준','납품주소 미등록 · 공식주소 사용');}
@@ -45,5 +53,5 @@ if(message?.method==='ui/notifications/tool-cancelled'){clear();el('status').tex
 if(message?.method==='ui/resource-teardown'){clear();el('status').textContent='';disposed=true;send({id:message.id,result:{}});}});
 addEventListener('openai:set_globals',event=>{render(event.detail?.globals?.toolOutput??window.openai?.toolOutput);render(event.detail?.globals?.toolResponseMetadata);fit(event.detail?.globals??window.openai);});
 addEventListener('resize',()=>fit(window.openai));window.visualViewport?.addEventListener('resize',()=>fit(window.openai));new ResizeObserver(resize).observe(document.querySelector('main'));
-globals();send({id:'customer-init',method:'ui/initialize',params:{protocolVersion:'2026-01-26',appInfo:{name:'geupsikgil-customer-view',version:'1.0.0'},appCapabilities:{}}});
+globals();send({id:'customer-init',method:'ui/initialize',params:{protocolVersion:'2026-01-26',appInfo:{name:'geupsikgil-customer-view',version:'1.1.0'},appCapabilities:{}}});
 })();</script></body></html>`;

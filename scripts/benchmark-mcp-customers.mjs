@@ -56,11 +56,24 @@ try {
     assert.equal(result.customer.delivery, null); assert.equal(result.customer.addresses, null);
     assert.equal(result.customer.contacts[0].phoneNumber, "010-1234-5678");
   });
+  const savedName = rows[489].name;
+  rows[489].name = "다람종합유통";
+  const abbreviations = [];
+  for (const query of ["다람", "다람종합", "다람 종합유통"]) {
+    const sample = await measure(async (call) => {
+      const result = await call("get_customer_details", { query });
+      assert.equal(result.resolution, "resolved"); assert.equal(result.customer.customerId, "c0489");
+      assert.equal(result.match.matchedField, "name"); assert.equal(result.match.matchedValue, "다람종합유통");
+    });
+    assert.equal(sample.toolCalls, 1); assert.equal(sample.catalogDocuments, 491); assert.equal(sample.detailReads, 1);
+    abbreviations.push(sample);
+  }
+  rows[489].name = savedName;
   assert.equal(separate.toolCalls, 2); assert.equal(direct.toolCalls, 1);
   assert.equal(separate.catalogDocuments, 491); assert.equal(direct.catalogDocuments, 491);
   assert.equal(knownId.catalogDocuments, 0); assert.equal(knownId.detailReads, 1);
   assert(knownId.responseBytes < textJson.responseBytes * .7);
   assert(contactOnly.responseBytes < knownId.responseBytes * .5);
   console.log(JSON.stringify({ note: "Synthetic 490 customers. Catalog counts include lookahead; detailReads counts service calls, not Firebase canonical/OAuth checks. No latency, billing or token cost claim. Selecting sections reduces responses, not the existing full source document read.",
-    separate, direct, textJson, knownId, contactOnly }, null, 2));
+    separate, direct, textJson, knownId, contactOnly, abbreviations }, null, 2));
 } finally { await client.close(); await server.close(); }

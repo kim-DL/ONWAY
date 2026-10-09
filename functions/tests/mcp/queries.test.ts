@@ -150,7 +150,7 @@ describe("MCP service composition", () => {
   });
   it("resolves a complete unique customer search and never exports private fields", async () => {
     const f = fixture([], [customer("school", "합성 한빛초")]);
-    const result = await f.queries.customerDeliverySummary({ query: "한빛", limit: 5 }, principal);
+    const result = await f.queries.customerDeliverySummary({ query: "합성 한빛", limit: 5 }, principal);
     expect(result).toMatchObject({ resolution: "resolved", customer: { customerId: "school" }, records: { photos: [], page: { complete: true } } });
     expect(f.photos).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(result)).not.toContain("DO-NOT-EXPORT");

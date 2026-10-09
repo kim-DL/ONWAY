@@ -26,6 +26,58 @@ function fixture(rows: Customer[] = [customer()]) {
   return { queries: new McpQueries(service), list, read };
 }
 describe("MCP current customer details", () => {
+  it.each(["다람", "다람종합", "다람 종합유통"])("resolves the unique abbreviation %s with evidence and one current source read", async (query) => {
+    const f = fixture([customer("one", "푸드림"), customer("two", "다람종합유통")]);
+    const result = await f.queries.customerDetails(customerDetailsInput.parse({ query }), principal);
+    expect(result).toMatchObject({ resolution: "resolved", candidates: [], customer: { customerId: "two" },
+      match: { matchType: query.includes("유통") ? "exact" : "prefix", matchedField: "name", matchedValue: "다람종합유통", searchMode: "name", eligibleForAutoSelection: true } });
+    expect(f.list).toHaveBeenCalledOnce(); expect(f.read).toHaveBeenCalledExactlyOnceWith("two", principal, false);
+  });
+  it("keeps overlapping prefixes and explicitly stored aliases ambiguous with per-candidate evidence", async () => {
+    for (const other of [customer("two", "다람식품"), customer("two", "별도다람공급"), { ...customer("two", "다른업체"), aliases: ["다람"] },
+      { ...customer("two", "다른업체"), aliases: ["다람식품"] }]) {
+      const f = fixture([customer("one", "다람종합유통"), other]);
+      const result = await f.queries.customerDetails(customerDetailsInput.parse({ query: "다람" }), principal);
+      expect(result).toMatchObject({ resolution: "ambiguous", customer: null, match: null });
+      expect(result.candidates).toHaveLength(2);
+      expect(result.candidates.every((row) => row.match?.matchedValue && row.match.searchMode === "name")).toBe(true);
+      expect(f.read).not.toHaveBeenCalled();
+    }
+  });
+  it("resolves only a stored alias and reads changed details freshly by the confirmed ID", async () => {
+    const f = fixture([{ ...customer("one", "정식등록명"), aliases: ["다람"] }]);
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ query: "다람" }), principal))
+      .toMatchObject({ resolution: "resolved", match: { matchType: "exact", matchedField: "aliases", matchedValue: "다람" } });
+    f.list.mockClear();
+    f.read.mockResolvedValueOnce({ ...customer("one", "바뀐정식명"), deliveryAddress: "변경된 주소" });
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ customerId: "one", sections: ["addresses"] }), principal))
+      .toMatchObject({ resolution: "resolved", match: { matchType: "id" }, customer: { addresses: { deliveryAddress: "변경된 주소" } } });
+    expect(f.list).not.toHaveBeenCalled();
+  });
+  it.each([["유통", "유통다람"], ["람종합", "다람종합유통"], ["ㄷㄹ", "다람종합유통"]])("does not call a weak single result %s not-found or automatically read it", async (query, name) => {
+    const f = fixture([customer("one", name)]);
+    const result = await f.queries.customerDetails(customerDetailsInput.parse({ query }), principal);
+    expect(result).toMatchObject({ resolution: "ambiguous", customer: null, candidates: [{ match: { eligibleForAutoSelection: false } }] });
+    expect(f.read).not.toHaveBeenCalled();
+  });
+  it("does not settle a prefix while a collision may be beyond the scan budget or on a prior page", async () => {
+    const f = fixture(Array.from({ length: 1251 }, (_, i) => customer(String(i).padStart(4, "0"), i === 0 ? "다람종합유통" : i === 1250 ? "다람식품" : "별도업체")));
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ query: "다람" }), principal))
+      .toMatchObject({ resolution: "incomplete_search", customer: null });
+    expect(await f.queries.customerDetails(customerDetailsInput.parse({ query: "다람", afterId: "1249" }), principal))
+      .toMatchObject({ resolution: "incomplete_search", customer: null });
+    expect(f.read).not.toHaveBeenCalled();
+  });
+  it("rejects a name/alias removed after resolution instead of claiming a current match", async () => {
+    const f = fixture([customer("one", "다람종합유통")]);
+    f.read.mockResolvedValueOnce(customer("one", "바뀐업체"));
+    await expect(f.queries.customerDetails(customerDetailsInput.parse({ query: "다람" }), principal)).rejects.toMatchObject({ code: "aborted" });
+  });
+  it("rechecks uniqueness when an exact source name changes to a colliding prefix", async () => {
+    const f = fixture([customer("one", "다람"), customer("two", "다람식품")]);
+    f.read.mockResolvedValueOnce(customer("one", "다람종합유통"));
+    await expect(f.queries.customerDetails(customerDetailsInput.parse({ query: "다람" }), principal)).rejects.toMatchObject({ code: "aborted" });
+  });
   it.each(["한빛", " 한 빛 "])("resolves exact name %s despite initial and partial collisions without extra search", async (query) => {
     const f = fixture([customer("one", "한별"), customer("two", "한빛유통"), customer("three", "한빛")]);
     const result = await f.queries.customerDetails(customerDetailsInput.parse({ query }), principal);

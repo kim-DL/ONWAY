@@ -107,7 +107,8 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
     const before = (await db.doc(`companies/onnuri/inventoryProducts/${productId}`).get()).data();
     const customer = await queries.searchCustomers("한빛", null);
     expect(customer.customers.map((c) => c.customerId)).toContain(customerId);
-    expect(customer.customers).toHaveLength(3);
+    expect(customer.customers).toHaveLength(2);
+    expect((await queries.searchCustomers("ㅎㅂ", null)).customers).toHaveLength(3);
     expect(JSON.stringify(customer)).not.toContain("never-export-this-field");
     const product = await queries.product(productId, actor);
     expect(product.product.totalQuantity).toBe(19);
@@ -200,6 +201,33 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
       expect(detail.structuredContent).toMatchObject({ resolution: "resolved", customer: { customerId,
         addresses: { preferredAddress: "합성 하차 주소" }, contacts: [{ phoneNumber: "010-1234-5678" }], delivery: null } });
       expect(JSON.stringify(detail)).not.toContain("never-export-this-field");
+      // Synthetic-only fixtures exercise the public SDK contract and fresh canonical reads.
+      const base = (await db.doc(`companies/onnuri/customers/${customerId}`).get()).data()!;
+      const refs = ["다람종합유통", "푸드림", "다람식품"].map(() => db.collection("companies/onnuri/customers").doc());
+      const seed = async (index: number, name: string, aliases?: string[]) => refs[index]!.set({ ...base,
+        customerId: refs[index]!.id, name, normalizedName: normalizeCustomerName(name), choseongName: getCustomerChoseong(name),
+        ...(aliases ? { aliases } : {}) });
+      try {
+        await seed(0, "다람종합유통"); await seed(1, "푸드림");
+        for (const query of ["다람", "다람종합", "다람 종합유통"]) {
+          const result = await client.callTool({ name: "get_customer_details", arguments: { query, sections: ["addresses"] } });
+          expect(result.isError).not.toBe(true);
+          expect(result.structuredContent).toMatchObject({ resolution: "resolved", customer: { customerId: refs[0]!.id },
+            match: { matchedField: "name", matchedValue: "다람종합유통", matchType: query.includes(" ") ? "exact" : "prefix" } });
+        }
+        const weak = await client.callTool({ name: "get_customer_details", arguments: { query: "ㄷㄹ" } });
+        expect(weak.structuredContent).toMatchObject({ resolution: "ambiguous", customer: null });
+        await seed(2, "다람식품");
+        const collision = await client.callTool({ name: "get_customer_details", arguments: { query: "다람" } });
+        expect(collision.structuredContent).toMatchObject({ resolution: "ambiguous", customer: null });
+        await seed(2, "별도 합성업체", ["다람"]);
+        const alias = await client.callTool({ name: "get_customer_details", arguments: { query: "다람" } });
+        expect(alias.structuredContent).toMatchObject({ resolution: "ambiguous", customer: null });
+        await refs[0]!.update({ deliveryAddress: "갱신된 합성 주소" });
+        const fresh = await client.callTool({ name: "get_customer_details", arguments: { customerId: refs[0]!.id, sections: ["addresses"] } });
+        expect(fresh.structuredContent).toMatchObject({ resolution: "resolved", match: { matchType: "id" },
+          customer: { addresses: { preferredAddress: "갱신된 합성 주소" } } });
+      } finally { await Promise.all(refs.map((ref) => ref.delete())); }
       expect(tools.every((tool) => tool.outputSchema?.type === "object")).toBe(true);
       const view = await client.readResource({ uri: PHOTO_VIEW_URI });
       expect(view.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");

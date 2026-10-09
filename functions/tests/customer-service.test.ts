@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { customerEmployeeIsActive, type CustomerActor } from "../src/customer/customer-authorization.js";
 import { customerDraftSchema, saveCustomerInputSchema, type SaveCustomerInput } from "../src/customer/customer-contract.js";
-import { CustomerRequestCollision, CustomerRevisionConflict, CustomerService, customerChangedFields, customerCoreInformationChanged, nextCustomer } from "../src/customer/customer-service.js";
+import { CustomerRequestCollision, CustomerRevisionConflict, CustomerService, customerResponse, customerChangedFields, customerCoreInformationChanged, nextCustomer } from "../src/customer/customer-service.js";
 
 const now = "2026-09-06T00:00:00.000Z";
 const draft = customerDraftSchema.parse({
@@ -34,6 +34,15 @@ function database(member: CustomerActor = actor) {
 }
 
 describe("customer trusted mutation contract", () => {
+  it("preserves explicitly stored aliases during edits without extending legacy PWA responses", () => {
+    const current = { ...nextCustomer(null, input, "one", "EMP-ADMIN", now), aliases: ["합성 별칭"] };
+    const changed = nextCustomer(current, input, "one", "EMP-ADMIN", now);
+    expect(changed.aliases).toEqual(current.aliases);
+    expect(customerResponse(changed)).not.toHaveProperty("aliases");
+    expect(customerResponse(changed, true)).not.toHaveProperty("aliases");
+    expect(nextCustomer(null, input, "new", "EMP-ADMIN", now)).not.toHaveProperty("aliases");
+  });
+
   it("creates name-only search fields and respects no-notice selection", () => {
     const created = nextCustomer(null, input, "one", "EMP-ADMIN", now);
     expect(created).toMatchObject({ normalizedName: "강은유통", choseongName: "ㄱㅇㅇㅌ", noticeType: "none", revision: 1, accessPassword: "001234*", companyId: "onnuri" });

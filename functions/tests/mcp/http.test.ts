@@ -7,7 +7,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { createMcpHttpApp } from "../../src/mcp/http.js";
 import { McpQueries } from "../../src/mcp/queries.js";
 import { CUSTOMER_DETAILS_BASIS } from "../../src/mcp/customer-details.js";
-import { CUSTOMER_VIEW_URI } from "../../src/mcp/customer-view.js";
+import { CUSTOMER_VIEW_URI, LEGACY_CUSTOMER_VIEW_URI } from "../../src/mcp/customer-view.js";
 import { fixture } from "./fixture.js";
 import { PHOTO_VIEW_URI } from "../../src/mcp/photo-view.js";
 import { INVENTORY_WRITE_VIEW_URI } from "../../src/mcp/inventory-write-view.js";
@@ -33,7 +33,7 @@ async function start(toolTimeoutMs = 20_000) {
   vi.spyOn(queries, "photo").mockResolvedValue({ photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "thumbnail",
     contentType: "image/webp", customerId: "synthetic-company", customerName: "합성 납품업체", createdByEmployeeId: "MCP-TEST", byteSize: 4, fileBase64: "UklGRg==", createdAt: "2026-10-07T03:56:00.000Z", createdByName: "합성 직원" });
   const gallery = vi.spyOn(queries, "customerGallery").mockResolvedValue({
-    resolution: "resolved", candidates: [], searchPage: null, searchNextCursor: null, timeBasis: "photo_registered_at", employeeId: null,
+    resolution: "resolved", candidates: [], match: null, searchPage: null, searchNextCursor: null, timeBasis: "photo_registered_at", employeeId: null,
     note: "합성 갤러리", initialPhoto: { photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "thumbnail", contentType: "image/webp",
       customerId: "synthetic-company", customerName: "합성 납품업체", createdByEmployeeId: "MCP-TEST", byteSize: 4, fileBase64: "UklGRg==",
       createdAt: "2026-10-07T03:56:00.000Z", createdByName: "합성 직원" },
@@ -48,7 +48,7 @@ async function start(toolTimeoutMs = 20_000) {
 describe("Remote MCP over real HTTP", () => {
   it("returns customer details once through the SDK, supports compact/JSON sections, and suppresses data revoked before release", async () => {
     const f = await start(), { exchange } = await f.setup(), tokens = await f.oauth.token(exchange);
-    const detail = vi.spyOn(f.queries, "customerDetails").mockResolvedValue({ resolution: "resolved", candidates: [],
+    const detail = vi.spyOn(f.queries, "customerDetails").mockResolvedValue({ resolution: "resolved", candidates: [], match: null,
       searchPage: null, searchNextCursor: null, sectionsIncluded: ["contacts"], basis: CUSTOMER_DETAILS_BASIS, note: "합성 조회 완료",
       customer: { customerId: "synthetic", name: "합성", status: "active", district: "합성구", administrativeDong: "합성동",
         revision: 1, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-08T00:00:00Z", hasOverviewPhoto: false,
@@ -60,6 +60,7 @@ describe("Remote MCP over real HTTP", () => {
       expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
       expect(tool._meta).toMatchObject({ "openai/outputTemplate": CUSTOMER_VIEW_URI });
       expect((await client.readResource({ uri: CUSTOMER_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
+      expect((await client.readResource({ uri: LEGACY_CUSTOMER_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
       const result = await client.callTool({ name: "get_customer_details", arguments: { query: "합성유통", sections: ["contacts"] } });
       expect(result.isError).not.toBe(true); expect(detail).toHaveBeenCalledOnce();
       expect(result.structuredContent).toMatchObject({ resolution: "resolved", sectionsIncluded: ["contacts"], customer: { name: "합성", contacts: [{ phoneNumber: "010-1234-5678" }] } });

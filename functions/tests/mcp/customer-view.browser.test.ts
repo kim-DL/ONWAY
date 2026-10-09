@@ -68,6 +68,26 @@ for (const engine of [chromium, webkit]) describe.skipIf(process.env.MCP_BROWSER
     expect(await page.evaluate(() => (window as unknown as { customerTest: { calls: number } }).customerTest.calls)).toBe(0);
     expect(network).toEqual([]); expect(errors).toEqual([]);
   });
+  it("shows candidate match evidence as inert text without IDs or extra calls", async () => {
+    const { page, frame, network, errors } = await mount(engine);
+    await page.evaluate(() => (window as unknown as { customerTest: { send: (m: string, p: unknown) => void } }).customerTest.send("ui/notifications/tool-result", {
+      structuredContent: { status: "ok", resolution: "ambiguous", sectionsIncluded: [], customer: null, note: "후보 확인",
+        candidates: [{ customerId: "never-show-customer-id", name: "다람종합유통", district: "합성구", administrativeDong: "합성동", status: "active",
+          match: { matchType: "prefix", matchedField: "name", matchedValue: "다람종합유통", blockedReason: null } },
+        { customerId: "never-show-alias-id", name: "다람식품", status: "closed",
+          match: { matchType: "initials", matchedField: "aliases", matchedValue: "<img src=x onerror=alert(1)>", blockedReason: "weak_match" } }] } }));
+    await browserExpect(frame.locator("#details")).toContainText("등록명 · 앞부분 일치");
+    await browserExpect(frame.locator("#details")).toContainText("저장된 별칭 · 초성 일치");
+    expect(await frame.locator("#details").innerText()).toContain("합성구 합성동");
+    expect(await frame.locator("#details").innerText()).toContain("약한 부분 일치");
+    expect(await frame.locator("#details").innerText()).toContain("폐업");
+    expect(await frame.locator("#details").innerText()).toContain("<img src=x onerror=alert(1)>");
+    expect(await frame.locator("#details img").count()).toBe(0);
+    expect(await frame.locator("body").innerText()).not.toContain("never-show");
+    expect(await frame.locator("body").innerText()).not.toContain(address);
+    expect(await page.evaluate(() => (window as unknown as { customerTest: { calls: number } }).customerTest.calls)).toBe(0);
+    expect(network).toEqual([]); expect(errors).toEqual([]);
+  });
   it("clears old private values for unresolved/cancelled/error results and omits sections that were not requested", async () => {
     const { page, frame } = await mount(engine);
     const send = (method: string, params: unknown) => page.evaluate(({ method, params }) =>

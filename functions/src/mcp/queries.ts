@@ -16,7 +16,7 @@ import { InventoryPhotoService } from "../inventory/inventory-photo-service.js";
 import type { z } from "zod";
 import type { inventoryPhotoInput, galleryInput } from "./contracts.js";
 import { customerDetailsProjection, CUSTOMER_DETAILS_BASIS, type customerDetailsInput } from "./customer-details.js";
-import { selectCustomerCandidate } from "../customer/customer-name-search.js";
+import { selectCustomerCandidate, customerNameMatch, customerIdMatch } from "../customer/customer-name-search.js";
 
 const STOCK_BASIS = "모든 보관장소(샘플 포함)의 합계가 threshold 이하. 상품별 안전재고/수요 기준은 등록되어 있지 않습니다. 단위는 각 상품의 unitLabel입니다.";
 export const STOCKTAKE_BASIS = "lastStocktakeAt은 제품별 수량일치 확인 버튼이 남긴 마지막 count_match 로그의 createdAt입니다. 기록자는 lastStocktake.actorName으로 답하세요. 원본 actorEmployeeId로 현재 직원 명부에서 조회한 이름이며 당시 이름 스냅샷은 아닙니다. actorName이 null이면 기록자 정보 없음이며 현재 로그인 사용자나 상품 수정자로 추정하지 마세요. 원본 로그 필드는 lastStocktake에 있으며 해당 로그의 장소에서 확인한 시각입니다. 다른 장소의 실사 완료 여부와 무관하고 입출고/수량조정은 포함하지 않습니다. null은 해당 버튼 로그 없음입니다. stocktakeByLocation과 현황의 실사 상태는 입출고도 반영하는 기존 PWA 완료 요약으로 버튼 로그와 구분하세요. updatedAt은 상품 문서 수정시각입니다. 수량과 로그는 별도 읽기이며 같은 시점 스냅샷을 보장하지 않습니다.";
@@ -34,6 +34,9 @@ export function stockProjection(product: InventoryProduct, lastStocktake: Invent
 }
 function customerProjection(customer: Pick<Customer, "customerId" | "name" | "district" | "administrativeDong">) {
   return { customerId: customer.customerId, name: customer.name, district: customer.district, administrativeDong: customer.administrativeDong };
+}
+function customerCandidate(query: string, customer: Pick<Customer, "customerId" | "name" | "district" | "administrativeDong" | "aliases">) {
+  return { ...customerProjection(customer), match: customerNameMatch(query, customer) };
 }
 export interface DeliveryRecordFilters {
   employeeId?: string | undefined;
@@ -120,29 +123,33 @@ export class McpQueries {
   }
   async searchCustomers(query: string, afterId: string | null, limit = 50) {
     const result = await this.customers.search(query, { afterId, limit });
-    return { customers: result.items.map(customerProjection), query, nextCursor: result.nextCursor, page: result.page,
-      note: "등록 이름·초성과 추가 업종 호칭을 확인했습니다. 여러 후보면 customerId를 확인하세요. page.complete가 false면 검색이 끝나지 않았습니다. 여러 페이지는 동일 시점의 스냅샷이 아닙니다." };
+    return { customers: result.items.map((customer) => customerCandidate(query, customer)), query, nextCursor: result.nextCursor, page: result.page,
+      note: "일반 이름과 초성 전용 입력을 분리해 검색했습니다. 후보별 match는 근거이며 eligibleForAutoSelection만으로 유일성을 보장하지 않습니다. 상세 조회는 같은 검색어로 get_customer_details 한 번을 사용하세요. page.complete가 false면 검색이 끝나지 않았습니다." };
   }
   async customerDetails(input: z.infer<typeof customerDetailsInput>, actor: McpPrincipal) {
     const search = input.query ? await this.customers.search(input.query,
       { afterId: input.afterId, limit: 100, includeClosed: input.includeClosed }) : null;
-    const base = { candidates: search?.items.map((customer) => ({ ...customerProjection(customer), status: customer.status })) ?? [],
+    const base = { candidates: search?.items.map((customer) => ({ ...customerCandidate(input.query!, customer), status: customer.status })) ?? [],
       searchPage: search?.page ?? null, searchNextCursor: search?.nextCursor ?? null,
       sectionsIncluded: input.sections, basis: CUSTOMER_DETAILS_BASIS };
     const customerId = input.customerId ?? (search
       ? selectCustomerCandidate(input.query!, search.items, search.page)?.customerId : null);
-    if (!customerId) return { ...base, customer: null,
+    if (!customerId) return { ...base, customer: null, match: null,
       resolution: search && (!search.page.complete || !search.page.startedFromBeginning) ? "incomplete_search" as const
         : search?.items.length ? "ambiguous" as const : "not_found" as const,
       note: search && (!search.page.complete || !search.page.startedFromBeginning)
         ? "전체 검색을 마치지 못했습니다. searchNextCursor를 같은 이름의 afterId로 전달하거나 확인된 customerId를 사용하세요. 후속 페이지 하나만 보고 자동 선택하지 않습니다."
-        : search?.items.length ? "거래처를 하나로 확인할 수 없습니다. 후보의 등록명·지역·상태를 보고 원하는 거래처를 선택해 주세요."
+        : search?.items.length ? "거래처를 자동으로 확정할 수 없습니다. 후보의 등록명·지역·상태와 매칭 근거를 확인해 선택해 주세요."
           : "일치하는 거래처가 없습니다. 기본은 활성 거래처이며 등록명 또는 명시적으로 요청한 폐업 포함 조건을 확인해 주세요." };
     // Always read the current source with canonical membership checks, including after name resolution.
     const customer = await this.customers.read(customerId, actor, input.includeClosed);
     if (customer && customer.customerId !== customerId) throw new HttpsError("failed-precondition", "Customer identity mismatch");
+    if (customer && input.query && search && selectCustomerCandidate(input.query,
+      search.items.map((row) => row.customerId === customerId ? customer : row), search.page)?.customerId !== customerId)
+      throw new HttpsError("aborted", "Customer name changed during lookup");
     return { ...base, candidates: [], resolution: customer ? "resolved" as const : "not_found" as const,
       customer: customer ? customerDetailsProjection(customer, input) : null,
+      match: customer ? input.customerId ? customerIdMatch(customerId) : customerNameMatch(input.query!, customer) : null,
       note: !customer ? "거래처가 없거나 폐업 처리되어 조회 조건에 맞지 않습니다. 기존 검색 결과로 상세정보를 추정하지 마세요."
         : customer.status === "closed" ? "폐업 처리된 거래처의 현재 저장 정보입니다. 방문·납품 전 확인하세요."
           : "거래처 상세정보를 확인했습니다. 요청한 항목만 답하고 이후 같은 거래처는 customerId를 재사용하세요. 추가 검색·사진·실사 조회는 필요하지 않습니다." };
@@ -226,14 +233,15 @@ export class McpQueries {
         pagesScanned, recordsScanned, stoppedBecause }, retentionHours: 168 as const, evidence: DELIVERY_BASIS };
   }
   async customerDeliverySummary(input: { customerId?: string | undefined; query?: string | undefined; date?: string | undefined; limit: number }, actor: McpPrincipal) {
-    const search = input.customerId ? null : await this.searchCustomers(input.query!, null, 100);
+    const search = input.customerId ? null : await this.customers.search(input.query!, { afterId: null, limit: 100 });
     const customer = input.customerId ? await this.customers.read(input.customerId, actor)
-      : search ? selectCustomerCandidate(input.query!, search.customers, search.page) : null;
+      : search ? selectCustomerCandidate(input.query!, search.items, search.page) : null;
     const resolution = customer ? "resolved" as const
       : search && (!search.page.complete || !search.page.startedFromBeginning) ? "incomplete_search" as const
-        : search && search.customers.length > 1 ? "ambiguous" as const : "not_found" as const;
+        : search && search.items.length ? "ambiguous" as const : "not_found" as const;
     return { resolution, customer: customer ? customerProjection(customer) : null,
-      candidates: customer ? [] : search?.customers ?? [], searchPage: search?.page ?? null, searchNextCursor: search?.nextCursor ?? null,
+      match: customer ? input.customerId ? customerIdMatch(input.customerId) : customerNameMatch(input.query!, customer) : null,
+      candidates: customer ? [] : search?.items.map((row) => customerCandidate(input.query!, row)) ?? [], searchPage: search?.page ?? null, searchNextCursor: search?.nextCursor ?? null,
       records: customer ? await this.deliveries({ customerId: customer.customerId, date: input.date, limit: input.limit }, actor) : null,
       note: resolution === "resolved" ? "거래처를 확인했습니다. 사진 보여주기는 같은 customerId와 요청 날짜로 get_delivery_gallery를 호출해 한 갤러리로 표시하세요."
         : resolution === "ambiguous" ? "거래처를 하나로 확인할 수 없습니다. 후보의 등록명과 지역으로 원하는 거래처를 선택해 주세요."
@@ -256,18 +264,18 @@ export class McpQueries {
   }
   /** Name resolution, one gallery and its first checked thumbnail in one tool operation. */
   async customerGallery(input: z.infer<typeof galleryInput>, actor: McpPrincipal) {
-    const search = input.query ? await this.searchCustomers(input.query, input.afterId, 100) : null;
-    const base = { candidates: search?.customers ?? [], searchPage: search?.page ?? null,
+    const search = input.query ? await this.customers.search(input.query, { afterId: input.afterId, limit: 100 }) : null;
+    const base = { candidates: search?.items.map((row) => customerCandidate(input.query!, row)) ?? [], searchPage: search?.page ?? null,
       searchNextCursor: search?.nextCursor ?? null, timeBasis: "photo_registered_at" as const };
     const customerId = input.customerId ?? (search
-      ? selectCustomerCandidate(input.query!, search.customers, search.page)?.customerId : null);
+      ? selectCustomerCandidate(input.query!, search.items, search.page)?.customerId : null);
     if (!customerId) return { ...base, resolution: search && (!search.page.complete || !search.page.startedFromBeginning)
-      ? "incomplete_search" as const : search?.customers.length ? "ambiguous" as const : "not_found" as const,
-      customerId: null, customerName: null, employeeId: input.employeeId ?? null, date: input.date ?? null,
+      ? "incomplete_search" as const : search?.items.length ? "ambiguous" as const : "not_found" as const,
+      match: null, customerId: null, customerName: null, employeeId: input.employeeId ?? null, date: input.date ?? null,
       photos: [], nextCursor: null, page: null, after: null, retentionHours: 168 as const, evidence: DELIVERY_BASIS,
       initialPhoto: null, note: search && (!search.page.complete || !search.page.startedFromBeginning)
         ? "검색 범위를 모두 확인하지 못했습니다. 검색 커서로 계속하거나 확인된 거래처 ID를 지정해 주세요."
-        : search?.customers.length ? "거래처를 하나로 확인할 수 없습니다. 후보의 등록명과 지역으로 원하는 거래처를 선택해 주세요."
+        : search?.items.length ? "거래처를 하나로 확인할 수 없습니다. 후보의 등록명과 지역으로 원하는 거래처를 선택해 주세요."
           : "일치하는 활성 거래처가 없습니다. 등록명을 확인해 주세요. 다른 거래처 사진으로 대신하지 않습니다." };
     const gallery = await this.gallery({ customerId, employeeId: input.employeeId, date: input.date,
       limit: input.limit, after: input.after }, actor);
@@ -279,6 +287,7 @@ export class McpQueries {
       throw new HttpsError("aborted", "Photo records changed during gallery lookup");
     }
     return { ...base, ...gallery, candidates: [], resolution: "resolved" as const,
+      match: input.customerId ? customerIdMatch(customerId) : customerNameMatch(input.query!, search!.items.find((row) => row.customerId === customerId)!),
       initialPhoto: checked ? { ...checked.download, customerId, customerName: gallery.customerName,
         createdAt: checked.createdAt, createdByName: checked.createdByName, createdByEmployeeId: checked.createdByEmployeeId } : null,
       note: gallery.photos.length ? "등록명으로 확인한 거래처의 납품사진 갤러리입니다. 첫 썸네일은 응답에 포함하며 추가 모델 호출은 불필요합니다. 나머지 사진·확대·페이지는 UI에서 조회합니다."
@@ -288,19 +297,19 @@ export class McpQueries {
   private async resolveDeliveryFilters(input: DeliveryRecordFilters, actor: McpPrincipal) {
     const [staff, customerSearch, customerById] = await Promise.all([
       input.employeeName || input.employeeId ? this.employees.resolve(input, actor) : null,
-      input.customerName ? this.searchCustomers(input.customerName, null, 100) : null,
+      input.customerName ? this.customers.search(input.customerName, { afterId: null, limit: 100 }) : null,
       input.customerId ? this.customers.read(input.customerId, actor, true) : null,
     ]);
     const employee = staff?.employee ?? null;
-    const selectedCustomer = customerSearch ? selectCustomerCandidate(input.customerName!, customerSearch.customers, customerSearch.page) : null;
+    const selectedCustomer = customerSearch ? selectCustomerCandidate(input.customerName!, customerSearch.items, customerSearch.page) : null;
     const customer = input.customerId ? { customerId: input.customerId, name: customerById?.name ?? null }
       : selectedCustomer ? { customerId: selectedCustomer.customerId, name: selectedCustomer.name } : null;
     const resolution = staff && !employee ? !staff.complete ? "incomplete_employee_search" as const
       : staff.candidates.length ? "ambiguous_employee" as const : "employee_not_found" as const
       : customerSearch && !customer ? !customerSearch.page.complete ? "incomplete_customer_search" as const
-        : customerSearch.customers.length ? "ambiguous_customer" as const : "customer_not_found" as const : "resolved" as const;
+        : customerSearch.items.length ? "ambiguous_customer" as const : "customer_not_found" as const : "resolved" as const;
     return { resolution, employee, employeeCandidates: staff?.candidates ?? [], employeeSearchComplete: staff?.complete ?? true,
-      customer, customerCandidates: customer ? [] : customerSearch?.customers ?? [], customerSearchComplete: customerSearch?.page.complete ?? true };
+      customer, customerMatch: customer ? input.customerId ? customerIdMatch(input.customerId) : customerNameMatch(input.customerName!, selectedCustomer!) : null, customerCandidates: customer ? [] : customerSearch?.items.map((row) => customerCandidate(input.customerName!, row)) ?? [], customerSearchComplete: customerSearch?.page.complete ?? true };
   }
   private resolutionNote(resolution: string) {
     if (resolution.includes("incomplete")) return "이름 검색 범위를 모두 확인하지 못했습니다. 등록 이름을 더 구체적으로 지정하거나 확인된 ID로 다시 조회해 주세요.";

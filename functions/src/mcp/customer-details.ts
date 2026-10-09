@@ -4,9 +4,9 @@ import { customerSchema, normalizeCustomerName, type Customer } from "../custome
 export const customerSections = ["addresses", "contacts", "delivery", "notes"] as const;
 const section = z.enum(customerSections);
 export const customerDetailsInput = z.object({
-  customerId: customerSchema.shape.customerId.optional(),
+  customerId: customerSchema.shape.customerId.optional().describe("앞선 응답에서 확인된 ID를 재사용. 이름 검색을 생략하고 현재 상세 원본을 조회합니다."),
   query: z.string().trim().min(1).max(120).refine((value) => normalizeCustomerName(value).length > 0,
-    "거래처 이름이나 초성을 입력해주세요.").optional().describe("거래처 이름만 알면 바로 전달. 검색 도구를 먼저 호출하지 않아도 됩니다."),
+    "거래처 이름이나 초성을 입력해주세요.").optional().describe("일반 이름/약칭은 그대로 전달하고 초성만 입력하면 별도 초성 검색. 고유한 이름 접두어도 한 번에 확정·상세 조회하며 검색 도구를 먼저 호출하지 않습니다."),
   afterId: customerSchema.shape.customerId.nullable().default(null),
   sections: z.array(section).min(1).max(4).refine((values) => new Set(values).size === values.length,
     "조회 항목 중복을 제외해주세요.").default([...customerSections])
