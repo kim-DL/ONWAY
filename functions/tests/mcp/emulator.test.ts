@@ -1,4 +1,5 @@
 import { randomUUID, createHash, randomBytes } from "node:crypto";
+import { get as httpGet } from "node:http";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -166,6 +167,19 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
 
   it("connects through Firebase Hosting rewrite and the actual Functions OAuth/MCP handler", async () => {
     const origin = "http://127.0.0.1:5002";
+    const landing = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      httpGet(`${origin}/mcp`, { headers: { Accept: "text/html", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document" } }, (response) => {
+        let body = ""; response.setEncoding("utf8"); response.on("data", (chunk: string) => { body += chunk; });
+        response.on("end", () => resolve({ status: response.statusCode!, body }));
+      }).on("error", reject);
+    });
+    expect(landing.status).toBe(200); expect(landing.body).toContain("급식길 MCP");
+    const font = await fetch(`${origin}/mcp-assets/v1/onnuri-editorial.woff2`);
+    expect(font.status).toBe(200); expect((await font.arrayBuffer()).byteLength).toBe(8056);
+    for (const accept of ["application/json", "text/event-stream", "text/html"]) {
+      const denied = await fetch(`${origin}/mcp`, { headers: { Accept: accept } });
+      expect(denied.status).toBe(401); expect(denied.headers.get("www-authenticate")).toContain("resource_metadata=");
+    }
     const metadata = await fetch(`${origin}/.well-known/oauth-authorization-server`);
     expect(metadata.status).toBe(200);
     expect(await metadata.json()).toMatchObject({ issuer: origin });

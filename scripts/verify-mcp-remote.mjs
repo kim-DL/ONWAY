@@ -21,6 +21,13 @@ const denied = await fetch(`${origin}/mcp`, { method: "POST", headers: { "conten
 assert.equal(denied.status, 401);
 assert.match(denied.headers.get("www-authenticate") ?? "", /resource_metadata=/);
 assert.match(denied.headers.get("cache-control") ?? "", /no-store/);
+for (const accept of ["application/json", "text/event-stream", "text/html", "text/html, application/json"]) {
+  const response = await fetch(`${origin}/mcp`, { headers: { accept }, signal: AbortSignal.timeout(15_000) });
+  assert.equal(response.status, 401, `non-navigation GET ${accept}`);
+  assert.match(response.headers.get("www-authenticate") ?? "", /resource_metadata=/);
+  assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+}
 const crossOrigin = await fetch(`${origin}/mcp`, { headers: { origin: "https://invalid.example" }, signal: AbortSignal.timeout(15_000) });
 assert.equal(crossOrigin.status, 403);
-console.log("PASS: HTTPS, OAuth discovery/issuer/PKCE, unauthenticated 401, cross-origin denial, private no-store. Authenticated ChatGPT connection is a separate check.");
+console.log("PASS: HTTPS, OAuth discovery/issuer/PKCE, unauthenticated POST/JSON/SSE/non-navigation GET 401, cross-origin denial, private no-store. Browser navigation and authenticated ChatGPT connection are separate checks.");

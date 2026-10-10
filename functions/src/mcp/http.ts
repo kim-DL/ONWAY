@@ -1,3 +1,4 @@
+import { serveMcpLanding } from "./landing.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import express, { type ErrorRequestHandler } from "express";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -75,6 +76,7 @@ export function createMcpHttpApp(oauth: McpOAuth, sourceKey: (ip: string) => str
     });
     next();
   });
+  app.use(serveMcpLanding);
   app.post("/register", async (req, res) => {
     await oauth.rate("register-global", 20, 60 * 60_000);
     res.status(201).json(await oauth.register(req.body));

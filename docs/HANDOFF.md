@@ -1,9 +1,19 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-09
+기준일: 2026-10-10
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-10 MCP 1.13.0 — 브라우저 연결 안내와 프로토콜 분리
+
+- 사용자가 모바일에서 승인한 ZIP의 실제 ONWAY 로고·Noto CJK 기반 한글 제목/본문 WOFF2·독립 HTML을 확인하고 Functions 자산에 포함했다. 로고는 기존 회사 PNG와 바이트가 같고 글꼴 메타데이터/한글 범위·실제 Chromium/WebKit 렌더링을 확인했다. OFL/부분집합 라이선스를 포함한다. 시안 표기를 운영 안내로 바꾸고 자산 경로/favicon/CSP nonce만 반영했다. 외부 CDN·분석기·새 로그인 폼은 없다.
+- `/mcp`의 정확한 GET 문서 탐색(Fetch Metadata navigate/document + 명시적 HTML Accept)만 안내한다. 인증/MCP 헤더·JSON/SSE Accept·쿼리·HEAD/POST·Fetch Metadata 없는 요청은 기존 경로다. 기존 401 challenge·인증된 GET405·OAuth discovery·POST SDK 계약을 유지하며 HTTPS/Origin/본문/rate guard 뒤에 배치했다. 기존 no-store/보안 헤더를 유지하고 랜딩만 nonce script/self font를 허용한다. 네 개의 정적 파일만 명시적으로 제공하며 임의 경로 파일 접근은 없다. 자세한 경계는 `docs/mcp-browser-landing.md`.
+- app/Functions typecheck·lint PASS, unit **1,867 PASS /94 조건부 SKIP**, demo Firebase/Hosting/공식 SDK **25 PASS**, Chromium/WebKit **53 PASS /1 CDP 전용 SKIP**. 320/390/844/1440px, 로고/글꼴, 넘침·터치 영역·복사 및 거절 fallback·키보드·reduced-motion을 검사했다. 초기 테스트의 local Origin 설정 및 CSP 차단에 대한 잘못된 기대를 수정했고 운영 Origin/CSP를 완화하지 않았다. WebKit은 기존 로컬 라이브러리 경로와 preflight skip으로 실제 실행했다. 실물 모바일 검증은 아니다.
+- Functions/Next build·PWA·성능 예산 PASS. 운영 frontend 설정이 없는 검증 out은 Hosting gate에서 예상대로 차단됐고 배포하지 않는다. 기존 브랜치/PR4를 유지하며 main 병합·PWA/다른 Functions 변경·업무 데이터 쓰기·권한 확대는 없다.
+
+- **functions:employeeMcp만** 배포해 ACTIVE **employeemcp-00028-fuv**, updateTime `2026-10-10T05:48:21.310428630Z` 확인. 기존71 Functions/PWA Hosting/MCP Hosting `392f487ef50a6a9c`, runtime SA·allowlist1·PIN secret2·max3/concurrency4 동일. 운영 HTTPS/discovery/PKCE/401 JSON/SSE GET/POST/Origin/no-store probe PASS. 운영 페이지의 Chromium/WebKit 390/1440px·글꼴2개·원본 로고·복사2개·콘솔 오류0을 확인했다. Chromium은 실제 clipboard 값을 비교했고 WebKit은 실제 클릭 성공 안내를 확인했다. Windows Chrome에서도 두 버튼 모두 실제 복사값이 일치했다.
+- 실제 Windows ChatGPT 새 대화에서 기존 앱의 `get_inventory_overview(exampleLimit=0)` 읽기 호출 **1회/성공/서버1,074ms**와 결과의 성공·조회시각을 확인했다. 기존 연결 앱 도구 직접 호출도 별도1회/성공/서버911ms였고 두 표본 모두 MCP1.13.0이다. 서버 시간은 ChatGPT 추론/전송/렌더 총시간이 아니다. 재인증·새 OAuth 동의·업무 쓰기는 없으며 검증 탭만 닫아 원래 Chrome1탭을 보존했다. 신규 자격증명·권한 추가 없음. 원본 라이선스 파일의 마지막 빈 줄은 그대로 보존했다.
 
 ### 2026-10-09 MCP 1.12.0 — 약칭·초성 검색 분리와 안전한 확정
 
