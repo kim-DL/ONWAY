@@ -5,6 +5,7 @@ import { requireVerifiedAdmin } from "../admin/admin-authorization.js";
 import { LoginRepository } from "../auth/login-repository.js";
 import { claimsMatchAuthz } from "../auth/login-service.js";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { observeRead } from "../shared/read-observation.js";
 
 export interface CustomerActor {
   uid: string;
@@ -50,7 +51,7 @@ export async function requireCustomerActor(request: CallableRequest<unknown>): P
 }
 
 export async function verifyCustomerTransactionActor(db: Firestore, transaction: Transaction, actor: CustomerActor) {
-  const [authz, employee] = await transaction.getAll(db.doc(`authz/${actor.uid}`), db.doc(`employees/${actor.employeeId}`));
+  const [authz, employee] = await observeRead("firestore", () => transaction.getAll(db.doc(`authz/${actor.uid}`), db.doc(`employees/${actor.employeeId}`)), (value) => value.length);
   const authorization = authz?.data();
   // Roles live on employees, not authz (see LoginRepository.getAuthz). Compare
   // that canonical role snapshot even if a faulty admin update missed a version
@@ -60,4 +61,5 @@ export async function verifyCustomerTransactionActor(db: Firestore, transaction:
     || authorization.sessionVersion !== actor.sessionVersion || authorization.permissionsVersion !== actor.permissionsVersion) {
     throw new HttpsError("permission-denied", "변경 권한이 만료되었습니다. 다시 로그인해주세요.");
   }
+  return employee!.data()!;
 }

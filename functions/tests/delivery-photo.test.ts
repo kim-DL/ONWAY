@@ -409,6 +409,11 @@ describe("private delivery photo lifecycle", () => {
     expect(recent.photos).toHaveLength(1);
     expect((await state.service.list({ scope: "customer", customerId: "customer-a", limit: 30 }, sales, now)).photos).toHaveLength(1);
     const download = await state.service.get({ photoId: created.photoId, variant: "evidence" }, actor, now, () => now);
+    expect(Object.keys(download).sort()).toEqual(["photoId", "variant", "contentType", "byteSize", "fileBase64"].sort());
+    // A later employee rename must not rewrite who recorded an existing photo.
+    state.data.get(`employees/${actor.employeeId}`)!.displayName = "변경된 합성 이름";
+    const withMetadata = await state.service.getWithMetadata({ photoId: created.photoId, variant: "evidence" }, actor, now, () => now);
+    expect(withMetadata).toEqual({ download, customerId: created.customerId, createdByEmployeeId: actor.employeeId, createdAt: created.createdAt, createdByName: created.createdByName });
     expect(Buffer.from(download.fileBase64, "base64")).toEqual(state.files.get(deliveryPhotoPath("2026-09-22", created.photoId, attemptToken, "evidence"))!.bytes);
     expect(state.data.get("companies/onnuri/customers/customer-a")).toEqual({ customerId: "customer-a", companyId: "onnuri", status: "active", name: "가 거래처" });
     expect(JSON.stringify(state.data.get(`companies/onnuri/deliveryPhotos/${created.photoId}`))).not.toMatch(/completion|fileBase64|Buffer/);
@@ -1006,6 +1011,10 @@ describe("private delivery photo lifecycle", () => {
     state.setClock(now);
     expect((await state.service.list({ scope: "customer", customerId: "customer-a", limit: 10 }, actor, now)).photos.map((photo) => photo.photoId)).toEqual([recent.photoId]);
     await expect(state.service.get(
+      { photoId: recent.photoId, variant: "evidence" }, actor, recentAt,
+      () => Timestamp.fromMillis(recentAt.toMillis() + 168 * 60 * 60 * 1000),
+    )).rejects.toMatchObject({ code: "not-found" });
+    await expect(state.service.getWithMetadata(
       { photoId: recent.photoId, variant: "evidence" }, actor, recentAt,
       () => Timestamp.fromMillis(recentAt.toMillis() + 168 * 60 * 60 * 1000),
     )).rejects.toMatchObject({ code: "not-found" });

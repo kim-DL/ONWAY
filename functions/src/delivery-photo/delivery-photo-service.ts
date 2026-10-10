@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { FieldValue, Timestamp, type DocumentData, type DocumentReference, type Firestore, type Transaction } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp, type DocumentData, type DocumentReference, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import type { z } from "zod";
 
@@ -7,6 +7,7 @@ import { verifyCustomerTransactionActor, type CustomerActor } from "../customer/
 import { CUSTOMER_COLLECTION_PATH } from "../customer/customer-contract.js";
 import { detectPhotoContentType } from "../photo/photo-processor.js";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { observeRead } from "../shared/read-observation.js";
 import {
   createDeliveryPhotoResultSchema,
   DELIVERY_PHOTO_DAY_OVERRIDE_RETENTION_DAYS,
@@ -50,6 +51,14 @@ const SCHEDULER_INTERVAL_MS = 60 * 60 * 1000;
 // Active application recovery period. It does not bound when a pending Storage write may finish.
 const CREATE_RECOVERY_WINDOW_MS = 2 * SCHEDULER_INTERVAL_MS;
 const DELIVERY_PHOTO_RATE_LIMIT = 60;
+
+export interface DeliveryPhotoSearch {
+  customerId?: string | undefined;
+  employeeId?: string | undefined;
+  date?: string | undefined;
+  limit: number;
+  after?: { createdAt: string; photoId: string } | undefined;
+}
 
 type CleanupTarget = Required<Pick<InspectedDeliveryPhotoObject, "objectPath" | "generation" | "uploadAttemptToken">>;
 
@@ -615,7 +624,56 @@ export class DeliveryPhotoService {
     return listDeliveryPhotosResultSchema.parse({ scope: "customer", customerId: input.customerId, fromDateKey, photos: photos.map(deliveryPhotoMetadata) });
   }
 
+  /** Preserve legacy customer pagination, including cursors across deleted records. */
+  async listPage(input: DeliveryPhotoSearch & { customerId: string }, actor: CustomerActor, now = Timestamp.now()) {
+    return this.readPage(input, actor, now, false);
+  }
+
+  /** Query the existing photo collection directly; no customer traversal or derived database. */
+  async searchPage(input: DeliveryPhotoSearch, actor: CustomerActor, now = Timestamp.now()) {
+    return this.readPage(input, actor, now, true);
+  }
+
+  private async readPage(input: DeliveryPhotoSearch, actor: CustomerActor, now: Timestamp, activeOnly: boolean) {
+    await this.verifyRead(actor);
+    const retentionStart = now.toMillis() - DELIVERY_PHOTO_RETENTION_HOURS * 60 * 60 * 1000;
+    const dayStart = input.date ? Date.parse(`${input.date}T00:00:00+09:00`) : retentionStart;
+    const from = Timestamp.fromMillis(Math.max(retentionStart, dayStart));
+    const until = Math.min(now.toMillis() + 1, input.date ? dayStart + 24 * 60 * 60 * 1000 : Infinity);
+    if (until <= from.toMillis()) {
+      await this.verifyRead(actor);
+      return { photos: [], nextCursor: null, recordsScanned: 0 };
+    }
+    let query: FirebaseFirestore.Query = this.db.collection(DELIVERY_PHOTO_PATH);
+    if (input.customerId) query = query.where("customerId", "==", input.customerId);
+    if (input.employeeId) query = query.where("createdByEmployeeId", "==", input.employeeId);
+    if (activeOnly) query = query.where("status", "==", "active");
+    query = query.where("createdAt", ">=", from).where("createdAt", "<", Timestamp.fromMillis(until))
+      .orderBy("createdAt", "desc").orderBy(FieldPath.documentId(), "desc").limit(input.limit + 1);
+    if (input.after) query = query.startAfter(Timestamp.fromDate(new Date(input.after.createdAt)), input.after.photoId);
+    const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
+    const rows = snapshot.docs.slice(0, input.limit).map((doc) => deliveryPhotoFromDocument(doc.data()));
+    const last = rows.at(-1);
+    await this.verifyRead(actor);
+    const checkedAt = this.currentTime().toMillis();
+    const photos = rows.filter((photo) => photo.status === "active" && photo.expiresAt.toMillis() > checkedAt
+      && photo.createdAt.toMillis() > checkedAt - DELIVERY_PHOTO_RETENTION_HOURS * 60 * 60 * 1000);
+    return { photos: photos.map(deliveryPhotoMetadata), recordsScanned: rows.length, nextCursor: snapshot.docs.length > input.limit && last
+      ? { createdAt: last.createdAt.toDate().toISOString(), photoId: last.photoId } : null };
+  }
+
   async get(
+    input: z.infer<typeof getDeliveryPhotoInputSchema>,
+    actor: CustomerActor,
+    now = Timestamp.now(),
+    currentTime: () => Timestamp = Timestamp.now,
+  ) {
+    // Preserve the strict Callable download contract for existing PWA clients.
+    return (await this.getWithMetadata(input, actor, now, currentTime)).download;
+  }
+
+  /** Use the same checked record for private image bytes and their display metadata. */
+  async getWithMetadata(
     input: z.infer<typeof getDeliveryPhotoInputSchema>,
     actor: CustomerActor,
     now = Timestamp.now(),
@@ -624,7 +682,7 @@ export class DeliveryPhotoService {
     const storage = this.storage;
     const check = async (checkedAt: Timestamp) => this.db.runTransaction(async (transaction) => {
       await verifyCustomerTransactionActor(this.db, transaction, actor);
-      const photoSnapshot = await transaction.get(this.db.doc(`${DELIVERY_PHOTO_PATH}/${input.photoId}`));
+      const photoSnapshot = await observeRead("firestore", () => transaction.get(this.db.doc(`${DELIVERY_PHOTO_PATH}/${input.photoId}`)));
       if (!photoSnapshot.exists) throw new HttpsError("not-found", "납품 사진을 찾을 수 없습니다.");
       const photo = deliveryPhotoFromDocument(photoSnapshot.data()!);
       if (photo.status !== "active" || photo.expiresAt.toMillis() <= checkedAt.toMillis()) throw new HttpsError("not-found", "납품 사진을 찾을 수 없습니다.");
@@ -632,7 +690,7 @@ export class DeliveryPhotoService {
     });
     const before = await check(now);
     const object = before[input.variant];
-    const buffer = await storage.download(object);
+    const buffer = await observeRead("storage", () => storage.download(object), (value) => value.length);
     if (buffer.length === 0 || buffer.length > DELIVERY_PHOTO_MAX_BYTES || buffer.length !== object.byteSize || detectPhotoContentType(buffer) !== "image/webp") {
       throw new HttpsError("failed-precondition", "저장된 납품 사진을 확인할 수 없습니다.");
     }
@@ -641,10 +699,11 @@ export class DeliveryPhotoService {
       || after[input.variant].uploadAttemptToken !== object.uploadAttemptToken) {
       throw new HttpsError("not-found", "납품 사진이 변경되었습니다.");
     }
-    return deliveryPhotoDownloadSchema.parse({
+    const download = deliveryPhotoDownloadSchema.parse({
       photoId: input.photoId, variant: input.variant, contentType: "image/webp",
       byteSize: buffer.length, fileBase64: buffer.toString("base64"),
     });
+    return { download, customerId: after.customerId, createdByEmployeeId: after.createdByEmployeeId, createdAt: after.createdAt.toDate().toISOString(), createdByName: after.createdByName };
   }
 
   async delete(input: z.infer<typeof deleteDeliveryPhotoInputSchema>, actor: CustomerActor, now = Timestamp.now()) {

@@ -9,6 +9,15 @@ coverage/
 .env*
 !.env.example
 functions/.secret.local
+# Deployment credentials and private signing material must stay local.
+application_default_credentials.json
+service-account*.json
+*-service-account.json
+serviceAccount*.json
+*.pem
+*.key
+*.p12
+*.pfx
 .firebase/
 .vercel/
 firebase-debug.log

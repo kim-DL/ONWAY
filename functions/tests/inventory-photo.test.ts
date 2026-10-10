@@ -128,6 +128,35 @@ describe("private inventory photo lifecycle", () => {
     expect(state.downloadedOptions()).toEqual({ start: 0, end: INVENTORY_PHOTO_MAX_BYTES });
   });
 
+  it("reads current photo metadata without lots/history, keeps Callable output strict and uses fresh product labels", async () => {
+    const state = fixture(); const input = upload(); await state.photos.upload(input, actor);
+    const product = await state.save(saveInput(input.uploadId));
+    state.afterDownload(() => { state.data.get(`${INVENTORY_PRODUCT_PATH}/${product.productId}`)!.name = "변경된 합성 상품"; });
+    const result = await state.photos.getWithMetadata({ productId: product.productId, variant: "thumbnail" }, actor);
+    expect(result.product).toMatchObject({ productId: product.productId, name: "변경된 합성 상품" });
+    expect(result.photo).toMatchObject({ photoId: input.uploadId, variant: "thumbnail", contentType: "image/webp" });
+    expect(result.photo?.byteSize).toBe(state.files.get(inventoryPhotoPath(input.uploadId, "thumbnail"))!.length);
+    expect(Object.keys(await state.photos.get(photoInput(product), actor)).sort()).toEqual(["byteSize", "contentType", "fileBase64"]);
+    expect(JSON.stringify(result.product)).not.toMatch(/createdBy|updatedAt|inputHash|storagePath|actorUid/);
+  });
+
+  it("returns no photo without touching Storage and does not substitute an explicitly requested old photo", async () => {
+    const state = fixture(); const product = await state.save(saveInput());
+    state.beforeDownload(() => { throw new Error("Must not read Storage"); });
+    expect(await state.photos.getWithMetadata({ productId: product.productId, variant: "thumbnail" }, actor))
+      .toMatchObject({ product: { productId: product.productId }, photo: null });
+    await expect(state.photos.getWithMetadata({ productId: product.productId, photoId: randomUUID(), variant: "thumbnail" }, actor))
+      .rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("keeps attached product photos readable beyond seven days, including inactive products", async () => {
+    const state = fixture(); const input = upload(); await state.photos.upload(input, actor);
+    const product = await state.save(saveInput(input.uploadId));
+    state.data.get(`${INVENTORY_PRODUCT_PATH}/${product.productId}`)!.status = "inactive";
+    state.data.get(`inventoryPhotoUploads/${input.uploadId}`)!.createdAt = Timestamp.fromMillis(1);
+    expect((await state.photos.getWithMetadata({ productId: product.productId, variant: "preview" }, actor)).photo?.photoId).toBe(input.uploadId);
+  });
+
   it("replaces/removes transactionally, instantly blocking the old image without deleting it", async () => {
     const state = fixture(); const first = upload(); await state.photos.upload(first, actor);
     const product = await state.save(saveInput(first.uploadId));
