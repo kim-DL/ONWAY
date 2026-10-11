@@ -46,15 +46,26 @@ for (const engine of ["chromium", "webkit"] as const) describe.skipIf(process.en
     expect(await frame.locator("#company img").count()).toBe(0);
     expect(await frame.locator("body").innerText()).not.toMatch(/납품완료|등록 시각 없음|7일|synthetic-product|49f0aeec/);
     await frame.locator("#open").click(); await expectBrowser(frame.locator("#evidence")).toBeVisible();
-    expect(await page.evaluate(() => window.inventoryPhotoTest.calls)).toEqual([{ name: "get_inventory_photo", arguments: { productId: thumbnail.productId, photoId, variant: "preview" } }]);
+    expect(await page.evaluate(() => window.inventoryPhotoTest.calls)).toEqual([{ name: "get_inventory_photo", arguments: { productId: thumbnail.productId, photoId, variant: "preview", imageResponse: "ui_only" } }]);
     await frame.locator("#zoom-in").click(); await expectBrowser(frame.locator("#zoom")).toHaveText("125%");
     await frame.locator("#zoom-fit").click(); await expectBrowser(frame.locator("#zoom")).toHaveText("100%");
     const box = await frame.locator("#zoom-in").boundingBox(); expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.y + box!.height).toBeLessThanOrEqual(480);
     await page.setViewportSize({ width: 667, height: 320 });
     const rotated = await frame.locator("#zoom-in").boundingBox(); expect(rotated!.y + rotated!.height).toBeLessThanOrEqual(320);
     await frame.locator("#close").click(); await expectBrowser(frame.locator("#viewer")).not.toBeVisible();
+    await frame.locator("#open").click(); await expectBrowser(frame.locator("#evidence")).toBeVisible();
+    await frame.locator("#close").click();
     expect(await page.evaluate(() => window.inventoryPhotoTest.calls.length)).toBe(1);
     expect(network).toEqual([]); expect(errors).toEqual([]);
+  });
+  it("uses an included preview for immediate repeated opening without another MCP call", async () => {
+    const { page, frame, errors } = await mount({ _meta: { inventoryPhoto: preview } });
+    await expectBrowser(frame.locator("#photo")).toBeVisible();
+    for (let count = 0; count < 3; count++) {
+      await frame.locator("#open").click(); await expectBrowser(frame.locator("#evidence")).toBeVisible();
+      await frame.locator("#close").click();
+    }
+    expect(await page.evaluate(() => window.inventoryPhotoTest.calls)).toEqual([]); expect(errors).toEqual([]);
   });
   it("rejects a different product image and clears a removed attachment instead of showing expired-delivery guidance", async () => {
     const { page, frame } = await mount(); await expectBrowser(frame.locator("#photo")).toBeVisible();

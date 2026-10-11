@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { PHOTO_VIEW_HTML } from "../../src/mcp/photo-view.js";
 
-type Photo = { createdByEmployeeId?: string; customerId: string; customerName: string | null; photoId: string; variant: string; mimeType: string; data: string; createdAt: string; createdByName: string };
+type Photo = { expiresAt?: string; createdByEmployeeId?: string; customerId: string; customerName: string | null; photoId: string; variant: string; mimeType: string; data: string; createdAt: string; createdByName: string };
 type Cursor = { photoId: string; createdAt: string };
 type Gallery = { employeeId?: string | null; employeeName?: string; customerId: string; customerName: string | null; date: string | null; photos: Array<Pick<Photo, "photoId" | "createdAt" | "createdByName">>; after: Cursor | null; nextCursor: Cursor | null };
 type Result = { _meta?: { error?: { code: string }; deliveryPhoto?: Photo; deliveryGallery?: Gallery; deliveryNotice?: { message: string } }; content?: Array<{ type: string; text: string }>; isError?: boolean; structuredContent?: { error: { code: string } } };
@@ -96,7 +96,7 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
       expect(await frame.locator("#open").evaluate((button) => button === document.activeElement)).toBe(true);
     }
     const calls = await page.evaluate(() => window.photoTest.calls.map(({ method, params }) => ({ method, params })));
-    expect(calls).toEqual(Array.from({ length: 3 }, () => ({ method: "tools/call", params: { name: "get_delivery_photo", arguments: { photoId, variant: "evidence" } } })));
+    expect(calls).toEqual([{ method: "tools/call", params: { name: "get_delivery_photo", arguments: { photoId, variant: "evidence", imageResponse: "ui_only" } } }]);
     expect(await page.evaluate(() => window.photoTest.modes.filter((mode) => mode === "fullscreen"))).toHaveLength(3);
     expect(Math.max(...await page.evaluate(() => window.photoTest.heights))).toBeLessThan(720);
     expect(requests).toEqual([]); expect(errors).toEqual([]);
@@ -158,6 +158,7 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
     await frame.locator("#retry").click(); await frame.locator("#evidence:not([hidden])").waitFor();
     await frame.locator("#close").click();
     await page.evaluate(() => { window.photoTest.result = { isError: true, _meta: { error: { code: "NOT_FOUND" } } }; });
+    await frame.locator("body").evaluate(() => { const now = Date.now(); Date.now = () => now + 301000; });
     await frame.locator("#open").click(); await frame.locator("#card[hidden]").waitFor({ state: "attached" });
     expect(await frame.locator("#photo").getAttribute("src")).toBeNull();
     expect(await frame.locator("#evidence").getAttribute("src")).toBeNull();
@@ -176,7 +177,7 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
     return group;
   }
 
-  it("shows an included first photo with zero calls and rechecks each user-selected gallery image", async () => {
+  it("shows an included first photo with zero calls and reuses received gallery images", async () => {
     const { page, frame, requests, errors } = await mount(); await galleryReady(page, { initial: true });
     expect(await frame.locator("#counter").innerText()).toBe("1 / 2");
     expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(0);
@@ -185,8 +186,54 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
     expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(1);
     await frame.locator("#prev").click(); await frame.locator("#photo:not([hidden])").waitFor();
     expect(await frame.locator("#counter").innerText()).toBe("1 / 2");
-    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(2);
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(1);
     expect(requests).toEqual([]); expect(errors).toEqual([]);
+  });
+  it("opens an included evidence immediately and never extends freshness on a cache hit", async () => {
+    const { page, frame, errors } = await mount();
+    await deliver(page, { _meta: { deliveryGallery: { customerId: thumbnail.customerId, customerName: thumbnail.customerName, date: null,
+      photos: [{ photoId, createdAt: thumbnail.createdAt, createdByName: thumbnail.createdByName }], after: null, nextCursor: null }, deliveryPhoto: evidence } });
+    await frame.locator("#photo:not([hidden])").waitFor();
+    for (const offset of [0, 250000]) {
+      if (offset) await frame.locator("body").evaluate((_element, offset) => { const now = Date.now(); Date.now = () => now + offset; }, offset);
+      await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
+      await frame.locator("#close").click();
+      expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(0);
+    }
+    await frame.locator("body").evaluate(() => { const now = Date.now(); Date.now = () => now + 60000; });
+    await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(1);
+    expect(errors).toEqual([]);
+  });
+  it("reuses a received large second gallery image for the card after closing and inline navigation", async () => {
+    const { page, frame, requests, errors } = await mount(); await galleryReady(page, { initial: true });
+    await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
+    await frame.locator("#viewer-next").click(); await frame.locator("#evidence:not([hidden])").waitFor();
+    expect(await frame.locator("#viewer-counter").innerText()).toBe("2 / 2");
+    const calls = await page.evaluate(() => window.photoTest.calls.length);
+    expect(calls).toBe(2); // First evidence and the previously unseen second evidence.
+    await frame.locator("#close").click(); await frame.locator("#photo:not([hidden])").waitFor();
+    expect(await frame.locator("#counter").innerText()).toBe("2 / 2");
+    await frame.locator("#prev").click(); await frame.locator("#photo:not([hidden])").waitFor();
+    await frame.locator("#next").click(); await frame.locator("#photo:not([hidden])").waitFor();
+    await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(calls);
+    expect(requests).toEqual([]); expect(errors).toEqual([]);
+  });
+  it("hides delivered pixels at the server expiry without a new tool call and clears received bytes on teardown", async () => {
+    const { page, frame, errors } = await mount();
+    await ready(page, { ...evidence, expiresAt: new Date(Date.now() + 800).toISOString() });
+    await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(0);
+    await frame.locator("#card[hidden]").waitFor({ state: "attached" });
+    expect(await frame.locator("#evidence").getAttribute("src")).toBeNull();
+    expect(await frame.locator("#photo").getAttribute("src")).toBeNull();
+    expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(0);
+    const fresh = await mount(); await ready(fresh.page, evidence);
+    await fresh.frame.locator("#open").click(); await fresh.frame.locator("#evidence:not([hidden])").waitFor();
+    await fresh.page.evaluate(() => document.querySelector<HTMLIFrameElement>("#view")!.contentWindow!.postMessage({ jsonrpc: "2.0", id: "teardown", method: "ui/resource-teardown" }, "*"));
+    await fresh.frame.locator("#card[hidden]").waitFor({ state: "attached" });
+    expect(await fresh.frame.locator("#evidence").getAttribute("src")).toBeNull(); expect(errors).toEqual([]);
   });
 
   it("shows several photos in one gallery, loads only the selection and zooms/pans without another request", async () => {
@@ -293,9 +340,8 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
     await frame.locator("#prev").click(); await frame.locator("#next").click(); await frame.locator("#prev").click();
     expect(await page.evaluate(() => window.photoTest.held.length)).toBe(1);
     await page.evaluate(() => window.photoTest.reply(window.photoTest.held.shift()!));
-    await page.waitForFunction(() => window.photoTest.held.length === 1);
-    expect(await frame.locator("#photo").getAttribute("src")).toBeNull();
-    await page.evaluate(() => { window.photoTest.hold = false; window.photoTest.reply(window.photoTest.held.shift()!); });
+    await page.waitForFunction(() => window.photoTest.held.length === 0);
+    await page.evaluate(() => { window.photoTest.hold = false; });
     await frame.locator("#photo:not([hidden])").waitFor();
     expect(await frame.locator("#caption").innerText()).toContain("12:56");
     await page.evaluate((id) => {
@@ -387,7 +433,7 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
     await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
     await frame.locator("#close").click();
     expect(await frame.locator("body").evaluate(() => (window as unknown as { compatibilityCalls: unknown[] }).compatibilityCalls))
-      .toEqual([{ name: "get_delivery_photo", args: { photoId, variant: "evidence" } }]);
+      .toEqual([{ name: "get_delivery_photo", args: { photoId, variant: "evidence", imageResponse: "ui_only" } }]);
     expect(await frame.locator("body").evaluate(() => (window as unknown as { compatibilityModes: string[] }).compatibilityModes)).toContain("fullscreen");
     expect(requests).toEqual([]); expect(errors).toEqual([]);
   });

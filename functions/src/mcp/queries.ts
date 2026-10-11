@@ -263,7 +263,7 @@ export class McpQueries {
       after: input.after ?? null };
   }
   /** Name resolution, one gallery and its first checked thumbnail in one tool operation. */
-  async customerGallery(input: z.infer<typeof galleryInput>, actor: McpPrincipal) {
+  async customerGallery(input: z.infer<typeof galleryInput>, actor: McpPrincipal, loadInitialPhoto = true) {
     const search = input.query ? await this.customers.search(input.query, { afterId: input.afterId, limit: 100 }) : null;
     const base = { candidates: search?.items.map((row) => customerCandidate(input.query!, row)) ?? [], searchPage: search?.page ?? null,
       searchNextCursor: search?.nextCursor ?? null, timeBasis: "photo_registered_at" as const };
@@ -280,8 +280,8 @@ export class McpQueries {
     const gallery = await this.gallery({ customerId, employeeId: input.employeeId, date: input.date,
       limit: input.limit, after: input.after }, actor);
     // Pagination is UI-only metadata: do not download another first image for every page.
-    const first = !input.after ? gallery.photos[0] : null;
-    const checked = first ? await this.delivery.getWithMetadata({ photoId: first.photoId, variant: "thumbnail" }, actor) : null;
+    const first = loadInitialPhoto && !input.after ? gallery.photos[0] : null;
+    const checked = first ? await this.delivery.getWithMetadata({ photoId: first.photoId, variant: input.initialVariant }, actor) : null;
     if (checked && (checked.customerId !== customerId || checked.download.photoId !== first!.photoId
       || input.employeeId && checked.createdByEmployeeId !== input.employeeId)) {
       throw new HttpsError("aborted", "Photo records changed during gallery lookup");
@@ -289,8 +289,9 @@ export class McpQueries {
     return { ...base, ...gallery, candidates: [], resolution: "resolved" as const,
       match: input.customerId ? customerIdMatch(customerId) : customerNameMatch(input.query!, search!.items.find((row) => row.customerId === customerId)!),
       initialPhoto: checked ? { ...checked.download, customerId, customerName: gallery.customerName,
-        createdAt: checked.createdAt, createdByName: checked.createdByName, createdByEmployeeId: checked.createdByEmployeeId } : null,
-      note: gallery.photos.length ? "등록명으로 확인한 거래처의 납품사진 갤러리입니다. 첫 썸네일은 응답에 포함하며 추가 모델 호출은 불필요합니다. 나머지 사진·확대·페이지는 UI에서 조회합니다."
+        createdAt: checked.createdAt, createdByName: checked.createdByName, createdByEmployeeId: checked.createdByEmployeeId,
+        ...(checked.expiresAt ? { expiresAt: checked.expiresAt } : {}) } : null,
+      note: gallery.photos.length ? "등록명으로 확인한 거래처의 납품사진 갤러리입니다. 첫 사진은 응답에 포함하며 추가 모델 호출은 불필요합니다. 나머지 사진·확대·페이지는 UI에서 조회합니다."
         : gallery.page.complete ? "최근168시간·지정 날짜에 조회 가능한 사진 등록 기록이 없습니다. 삭제·만료·미등록은 미납품을 뜻하지 않습니다."
           : "이 구간에 유효한 사진이 없습니다. 같은 거래처와 nextCursor로 사진 더 보기를 사용하세요." };
   }
@@ -361,7 +362,8 @@ export class McpQueries {
       gallery: { ...records, customerId: latest.customerId, customerName, employeeId: resolved.employee!.employeeId,
         employeeName: resolved.employee!.displayName, after: null },
       initialPhoto: { ...initial.download, customerId: initial.customerId, customerName, createdAt: initial.createdAt,
-        createdByName: initial.createdByName, createdByEmployeeId: initial.createdByEmployeeId },
+        createdByName: initial.createdByName, createdByEmployeeId: initial.createdByEmployeeId,
+        ...(initial.expiresAt ? { expiresAt: initial.expiresAt } : {}) },
       note: "직원이 가장 최근 사진을 등록한 거래처·서울 등록일의 해당 직원 사진을 한 갤러리에 표시했습니다. 최초 썸네일을 이 응답에 포함해 추가 MCP 호출 없이 표시합니다. 추가 사진/확대/다음 페이지는 사용자 조작 시 조회합니다. 등록 시각은 실제 납품완료 시각이 아닙니다." };
   }
 

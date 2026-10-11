@@ -1,9 +1,21 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-10
+기준일: 2026-10-11
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-11 MCP 1.14.2 — 사진 단일 전송과 갤러리 재사용
+
+- 공식 MCP image 응답·OpenAI UI/reference·공식 확장 규격을 확인했다. `get_photo_images`는 기존 상품 preview/납품 evidence를 표준 image로 한 번 전달하며 새 계정/권한/Storage 복제/공개 URL은 없다. 합계12MiB/최대5장, 원본 삭제·만료/직원 필터·메타데이터 연관·마지막 OAuth를 검사하고 부분 커서를 반환한다. **실제 Windows ChatGPT에서는 사진 바이트가 전달돼도 기본 이미지 카드/뷰어가 표시되지 않았다.** OpenAI가 업무 사진을 자체 CDN에 저장한다거나 기본 뷰어가 지원된다고 약속하지 않는다. 다른 표준 이미지 수신 클라이언트/명시적 진단용이며 ChatGPT의 일반 사진 요청은 기존 갤러리를 사용하도록 지침/설명을 보강했다. 모델18개+UI 전용1개다. 자세한 근거는 `docs/mcp-photo-images.md`.
+- 보기 요청은 기존 상품 도구 preview 또는 거래처 갤러리 initialVariant=evidence로 첫 큰 사진1장을 포함하고 `imageResponse=ui_only`로 UI metadata에 한 번만 전달한다. 기본 compatible/분석용 image content는 유지한다. 같은256KiB 합성 SDK 응답은 기존 중복 경로의55% 미만이며 이는 전송 바이트다. Storage 원본 읽기는 각각1회로 같고 청구액 감소율/모델 비용을 실측한 것은 아니다. 아직 받지 않은 다른 사진만 선택할 때 내려받는다.
+- 사진 UI v11은 현재 UI 메모리에서 최대5분/10항목/약12MiB 원본 바이트 이내로 재사용한다. 히트가 기한을 연장하지 않고 큰 사진을 작은 카드에도 사용한다. 운영1.14.1의 두 번째 evidence445,794B 뒤 닫기에서 thumbnail28,006B/추가 Storage1회가 발생한 것을 확인해1.14.2에서 제거했으며 닫기·카드 이동·재확대 추가 호출0 회귀 검사를 추가했다. 기존 PWA 다운로드 계약을 보존하며 canonical 검사 후의 expiresAt을 private metadata에 추가했다. UI는 expiresAt/등록+168시간의 이른 기한에 사진을 숨기고 관련 사본을 지운다. 새 범위/새 갤러리 retrievedAt·인가 오류·종료 때 캐시를 비운다. 디스크·Service Worker·공용/업무/인가 캐시가 아니다. 삭제/교체/권한 취소는 새 서버 조회/오류 때 확인하며 이미 전달된 사본의 OpenAI 보관을 원본7일 정책으로 회수한다고 주장하지 않는다.
+- WebKit 회귀 검사에서 기존 거래처 카드의 resize가 MCP hostContext의 safe-area를 잃어 높이426px 대신466px가 되는 원인을 확인했다. customer UI v3에서 이전 호스트 범위를 보존하고 실제 resize 이벤트 뒤426px/회전216px를 검사한다. 사진 v9/v10과 거래처 v1/v2 resource도 같은 인증 경계로 호환한다. 주소/연락처/검색·업무 서비스·PWA는 바꾸지 않는다.
+- 전체 unit1,874 PASS/98 조건부 SKIP(1.14.1), 최종 MCP/PIN/SDK135 PASS/84 조건부 SKIP, Chromium/WebKit58 PASS/1 CDP 전용 SKIP. demo Firebase/Hosting/SDK25 PASS는 이미지 단일 전송·evidence·원본 만료·기존 재고 승인을 검사했으며 마지막 UI/리소스 보완 뒤 공식 SDK/브라우저를 다시 검증했다. app/Functions typecheck·lint·최종 Functions build PASS, Next build/PWA/JS·CSS 예산 PASS. 운영 frontend 설정 없는 검증 out은 Hosting gate에서 차단됐고 미배포다. 실물 Android/iPhone은 별도 원격 환경이 없어 미검증이다.
+- **functions:employeeMcp만** 최종 배포해 ACTIVE **employeemcp-00031-muy**, updateTime `2026-10-11T06:05:30.729116241Z` 확인. 기존71 Functions/PWA/MCP Hosting `392f487ef50a6a9c`, runtime SA·allowlist1·PIN secret2·max3/concurrency4 동일. 운영 HTTPS/discovery/PKCE/비인증 JSON·SSE GET/POST401/Origin/no-store probe PASS. 업무 데이터·Rules·인덱스·IAM·새 OAuth scope는 변경하지 않는다.
+- 실제1.14.1 상품 사진 UI는 최초1회/서버1,345ms/Storage1/관측100문서/사진188,822B/응답253,578B였다. 상품명 원문·실제 포장 이미지·버튼 가시성을 UIA와 화면으로 확인했고 세 번 열기·확대/축소/맞춤/닫기 뒤 추가 사진 호출/Storage0이었다. UIA 관측509/390ms는 자동화 오버헤드를 포함한 표본이며 프레임 렌더 시간/SLO가 아니다. 기본 뷰어 실패 표본1.14.0은1회/1,247ms/같은188,822B/응답254,651B이며 사진 자체가 아니라 호스트 표시의 한계였다. 실제 상품/직원/거래처 식별자·사진·PIN/token은 Git에 넣지 않는다.
+
+- 최종1.14.2의 실제 ChatGPT 재조회는 확인된 거래처 ID를 재사용해 `get_delivery_gallery`1회/1,350ms/관측26문서/Firestore18/Auth2/Storage1/사진390,568B/응답523,212B로2장 목록과 첫 큰 사진을 표시했다. 이름 검색1.14.1 표본은 같은 사진·목록에246문서/1,619ms/523,338B였고 검색 읽기를 생략한 차이를 확인했다. 아직 받지 않은 둘째 사진은 UI1회/1,431ms/관측20문서/사진445,794B/응답595,207B였다. 최종 전체 사진 calls2/Storage2/재시도0이며 첫 확대·둘째 사진 닫기/재열기·앞뒤 전환·125%/맞춤·최종 닫기 뒤 추가 사진 calls0을 로그와 대조했다. 실제 갤러리의 두 이미지·등록시각/기록자·업체명과 도달 가능한48px 버튼을 화면/UIA로 확인했다. 서버 시간은 추론/호스트 총시간이나 SLO가 아니다. 검증용 Chrome1탭 창과 직접 생성한4개 임시 파일만 정리하고 사용자의 다른 앱은 보존했다. 기존 ONWAY 작업 브랜치/초안 PR4를 유지하며 main은 병합하지 않는다.
 
 ### 2026-10-10 MCP 1.13.0 — 브라우저 연결 안내와 프로토콜 분리
 

@@ -49,6 +49,9 @@ for (const engine of [chromium, webkit]) describe.skipIf(process.env.MCP_BROWSER
     expect(await frame.locator("#door-information").innerText()).toContain("등록됨");
     expect(await frame.locator("#updated").innerText()).toContain("2026-10-08 12:00");
     expect(await frame.locator("#retrieved").innerText()).toContain("12:59");
+    // Native resize events do not carry hostContext; they must retain its safe-area bounds.
+    await frame.locator("body").evaluate(() => dispatchEvent(new Event("resize")));
+    await browserExpect(frame.locator("main")).toHaveCSS("max-height", "426px");
     expect(await frame.locator("main").evaluate((node) => node.getBoundingClientRect().height)).toBeLessThanOrEqual(426);
     await page.setViewportSize({ width: 640, height: 320 });
     await page.evaluate(() => (window as unknown as { customerTest: { send: (m: string, p: unknown) => void } }).customerTest.send("ui/notifications/host-context-changed", { containerDimensions: { maxHeight: 280 }, safeAreaInsets: { bottom: 40 } }));

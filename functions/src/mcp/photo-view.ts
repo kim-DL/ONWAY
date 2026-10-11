@@ -1,5 +1,7 @@
 /** Private bytes/metadata arrive only in authenticated tool results; no browser network fetch. */
-export const PHOTO_VIEW_URI = "ui://geupsikgil/delivery-photo-v9.html";
+export const PHOTO_VIEW_URI = "ui://geupsikgil/delivery-photo-v11.html";
+export const PREVIOUS_PHOTO_VIEW_URI = "ui://geupsikgil/delivery-photo-v10.html";
+export const LEGACY_PHOTO_VIEW_URI = "ui://geupsikgil/delivery-photo-v9.html";
 export const PHOTO_VIEW_HTML = String.raw`<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
@@ -57,8 +59,9 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
   const el = (id) => document.getElementById(id);
   const card = el('card'), photo = el('photo'), status = el('status'), opener = el('open');
   const viewer = el('viewer'), evidence = el('evidence'), viewerStatus = el('viewer-status'), retry = el('retry');
-  const viewport = el('viewport'), stage = el('stage'), pending = new Map(), localPhotos = new Set();
-  let initialized = false, host = {}, current = null, gallery = null, index = 0, sequence = 0, requestId = 0, disposed = false;
+  const viewport = el('viewport'), stage = el('stage'), pending = new Map(), localPhotos = new Set(), receivedImages = new Map();
+  let cacheChars = 0, cacheTimer = null, currentExpiry = Infinity;
+  let initialized = false, host = {}, current = null, gallery = null, galleryStamp = null, index = 0, sequence = 0, requestId = 0, disposed = false;
   let mode = 'inline', modeQueue = Promise.resolve(), changingMode = false;
   let wanted = null, running = false, thumbId = null, loadingPage = false, zoom = 1, suppressClickUntil = 0;
   let compatibilityGlobals = {}, lastHeight = null, clearGestures = () => {};
@@ -131,6 +134,42 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
     return { ...item, photos: item.photos.map(({ photoId, createdAt, createdByName }) => ({ photoId, createdAt, createdByName })) };
   }
   const imageKey = (item) => (item.kind || 'delivery') + ':' + (item.productId || '') + ':' + item.photoId + ':' + item.variant;
+  const scopedImageKey = (item) => (gallery?.customerId || item.customerId || '') + ':' + (gallery?.employeeId || '') + ':' + imageKey(item);
+  function imageExpiry(item) {
+    if (item.kind === 'inventory') return Infinity;
+    const registered = Date.parse(item.createdAt), explicit = Date.parse(item.expiresAt);
+    return Number.isFinite(registered) ? Math.min(registered + 168 * 3600000, Number.isFinite(explicit) ? explicit : Infinity) : NaN;
+  }
+  function removeReceived(key) { const entry = receivedImages.get(key); if (entry) cacheChars -= entry.item.data.length; receivedImages.delete(key); }
+  function pruneReceived() {
+    clearTimeout(cacheTimer); cacheTimer = null;
+    const now = Date.now();
+    for (const [key, entry] of receivedImages) if (entry.until <= now) removeReceived(key);
+    if (current && currentExpiry <= now) {
+      currentExpiry = Infinity; imageFailure({ variant: viewer.open ? 'evidence' : 'thumbnail' }, true);
+    }
+    let next = currentExpiry;
+    for (const entry of receivedImages.values()) next = Math.min(next, entry.until);
+    if (!disposed && Number.isFinite(next)) cacheTimer = setTimeout(pruneReceived, Math.max(1, next - now));
+  }
+  function keepReceived(item) {
+    const expiry = imageExpiry(item);
+    if (Number.isNaN(expiry) || expiry <= Date.now()) return;
+    const key = scopedImageKey(item); removeReceived(key);
+    const entry = { item, until: Math.min(Date.now() + 5 * 60000, expiry) };
+    receivedImages.set(key, entry); cacheChars += item.data.length;
+    while (receivedImages.size > 10 || cacheChars > 16 * 1024 * 1024) removeReceived(receivedImages.keys().next().value);
+    pruneReceived();
+  }
+  function alreadyReceived(task) {
+    pruneReceived();
+    let key = scopedImageKey(task), entry = receivedImages.get(key);
+    // A received full image also fills the small card. Never enlarge a thumbnail instead.
+    if (!entry && task.variant === 'thumbnail') { key = scopedImageKey({ ...task, variant: 'evidence' }); entry = receivedImages.get(key); }
+    if (!entry || entry.until <= Date.now()) return null;
+    receivedImages.delete(key); receivedImages.set(key, entry); // LRU changes order, never freshness.
+    return entry.item;
+  }
   function caption(item) {
     if (item.kind === 'inventory') return [item.manufacturer, item.specification].filter((value) => typeof value === 'string' && value.trim()).map((value) => value.slice(0, 200)).join(' · ') || '등록된 상품 사진';
     const date = typeof item.createdAt === 'string' ? new Date(item.createdAt) : new Date(NaN);
@@ -228,7 +267,8 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
     resize();
   }
   function clearAll() {
-    current = null; gallery = null; index = 0; thumbId = null; loadingPage = false;
+    receivedImages.clear(); cacheChars = 0; currentExpiry = Infinity; clearTimeout(cacheTimer); cacheTimer = null;
+    current = null; gallery = null; galleryStamp = null; index = 0; thumbId = null; loadingPage = false;
     card.hidden = true; clearImage(photo); closeViewer(true, false); el('thumb-retry').hidden = true; captions(); navigation();
   }
   function authFailure(result) {
@@ -243,6 +283,7 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
     catch { return null; }
   }
   function imageFailure(task, missing = false) {
+    if (missing) { for (const [key, entry] of receivedImages) if (entry.item.photoId === current?.photoId) removeReceived(key); currentExpiry = Infinity; }
     const inventory = current?.kind === 'inventory';
     const message = missing ? inventory ? '상품 사진이 교체되었거나 삭제되었습니다. 상품을 다시 조회해 주세요.' : '사진이 삭제되었거나 보관기간이 지났습니다.' : '사진을 불러오지 못했습니다. 다시 시도해 주세요.';
     if (missing && !gallery) { clearAll(); if (inventory) { el('photo-title').textContent = '상품 사진'; el('time-basis').textContent = ''; } status.textContent = inventory ? message : '사진이 만료되었거나 조회 권한이 변경되었습니다. 다시 조회해 주세요.'; return; }
@@ -252,13 +293,18 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
     resize();
   }
   function applyImage(item, task) {
+    const expiry = imageExpiry(item);
+    if (Number.isFinite(expiry) && expiry <= Date.now()) { imageFailure(task, true); return; }
     const target = task.variant === 'evidence' ? evidence : photo;
     target.onload = () => {
       if (sequence !== task.sequence || disposed || current?.photoId !== item.photoId) return;
       target.hidden = false;
       // Authenticated image metadata is fresher than the gallery list.
       current = current.kind === 'inventory' ? { ...current, name: item.name, manufacturer: item.manufacturer, specification: item.specification }
-        : { ...current, createdAt: item.createdAt, createdByName: item.createdByName };
+        : { ...current, createdAt: item.createdAt, createdByName: item.createdByName, expiresAt: item.expiresAt };
+      currentExpiry = expiry;
+      if (!task.received) keepReceived(item); else pruneReceived();
+      if (!current || sequence !== task.sequence || disposed) return;
       if (gallery && (typeof item.customerName === 'string' || item.customerName === null)) gallery.customerName = item.customerName;
       captions();
       if (task.variant === 'evidence') { viewerStatus.classList.add('sr-only'); viewerStatus.textContent = '큰 사진을 표시했습니다.'; fitImage(true); }
@@ -278,8 +324,8 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
         if (localPhotos.size > 256) localPhotos.delete(localPhotos.values().next().value);
         try {
           const result = unwrap(await (task.kind === 'inventory'
-            ? callTool('get_inventory_photo', { productId: task.productId, photoId: task.photoId, variant: task.variant === 'evidence' ? 'preview' : 'thumbnail' })
-            : callTool('get_delivery_photo', { photoId: task.photoId, variant: task.variant })));
+            ? callTool('get_inventory_photo', { productId: task.productId, photoId: task.photoId, variant: task.variant === 'evidence' ? 'preview' : 'thumbnail', imageResponse: 'ui_only' })
+            : callTool('get_delivery_photo', { photoId: task.photoId, variant: task.variant, imageResponse: 'ui_only' })));
           // A revoked connection clears even a superseded request's private content.
           if (disposed) break;
           if (authFailure(result)) continue;
@@ -295,14 +341,20 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
   }
   function scheduleImage(variant) {
     if (!current || disposed) return;
-    sequence++; wanted = { photoId: current.photoId, kind: current.kind || 'delivery', productId: current.productId, variant, sequence };
+    sequence++; wanted = { photoId: current.photoId, kind: current.kind || 'delivery', productId: current.productId, customerId: current.customerId, variant, sequence };
     if (variant === 'evidence') { clearEvidence(); retry.hidden = true; viewerStatus.classList.remove('sr-only'); viewerStatus.textContent = '큰 사진을 불러오는 중입니다.'; }
     else { clearImage(photo); thumbId = null; opener.disabled = true; el('thumb-retry').hidden = true; status.textContent = '사진을 불러오는 중입니다.'; }
-    captions(); void pump();
+    const task = wanted, item = alreadyReceived(task);
+    if (!current || disposed) { wanted = null; return; }
+    currentExpiry = imageExpiry(current);
+    if (Number.isFinite(currentExpiry) && currentExpiry <= Date.now()) { wanted = null; imageFailure(task, true); return; }
+    if (item) { wanted = null; applyImage(item, { ...task, received: true }); }
+    else void pump();
+    captions();
   }
   function select(next) {
     if (!gallery?.photos[next]) return;
-    index = next; current = gallery.photos[index]; clearImage(photo); thumbId = null; card.hidden = false;
+    index = next; current = gallery.photos[index]; currentExpiry = Infinity; clearImage(photo); thumbId = null; card.hidden = false;
     el('thumb-retry').hidden = true; scheduleImage(viewer.open ? 'evidence' : 'thumbnail'); navigation();
   }
   async function loadMore(advance = false) {
@@ -354,13 +406,15 @@ dialog.compact{--gutter:0px}dialog.compact .panel{width:100%;border:0;border-rad
     const group = extractGallery(result);
     if (group) {
       // Page calls can be echoed by the host. Only their direct reply may append results.
-      if (gallery && group.customerId === gallery.customerId && group.date === gallery.date && (group.employeeId ?? null) === (gallery.employeeId ?? null)) return;
-      clearAll(); gallery = group; captions(); navigation();
+      const stamp = typeof result.structuredContent?.retrievedAt === 'string' ? result.structuredContent.retrievedAt : null;
+      if (gallery && group.customerId === gallery.customerId && group.date === gallery.date && (group.employeeId ?? null) === (gallery.employeeId ?? null)
+        && (group.after || (!stamp || stamp === galleryStamp) && JSON.stringify(group.photos) === JSON.stringify(gallery.photos))) return;
+      clearAll(); gallery = group; galleryStamp = stamp; captions(); navigation();
       if (group.photos.length && result._meta?.deliveryPhoto) {
         // Both name/customer and employee lookups include the first checked thumbnail.
         const initial = extract(result);
         index = 0; current = group.photos[0]; card.hidden = false; opener.disabled = true; captions();
-        if (initial?.variant === 'thumbnail' && initial.photoId === current.photoId && initial.customerId === group.customerId
+        if (['thumbnail', 'evidence'].includes(initial?.variant) && initial.photoId === current.photoId && initial.customerId === group.customerId
           && (!group.employeeId || initial.createdByEmployeeId === group.employeeId)) applyImage(initial, { sequence, variant: 'thumbnail' });
         else imageFailure({ variant: 'thumbnail' });
       } else if (group.photos.length) select(0);

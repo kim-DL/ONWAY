@@ -1,5 +1,6 @@
 export const LEGACY_CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v1.html";
-export const CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v2.html";
+export const PREVIOUS_CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v2.html";
+export const CUSTOMER_VIEW_URI = "ui://geupsikgil/customer-details-v3.html";
 export const CUSTOMER_VIEW_META = { ui: { csp: { connectDomains: [], resourceDomains: [] } },
   "openai/widgetCSP": { connect_domains: [], resource_domains: [] }, "openai/widgetPrefersBorder": true,
   "openai/widgetDescription": "현재 거래처의 주소·연락처·납품 안내를 조회 원문 그대로 표시합니다. 미조회/미등록·폐업 상태를 구분합니다." };
@@ -9,10 +10,10 @@ export const CUSTOMER_VIEW_HTML = String.raw`<!doctype html><html lang="ko"><hea
 <title>거래처 상세정보</title><style>*{box-sizing:border-box}body{margin:0;padding:12px;font:15px/1.55 system-ui;color:light-dark(#172237,#eef3fa);background:light-dark(#fff,#151a22);color-scheme:light dark}
 main{max-height:var(--available,560px);overflow:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom,0px)}header{position:sticky;top:0;padding-bottom:8px;border-bottom:1px solid #8884;background:light-dark(#fff,#151a22)}h2,h3,p{margin:0}h2{font-size:19px;overflow-wrap:anywhere}h3{font-size:15px;margin-top:14px}dl{margin:6px 0;display:grid;grid-template-columns:76px minmax(0,1fr);gap:6px 10px}dt,.muted{font-size:13px;opacity:.75}dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}.warning{color:light-dark(#9f3600,#ffb780)}#status{white-space:pre-wrap;overflow-wrap:anywhere}.muted{margin-top:8px}[hidden]{display:none!important}@media(max-width:340px){body{padding:8px}dl{grid-template-columns:64px minmax(0,1fr);gap:5px 8px}}</style></head>
 <body><main><header><h2 id="name">거래처 상세정보</h2><p id="state" class="muted"></p></header><p id="status" role="status">조회 결과를 불러오는 중입니다.</p><div id="details"></div><p id="updated" class="muted"></p><p id="retrieved" class="muted"></p></main><script>(()=>{
-const el=id=>document.getElementById(id);let ready=false,disposed=false,lastHeight=null;
+const el=id=>document.getElementById(id);let ready=false,disposed=false,lastHeight=null,hostContext={};
 const send=m=>parent.postMessage({jsonrpc:'2.0',...m},'*');
-function fit(context){const dimensions=context?.containerDimensions, insets=context?.safeAreaInsets??context?.safeArea?.insets;
-const host=dimensions?.height??dimensions?.maxHeight??context?.maxHeight;const viewport=window.visualViewport?.height??innerHeight;
+function fit(context){if(context)hostContext={...hostContext,...context};const dimensions=hostContext.containerDimensions, insets=hostContext.safeAreaInsets??hostContext.safeArea?.insets;
+const host=dimensions?.height??dimensions?.maxHeight??hostContext.maxHeight;const viewport=window.visualViewport?.height??innerHeight;
 const height=Math.max(80,Math.min(560,Number.isFinite(host)?host:viewport,viewport)-(insets?.top??0)-(insets?.bottom??0)-24);
 document.documentElement.style.setProperty('--available',height+'px');resize();}
 function resize(){if(disposed)return;const height=Math.ceil(document.querySelector('main').getBoundingClientRect().height+24);

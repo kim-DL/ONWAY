@@ -73,8 +73,14 @@ describe("MCP service composition", () => {
     expect(image).toHaveBeenCalledTimes(1); expect(f.photos).toHaveBeenCalledTimes(1);
     expect(f.photos.mock.calls[0]![0]).not.toHaveProperty("date", expect.any(String));
     expect(JSON.stringify(result)).not.toContain("DO-NOT-EXPORT");
+    const metadataOnly = await f.queries.customerGallery(galleryInput.parse({ query: "합성유통" }), principal, false);
+    expect(metadataOnly).toMatchObject({ resolution: "resolved", initialPhoto: null, page: { returnedCount: 2 } });
+    expect(image).toHaveBeenCalledTimes(1); // Native image path does not waste an initial thumbnail read.
+    await f.queries.customerGallery(galleryInput.parse({ customerId: "school", initialVariant: "evidence" }), principal);
+    expect(image).toHaveBeenLastCalledWith({ photoId: first.photoId, variant: "evidence" }, principal);
+    image.mockClear();
     await f.queries.customerGallery(galleryInput.parse({ customerId: "school", after: { photoId: first.photoId, createdAt: first.createdAt } }), principal);
-    expect(image).toHaveBeenCalledTimes(1);
+    expect(image).not.toHaveBeenCalled();
     image.mockResolvedValueOnce({ ...result.initialPhoto!, customerId: "different", download: { photoId: first.photoId, variant: "thumbnail", contentType: "image/webp", byteSize: 4, fileBase64: "UklGRg==" } });
     await expect(f.queries.customerGallery(galleryInput.parse({ customerId: "school" }), principal)).rejects.toMatchObject({ code: "aborted" });
   });

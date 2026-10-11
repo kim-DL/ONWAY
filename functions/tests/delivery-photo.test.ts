@@ -413,7 +413,7 @@ describe("private delivery photo lifecycle", () => {
     // A later employee rename must not rewrite who recorded an existing photo.
     state.data.get(`employees/${actor.employeeId}`)!.displayName = "변경된 합성 이름";
     const withMetadata = await state.service.getWithMetadata({ photoId: created.photoId, variant: "evidence" }, actor, now, () => now);
-    expect(withMetadata).toEqual({ download, customerId: created.customerId, createdByEmployeeId: actor.employeeId, createdAt: created.createdAt, createdByName: created.createdByName });
+    expect(withMetadata).toEqual({ download, customerId: created.customerId, createdByEmployeeId: actor.employeeId, createdAt: created.createdAt, createdByName: created.createdByName, expiresAt: created.expiresAt });
     expect(Buffer.from(download.fileBase64, "base64")).toEqual(state.files.get(deliveryPhotoPath("2026-09-22", created.photoId, attemptToken, "evidence"))!.bytes);
     expect(state.data.get("companies/onnuri/customers/customer-a")).toEqual({ customerId: "customer-a", companyId: "onnuri", status: "active", name: "가 거래처" });
     expect(JSON.stringify(state.data.get(`companies/onnuri/deliveryPhotos/${created.photoId}`))).not.toMatch(/completion|fileBase64|Buffer/);

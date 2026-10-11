@@ -1,8 +1,8 @@
 # 급식길 사내 Remote MCP
 
-현재 구현: **1.12.0 거래처 이름/초성 분리·고유 약칭 자동 확정**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
+현재 구현: **1.14.2 사진 단일 전송·첫 큰 사진·갤러리 재사용**. 배포와 실제 ChatGPT 확인 상태는 [HANDOFF](HANDOFF.md)의 최신 항목을 따른다. [사진 전달·비용 가이드](mcp-photo-images.md)·[거래처 상세 가이드](mcp-customer-details.md)·[상품 사진 가이드](mcp-inventory-photos.md)·[재고 업무 가이드](mcp-inventory-write.md)를 참고한다.
 
-MCP URL은 `https://onnuriway-mcp.web.app/mcp`, 플러그인 이름은 **온누리종합식품**이다. 기존 직원 PIN·허용 직원·조회 token을 유지하며 사진 UI는 v9이다. 납품사진의168시간 보관과 상품 대표 사진의 기존 보관 정책을 구분한다. 저장에는 `geupsikgil:inventory.write` 추가 동의와 사용자 카드 승인이 필요하며 기존 read 토큰을 자동 승격하지 않는다. 모델 공개 도구17개와 UI 전용 실행1개다. 정상 조회의 요청 인증/응답 전 재인가, 제품별 count_match 시각·현재 명부 기록자 의미를 유지한다. 실물 모바일 기기는 별도 검증하지 않았다.
+MCP URL은 `https://onnuriway-mcp.web.app/mcp`, 플러그인 이름은 **온누리종합식품**이다. 기존 직원 PIN·허용 직원·조회 token을 유지하며 사진 UI는 v11이고 v9/v10 resource도 호환한다. 납품사진의168시간 보관과 상품 대표 사진의 기존 보관 정책을 구분한다. 저장에는 `geupsikgil:inventory.write` 추가 동의와 사용자 카드 승인이 필요하며 기존 read 토큰을 자동 승격하지 않는다. 모델 공개 도구18개와 UI 전용 실행1개다. 정상 조회의 요청 인증/응답 전 재인가, 제품별 count_match 시각·현재 명부 기록자 의미를 유지한다. 실물 모바일 기기는 별도 검증하지 않았다.
 
 ## Git 저장과 배포 경계
 
@@ -24,7 +24,8 @@ MCP 소스는 기존 [ONWAY 저장소](https://github.com/kim-DL/ONWAY)에서 �
 
 | Tool | 기존 경로와 응답 |
 |---|---|
-| `get_inventory_photo` | 상품 이름 또는 ID → 현재 등록 사진과 상품명·제조사·규격을 한 번에 표시. 기본 thumbnail, 카드 확대는 preview. 중복 후보·사진 없음은 명시적으로 반환 |
+| `get_inventory_photo` | 이름/ID → 현재 사진과 상품명·제조사·규격. 보기 요청은 preview/ui_only로 큰 사진 한 번 수신·재사용, 기본 thumbnail/compatible도 유지. 중복·사진 없음은 명시 |
+| `get_photo_images` | 표준 MCP image 바이트를 중복 없이 한 번 전달. 상품 preview1장/납품 evidence 최대5장·12MiB. 다른 이미지 수신 클라이언트/진단용이며 실제 ChatGPT 기본 이미지 카드 표시는 지원 확인 실패. ChatGPT는 기존 갤러리 사용 |
 | `search_inventory_records` | 직원·상품·창고·최대93일 기간의 원본 실사/변동 이력을 인덱스로 직접 검색. 건수만 필요하면 includeRecords=false |
 | `preview_inventory_change` | 기존 재고 계산으로 변경 전후를 표시. 업무 자료는 저장하지 않고 UI 승인 capability 발급 |
 | `commit_inventory_change` | UI 전용. write scope·승인 capability·transaction 재인가·동시 변경 검사 후 기존 서비스로 저장 |

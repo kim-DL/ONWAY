@@ -209,7 +209,7 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
     }) as Transport);
     try {
       const tools = (await client.listTools()).tools;
-      expect(tools).toHaveLength(18);
+      expect(tools).toHaveLength(19);
       const detail = await client.callTool({ name: "get_customer_details", arguments: { query: "합성 한빛초", sections: ["addresses", "contacts"] } });
       expect(detail.isError).not.toBe(true);
       expect(detail.structuredContent).toMatchObject({ resolution: "resolved", customer: { customerId,
@@ -250,6 +250,28 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
       expect(inventoryImage.structuredContent).toMatchObject({ resolution: "resolved", product: { productId }, photo: { photoId: inventoryPhotoId, variant: "thumbnail" } });
       expect(inventoryImage._meta?.inventoryPhoto).toMatchObject({ productId, photoId: inventoryPhotoId, variant: "thumbnail" });
       expect((inventoryImage.content as Array<{ type: string }>).filter((item) => item.type === "image")).toHaveLength(1);
+      const nativeTool = tools.find((tool) => tool.name === "get_photo_images")!;
+      expect(nativeTool._meta).not.toHaveProperty("ui"); expect(nativeTool._meta).not.toHaveProperty("openai/outputTemplate");
+      const nativeProduct = await client.callTool({ name: "get_photo_images", arguments: { source: "inventory", query: "합성 만두" } });
+      expect(nativeProduct.isError).not.toBe(true);
+      expect(nativeProduct.structuredContent).toMatchObject({ imageCount: 1, inventory: { product: { productId }, photo: { variant: "preview" } } });
+      const nativeDelivery = await client.callTool({ name: "get_photo_images", arguments: { source: "delivery", query: "합성 한빛초",
+        employeeId: actor.employeeId, date: deliveryDateKeyInSeoul(new Date()) } });
+      expect(nativeDelivery.isError).not.toBe(true);
+      expect(nativeDelivery.structuredContent).toMatchObject({ imageCount: 2, delivery: { retentionHours: 168, page: { complete: true } },
+        photos: [{ photoId: secondPhotoId, variant: "evidence", deliveryCompletedAt: null }, { photoId, variant: "evidence" }] });
+      for (const native of [nativeProduct, nativeDelivery]) {
+        expect(native._meta).toBeUndefined();
+        const images = native.content.filter((row) => row.type === "image") as Array<{ data: string; mimeType: string }>;
+        expect(images).toHaveLength(native.structuredContent!.imageCount as number);
+        const total = images.reduce((sum, row) => sum + Buffer.from(row.data, "base64").byteLength, 0);
+        expect(total).toBe(native.structuredContent!.totalImageBytes);
+        for (const row of images) {
+          expect(row.mimeType).toBe("image/webp");
+          expect(Buffer.from(row.data, "base64").subarray(8, 12).toString()).toBe("WEBP");
+          expect(JSON.stringify(native).split(row.data)).toHaveLength(1 + images.filter((image) => image.data === row.data).length);
+        }
+      }
       const latest = await client.callTool({ name: "get_latest_employee_delivery_gallery", arguments: { employeeName: "합성 MCP", limit: 1 } });
       expect(latest.isError).not.toBe(true);
       expect(latest.structuredContent).toMatchObject({ resolution: "resolved", timeBasis: "photo_registered_at",
@@ -300,6 +322,12 @@ describe.skipIf(!enabled)("MCP real Firebase boundaries (demo only)", () => {
         photoIds: expect.arrayContaining([photoId, secondPhotoId]), page: { returnedCount: 2, complete: true } });
       expect(namedGallery._meta?.deliveryPhoto).toMatchObject({ variant: "thumbnail", customerId });
       expect(namedGallery.content.filter((item) => item.type === "image")).toHaveLength(1);
+      const includedEvidence = await client.callTool({ name: "get_delivery_gallery", arguments: { customerId, limit: 1, initialVariant: "evidence", imageResponse: "ui_only" } });
+      expect(includedEvidence.isError).not.toBe(true);
+      expect(includedEvidence._meta?.deliveryPhoto).toMatchObject({ variant: "evidence", customerId });
+      expect(includedEvidence.content.some((item) => item.type === "image")).toBe(false);
+      const expiry = (includedEvidence._meta?.deliveryPhoto as { expiresAt: string }).expiresAt;
+      expect(Date.parse(expiry)).toBeGreaterThan(Date.now());
       const next = await client.callTool({ name: "get_delivery_gallery", arguments: { customerId, limit: 1, after: gallery.structuredContent!.nextCursor } });
       expect(next.isError).not.toBe(true);
       expect(next.structuredContent).toMatchObject({ page: { complete: true, returnedCount: 1, startedFromBeginning: false } });

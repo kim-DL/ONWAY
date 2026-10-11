@@ -6,9 +6,9 @@ import { inventoryQuantityMatchSchema } from "../inventory/inventory-quantity-ma
 import { customerNameMatchSchema } from "../customer/customer-name-search.js";
 import { customerDetailsSchema, customerSections } from "./customer-details.js";
 
-export const MCP_VERSION = "1.13.0";
+export const MCP_VERSION = "1.14.2";
 export const MCP_TOOL_NAMES = ["search_customers", "get_customer_details", "search_inventory_products", "get_inventory_product", "list_low_stock",
-  "list_delivery_records", "get_delivery_photo", "get_inventory_photo", "get_inventory_products", "list_inventory_alerts", "get_customer_delivery_summary", "get_delivery_gallery", "search_delivery_records", "get_latest_employee_delivery_gallery", "get_inventory_overview", "search_inventory_records", "preview_inventory_change", "commit_inventory_change"] as const;
+  "list_delivery_records", "get_delivery_photo", "get_inventory_photo", "get_photo_images", "get_inventory_products", "list_inventory_alerts", "get_customer_delivery_summary", "get_delivery_gallery", "search_delivery_records", "get_latest_employee_delivery_gallery", "get_inventory_overview", "search_inventory_records", "preview_inventory_change", "commit_inventory_change"] as const;
 export type McpToolName = typeof MCP_TOOL_NAMES[number];
 export const pageSchema = z.object({ returnedCount: z.number().int().nonnegative(), hasMore: z.boolean(), complete: z.boolean(),
   startedFromBeginning: z.boolean(), pagesScanned: z.number().int().nonnegative(), recordsScanned: z.number().int().nonnegative(),
@@ -31,6 +31,7 @@ export const customerSchema = z.object({ customerId: inventoryIdSchema, name: z.
 export const photoCursorSchema = z.object({ createdAt: z.iso.datetime(), photoId: z.uuid() }).strict();
 const envelope = { status: z.literal("ok"), retrievedAt: z.iso.datetime(), timezone: z.literal("Asia/Seoul") };
 export const inventoryPhotoInput = z.object({ productId: inventoryIdSchema.optional(),
+  imageResponse: z.enum(["compatible", "ui_only"]).optional().describe("기본 compatible은 표준 image와 UI 둘 다 제공. ui_only는 사진 보기 UI에만 바이트를 한 번 전달해 전송량 절감. 모델의 이미지 분석에는 compatible을 사용."),
   query: z.string().trim().min(1).max(120).optional().describe("상품명·제조사·초성. 하나로 확정되는 경우 사진까지 한 번에 조회."),
   photoId: z.uuid().optional().describe("확대 UI가 같은 사진임을 확인할 때만 전달. 일반 조회에서는 생략."),
   variant: z.enum(["thumbnail", "preview"]).default("thumbnail"),
@@ -88,8 +89,10 @@ export const deliverySummaryResult = z.object({ ...envelope, resolution: z.enum(
   searchNextCursor: inventoryIdSchema.nullable(), records: deliveryResult.omit({ status: true, retrievedAt: true, timezone: true }).nullable(), note: z.string() }).strict();
 export const photoResult = z.object({ ...envelope, photoId: z.uuid(), variant: z.enum(["thumbnail", "evidence"]), contentType: z.literal("image/webp") }).strict();
 export const galleryInput = z.object({ customerId: inventoryIdSchema.optional(),
+  imageResponse: z.enum(["compatible", "ui_only"]).optional().describe("기본 compatible, UI에서 보기만 할 때 ui_only로 이미지 바이트 중복 전송을 줄입니다. 사진 내용 분석에는 compatible을 사용."),
   query: z.string().trim().min(1).max(120).optional().describe("거래처 이름만 알면 바로 전달. 등록명과 추가 업종 호칭도 확인하며 여러 후보는 임의 선택하지 않음."),
   employeeId: inventoryIdSchema.optional(), date: deliveryDateKeySchema.optional(),
+  initialVariant: z.enum(["thumbnail", "evidence"]).default("thumbnail").describe("클릭 때 즉시 확대하려면 evidence. 첫 사진1장만 큰 크기로 받아 추가 읽기를 줄입니다. thumbnail은 초기 전송량이 작지만 첫 확대 때 추가 조회."),
   limit: z.number().int().min(1).max(100).default(50), after: photoCursorSchema.optional(),
   afterId: inventoryIdSchema.nullable().default(null),
 }).strict().refine((input) => Boolean(input.customerId) !== Boolean(input.query), "거래처 ID 또는 이름 중 하나만 지정해주세요.")

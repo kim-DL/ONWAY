@@ -703,7 +703,8 @@ export class DeliveryPhotoService {
       photoId: input.photoId, variant: input.variant, contentType: "image/webp",
       byteSize: buffer.length, fileBase64: buffer.toString("base64"),
     });
-    return { download, customerId: after.customerId, createdByEmployeeId: after.createdByEmployeeId, createdAt: after.createdAt.toDate().toISOString(), createdByName: after.createdByName };
+    const retention: { expiresAt?: string } = { expiresAt: after.expiresAt.toDate().toISOString() };
+    return { download, customerId: after.customerId, createdByEmployeeId: after.createdByEmployeeId, createdAt: after.createdAt.toDate().toISOString(), createdByName: after.createdByName, ...retention };
   }
 
   async delete(input: z.infer<typeof deleteDeliveryPhotoInputSchema>, actor: CustomerActor, now = Timestamp.now()) {

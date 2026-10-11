@@ -7,9 +7,9 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { createMcpHttpApp } from "../../src/mcp/http.js";
 import { McpQueries } from "../../src/mcp/queries.js";
 import { CUSTOMER_DETAILS_BASIS } from "../../src/mcp/customer-details.js";
-import { CUSTOMER_VIEW_URI, LEGACY_CUSTOMER_VIEW_URI } from "../../src/mcp/customer-view.js";
+import { CUSTOMER_VIEW_URI, PREVIOUS_CUSTOMER_VIEW_URI, LEGACY_CUSTOMER_VIEW_URI } from "../../src/mcp/customer-view.js";
 import { fixture } from "./fixture.js";
-import { PHOTO_VIEW_URI } from "../../src/mcp/photo-view.js";
+import { PHOTO_VIEW_URI, PREVIOUS_PHOTO_VIEW_URI, LEGACY_PHOTO_VIEW_URI } from "../../src/mcp/photo-view.js";
 import { INVENTORY_WRITE_VIEW_URI } from "../../src/mcp/inventory-write-view.js";
 import { HttpsError } from "firebase-functions/v2/https";
 import { observeRead } from "../../src/shared/read-observation.js";
@@ -46,6 +46,59 @@ async function start(toolTimeoutMs = 20_000) {
   return { ...f, origin, low, gallery, metrics, queries };
 }
 describe("Remote MCP over real HTTP", () => {
+  it("returns native image blocks through the SDK with no UI template and releases no batch after OAuth revocation", async () => {
+    const f = await start(), { exchange } = await f.setup(), tokens = await f.oauth.token(exchange);
+    const photo = vi.spyOn(f.queries, "photo").mockResolvedValue({ photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "evidence",
+      contentType: "image/webp", customerId: "synthetic-company", customerName: "합성 납품업체", createdByEmployeeId: "MCP-TEST",
+      byteSize: 4, fileBase64: "UklGRg==", createdAt: "2026-10-07T03:56:00.000Z", createdByName: "합성 직원" });
+    const client = new Client({ name: "native-photo-sdk", version: "1" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${f.origin}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${tokens.access_token}` } } }) as Transport);
+    try {
+      const tool = (await client.listTools()).tools.find((row) => row.name === "get_photo_images")!;
+      expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+      expect(tool._meta).not.toHaveProperty("ui"); expect(tool._meta).not.toHaveProperty("openai/outputTemplate");
+      expect(tool._meta?.securitySchemes).toEqual([{ type: "oauth2", scopes: ["geupsikgil:read"] }]);
+      const args = { source: "delivery", query: "합성 납품업체", date: "2026-10-07" };
+      const result = await client.callTool({ name: "get_photo_images", arguments: args });
+      expect(result.isError).not.toBe(true); expect(f.gallery).toHaveBeenCalledOnce(); expect(photo).toHaveBeenCalledOnce();
+      expect(result.structuredContent).toMatchObject({ imageCount: 1, totalImageBytes: 4, delivery: { resolution: "resolved" }, photos: [{ variant: "evidence" }] });
+      expect(result.content.filter((row) => row.type === "image")).toEqual([{ type: "image", data: "UklGRg==", mimeType: "image/webp" }]);
+      expect(JSON.stringify(result).match(/UklGRg==/g)).toHaveLength(1); expect(result._meta).toBeUndefined();
+      await vi.waitFor(() => expect(f.metrics.find((row) => row.tool === "get_photo_images")).toMatchObject({ returnedCount: 1, complete: true }));
+      // Compare the same large synthetic payload, rather than thumbnail vs preview quality.
+      const fileBase64 = Buffer.alloc(256 * 1024, 0x77).toString("base64");
+      const inventoryPhoto = vi.spyOn(f.queries, "inventoryPhoto").mockResolvedValue({ resolution: "resolved",
+        product: { productId: "synthetic", name: "합성 상품", manufacturer: "합성", specification: "1kg", status: "active" },
+        candidates: [], searchPage: null, searchNextCursor: null, note: "합성",
+        image: { photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "preview", width: 1200, height: 800,
+          contentType: "image/webp", byteSize: 256 * 1024, fileBase64 } });
+      const legacy = await client.callTool({ name: "get_inventory_photo", arguments: { productId: "synthetic", variant: "preview" } });
+      const native = await client.callTool({ name: "get_photo_images", arguments: { source: "inventory", productId: "synthetic" } });
+      const uiOnly = await client.callTool({ name: "get_inventory_photo", arguments: { productId: "synthetic", variant: "preview", imageResponse: "ui_only" } });
+      expect(legacy.isError).not.toBe(true); expect(native.isError).not.toBe(true);
+      expect(uiOnly.isError).not.toBe(true);
+      expect(inventoryPhoto).toHaveBeenCalledTimes(3); // One read for each tool; no hidden thumbnail request.
+      expect(JSON.stringify(legacy).split(fileBase64)).toHaveLength(3);
+      expect(JSON.stringify(native).split(fileBase64)).toHaveLength(2);
+      expect(Buffer.byteLength(JSON.stringify(native))).toBeLessThan(Buffer.byteLength(JSON.stringify(legacy)) * .55);
+      expect(uiOnly.content.some((item) => item.type === "image")).toBe(false);
+      expect(uiOnly._meta?.inventoryPhoto).toMatchObject({ data: fileBase64, variant: "preview" });
+      expect(JSON.stringify(uiOnly).split(fileBase64)).toHaveLength(2);
+      expect(Buffer.byteLength(JSON.stringify(uiOnly))).toBeLessThan(Buffer.byteLength(JSON.stringify(legacy)) * .55);
+      const deliveryUiOnly = await client.callTool({ name: "get_delivery_photo", arguments: { photoId: "c3bc6631-22fb-4f14-b622-bb852652c891", variant: "evidence", imageResponse: "ui_only" } });
+      expect(deliveryUiOnly.isError).not.toBe(true);
+      expect(deliveryUiOnly.content.some((item) => item.type === "image")).toBe(false);
+      expect(deliveryUiOnly._meta?.deliveryPhoto).toMatchObject({ data: "UklGRg==", variant: "evidence" });
+      expect(JSON.stringify(deliveryUiOnly).match(/UklGRg==/g)).toHaveLength(1);
+      photo.mockImplementationOnce(async () => { f.identity.verify.mockRejectedValueOnce(new Error("revoked")); return photo.mock.results[0]!.value; });
+      const revoked = await client.callTool({ name: "get_photo_images", arguments: args });
+      expect(revoked.isError).toBe(true); expect(revoked._meta).toMatchObject({ error: { code: "AUTH_REQUIRED" } });
+      expect(JSON.stringify(revoked)).not.toMatch(/UklGRg==|합성 직원|합성 납품업체/);
+      const calls = f.gallery.mock.calls.length;
+      expect((await client.callTool({ name: "get_photo_images", arguments: { ...args, limit: 6 } })).isError).toBe(true);
+      expect(f.gallery.mock.calls).toHaveLength(calls);
+    } finally { await client.close(); }
+  });
   it("returns customer details once through the SDK, supports compact/JSON sections, and suppresses data revoked before release", async () => {
     const f = await start(), { exchange } = await f.setup(), tokens = await f.oauth.token(exchange);
     const detail = vi.spyOn(f.queries, "customerDetails").mockResolvedValue({ resolution: "resolved", candidates: [], match: null,
@@ -61,6 +114,7 @@ describe("Remote MCP over real HTTP", () => {
       expect(tool._meta).toMatchObject({ "openai/outputTemplate": CUSTOMER_VIEW_URI });
       expect((await client.readResource({ uri: CUSTOMER_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
       expect((await client.readResource({ uri: LEGACY_CUSTOMER_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
+      expect((await client.readResource({ uri: PREVIOUS_CUSTOMER_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
       const result = await client.callTool({ name: "get_customer_details", arguments: { query: "합성유통", sections: ["contacts"] } });
       expect(result.isError).not.toBe(true); expect(detail).toHaveBeenCalledOnce();
       expect(result.structuredContent).toMatchObject({ resolution: "resolved", sectionsIncluded: ["contacts"], customer: { name: "합성", contacts: [{ phoneNumber: "010-1234-5678" }] } });
@@ -241,7 +295,7 @@ describe("Remote MCP over real HTTP", () => {
       expect(client.getServerVersion()).toMatchObject({ title: "온누리종합식품",
         icons: [{ src: `${f.origin}/onnuri-icon-v1.png`, mimeType: "image/png", sizes: ["1254x1254"] }] });
       const listed = await client.listTools();
-      expect(listed.tools).toHaveLength(18);
+      expect(listed.tools).toHaveLength(19);
       expect(listed.tools.every((tool) => tool.outputSchema?.type === "object")).toBe(true);
       expect(listed.tools.filter((tool) => !["preview_inventory_change", "commit_inventory_change"].includes(tool.name)).every((tool) => tool.annotations?.readOnlyHint === true && tool.annotations.destructiveHint === false)).toBe(true);
       expect(listed.tools.find((tool) => tool.name === "get_delivery_photo")?._meta).toMatchObject({
@@ -253,6 +307,8 @@ describe("Remote MCP over real HTTP", () => {
       const approvalView = await client.readResource({ uri: INVENTORY_WRITE_VIEW_URI });
       expect(approvalView.contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
       const view = await client.readResource({ uri: PHOTO_VIEW_URI });
+      expect((await client.readResource({ uri: LEGACY_PHOTO_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
+      expect((await client.readResource({ uri: PREVIOUS_PHOTO_VIEW_URI })).contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
       expect(view.contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app",
         _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } } });
       expect(JSON.stringify(view)).not.toContain("test-only");
