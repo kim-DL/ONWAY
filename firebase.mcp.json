@@ -1,0 +1,91 @@
+{
+  "hosting": {
+    "site": "onnuriway-mcp",
+    "public": "mcp-public",
+    "ignore": [
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/.well-known/oauth-authorization-server",
+        "function": {
+          "functionId": "employeeMcp",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/.well-known/oauth-protected-resource",
+        "function": {
+          "functionId": "employeeMcp",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/.well-known/oauth-protected-resource/mcp",
+        "function": {
+          "functionId": "employeeMcp",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "**",
+        "function": {
+          "functionId": "employeeMcp",
+          "region": "asia-northeast3"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "private, no-store, max-age=0"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "same-origin"
+          }
+        ]
+      }
+    ]
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22",
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" run build"
+    ]
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "hosting": {
+      "port": 5002
+    },
+    "singleProjectMode": true
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

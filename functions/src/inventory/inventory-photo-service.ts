@@ -8,12 +8,17 @@ import { detectPhotoContentType, InvalidPhotoError, processInventoryPhoto } from
 import { verifyInventoryTransactionActor, type InventoryActor } from "./inventory-authorization.js";
 import {
   INVENTORY_PHOTO_MAX_BYTES, INVENTORY_PRODUCT_PATH, getInventoryPhotoInputSchema,
-  inventoryPhotoDownloadSchema, inventoryPhotoUploadResultSchema, uploadInventoryPhotoInputSchema,
+  inventoryPhotoDownloadSchema, inventoryPhotoUploadResultSchema, uploadInventoryPhotoInputSchema, inventoryProductSchema,
 } from "./inventory-contract.js";
 import {
   INVENTORY_PHOTO_PENDING_MS, INVENTORY_PHOTO_RATE_PATH, INVENTORY_PHOTO_UPLOAD_PATH,
   inventoryPhotoPath, inventoryPhotoStageRef, inventoryPhotoStageSchema,
 } from "./inventory-photo-store.js";
+
+import { observeRead } from "../shared/read-observation.js";
+
+const photoProductSchema = inventoryProductSchema.pick({ productId: true, name: true, manufacturer: true, specification: true, status: true, photo: true });
+const currentPhotoInputSchema = getInventoryPhotoInputSchema.extend({ photoId: getInventoryPhotoInputSchema.shape.photoId.optional() });
 
 type PhotoStage = "image-processing" | "storage-write" | "storage-read";
 const dependencyCodes = new Set([3, 4, 5, 7, 8, 9, 10, 13, 14, 16, 400, 401, 403, 404, 409, 412, 413, 429, 500, 502, 503, 504]);
@@ -114,20 +119,52 @@ export class InventoryPhotoService {
 
   async get(input: z.infer<typeof getInventoryPhotoInputSchema>, actor: InventoryActor) {
     getInventoryPhotoInputSchema.parse(input);
+    const result = await this.getWithMetadata(input, actor);
+    if (!result.photo) throw new HttpsError("not-found", "현재 상품 사진을 찾을 수 없습니다.");
+    // Preserve the existing strict Callable/PWA download contract.
+    return inventoryPhotoDownloadSchema.parse({ contentType: result.photo.contentType,
+      byteSize: result.photo.byteSize, fileBase64: result.photo.fileBase64 });
+  }
+
+  /** Reads the current attachment without loading lots/history or disclosing Storage URLs. */
+  async getWithMetadata(input: z.infer<typeof currentPhotoInputSchema>, actor: InventoryActor) {
+    currentPhotoInputSchema.parse(input);
+    let photoId = input.photoId;
     const check = async () => this.db.runTransaction(async (transaction) => {
       await verifyInventoryTransactionActor(this.db, transaction, actor, "read");
-      const [product, stage] = await transaction.getAll(this.db.doc(`${INVENTORY_PRODUCT_PATH}/${input.productId}`), inventoryPhotoStageRef(this.db, input.photoId));
-      if (!product!.exists || product!.get("companyId") !== "onnuri" || product!.get("productId") !== input.productId || !["active", "inactive"].includes(product!.get("status"))
-        || product!.get("photo.photoId") !== input.photoId || !stage!.exists || stage!.get("uploadId") !== input.photoId
-        || stage!.get("state") !== "attached" || stage!.get("productId") !== input.productId)
+      const productRef = this.db.doc(`${INVENTORY_PRODUCT_PATH}/${input.productId}`);
+      // A known photo ID can fetch product and attachment in one round trip.
+      const [product, knownStage] = photoId
+        ? await observeRead("firestore", () => transaction.getAll(productRef, inventoryPhotoStageRef(this.db, photoId!)), (value) => value.length)
+        : [await observeRead("firestore", () => transaction.get(productRef)), undefined];
+      if (!product?.exists || product.get("companyId") !== "onnuri" || product.get("productId") !== input.productId
+        || !["active", "inactive"].includes(product.get("status")))
+        throw new HttpsError("not-found", "현재 상품을 찾을 수 없습니다.");
+      const parsed = photoProductSchema.parse(Object.fromEntries(Object.keys(photoProductSchema.shape)
+        .map((field) => [field, product.get(field)])));
+      if (!parsed.photo && !photoId) return parsed;
+      if (!parsed.photo || photoId && parsed.photo.photoId !== photoId)
         throw new HttpsError("not-found", "현재 상품 사진을 찾을 수 없습니다.");
+      const stage = knownStage ?? await observeRead("firestore", () => transaction.get(inventoryPhotoStageRef(this.db, parsed.photo!.photoId)));
+      if (!stage.exists || stage.get("uploadId") !== parsed.photo.photoId || stage.get("state") !== "attached"
+        || stage.get("productId") !== input.productId)
+        throw new HttpsError("not-found", "현재 상품 사진을 찾을 수 없습니다.");
+      return parsed;
     });
-    await check();
-    const [buffer] = await photoOperation("storage-read", () => this.bucket.file(inventoryPhotoPath(input.photoId, input.variant)).download({ start: 0, end: INVENTORY_PHOTO_MAX_BYTES }));
+    const first = await check();
+    const { photo: attachment, ...product } = first;
+    if (!attachment) return { product, photo: null };
+    photoId = attachment.photoId;
+    const buffer = await observeRead("storage", async () => {
+      const [bytes] = await photoOperation("storage-read", () => this.bucket.file(inventoryPhotoPath(photoId!, input.variant))
+        .download({ start: 0, end: INVENTORY_PHOTO_MAX_BYTES }));
+      return bytes;
+    }, (value) => value.length);
     if (buffer.length === 0 || buffer.length > INVENTORY_PHOTO_MAX_BYTES || detectPhotoContentType(buffer) !== "image/webp")
       throw new HttpsError("failed-precondition", "저장된 상품 사진을 확인할 수 없습니다.");
-    await check(); // Session revocation, deletion and replacement invalidate in-flight reads.
-    return inventoryPhotoDownloadSchema.parse({ contentType: "image/webp", byteSize: buffer.length, fileBase64: buffer.toString("base64") });
+    const { photo: latestPhoto, ...latestProduct } = await check(); // Fresh membership, product and attachment checks after I/O.
+    return { product: latestProduct, photo: { ...latestPhoto!, variant: input.variant,
+      ...inventoryPhotoDownloadSchema.parse({ contentType: "image/webp", byteSize: buffer.length, fileBase64: buffer.toString("base64") }) } };
   }
 
   async expire(now = Timestamp.now()) {

@@ -64,7 +64,9 @@ describe("delivery-photo dedicated runtime identity", () => {
     const exports = await import("../src/index.js");
     const configured = Object.entries(exports).filter(([, value]) => value && typeof value === "function"
       && "__endpoint" in value && typeof endpoint(value).serviceAccountEmail === "string").map(([name]) => name).sort();
-    expect(configured).toEqual(deliveryPhotoFunctionNames.toSorted());
+    expect(configured).toEqual([...deliveryPhotoFunctionNames, "employeeMcp"].toSorted());
+    expect(endpoint(exports.employeeMcp).serviceAccountEmail).toBe("mcp-readonly-runtime@onnuriway.iam.gserviceaccount.com");
+    expect(endpoint(exports.employeeMcp).serviceAccountEmail).not.toBe(account);
     for (const name of deliveryPhotoFunctionNames) {
       expect(endpoint(exports[name as keyof typeof exports]).serviceAccountEmail).toBe(account);
     }

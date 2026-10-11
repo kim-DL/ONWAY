@@ -82,3 +82,5 @@ export const phase0Health = onCall(
     version: 1,
   }),
 );
+
+export { employeeMcp } from "./mcp/function.js";

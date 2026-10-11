@@ -1,64 +1,197 @@
 {
   "indexes": [
     {
-      "collectionGroup": "salesVisits",
+      "collectionGroup": "events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "schoolId", "order": "ASCENDING" },
-        { "fieldPath": "deleted", "order": "ASCENDING" },
-        { "fieldPath": "visitedAt", "order": "DESCENDING" }
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "salesVisits",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "visitedBy", "order": "ASCENDING" },
-        { "fieldPath": "visitedAt", "order": "DESCENDING" }
+        {"fieldPath": "schoolId", "order": "ASCENDING"},
+        {"fieldPath": "deleted", "order": "ASCENDING"},
+        {"fieldPath": "visitedAt", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "salesVisits",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "cycleId", "order": "ASCENDING" },
-        { "fieldPath": "visitedAt", "order": "DESCENDING" }
+        {"fieldPath": "visitedBy", "order": "ASCENDING"},
+        {"fieldPath": "visitedAt", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "salesVisits",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "followUp.required", "order": "ASCENDING" },
-        { "fieldPath": "followUp.dueDate", "order": "ASCENDING" }
+        {"fieldPath": "cycleId", "order": "ASCENDING"},
+        {"fieldPath": "visitedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "salesVisits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "followUp.required", "order": "ASCENDING"},
+        {"fieldPath": "followUp.dueDate", "order": "ASCENDING"}
       ]
     },
     {
       "collectionGroup": "employees",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "roleScopes", "arrayConfig": "CONTAINS" }
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "roleScopes", "arrayConfig": "CONTAINS"}
       ]
     },
     {
       "collectionGroup": "deliveryPhotos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "deliveryDateKey", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {"fieldPath": "deliveryDateKey", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "deliveryPhotos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "customerId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {"fieldPath": "customerId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "deliveryPhotos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "deliveryPhotos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdByEmployeeId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "deliveryPhotos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "customerId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "deliveryPhotos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "createdByEmployeeId", "order": "ASCENDING"},
+        {"fieldPath": "customerId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "actorEmployeeId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "productId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "actorEmployeeId", "order": "ASCENDING"},
+        {"fieldPath": "productId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "locationId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "actorEmployeeId", "order": "ASCENDING"},
+        {"fieldPath": "locationId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "productId", "order": "ASCENDING"},
+        {"fieldPath": "locationId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "kind", "order": "ASCENDING"},
+        {"fieldPath": "actorEmployeeId", "order": "ASCENDING"},
+        {"fieldPath": "productId", "order": "ASCENDING"},
+        {"fieldPath": "locationId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"},
+        {"fieldPath": "__name__", "order": "DESCENDING"}
       ]
     }
   ],
   "fieldOverrides": [
-    { "collectionGroup": "customers", "fieldPath": "*", "indexes": [] }
+    {"collectionGroup": "customers", "fieldPath": "*", "indexes": []}
   ]
 }

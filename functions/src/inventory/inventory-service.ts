@@ -7,11 +7,12 @@ import { inventoryCycle, inventoryToday, nextInventorySettings } from "./invento
 import {
   INVENTORY_COMPANY_ID, INVENTORY_CYCLE_PATH, INVENTORY_LOCATIONS, INVENTORY_MAX_LOTS,
   INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryEventSchema, inventoryInitialStockSchema, inventoryLocationMap, inventoryLotSchema,
-  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryStatusChangeSchema,
+  inventoryAuditReasonSchema, inventoryIdSchema, inventoryLotChangeSchema, inventoryStatusChangeSchema,
   type DeleteInventoryProductInput, type InventoryCountInput, type InventoryEvent, type InventoryLocation,
   type InventoryLot, type InventoryLotChange, type InventoryMovementInput, type InventoryMutationResult, type InventoryProduct, type InventoryStatusChange,
   type InventoryProductSaveResult, type InventorySettings, type SetInventoryProductStatusInput,
-  type UpdateInventoryLotInput, type UpdateInventorySettingsInput,
+  type UpdateInventoryLotInput, type UpdateInventorySettingsInput, inventoryProductSchema,
+  inventoryMovementInputSchema, inventoryCountInputSchema, updateInventoryLotInputSchema,
 } from "./inventory-contract.js";
 import {
   INVENTORY_MANUFACTURER_PATH, inventoryManufacturerSchema, inventoryMutationResultWithManufacturerSchema,
@@ -25,6 +26,12 @@ import { inventoryProductRecord, inventoryProductWire, summarizeInventoryLotGrou
 import { datesFromDocument, inventoryLotFromDocument, inventoryProductFromDocument, persisted, settingsFromDocument } from "./inventory-document-codec.js";
 import { projectInventoryInspection } from "./inventory-inspection-projection.js";
 import { activeSortedLots, ensureQuantity, summarizeInventoryLots } from "./inventory-lot-calculations.js";
+import { boundedScan, type ScanOptions } from "../shared/bounded-scan.js";
+import { observeRead } from "../shared/read-observation.js";
+import { inventorySearchMatcher, inventorySearchText } from "./inventory-search.js";
+import { inventoryAlerts, inventoryAlertWindow, inventoryTotalQuantity } from "./inventory-alerts.js";
+import { inventoryOverviewAccumulator } from "./inventory-overview.js";
+import { inventoryQuantityMatchSchema, type InventoryQuantityMatch } from "./inventory-quantity-match.js";
 
 export { inventoryLotFromDocument, inventoryProductFromDocument } from "./inventory-document-codec.js";
 export { summarizeInventoryLots } from "./inventory-lot-calculations.js";
@@ -42,8 +49,40 @@ function checkStockRevision(product: InventoryProduct, revision: number) {
   if (product.stockRevision !== revision) conflict(product);
   if (product.status !== "active") throw new HttpsError("failed-precondition", "사용 중인 상품의 재고만 변경할 수 있습니다.", { reason: "inventory-inactive" });
 }
+export type InventoryStockCommand =
+  | { operation: "movement"; input: InventoryMovementInput }
+  | { operation: "count"; input: InventoryCountInput }
+  | { operation: "lot"; input: UpdateInventoryLotInput };
+export interface InventoryMutationControl {
+  /** Server-only policy. A preview executes the SAME validation/calculation with discarded writes. */
+  preview?: boolean;
+  before: (transaction: Transaction, replayed: boolean) => Promise<void>;
+}
+function discardedWrites(transaction: Transaction): Transaction {
+  let staged = false;
+  const proxy = new Proxy(transaction, { get(target, key) {
+    if (["set", "create", "update", "delete"].includes(String(key))) return () => { staged = true; return proxy; };
+    const member = Reflect.get(target, key);
+    if (typeof member !== "function") return member;
+    return (...args: unknown[]) => {
+      if (staged && ["get", "getAll"].includes(String(key))) throw new Error("Preview read after write");
+      return Reflect.apply(member, target, args);
+    };
+  } });
+  return proxy;
+}
 export class InventoryService {
-  constructor(private readonly db: Firestore = getAdminFirestore(), private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly db: Firestore = getAdminFirestore(), private readonly now: () => Date = () => new Date(),
+    private readonly control?: InventoryMutationControl) {}
+  /** Transport-independent stock command entrypoint; no second business implementation. */
+  async stockCommand(command: InventoryStockCommand, actor: InventoryActor, control: InventoryMutationControl) {
+    const service = new InventoryService(this.db, this.now, control);
+    switch (command.operation) {
+      case "movement": return service.move(inventoryMovementInputSchema.parse(command.input), actor);
+      case "count": return service.count(inventoryCountInputSchema.parse(command.input), actor);
+      case "lot": return service.updateLot(updateInventoryLotInputSchema.parse(command.input), actor);
+    }
+  }
   private productRef(productId: string) { return this.db.doc(`${INVENTORY_PRODUCT_PATH}/${productId}`); }
   private lotRef(productId: string, lotId: string) { return this.db.doc(`${INVENTORY_PRODUCT_PATH}/${productId}/lots/${lotId}`); }
   private lotsQuery(productId: string) {
@@ -55,7 +94,7 @@ export class InventoryService {
     return docs.map((doc) => inventoryLotFromDocument(doc.data()));
   }
   private async product(transaction: Transaction, productId: string) {
-    const snapshot = await transaction.get(this.productRef(productId));
+    const snapshot = await observeRead("firestore", () => transaction.get(this.productRef(productId)));
     if (!snapshot.exists) throw new HttpsError("not-found", "상품을 찾을 수 없습니다.");
     return inventoryProductRecord(datesFromDocument(snapshot.data()!));
   }
@@ -73,10 +112,12 @@ export class InventoryService {
     const command = Object.fromEntries(Object.entries(input).filter(([key]) => !["includeDetail", "refreshOnReplay", "includeSummary", "includeManufacturerReference"].includes(key)));
     const fingerprint = createHash("sha256").update(JSON.stringify(command)).digest("hex");
     const receiptRef = this.db.doc(`${REQUEST_PATH}/${input.requestId}`);
-    return this.db.runTransaction(async (transaction) => {
+    return this.db.runTransaction(async (realTransaction) => {
+      const transaction = this.control?.preview ? discardedWrites(realTransaction) : realTransaction;
       // Revalidate even an exact retry after the employee was disabled/revoked.
       await verifyInventoryTransactionActor(this.db, transaction, actor, access);
       const receipt = await transaction.get(receiptRef);
+      await this.control?.before(transaction, receipt.exists);
       if (receipt.exists) {
         const stored = receipt.data()!;
         if (stored.operation !== operation || stored.actorUid !== actor.uid || stored.fingerprint !== fingerprint) {
@@ -112,15 +153,26 @@ export class InventoryService {
       changedFields, changeReason: inventoryAuditReasonSchema.parse(reason) || null, requestId: input.requestId, appVersion: null,
       createdAt: Timestamp.fromDate(now), ...inventoryChange });
   }
-  async context() {
-    const settings = settingsFromDocument((await this.db.doc(INVENTORY_SETTINGS_PATH).get()).data());
-    const today = inventoryToday(this.now());
+  async context(at = this.now()) {
+    const settings = settingsFromDocument((await observeRead("firestore", () => this.db.doc(INVENTORY_SETTINGS_PATH).get())).data());
+    const today = inventoryToday(at);
     return { settings, cycle: inventoryCycle(settings, today), today };
   }
   async list(afterId: string | null) {
-    let query = this.db.collection(INVENTORY_PRODUCT_PATH).orderBy(FieldPath.documentId()).limit(101);
+    return this.catalogPage(afterId, false);
+  }
+  async listActive(afterId: string | null) {
+    return this.catalogPage(afterId, true);
+  }
+  private async catalogPage(afterId: string | null, activeOnly: boolean) {
+    const collection = this.db.collection(INVENTORY_PRODUCT_PATH);
+    // Equality + ascending document ID uses the existing status single-field index.
+    let query = (activeOnly ? collection.where("status", "==", "active") : collection).orderBy(FieldPath.documentId()).limit(101);
     if (afterId) query = query.startAfter(afterId);
-    const snapshot = await query.get();
+    // MCP catalog summaries never need the per-lot inspection map (up to 200 entries).
+    // Keep the PWA listing's original projection and response contract unchanged.
+    if (activeOnly) query = query.select(...Object.keys(inventoryProductSchema.shape), "manufacturerId");
+    const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
     const docs = snapshot.docs.slice(0, 100);
     return { products: docs.map((doc) => inventoryProductFromDocument(doc.data())).filter((product) => product.status !== "deleted"),
       nextCursor: snapshot.docs.length > 100 ? docs.at(-1)!.id : null };
@@ -129,11 +181,76 @@ export class InventoryService {
     return this.db.runTransaction(async (transaction) => {
       await verifyInventoryTransactionActor(this.db, transaction, actor, "read");
       const [product, lotsSnapshot] = await Promise.all([
-        this.product(transaction, productId), transaction.get(this.lotsQuery(productId)),
+        this.product(transaction, productId), observeRead("firestore", () => transaction.get(this.lotsQuery(productId)), (value) => value.docs.length),
       ]);
       if (product.status === "deleted") throw new HttpsError("not-found", "삭제된 상품입니다.");
       const lots = activeSortedLots(this.parseLots(lotsSnapshot.docs));
       return { product: { ...inventoryProductWire(product), lotSummary: summarizeInventoryLotGroups(lots) }, lots };
+    });
+  }
+
+  private scan(matches: (product: InventoryProduct) => boolean, options: ScanOptions) {
+    return boundedScan(async (cursor) => {
+      const page = await this.listActive(cursor);
+      return { items: page.products, nextCursor: page.nextCursor };
+    }, (product) => product.productId, (product) => product.status === "active" && matches(product), options);
+  }
+  search(query: string, options: ScanOptions = {}) {
+    const matches = inventorySearchMatcher(query);
+    return this.scan((product) => matches(inventorySearchText(product)), options);
+  }
+  async searchMany(queries: string[], options: ScanOptions = {}) {
+    const matchers = queries.map(inventorySearchMatcher);
+    const page = await this.scan((product) => {
+      const text = inventorySearchText(product);
+      return matchers.some((matches) => matches(text));
+    }, options);
+    const matches = queries.map((query, index) => ({ query, productIds: page.items
+      .filter((product) => matchers[index]!(inventorySearchText(product))).map((product) => product.productId) }));
+    return { ...page, matches };
+  }
+  async overview(threshold: number, days: number, exampleLimit: number, options: ScanOptions = {}) {
+    const now = options.now ?? Date.now, deadline = now() + Math.min(5_000, Math.max(1, options.maxDurationMs ?? 5_000));
+    const at = this.now(), { cycle } = await this.context(at), window = inventoryAlertWindow(days, at);
+    const summary = inventoryOverviewAccumulator(threshold, window, cycle, exampleLimit);
+    let cursor = options.afterId ?? null, pagesScanned = 0, recordsScanned = 0;
+    let stoppedBecause: "complete" | "page_budget" | "time_budget" = "complete";
+    do {
+      const page = await this.listActive(cursor);
+      pagesScanned++; recordsScanned += page.products.length;
+      page.products.forEach(summary.include);
+      if (page.nextCursor !== null && page.nextCursor === cursor) throw new Error("Non-advancing inventory cursor");
+      cursor = page.nextCursor;
+      if (cursor === null) break;
+      if (pagesScanned >= Math.min(5, Math.max(1, options.maxPages ?? 5))) { stoppedBecause = "page_budget"; break; }
+      if (now() >= deadline) { stoppedBecause = "time_budget"; break; }
+    } while (cursor !== null);
+    return { counts: summary.counts, examples: summary.examples, cycle, ...window, nextCursor: cursor,
+      page: { returnedCount: summary.counts.activeProducts, hasMore: cursor !== null, complete: cursor === null,
+        startedFromBeginning: options.afterId == null, pagesScanned, recordsScanned, stoppedBecause } };
+  }
+  lowStock(threshold: number, options: ScanOptions = {}) {
+    return this.scan((product) => inventoryTotalQuantity(product) <= threshold, options);
+  }
+  async alerts(threshold: number, days: number, options: ScanOptions = {}) {
+    const window = inventoryAlertWindow(days, this.now());
+    const page = await this.scan((product) => {
+      const alerts = inventoryAlerts(product, threshold, window);
+      return alerts.lowStock || alerts.expiringLocations.length > 0;
+    }, options);
+    return { ...page, window, items: page.items.map((product) => ({ product, ...inventoryAlerts(product, threshold, window) })) };
+  }
+  async readProducts(productIds: string[], actor: InventoryActor) {
+    if (productIds.length < 1 || productIds.length > 20 || new Set(productIds).size !== productIds.length) {
+      throw new HttpsError("invalid-argument", "상품은 중복 없이 1~20개를 지정해주세요.");
+    }
+    return this.db.runTransaction(async (transaction) => {
+      await verifyInventoryTransactionActor(this.db, transaction, actor, "read");
+      const snapshots = await observeRead("firestore", () => transaction.getAll(...productIds.map((id) => this.productRef(id))), (value) => value.length);
+      const products = snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => inventoryProductFromDocument(snapshot.data()!))
+        .filter((product) => product.status !== "deleted");
+      const found = new Set(products.map((product) => product.productId));
+      return { products, missingProductIds: productIds.filter((id) => !found.has(id)) };
     });
   }
   async save(input: SaveInventoryProductWithManufacturerInput, actor: InventoryActor): Promise<InventoryProductSaveResult> {
@@ -384,6 +501,33 @@ export class InventoryService {
       this.audit(transaction, input, actor, now, "INVENTORY_SETTINGS_UPDATED", "settings", ["weekday", "urgentDays"]);
       return next;
     });
+  }
+  /** Read only returned products' latest button events, without scanning general history. */
+  async lastQuantityMatches(productIds: string[]) {
+    if (productIds.length > 100 || new Set(productIds).size !== productIds.length || productIds.some((id) => !inventoryIdSchema.safeParse(id).success)) {
+      throw new HttpsError("invalid-argument", "상품은 중복 없이 최대100개를 지정해주세요.");
+    }
+    const result = new Map<string, InventoryQuantityMatch | null>();
+    let next = 0, failed = false;
+    await Promise.all(Array.from({ length: Math.min(8, productIds.length) }, async () => {
+      while (!failed) {
+        const productId = productIds[next++];
+        if (productId === undefined) return;
+        try {
+          const query = this.db.collection(`${INVENTORY_PRODUCT_PATH}/${productId}/events`)
+            .where("kind", "==", "count_match").orderBy("createdAt", "desc").orderBy(FieldPath.documentId(), "desc")
+            .select(...Object.keys(inventoryQuantityMatchSchema.shape)).limit(1);
+          const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
+          const doc = snapshot.docs[0];
+          const event = doc ? inventoryQuantityMatchSchema.parse(datesFromDocument(doc.data())) : null;
+          if (event && (event.productId !== productId || event.eventId !== doc!.id)) {
+            throw new HttpsError("failed-precondition", "실사확인 이력의 상품을 확인해주세요.");
+          }
+          result.set(productId, event);
+        } catch (error) { failed = true; throw error; }
+      }
+    }));
+    return result;
   }
   async history(productId: string, afterId: string | null) {
     // History remains accessible for inactive/deleted products via a known ID.

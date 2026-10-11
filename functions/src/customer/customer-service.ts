@@ -3,8 +3,12 @@ import { FieldPath, Timestamp, type DocumentData, type Firestore } from "firebas
 
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { formatPhoneNumber } from "../shared/phone-number.js";
+import { z } from "zod";
+import { customerNameMatcher } from "./customer-name-search.js";
 import { verifyCustomerTransactionActor, type CustomerActor } from "./customer-authorization.js";
 import { resolveCustomerPhotoChange } from "./customer-photo-store.js";
+import { boundedScan, type ScanOptions } from "../shared/bounded-scan.js";
+import { observeRead } from "../shared/read-observation.js";
 import {
   CUSTOMER_COLLECTION_PATH, CUSTOMER_COMPANY_ID, customerDraftSchema, customerSchema,
   getCustomerChoseong, normalizeCustomerName,
@@ -15,8 +19,16 @@ export class CustomerRevisionConflict extends Error {}
 export class CustomerRequestCollision extends Error {}
 export class CustomerNotFound extends Error {}
 
+// Server-only metadata: preserve the strict PWA wire schema and frontend bundle.
+const storedCustomerSchema = customerSchema.safeExtend({ aliases: z.array(z.string().trim().min(1).max(120)).max(50).optional() });
+const customerSearchSchema = z.object({ customerId: customerSchema.shape.customerId,
+  name: customerSchema.shape.name, normalizedName: customerSchema.shape.normalizedName,
+  choseongName: customerSchema.shape.choseongName, status: customerSchema.shape.status,
+  district: customerSchema.shape.district, administrativeDong: customerSchema.shape.administrativeDong,
+  aliases: storedCustomerSchema.shape.aliases });
+
 export function customerFromDocument(data: DocumentData): Customer {
-  return customerSchema.parse({
+  return storedCustomerSchema.parse({
     ...data,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : null,
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : null,
@@ -24,10 +36,12 @@ export function customerFromDocument(data: DocumentData): Customer {
 }
 
 export function customerResponse(customer: Customer, includeOverviewPhoto = false): Customer {
-  if (includeOverviewPhoto || !("overviewPhoto" in customer)) return customer;
   // Older installed clients validate a strict wire schema. Opt-in keeps their
   // normal list/save flows working without exposing a new unknown field.
-  const { overviewPhoto: _photo, ...legacy } = customer;
+  const { aliases: _aliases, ...withoutAliases } = customer;
+  void _aliases;
+  if (includeOverviewPhoto || !("overviewPhoto" in withoutAliases)) return withoutAliases;
+  const { overviewPhoto: _photo, ...legacy } = withoutAliases;
   void _photo;
   return legacy;
 }
@@ -57,10 +71,11 @@ export function customerChangedFields(current: Customer | null, next: Customer):
 
 export function nextCustomer(current: Customer | null, input: SaveCustomerInput, customerId: string, employeeId: string, now: string): Customer {
   const coreChanged = current !== null && customerCoreInformationChanged(current, input.draft);
-  return customerSchema.parse({
+  return storedCustomerSchema.parse({
     ...input.draft,
     contacts: input.draft.contacts.map((contact) => ({ ...contact, phoneNumber: formatPhoneNumber(contact.phoneNumber) })),
     ...(current?.overviewPhoto !== undefined ? { overviewPhoto: current.overviewPhoto } : {}),
+    ...(current?.aliases !== undefined ? { aliases: current.aliases } : {}),
     accessPassword: input.draft.accessPasswordState === "registered" ? input.draft.accessPassword : "",
     customerId, companyId: CUSTOMER_COMPANY_ID,
     normalizedName: normalizeCustomerName(input.draft.name), choseongName: getCustomerChoseong(input.draft.name),
@@ -77,12 +92,57 @@ export class CustomerService {
   async list(afterId: string | null, includeOverviewPhoto = false) {
     let query = this.db.collection(CUSTOMER_COLLECTION_PATH).orderBy(FieldPath.documentId()).limit(251);
     if (afterId) query = query.startAfter(afterId);
-    const snapshot = await query.get();
+    const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
     const docs = snapshot.docs.slice(0, 250);
     return {
       customers: docs.map((document) => customerResponse(customerFromDocument(document.data()), includeOverviewPhoto)),
       nextCursor: snapshot.docs.length > 250 ? docs.at(-1)!.id : null,
     };
+  }
+
+  /** MCP search never downloads contacts, access passwords, addresses or photo fields. */
+  async listSearch(afterId: string | null) {
+    let query = this.db.collection(CUSTOMER_COLLECTION_PATH).orderBy(FieldPath.documentId()).limit(251)
+      .select(...Object.keys(customerSearchSchema.shape));
+    if (afterId) query = query.startAfter(afterId);
+    const snapshot = await observeRead("firestore", () => query.get(), (value) => value.docs.length);
+    const docs = snapshot.docs.slice(0, 250);
+    return { customers: docs.map((document) => customerSearchSchema.parse(document.data())),
+      nextCursor: snapshot.docs.length > 250 ? docs.at(-1)!.id : null };
+  }
+
+  async search(query: string, options: ScanOptions & { includeClosed?: boolean } = {}) {
+    const matches = customerNameMatcher(query);
+    return boundedScan(async (cursor) => {
+      const page = await this.listSearch(cursor);
+      return { items: page.customers, nextCursor: page.nextCursor };
+    }, (customer) => customer.customerId, (customer) => (customer.status === "active" || options.includeClosed === true)
+      && matches(customer), options);
+  }
+
+  async read(customerId: string, actor: CustomerActor, includeClosed = false) {
+    return this.db.runTransaction(async (transaction) => {
+      await verifyCustomerTransactionActor(this.db, transaction, actor);
+      const snapshot = await observeRead("firestore", () => transaction.get(this.db.doc(`${CUSTOMER_COLLECTION_PATH}/${customerId}`)));
+      if (!snapshot.exists) return null;
+      const customer = customerFromDocument(snapshot.data()!);
+      return customer.status === "active" || includeClosed ? customer : null;
+    });
+  }
+
+  /** Names for an already selected, bounded set of photo records; one transaction, no catalog scan. */
+  async readNames(customerIds: string[], actor: CustomerActor) {
+    const ids = [...new Set(customerIds)];
+    if (ids.length > 100) throw new Error("Customer name batch limit exceeded");
+    return this.db.runTransaction(async (transaction) => {
+      await verifyCustomerTransactionActor(this.db, transaction, actor);
+      if (!ids.length) return [];
+      const snapshots = await observeRead("firestore", () => transaction.getAll(...ids.map((id) => this.db.doc(`${CUSTOMER_COLLECTION_PATH}/${id}`))), (value) => value.length);
+      return snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => {
+        const customer = customerFromDocument(snapshot.data()!);
+        return { customerId: customer.customerId, name: customer.name };
+      });
+    });
   }
 
   async save(input: SaveCustomerInput, actor: CustomerActor): Promise<Customer> {

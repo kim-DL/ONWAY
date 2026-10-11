@@ -91,7 +91,7 @@ export const customerLocationCandidateSchema = z.object({
   id: z.string().min(1).max(160), name: z.string().max(300), address: addressText, point: customerPointSchema,
 }).strict();
 export const customerRegionSchema = z.object({ district: shortText, administrativeDong: shortText, address: addressText }).strict();
-export type Customer = z.infer<typeof customerSchema>;
+export type Customer = z.infer<typeof customerSchema> & { aliases?: string[] | undefined };
 export type CustomerDraft = z.infer<typeof customerDraftSchema>;
 export type CustomerContact = z.infer<typeof customerContactSchema>;
 export type CustomerPoint = z.infer<typeof customerPointSchema>;
