@@ -1,7 +1,7 @@
 import { chromium, webkit, devices, type Browser, type Page } from "@playwright/test";
 import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PHOTO_VIEW_HTML } from "../../src/mcp/photo-view.js";
+import { PHOTO_TEST_HTML } from "./photo-view-fixture.js";
 
 type Insets = { top: number; right: number; bottom: number; left: number };
 type Geometry = { height: number; insets: Insets };
@@ -60,7 +60,7 @@ async function mount(browser: Browser, engine: string, bridge: "standard" | "cha
       + ';window.openai.callTool=(name,args)=>new Promise(resolve=>{const key="compat-"+(++id);pending.set(key,resolve);parent.postMessage({jsonrpc:"2.0",id:key,method:"tools/call",params:{name,arguments:args}},"*")});window.openai.requestDisplayMode=async({mode})=>{window.openai.displayMode=mode;return{mode}};addEventListener("message",e=>{if(e.source!==parent)return;if(e.data.testGlobals)dispatchEvent(new CustomEvent("openai:set_globals",{detail:{globals:e.data.testGlobals}}));const p=pending.get(e.data.id);if(p){pending.delete(e.data.id);p(e.data.result)}})})();</script>';
     frame.srcdoc = bridge === "chatgpt" ? html.replace("<script>", compatibility + "<script>") : html;
     state.update(initial);
-  }, { html: PHOTO_VIEW_HTML, bridge, initial, bytes, firstId, secondId, longNames });
+  }, { html: PHOTO_TEST_HTML, bridge, initial, bytes, firstId, secondId, longNames });
   const frame = page.frameLocator("#view");
   await frame.locator("#photo:not([hidden])").waitFor();
   await frame.locator("#open").tap(); await frame.locator("#evidence:not([hidden])").waitFor();

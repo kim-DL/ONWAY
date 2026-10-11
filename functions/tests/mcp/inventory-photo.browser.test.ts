@@ -1,7 +1,7 @@
 import { chromium, webkit, expect as expectBrowser, type Browser, type Page } from "@playwright/test";
 import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PHOTO_VIEW_HTML } from "../../src/mcp/photo-view.js";
+import { PHOTO_TEST_HTML } from "./photo-view-fixture.js";
 const photoId = "49f0aeec-f503-4c44-88a2-36a2f3c9f665";
 type Image = { productId: string; photoId: string; name: string; manufacturer: string; specification: string; variant: string; mimeType: string; data: string };
 type Reply = { isError?: boolean; _meta?: { inventoryPhoto?: Image; inventoryNotice?: { message: string }; error?: { code: string } } };
@@ -33,7 +33,7 @@ for (const engine of ["chromium", "webkit"] as const) describe.skipIf(process.en
         if (m.method === "tools/call") { state.calls.push(m.params); post({ jsonrpc: "2.0", id: m.id, result: state.reply }); }
       });
       frame.srcdoc = html;
-    }, { html: PHOTO_VIEW_HTML, initial, preview });
+    }, { html: PHOTO_TEST_HTML, initial, preview });
     const frame = page.frameLocator("iframe"); await frame.locator("#status").waitFor();
     return { page, frame, network, errors };
   }

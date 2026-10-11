@@ -1,7 +1,7 @@
 import { chromium, type Browser, type Page } from "@playwright/test";
 import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PHOTO_VIEW_HTML } from "../../src/mcp/photo-view.js";
+import { PHOTO_TEST_HTML } from "./photo-view-fixture.js";
 
 type Photo = { expiresAt?: string; createdByEmployeeId?: string; customerId: string; customerName: string | null; photoId: string; variant: string; mimeType: string; data: string; createdAt: string; createdByName: string };
 type Cursor = { photoId: string; createdAt: string };
@@ -48,7 +48,7 @@ async function mount(options: { mobile?: boolean; compatibility?: boolean; hold?
       if (message.method === "ui/notifications/size-changed") state.heights.push(message.params.height as number);
     });
     frame.srcdoc = html;
-  }, { html: PHOTO_VIEW_HTML, result: { _meta: { deliveryPhoto: evidence } }, ...options });
+  }, { html: PHOTO_TEST_HTML, result: { _meta: { deliveryPhoto: evidence } }, ...options });
   const frame = page.frameLocator("#view");
   await frame.locator("#status").waitFor();
   if (!options.compatibility) await page.waitForFunction(() => window.photoTest.heights.length > 0);
@@ -222,7 +222,8 @@ describe.skipIf(process.env.MCP_BROWSER_TEST !== "true")("MCP photo card and evi
   });
   it("hides delivered pixels at the server expiry without a new tool call and clears received bytes on teardown", async () => {
     const { page, frame, errors } = await mount();
-    await ready(page, { ...evidence, expiresAt: new Date(Date.now() + 800).toISOString() });
+    const expiresAt = await frame.locator("body").evaluate(() => new Date(Date.now() + 800).toISOString());
+    await ready(page, { ...evidence, expiresAt });
     await frame.locator("#open").click(); await frame.locator("#evidence:not([hidden])").waitFor();
     expect(await page.evaluate(() => window.photoTest.calls.length)).toBe(0);
     await frame.locator("#card[hidden]").waitFor({ state: "attached" });
