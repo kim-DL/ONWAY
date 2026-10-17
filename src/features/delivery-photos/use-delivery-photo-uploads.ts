@@ -47,5 +47,10 @@ export function useDeliveryPhotoUploads(session: AuthenticatedSession, onConfirm
     }
     return map;
   }, [jobs]);
-  return { coordinator, jobs, byCustomer, pendingByCustomer, ready: coordinator !== null };
+  const retryByCustomer = useMemo(() => {
+    const map = new Map<string, DeliveryPhotoUploadProjection>();
+    for (const job of jobs) if (job.status === "failed" && job.errorCategory === "retryable" && !map.has(job.customerId)) map.set(job.customerId, job);
+    return map;
+  }, [jobs]);
+  return { coordinator, jobs, byCustomer, pendingByCustomer, retryByCustomer, ready: coordinator !== null };
 }
