@@ -294,9 +294,13 @@ export class InventoryService {
     return this.mutation("recordInventoryCount", input, actor, "write", async (transaction, now) => {
       // Independent reads share one wait, after membership and retry receipt
       // checks. Everything remains within this transaction and before writes.
-      const [product, settingsSnapshot, lotsSnapshot] = await Promise.all([
+      // The cycle document path is already known from the validated input.
+      // Read it alongside the other transaction documents, rather than adding
+      // another sequential network round trip after checking the cycle ID.
+      const cycleRef = this.db.doc(`${INVENTORY_CYCLE_PATH}/${input.cycleId}`);
+      const [product, settingsSnapshot, lotsSnapshot, cycleSnapshot] = await Promise.all([
         this.product(transaction, input.productId), transaction.get(this.db.doc(INVENTORY_SETTINGS_PATH)),
-        transaction.get(this.lotsQuery(input.productId)),
+        transaction.get(this.lotsQuery(input.productId)), transaction.get(cycleRef),
       ]);
       checkStockRevision(product, input.expectedStockRevision);
       const settings = settingsFromDocument(settingsSnapshot.data());
@@ -317,8 +321,7 @@ export class InventoryService {
       const changed = lines.some((line) => line.delta !== 0);
       if (input.matchOnly && changed) throw new HttpsError("aborted", "현재 수량과 일치하지 않습니다. 최신 재고를 다시 확인해주세요.", { reason: "inventory-count-mismatch" });
       if (changed && !input.reason) throw new HttpsError("invalid-argument", "실사 수량이 다르면 조정 사유를 입력해주세요.");
-      const cycleRef = this.db.doc(`${INVENTORY_CYCLE_PATH}/${cycle.cycleId}`);
-      const cycleSnapshot = await transaction.get(cycleRef);
+      // cycleRef and cycleSnapshot were read in parallel above.
       const all = [...lots.filter((lot) => lot.locationId !== input.locationId), ...changedLots];
       const result = this.writeStock(transaction, input, actor, now, product, all,
         changedLots.filter((lot) => selected.find((item) => item.lotId === lot.lotId)!.quantity !== lot.quantity),
