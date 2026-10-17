@@ -14,7 +14,8 @@ import { DeliveryPhotoHistoryLoader } from "./delivery-photo-history-loader";
 import { DeliveryPhotoInputController, type DeliveryPhotoInputControllerHandle } from "./delivery-photo-input-controller";
 import { mergeConfirmedDeliveryPhoto, deliveryPhotoDateKey } from "./delivery-photo-memory";
 import { deliveryPhotoErrorKind, deliveryPhotoRepository } from "./delivery-photo-repository";
-import { deliveryPhotoUploadStatusText, isActiveDeliveryPhotoUpload, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
+import { deliveryPhotoUploadStatusText, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
+import { MAX_PENDING_PHOTOS_PER_CUSTOMER } from "./delivery-photo-upload-memory";
 import { useDeliveryPhotoData } from "./use-delivery-photo-data";
 import { useDeliveryPhotoCatalog } from "./use-delivery-photo-catalog";
 import { useDeliveryPhotoUploads } from "./use-delivery-photo-uploads";
@@ -24,8 +25,9 @@ import styles from "./photo.module.css";
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { ssr: false });
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
 
-export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, uploadReady, inToday, onAdd, onView, onCapture, onMore, onRetry }: {
+export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onAdd, onView, onCapture, onMore, onRetry }: {
   customer: Customer; count?: number | undefined; latestAt?: string | undefined; job?: DeliveryPhotoUploadProjection | undefined;
+  pendingCount?: number | undefined; captureAllowed?: boolean | undefined;
   inToday?: boolean | undefined; onAdd?: ((customerId: string) => void) | undefined;
   uploadReady: boolean; onView: (customer: Customer) => void; onCapture: (customer: Customer) => void; onMore: (customer: Customer) => void; onRetry: (jobId: string) => void;
 }) {
@@ -34,9 +36,9 @@ export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, uploadRea
   const customerSecondary = password ? `${place}${place ? " · " : ""}출입비번 ${password}` : place;
   const time = latestAt ? new Date(Date.parse(latestAt) + 9 * 60 * 60 * 1_000).toISOString().slice(11, 16) : "";
   const status = job && job.status !== "completed" && deliveryPhotoUploadStatusText(job);
-  const active = !uploadReady || isActiveDeliveryPhotoUpload(job);
+  const active = !uploadReady || !captureAllowed || pendingCount >= MAX_PENDING_PHOTOS_PER_CUSTOMER;
   const photoSummary = count && `사진 ${count}장${time ? ` · 마지막 등록 ${time}` : ""}`;
-  const detail = status || photoSummary;
+  const detail = pendingCount ? `${pendingCount}장 전송 대기·진행 중` : status || photoSummary;
   return <li className={styles.row}><div className={styles.photoMain}>
     <button type="button" className={styles.rowText} onClick={() => onView(customer)} aria-label={`${customer.name} 사진 기록`}>
       <strong>{customer.name}</strong>
@@ -84,6 +86,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
   const capture = (customer: Customer) => { inputs.current?.openCamera(customer.customerId); };
   const album = (customer: Customer) => { inputs.current?.openAlbum(customer.customerId); };
   const retry = (jobId: string) => { uploads.coordinator?.retry(jobId); };
+  const captureAvailable = (customerId: string) => uploads.coordinator?.canBegin(customerId) ?? false;
 
   const saveEditor = async (ids: readonly string[]): Promise<"saved" | "conflict" | "error"> => {
     if (!editor || !snapshot) return "error";
@@ -121,7 +124,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
     <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
     {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
       {searchResults.length ? <ul className={styles.list}>{searchResults.map((customer) => <DeliveryPhotoRow key={customer.customerId} customer={customer}
-        count={summaries.get(customer.customerId)?.count} inToday={todayIds.includes(customer.customerId)} job={uploads.byCustomer.get(customer.customerId)}
+        count={summaries.get(customer.customerId)?.count} inToday={todayIds.includes(customer.customerId)} job={uploads.byCustomer.get(customer.customerId)} pendingCount={uploads.pendingByCustomer.get(customer.customerId) ?? 0} captureAllowed={captureAvailable(customer.customerId)}
         uploadReady={uploads.ready} onAdd={(customerId) => setEditor({ mode: "day", addId: customerId })} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} />)}</ul>
         : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
     {!snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처를 불러오는 중입니다.</p> : null}
@@ -129,14 +132,14 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       <section className={styles.section} aria-labelledby="delivery-photo-remaining-heading"><h2 id="delivery-photo-remaining-heading">오늘 남은 납품처</h2>
         {completion.remainingCustomerIds.length ? <ul className={styles.list}>{completion.remainingCustomerIds.map((id) => {
           const customer = byId.get(id);
-          return customer ? <DeliveryPhotoRow key={id} customer={customer} job={uploads.byCustomer.get(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} job={uploads.byCustomer.get(id)} pendingCount={uploads.pendingByCustomer.get(id) ?? 0} captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
         })}</ul> : <p className={styles.empty}>{todayIds.length ? "오늘 목록의 모든 거래처에 사진 기록이 있습니다." : "오늘 납품처가 비어 있습니다. 내 납품처를 설정해 주세요."}</p>}
       </section>
       <details className={styles.completed}><summary>기록완료 {completion.completedCustomerIds.length}곳</summary>
         {completion.completedCustomerIds.length ? <ul className={styles.list}>{completion.completedCustomerIds.map((id) => {
           const customer = byId.get(id);
           const summary = summaries.get(id);
-          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} job={uploads.byCustomer.get(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} job={uploads.byCustomer.get(id)} pendingCount={uploads.pendingByCustomer.get(id) ?? 0} captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
         })}</ul> : <p className={styles.empty}>아직 기록된 납품사진이 없습니다.</p>}
       </details>
       <div className={styles.secondaryActions}>
@@ -150,7 +153,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       onSave={saveEditor} onClose={() => setEditor(null)} /> : null}
     {historyCustomer ? <DeliveryPhotoHistoryLoader key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${historyCustomer.customerId}`}
       customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} sync={data.accept} /> : null}
-    {moreCustomer ? <DeliveryPhotoMoreMenu customer={moreCustomer} albumDisabled={!uploads.ready || isActiveDeliveryPhotoUpload(uploads.byCustomer.get(moreCustomer.customerId))}
+    {moreCustomer ? <DeliveryPhotoMoreMenu customer={moreCustomer} albumDisabled={!captureAvailable(moreCustomer.customerId)}
       onAlbum={album} onOpenCustomerDetail={onOpenCustomerDetail} onClose={() => setMoreCustomer(null)} className={styles.moreActions!} /> : null}
     <DeliveryPhotoInputController ref={inputs} coordinator={uploads.coordinator} />
   </section>;
