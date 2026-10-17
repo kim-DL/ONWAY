@@ -113,6 +113,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       <div className={styles.summary}><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong>
         {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
     </header>
+    {uploads.jobs.some((job) => job.status === "preparing" || job.status === "queued" || job.status === "uploading" || job.status === "failed" && job.errorCategory === "retryable")
+      ? <p className={styles.freshness} role="status">사진을 저장하는 중입니다. 완료 전 앱을 닫으면 아직 전송하지 못한 사진이 유실될 수 있습니다.</p> : null}
     {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
       if (data.error) data.refresh();
       if (catalog.status === "error") catalog.retry();
