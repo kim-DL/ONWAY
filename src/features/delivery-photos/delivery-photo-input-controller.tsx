@@ -29,10 +29,7 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
 
   const open = (customerId: string, source: "camera" | "album") => {
     if (!coordinator || reading.current || (pending.current && !returnedFromPicker.current)
-      || coordinator.getCustomerJob(customerId)?.status === "uploading"
-      || coordinator.getCustomerJob(customerId)?.status === "queued"
-      || coordinator.getCustomerJob(customerId)?.status === "preparing"
-      || coordinator.getCustomerJob(customerId)?.errorCategory === "retryable") return false;
+      || !coordinator.canBegin(customerId)) return false;
     const input = source === "camera" ? camera.current : album.current;
     if (!input) return false;
     // A cancelled picker may not emit `cancel` on every WebKit version. Only a
