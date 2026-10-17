@@ -24,8 +24,8 @@ import styles from "./photo.module.css";
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { ssr: false });
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
 
-export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onAdd, onView, onCapture, onMore, onRetry }: {
-  customer: Customer; count?: number | undefined; latestAt?: string | undefined; job?: DeliveryPhotoUploadProjection | undefined;
+export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onAdd, onView, onCapture, onMore, onRetry }: {
+  customer: Customer; count?: number | undefined; latestAt?: string | undefined; job?: DeliveryPhotoUploadProjection | undefined; retryJob?: DeliveryPhotoUploadProjection | undefined;
   pendingCount?: number | undefined; captureAllowed?: boolean | undefined;
   inToday?: boolean | undefined; onAdd?: ((customerId: string) => void) | undefined;
   uploadReady: boolean; onView: (customer: Customer) => void; onCapture: (customer: Customer) => void; onMore: (customer: Customer) => void; onRetry: (jobId: string) => void;
@@ -44,10 +44,9 @@ export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, pendingCo
       {customerSecondary ? <small>{customerSecondary}</small> : null}
       {detail ? <small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{detail}</small> : null}
     </button>
-    {job?.status === "failed" && job.errorCategory === "retryable"
-      ? <button type="button" className={styles.photoPrimary} onClick={() => onRetry(job.jobId)}>다시 시도</button>
-      : <button type="button" className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
-        onClick={() => onCapture(customer)}><Icon name="camera" size={24} /></button>}
+    {retryJob ? <button type="button" onClick={() => onRetry(retryJob.jobId)} aria-label={`${customer.name} 사진 업로드 다시 시도`}>재시도</button> : null}
+    <button type="button" className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
+      onClick={() => onCapture(customer)}><Icon name="camera" size={24} /></button>
     <button type="button" className={styles.photoMore} aria-label={`${customer.name} 더보기`} aria-haspopup="dialog"
       onClick={() => onMore(customer)}>⋯</button>
   </div>
@@ -123,7 +122,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
     <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
     {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
       {searchResults.length ? <ul className={styles.list}>{searchResults.map((customer) => <DeliveryPhotoRow key={customer.customerId} customer={customer}
-        count={summaries.get(customer.customerId)?.count} inToday={todayIds.includes(customer.customerId)} job={uploads.byCustomer.get(customer.customerId)} pendingCount={uploads.pendingByCustomer.get(customer.customerId) ?? 0} captureAllowed={captureAvailable(customer.customerId)}
+        count={summaries.get(customer.customerId)?.count} inToday={todayIds.includes(customer.customerId)} job={uploads.byCustomer.get(customer.customerId)} retryJob={uploads.retryByCustomer.get(customer.customerId)} pendingCount={uploads.pendingByCustomer.get(customer.customerId) ?? 0} captureAllowed={captureAvailable(customer.customerId)}
         uploadReady={uploads.ready} onAdd={(customerId) => setEditor({ mode: "day", addId: customerId })} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} />)}</ul>
         : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
     {!snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처를 불러오는 중입니다.</p> : null}
@@ -131,14 +130,14 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       <section className={styles.section} aria-labelledby="delivery-photo-remaining-heading"><h2 id="delivery-photo-remaining-heading">오늘 남은 납품처</h2>
         {completion.remainingCustomerIds.length ? <ul className={styles.list}>{completion.remainingCustomerIds.map((id) => {
           const customer = byId.get(id);
-          return customer ? <DeliveryPhotoRow key={id} customer={customer} job={uploads.byCustomer.get(id)} pendingCount={uploads.pendingByCustomer.get(id) ?? 0} captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} job={uploads.byCustomer.get(id)} retryJob={uploads.retryByCustomer.get(id)} pendingCount={uploads.pendingByCustomer.get(id) ?? 0} captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
         })}</ul> : <p className={styles.empty}>{todayIds.length ? "오늘 목록의 모든 거래처에 사진 기록이 있습니다." : "오늘 납품처가 비어 있습니다. 내 납품처를 설정해 주세요."}</p>}
       </section>
       <details className={styles.completed}><summary>기록완료 {completion.completedCustomerIds.length}곳</summary>
         {completion.completedCustomerIds.length ? <ul className={styles.list}>{completion.completedCustomerIds.map((id) => {
           const customer = byId.get(id);
           const summary = summaries.get(id);
-          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} job={uploads.byCustomer.get(id)} pendingCount={uploads.pendingByCustomer.get(id) ?? 0} captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
+          return customer ? <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt} job={uploads.byCustomer.get(id)} retryJob={uploads.retryByCustomer.get(id)} pendingCount={uploads.pendingByCustomer.get(id) ?? 0} captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} /> : null;
         })}</ul> : <p className={styles.empty}>아직 기록된 납품사진이 없습니다.</p>}
       </details>
       <div className={styles.secondaryActions}>
