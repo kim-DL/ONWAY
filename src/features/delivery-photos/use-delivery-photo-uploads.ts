@@ -35,6 +35,17 @@ export function useDeliveryPhotoUploads(session: AuthenticatedSession, onConfirm
     }
   }, [coordinator, jobs, onConfirmed]);
 
-  const byCustomer = useMemo(() => new Map(jobs.map((job) => [job.customerId, job])), [jobs]);
-  return { coordinator, jobs, byCustomer, ready: coordinator !== null };
+  const byCustomer = useMemo(() => {
+    const map = new Map<string, DeliveryPhotoUploadProjection>();
+    for (const job of jobs) if (!map.has(job.customerId)) map.set(job.customerId, job);
+    return map;
+  }, [jobs]);
+  const pendingByCustomer = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const job of jobs) if (job.status === "preparing" || job.status === "queued" || job.status === "uploading" || job.status === "failed" && job.errorCategory === "retryable") {
+      map.set(job.customerId, (map.get(job.customerId) ?? 0) + 1);
+    }
+    return map;
+  }, [jobs]);
+  return { coordinator, jobs, byCustomer, pendingByCustomer, ready: coordinator !== null };
 }
