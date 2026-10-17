@@ -9,16 +9,14 @@ import {
   type DeliveryPhotoCreateResult,
 } from "./delivery-photo-create-repository";
 import {
+  MAX_PENDING_PHOTOS_PER_CUSTOMER,
+  MAX_PENDING_PHOTOS_TOTAL,
   isActiveDeliveryPhotoUpload,
   type DeliveryPhotoUploadProjection,
 } from "./delivery-photo-upload-state";
 import type { PreparedDeliveryPhoto } from "./delivery-photo-preparation";
 
 const MAX_CONCURRENT_RELAYS = 2;
-// Allow another angle while the previous image is still preparing or uploading.
-// The bounded queue protects memory on slow mobile connections.
-export const MAX_PENDING_PHOTOS_PER_CUSTOMER = 3;
-export const MAX_PENDING_PHOTOS_TOTAL = 8;
 
 type UploadPayload = {
   source?: File;
