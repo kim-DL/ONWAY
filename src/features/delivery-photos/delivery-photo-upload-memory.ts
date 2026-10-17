@@ -15,6 +15,10 @@ import {
 import type { PreparedDeliveryPhoto } from "./delivery-photo-preparation";
 
 const MAX_CONCURRENT_RELAYS = 2;
+// Allow another angle while the previous image is still preparing or uploading.
+// The bounded queue protects memory on slow mobile connections.
+export const MAX_PENDING_PHOTOS_PER_CUSTOMER = 3;
+export const MAX_PENDING_PHOTOS_TOTAL = 8;
 
 type UploadPayload = {
   source?: File;
@@ -87,11 +91,22 @@ export class DeliveryPhotoUploadCoordinator {
     return id ? this.jobs.get(id) : undefined;
   }
 
+  getPendingCount(customerId: string) {
+    return [...this.jobs.values()].filter((job) => job.customerId === customerId && isActiveDeliveryPhotoUpload(job)).length;
+  }
+
+  canBegin(customerId: string) {
+    return this.getPendingCount(customerId) < MAX_PENDING_PHOTOS_PER_CUSTOMER
+      && [...this.jobs.values()].filter(isActiveDeliveryPhotoUpload).length < MAX_PENDING_PHOTOS_TOTAL;
+  }
+
   begin(customerId: string, source: "camera" | "album") {
-    const current = this.getCustomerJob(customerId);
-    if (isActiveDeliveryPhotoUpload(current)) return null;
-    if (current) {
-      this.jobs.delete(current.jobId); this.confirmed.delete(current.jobId); this.payloads.delete(current.jobId);
+    if (!this.canBegin(customerId)) return null;
+    // Keep earlier photo jobs alive: each angle has its own immutable request ID.
+    // A recent completed job is no longer needed once its metadata is merged.
+    for (const job of this.jobs.values()) {
+      if (job.status !== "completed" || this.confirmed.has(job.jobId)) continue;
+      this.jobs.delete(job.jobId); this.payloads.delete(job.jobId);
     }
     const now = this.dependencies.now();
     const job: DeliveryPhotoUploadProjection = {
