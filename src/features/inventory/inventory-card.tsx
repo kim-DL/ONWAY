@@ -2,6 +2,7 @@ import { memo, useId } from "react";
 import { INVENTORY_LOCATION_LABELS, type InventoryContext, type InventoryProduct } from "@/domain/inventory";
 import { INVENTORY_COUNT_LABELS, inventoryCountBadgeState, inventoryExpiryGroupCount, inventoryExpiryLabel, inventoryScopeIsUrgent, inventoryScope, inventoryUnitDisplayLabel, type InventoryLocationFilter } from "./inventory-model";
 import styles from "./inventory.module.css";
+import { inventoryProductFocusId } from "./inventory-focus";
 
 export const InventoryCard = memo(function InventoryCard({ product, location, context, countMode = false, onOpen }: { product: InventoryProduct; location: InventoryLocationFilter; context: InventoryContext | null; countMode?: boolean; onOpen: (productId: string) => void }) {
   const statusId = useId();
@@ -13,7 +14,7 @@ export const InventoryCard = memo(function InventoryCard({ product, location, co
   const metadata = [locations.map((item) => INVENTORY_LOCATION_LABELS[item]).join("/"), product.manufacturer].filter(Boolean).join(" · ");
   const showIndicator = !!context && (countMode || context.today === context.cycle.startDate);
   return <article data-count-state={countState ?? undefined} data-count-indicator={showIndicator && countState ? countState : undefined}>
-    <button type="button" className={styles.productButton} onClick={() => onOpen(product.productId)} aria-label={`${product.name}, ${quantity} ${unitLabel}, 상세 보기`} aria-describedby={context || product.status !== "active" ? statusId : undefined}>
+    <button id={inventoryProductFocusId(product.productId)} type="button" className={styles.productButton} onClick={() => onOpen(product.productId)} aria-label={`${product.name}, ${quantity} ${unitLabel}, 상세 보기`} aria-describedby={context || product.status !== "active" ? statusId : undefined}>
       {showIndicator ? <span className={styles.countIndicator} data-state={countState ?? "none"} aria-hidden="true">{countState === "done" ? "✓" : countState === "changed" ? "↻" : null}</span> : null}
       <span className={styles.productBody} id={statusId}>
         <span className={styles.cardTitle}>{product.name}</span>
