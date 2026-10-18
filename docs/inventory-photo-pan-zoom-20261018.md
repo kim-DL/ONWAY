@@ -25,6 +25,7 @@
 - 확대/버튼은 requestAnimationFrame으로 보간하며 reduced motion은 즉시 맞춘다. 이미지 이동 중에는 React 상태를 매 픽셀 다시 렌더하지 않는다. 배율 정수/한도/확대 여부가 달라질 때만 제어부 상태를 갱신한다.
 - 가려진 창의 compositor frame 정지에도 마지막 요청을 보존하는 120ms frame watchdog을 둔다. blur/visibility interruption, pointer cancellation과 resize를 정리한다. 모든 frame/timer/observer/listener/capture는 뷰어 해제 시 함께 해제한다.
 - 소수점 CSS 뷰포트 크기와 좌상단 원점 transform으로 WebKit의 백분율 중심 정렬 오차를 피한다. resize 때 현재 배율과 상대 위치를 다시 제한한다.
+- Aside에서 사진 모달을 연 채 새로고침한 뒤 재열기/닫기가 무시되는 기존 공통 모달 이력 충돌을 발견했고 일반 Chromium PC·모바일에서도 재현했다. React `useId`는 문서 재시작 시 같아지지만 `history.state`는 남으므로 공통 BottomSheet의 이력 키에 인스턴스 구분값을 더했다. DOM/ARIA ID와 중첩 모달의 소유권·뒤로가기 계약은 그대로 유지한다. 이 값은 UI 이력 식별자이며 보안 토큰이 아니다.
 
 ## 지연 로딩과 성능 경계
 
@@ -36,8 +37,8 @@
 
 - geometry 단위 10개: 비율 유지, 해상도·DPR 최대 배율, 잘못된 크기 대기, 연속 배율의 커서 좌표 보존, 가로/세로/파노라마 이동 경계, 축소 복원을 검증했다.
 - 전체 unit 1,746 PASS / 기존 emulator 조건 15 SKIP. 최초 build 동시 실행에서 기존 runtime identity 동적 import의 5초 timeout 1회 후, 테스트 변경 없이 단독 4개와 전체 순차 실행을 통과했다.
-- Chromium PC/모바일 새 브라우저 회귀 8 PASS / 반대 플랫폼 전용 2 SKIP: 실제 mouse wheel/drag/double click, CDP native touch의 핀치·남은 손가락 pan·더블탭·취소/재조작, 배율 한도·여러 비율·resize·Back·Escape·재열기, 320px/200% 글자/axe, compositor frame 정지를 검사한다. 두 SKIP은 해당 조작을 다른 프로젝트에서 실제 실행한 플랫폼 분리다.
-- Windows Playwright WebKit desktop 4 PASS / Chromium native touch 전용 1 SKIP. 실제 iPhone Safari나 설치 PWA 터치 합격으로 보고하지 않는다.
+- Chromium PC/모바일 새 브라우저 회귀는 실제 mouse wheel/drag/double click, CDP native touch의 핀치·남은 손가락 pan·더블탭·취소/재조작, 배율 한도·여러 비율·resize·Back·Escape·재열기, 320px/200% 글자/axe, compositor frame 정지, 사진을 연 채 새로고침 후 재열기/닫기를 검사한다. 반대 플랫폼 전용 2 SKIP은 해당 조작을 다른 프로젝트에서 실제 실행한 플랫폼 분리다. 최종 수치는 릴리스 기록을 따른다.
+- Windows Playwright WebKit desktop에서도 PC 조작·범위·닫기/포커스·접근성·frame 정지·새로고침을 검사한다. Chromium native touch 전용 1개는 분리한다. 실제 iPhone Safari나 설치 PWA 터치 합격으로 보고하지 않는다.
 - 재고 static PWA/실제 demo Auth·Callable·Firestore·Storage 업무 회귀 18 PASS, transaction integration 12 PASS. 등록/사진·입출고·실사·교체/삭제·권한 회수·viewer 거절·1,000품목 paging을 포함한다.
 - `aside-browser`로 별도 localhost 합성 사진 화면의 실제 뷰어 컴포넌트를 열고 확대 버튼, 휠, 드래그, 더블클릭 확대/복원, 상태 문구와 화면을 직접 확인했다. Aside는 새 viewport API를 제공하지 않아 모바일 검증은 별도 네이티브 입력 회귀와 구분한다. 일부 Aside 전체 화면 캡처가 CDP timeout/clip 오류를 냈으며 이를 제품 사진 오류로 취급하지 않는다.
 - 실제 기기의 핀치·OS 제스처·설치 PWA lifecycle은 별도 현장 인수다. 운영 업무 데이터 생성·변경·삭제를 테스트에 사용하지 않는다.

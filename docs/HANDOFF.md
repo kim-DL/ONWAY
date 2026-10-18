@@ -9,7 +9,7 @@
 
 - 기존 2배 스크롤 확대를 커서 중심 휠·드래그·더블클릭 및 모바일 핀치·한 손가락 이동·더블탭으로 바꿨다. 맞춤 100%, 빠른 확대 1.8배, 최대 2.5배/충분한 실제 이미지 해상도일 때 3배다. 축별 이동 경계, 키보드, 포인터 취소, 화면 크기 변경, 창 가림의 frame 정지 복구와 Safari 닫기 포커스 복원을 포함한다.
 - PhotoSwipe 5.4.4, react-zoom-pan-pinch 4.2.0과 비교해 경량 자체 구현을 선택했다. 기존 인증된 Blob URL·BottomSheet·사진 전환을 재사용하고 새 조작부는 사진 뷰어 안에서만 지연 로딩한다. 기존 성능 상한은 유지하고 새 경계·전체 방문 흐름도 별도 작은 한도로 검사한다. 설계·패키지 실측·검증 범위는 [구현 기록](inventory-photo-pan-zoom-20261018.md)을 참고한다.
-- unit 1,746 PASS / 기존 조건부 15 SKIP, 새 Chromium PC/모바일 8 PASS / 플랫폼 분리 2 SKIP, WebKit desktop 4 PASS / native CDP touch 분리 1 SKIP, 재고 static browser 18 PASS와 실제 transaction 12 PASS를 확인했다. Aside 직접 PC 조작도 확인했다. 실제 iPhone/설치 PWA의 터치·lifecycle 검증과 구분한다. 최종 source의 main CI 및 Hosting 릴리스 결과는 완료 뒤 별도 최신 항목에 기록한다.
+- unit 1,746 PASS / 기존 조건부 15 SKIP, 새 Chromium PC/모바일 조작·WebKit desktop 회귀, 재고 static browser 18 PASS와 실제 transaction 12 PASS를 확인했다. Aside 직접 PC 조작 중 발견한 새로고침 후 모달 이력 충돌도 일반 브라우저에 재현한 뒤 인스턴스 이력 키와 추가 회귀로 보완한다. 실제 iPhone/설치 PWA의 터치·lifecycle 검증과 구분한다. 최종 source의 검사 수치·main CI 및 Hosting 릴리스 결과는 완료 뒤 별도 최신 항목에 기록한다.
 - 이번 요청에는 테스트 통과 후 Git 저장과 운영 Hosting 배포 승인이 포함된다. 대상은 `hosting:onnuriway`만이며 기존 Functions·Rules·MCP 작업을 보존한다. 중간 검증 `out`은 `inventory-pan-zoom-local-validation` source marker이므로 배포하지 않고 정확한 commit으로 새 production build를 만들어야 한다.
 
 ### 2026-10-18 현장 지연 P0 — PR #5 main 병합·운영 배포·검증 완료

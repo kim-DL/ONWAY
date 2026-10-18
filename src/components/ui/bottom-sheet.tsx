@@ -138,7 +138,10 @@ export function BottomSheetActions({ children, className = "", busy = false }: {
 export function BottomSheet({ open, title, description, children, onClose, dismissible = true, beforeClose }: BottomSheetProps) {
   const titleId = useId();
   const descriptionId = useId();
-  const historyId = useId();
+  const componentId = useId();
+  // React IDs restart after a reload, while history.state survives it. This
+  // UI-only instance key must not match a retired sheet from another document.
+  const [historyId] = useState(() => `${componentId}:${Math.random().toString(36).slice(2)}`);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);

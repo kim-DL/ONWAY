@@ -126,3 +126,11 @@ test("requested zoom survives compositor frame suspension and closes cleanly", a
   await dialog.getByRole("button", { name: "닫기", exact: true }).click(); await expect(dialog).toHaveCount(0);
   await open(page); await expect.poll(() => scale(stage)).toBe(1);
 });
+test("a viewer reopened after page reload closes without colliding with the previous document's history", async ({ page }) => {
+  await open(page);
+  await page.reload();
+  await page.addScriptTag({ content: fixture.script });
+  const { dialog } = await open(page);
+  await dialog.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+});
