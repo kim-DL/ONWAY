@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Customer, CustomerPoint } from "@/domain/customer";
 import { customerDirectoryEntry, UNKNOWN_CUSTOMER_DISTRICT, UNKNOWN_CUSTOMER_DONG } from "./customer-directory-filter";
 import { customerRepository } from "./customer-repository";
+import { isCustomerPoint } from "./customer-point";
 
 type Region = Pick<Customer, "district" | "administrativeDong">;
 type Result = { region: Region | null; failed: boolean };
@@ -17,8 +18,7 @@ function lookupKey(customer: Customer): string {
 
 function needsLookup(customer: Customer): boolean {
   const point = customer.deliveryPoint;
-  if (!point || !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)
-    || Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) return false;
+  if (!isCustomerPoint(point)) return false;
   const region = customerDirectoryEntry(customer);
   return region.district === UNKNOWN_CUSTOMER_DISTRICT || region.dong === UNKNOWN_CUSTOMER_DONG;
 }

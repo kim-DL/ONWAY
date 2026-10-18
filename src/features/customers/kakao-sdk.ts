@@ -1,3 +1,6 @@
+import { isCustomerPoint as isDeliveryMapPoint } from "./customer-point";
+export { isDeliveryMapPoint };
+
 export interface DeliveryMapPoint {
   latitude: number;
   longitude: number;
@@ -159,12 +162,6 @@ export function loadKakaoMapsSdk(): Promise<KakaoMapsSdk> {
     throw error;
   });
   return pendingSdk;
-}
-
-export function isDeliveryMapPoint(point: DeliveryMapPoint | null | undefined): point is DeliveryMapPoint {
-  return Boolean(point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
-    && point.latitude >= -90 && point.latitude <= 90
-    && point.longitude >= -180 && point.longitude <= 180);
 }
 
 /** A cached map may not emit tilesloaded. Inspect rendered images, never SDK internals. */

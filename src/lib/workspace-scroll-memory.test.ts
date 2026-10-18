@@ -32,8 +32,8 @@ describe("workspace scroll memory", () => {
     expect(saved).toEqual([1_420]);
     layoutInvalid = true;
     cleanup();
-    expect(saved).toEqual([1_420, 1_420]);
+    expect(saved).toEqual([1_420]);
     target.dispatchEvent(new Event("scroll"));
-    expect(saved).toHaveLength(2);
+    expect(saved).toHaveLength(1);
   });
 });

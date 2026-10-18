@@ -6,8 +6,9 @@
 
 - 거래처 검색은 기존 전체 데이터 검색·초성·정렬·총건수를 유지하고 처음 32개를 표시한다. '거래처 더 보기'로 32개씩 추가한다. 검색어 변경·지우기는 32개로 초기화하고, 화면 재진입 시 검색어와 표시 개수를 같은 세션의 메모리에서 복원한다. 권한 폐기·계정 변경·오프라인 정리 시 추가된 표시 개수도 초기화한다.
 - 재고 카드는 React 기본 shallow memo를 적용하고 onOpen 콜백을 안정화했다. product 전체, context 전체, location, countMode를 그대로 비교하므로 수량/revision·날짜/실사 주기·보관 장소·실사 상태 변경을 생략하지 않는다. 기존 60개씩 더보기, 전체 검색, native 키보드/브라우저 찾기를 유지한다.
-- 스크롤은 session 기준 화면 진입 시 한 번 복원하고 passive scroll 이벤트로 기록한다. DOM commit 뒤 cleanup에서 scrollTop을 다시 읽지 않고 마지막 관측 값을 저장하므로 목록 변경마다 layout effect를 해제/재설치하지 않는다. 복원 위치는 기존 scrollHeight/clientHeight 경계로 제한한다.
+- 스크롤은 session 기준 화면 진입 시 한 번 복원하고 passive scroll 이벤트로 기록한다. DOM commit 뒤 cleanup에서 scrollTop을 다시 읽거나 이미 기록한 값을 중복 저장하지 않으며 목록 변경마다 layout effect를 해제/재설치하지 않는다. 복원 위치는 기존 scrollHeight/clientHeight 경계로 제한한다.
 - 기존 Callable 인가/App Check, request ID·revision·감사, 재고 reconcile/최신 상세 확인, 60초 freshness, 사진 outbox, MCP는 유지한다. 페이지 크기/서버 조회 구조는 이번에 바꾸지 않았다.
+- 운영 설정의 번들 상한을 유지하기 위해 directions/지도/행정동 조회의 같은 좌표 범위 검증을 순수 함수로 공통화했다. SDK는 기존 지도 지연 로딩 경계 안에 두고, 기존 isDeliveryMapPoint export와 좌표 검증 조건을 보존한다. 새 더보기 버튼에는 기존 공통 조작부를 재사용한다.
 
 ## 방식 선택
 
