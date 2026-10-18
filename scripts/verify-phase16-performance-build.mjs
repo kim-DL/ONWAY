@@ -169,6 +169,14 @@ const adminInterfaceGzipBytes = adminInterfaceStylesheets.reduce((sum, asset) =>
 // Account for its new UI separately, never by relaxing existing app budgets.
 const inventoryWorkspaceEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-workspace"));
 const inventoryPhotoEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-photo-viewer"));
+// Pan/zoom is requested only from the already event-loaded photo dialog.
+// Keep the established workspace/viewer envelopes and charge this new feature separately.
+const inventoryPanZoomEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-photo-pan-zoom"));
+const inventoryPanZoomAssets = new Set(inventoryPanZoomEntries.flatMap((entry) => entry.files));
+const inventoryPanZoomStylesheets = stylesheets.filter((asset) => inventoryPanZoomAssets.has(asset.asset));
+const inventoryPanZoomJavascriptGzipBytes = [...inventoryPanZoomAssets].filter((asset) => asset.endsWith(".js")).map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const inventoryPanZoomStylesheetRawBytes = inventoryPanZoomStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
+const inventoryPanZoomStylesheetGzipBytes = inventoryPanZoomStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryManufacturerEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-picker"));
 const inventoryManufacturerFieldEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-field"));
 const inventoryEntries = [...inventoryWorkspaceEntries, ...inventoryPhotoEntries];
@@ -194,15 +202,16 @@ const inventoryViewerJavascriptGzipBytes = inventoryViewerAdditionalAssets.filte
 const inventorySharedPhotoStylesheets = photoMorphStylesheets.filter((asset) => inventoryAssetNames.has(asset.asset));
 const inventorySharedPhotoStylesheetRawBytes = inventorySharedPhotoStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventorySharedPhotoStylesheetGzipBytes = inventorySharedPhotoStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const inventoryWithPhotoStylesheetRawBytes = inventoryStylesheetRawBytes + inventorySharedPhotoStylesheetRawBytes;
-const inventoryWithPhotoStylesheetGzipBytes = inventoryStylesheetGzipBytes + inventorySharedPhotoStylesheetGzipBytes;
+const inventoryWithPhotoStylesheetRawBytes = inventoryStylesheetRawBytes + inventorySharedPhotoStylesheetRawBytes + inventoryPanZoomStylesheetRawBytes;
+const inventoryWithPhotoStylesheetGzipBytes = inventoryStylesheetGzipBytes + inventorySharedPhotoStylesheetGzipBytes + inventoryPanZoomStylesheetGzipBytes;
+const inventoryWithPhotoJavascriptGzipBytes = inventoryJavascriptGzipBytes + inventoryPanZoomJavascriptGzipBytes;
 const inventoryManufacturerJavascriptGzipBytes = [...inventoryManufacturerAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryManufacturerFieldJavascriptGzipBytes = [...inventoryManufacturerFieldAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryManufacturerStylesheetRawBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryManufacturerStylesheetGzipBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -280,7 +289,12 @@ for (const asset of inventoryAssetNames) {
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryEntries.includes(entry)),
     `inventory asset ${asset} must not leak into unrelated work modes`);
 }
-for (const asset of stylesheets.filter((item) => !inventoryStylesheets.includes(item) && !inventoryManufacturerStylesheets.includes(item))) {
+assertBudget(inventoryPanZoomEntries.length === 1 && inventoryPanZoomStylesheets.length === 1, "inventory pan/zoom must retain one nested boundary and isolated stylesheet");
+for (const asset of inventoryPanZoomAssets) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset) && !inventoryAssetNames.has(asset), `pan/zoom asset ${asset} must wait until the photo dialog opens`);
+  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryPanZoomEntries.includes(entry)), `pan/zoom asset ${asset} must not leak into other screens`);
+}
+for (const asset of stylesheets.filter((item) => !inventoryStylesheets.includes(item) && !inventoryManufacturerStylesheets.includes(item) && !inventoryPanZoomStylesheets.includes(item))) {
   assertBudget(!/\.inventory(?:-[\w-]+)?_[\w-]+__/u.test(readFileSync(join(nextRoot, asset.asset), "utf8")),
     `inventory scoped CSS must not be merged into unrelated/shared asset ${asset.asset}`);
 }
@@ -293,7 +307,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 4 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the four approved photo viewers");
 }
-const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
+const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -347,7 +361,7 @@ for (const layer of deliveryPhotoFieldLayers) {
     assertBudget(serviceWorker.includes(asset), `delivery photo ${layer.name} asset must remain precached`);
   }
 }
-for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-history-dates", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer"]) {
+for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-history-dates", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer", "inventory-photo-pan-zoom"]) {
   const entry = dynamicEntries.find(({ boundary }) => boundary.endsWith(tool));
   assertBudget(entry?.files.every((asset) => serviceWorker.includes(asset)),
     `deferred ${tool} assets must remain in the PWA precache`);
@@ -427,6 +441,9 @@ assertBudget(inventoryStylesheetRawBytes <= 28.5 * 1024, `inventory CSS raw ${in
 assertBudget(inventoryStylesheetGzipBytes <= 6.5 * 1024, `inventory CSS gzip ${inventoryStylesheetGzipBytes}B exceeds 6.5KiB`);
 assertBudget(inventoryJavascriptGzipBytes <= 25 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25KiB`);
 assertBudget(inventoryViewerJavascriptGzipBytes <= 2.25 * 1024, `inventory photo viewer JavaScript gzip ${inventoryViewerJavascriptGzipBytes}B exceeds 2.25KiB`);
+assertBudget(inventoryPanZoomJavascriptGzipBytes <= 6 * 1024, `inventory pan/zoom JavaScript gzip ${inventoryPanZoomJavascriptGzipBytes}B exceeds 6KiB`);
+assertBudget(inventoryPanZoomStylesheetRawBytes <= 2 * 1024 && inventoryPanZoomStylesheetGzipBytes <= .75 * 1024, "inventory pan/zoom CSS exceeds its 2KiB raw / .75KiB gzip allowance");
+assertBudget(inventoryWithPhotoJavascriptGzipBytes <= 31 * 1024, "complete inventory and photo flow exceeds 31KiB gzip");
 
 const report = {
   generatedAt: new Date().toISOString(),
@@ -503,6 +520,10 @@ const report = {
     inventoryJavascriptGzipBytes,
     inventoryWorkspaceJavascriptGzipBytes,
     inventoryViewerJavascriptGzipBytes,
+    inventoryPanZoomJavascriptGzipBytes,
+    inventoryPanZoomStylesheetRawBytes,
+    inventoryPanZoomStylesheetGzipBytes,
+    inventoryWithPhotoJavascriptGzipBytes,
     inventoryManufacturerJavascriptGzipBytes,
     inventoryManufacturerFieldJavascriptGzipBytes,
     inventoryManufacturerStylesheetRawBytes,
@@ -515,6 +536,7 @@ const report = {
   inventoryAssetAccounting: {
     workspaceAssets: [...inventoryWorkspaceAssetNames],
     viewerAdditionalAssets: inventoryViewerAdditionalAssets,
+    panZoomAssets: [...inventoryPanZoomAssets].map(sizeAsset),
     exclusiveStylesheets: inventoryStylesheets,
     sharedPhotoStylesheets: inventorySharedPhotoStylesheets,
     manufacturerPickerAssets: [...inventoryManufacturerAssetNames].map(sizeAsset),

@@ -766,8 +766,9 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await photoButton.click();
   const photoViewer = page.getByRole("dialog", { name: `${productName} 제품 사진`, exact: true });
   await expect(photoViewer.getByRole("region", { name: "제품 사진 보기", exact: true })).toBeVisible();
-  await photoViewer.getByRole("button", { name: "2배 확대", exact: true }).click();
-  await expect(photoViewer.getByRole("button", { name: "전체 보기", exact: true })).toBeVisible();
+  await photoViewer.getByRole("button", { name: "사진 1.8배 빠른 확대", exact: true }).click();
+  await expect(photoViewer.getByLabel("사진 배율", { exact: true })).toHaveText("180%");
+  await expect(photoViewer.getByRole("button", { name: "화면 맞춤", exact: true })).toBeEnabled();
   await capture(page, info, "inventory-photo-viewer-360");
   await page.goBack(); await expect(photoViewer).toHaveCount(0); await expect(detail).toBeVisible();
   const products = await db().collection(INVENTORY_PRODUCT_PATH).where("name", "==", productName).get();
