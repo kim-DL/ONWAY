@@ -46,8 +46,10 @@
 .countToggle:has(input:disabled) { cursor: wait; opacity: .55; }
 .catalogMeta :global(.glass-button) { min-height: 44px; padding: 4px 8px; margin-block: -8px; margin-left: auto; color: #50667f; font-size: 12px; }
 .list { composes: list from "../../components/ui/field-list.module.css?inventory"; }
+.list .productButton:focus-visible { outline-offset: -3px; }
+.list .productButton { scroll-margin-block-end: calc(var(--inventory-action-inset) + 90px); }
 .productBody { min-width: 0; flex: 1; display: grid; gap: 2px; }
-.cardTitle { font-size: 16px; line-height: 1.35; font-weight: 750; overflow-wrap: anywhere; }
+.cardTitle { font-size: 16px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
 .cardMeta, .cardDetails { color: #58687c; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .cardDetails { display: flex; flex-wrap: wrap; gap: 1px 8px; }
 .rowUrgent { color: #85500f; font-weight: 700; }
@@ -75,7 +77,7 @@
 :global(.bottom-sheet__footer) > .detailActions:global(.bottom-sheet__actions) { display: grid; gap: 6px; }
 .detailSecondaryActions, .detailStockActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .detailSecondaryActions > :only-child { grid-column: 1 / -1; }
-.detailActions :global(.glass-button) { min-width: 0; min-height: 44px; padding: 6px 3px; border-radius: 7px; font-size: 12px; gap: 5px; box-shadow: none; }
+.detailActions :global(.glass-button) { min-width: 0; min-height: 44px; padding: 6px 3px; border-radius: 7px; font-size: 12px; font-weight: 700; gap: 5px; box-shadow: none; }
 .detailSecondaryActions :global(.glass-button) { background: #f2f5f8; color: #4c6076; border-color: #d4dfe8; }
 .detailEditAction:global(.glass-button) { background: #e5eff1; color: #365e69; border-color: #c5d9dd; }
 .detailStockActions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -86,7 +88,7 @@
 .detailActionCount:global(.glass-button) { background: #d9f1e6; color: #216e50; border-color: #aad7c4; }
 .detailActionCount:global(.glass-button):disabled { opacity: 1; background: #edf1f4; color: #607184; border-color: #d4dfe8; }
 .detailActionLabel { display: grid; gap: 2px; line-height: 1.25; }
-.detailActionLabel small { font-size: 10px; font-weight: 500; }
+.detailActionLabel small { font-size: 10px; font-weight: 400; }
 .detailMoreIcon { font-size: 23px; line-height: .7; letter-spacing: 1px; }
 .field { display: flex; flex-direction: column; gap: 6px; color: #4e5968; font-size: 13px; font-weight: 650; min-width: 0; position: relative; }
 .field :is(input, select, textarea) { box-sizing: border-box; min-width: 0; width: 100%; min-height: 48px; border: 1px solid #d1d6db; border-radius: 10px; padding: 12px; color: #191f28; background: #fff; font: inherit; font-size: 16px; font-weight: 450; }
@@ -99,7 +101,7 @@
 .notice { margin: 0; padding: 14px; border-radius: 10px; background: #f2f4f6; color: #4e5968; line-height: 1.7; font-size: 14px; }
 .note { display: flex; gap: 8px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 10px 12px; border-radius: 8px; background: #f3f5f7; font-size: 13px; line-height: 1.7; color: #4e5968; }
 .note > svg { flex-shrink: 0; margin-top: 3px; }
-.detailSurface :global(.bottom-sheet__header) h2 { font-weight: 750; text-align: center; padding-inline: 32px; font-size: 20px; }
+.detailSurface :global(.bottom-sheet__header) h2 { font-weight: 700; text-align: center; padding-inline: 32px; font-size: 20px; }
 .detailBody { gap: 9px; }
 .detailBody .note { justify-content: center; text-align: center; background: #eff3f780; padding: 8px 10px; }
 .detailSummary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; align-items: center; }
@@ -111,14 +113,14 @@
 .detailStock > span { font-size: 12px; color: #657386; }
 .detailLocation { display: flex; align-items: center; gap: 4px; color: #657386; font-size: 12px; }
 .detailLocationControl { position: relative; display: inline-flex; align-items: center; }
-.detailLocation select { appearance: none; min-height: 44px; padding: 6px 24px 6px 10px; background: #edf3f7; border: 1px solid #d4e0e9; border-radius: 6px; color: #365773; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.detailLocation select { appearance: none; min-height: 44px; padding: 6px 24px 6px 10px; background: #edf3f7; border: 1px solid #d4e0e9; border-radius: 6px; color: #365773; font: inherit; font-size: 13px; font-weight: 400; cursor: pointer; }
 .detailLocationControl > svg { position: absolute; right: 7px; transform: rotate(90deg); pointer-events: none; color: #50718e; }
 .detailStock > strong { color: #215fac; font-size: clamp(30px, 7vw, 44px); line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.04em; overflow-wrap: anywhere; max-width: 100%; }
 .detailStock small { margin-left: 5px; font-size: 14px; color: #617084; }
 .productFacts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; text-align: center; border-block: 1px solid #c6d2dd80; }
 .productFacts > div { padding: 7px 4px; min-width: 0; }
 .productFacts dt { color: #657386; font-size: 11px; margin-bottom: 3px; }
-.productFacts dd { font-size: 14px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
+.productFacts dd { font-size: 14px; font-weight: 400; margin: 0; overflow-wrap: anywhere; }
 .dateStockList { border: 1px solid #d3dde780; border-radius: 6px; overflow: hidden; }
 .dateStockRow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #ffffffad; }
 .dateStockRow + .dateStockRow { border-top: 1px solid #d3dde770; }

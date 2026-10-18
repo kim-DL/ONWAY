@@ -442,7 +442,10 @@ assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${sales
 // boundary a 1KiB allowance without changing any initial or unrelated budget.
 assertBudget(inventoryStylesheetRawBytes <= 28.5 * 1024, `inventory CSS raw ${inventoryStylesheetRawBytes}B exceeds 28.5KiB`);
 assertBudget(inventoryStylesheetGzipBytes <= 6.5 * 1024, `inventory CSS gzip ${inventoryStylesheetGzipBytes}B exceeds 6.5KiB`);
-assertBudget(inventoryJavascriptGzipBytes <= 25 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25KiB`);
+// Retained-DOM render groups + memoized list (previous inventory: 25,563B).
+// Bound this helper to 256B; initial assets, CSS, other features and the
+// complete inventory/photo 31KiB envelope below remain unchanged.
+assertBudget(inventoryJavascriptGzipBytes <= 25.25 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25.25KiB`);
 assertBudget(inventoryViewerJavascriptGzipBytes <= 2.25 * 1024, `inventory photo viewer JavaScript gzip ${inventoryViewerJavascriptGzipBytes}B exceeds 2.25KiB`);
 assertBudget(inventoryPanZoomJavascriptGzipBytes <= 6 * 1024, `inventory pan/zoom JavaScript gzip ${inventoryPanZoomJavascriptGzipBytes}B exceeds 6KiB`);
 assertBudget(inventoryPanZoomStylesheetRawBytes <= 2 * 1024 && inventoryPanZoomStylesheetGzipBytes <= .75 * 1024, "inventory pan/zoom CSS exceeds its 2KiB raw / .75KiB gzip allowance");
@@ -481,7 +484,7 @@ const report = {
     salesWorkspaceGzipBytes: 14 * 1024,
     inventoryStylesheetRawBytes: 28.5 * 1024,
     inventoryStylesheetGzipBytes: 6.5 * 1024,
-    inventoryJavascriptGzipBytes: 25 * 1024,
+    inventoryJavascriptGzipBytes: 25.25 * 1024,
     inventoryViewerJavascriptGzipBytes: 2.25 * 1024,
   },
   measurements: {

@@ -189,6 +189,11 @@ async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, 
   const more = page.getByRole("button", { name: "품목 더 보기", exact: true });
   const moreBox = await more.count() ? await more.boundingBox() : null;
   if (moreBox) {
+    if (moreBox.y + moreBox.height > after!.y) {
+      const path = info.outputPath(`${name}-overflow.json`);
+      await writeFile(path, JSON.stringify({ before, after, last, moreBox, currentLast: await finalCard.boundingBox(), scroll: await scroller.evaluate((e) => ({ top: e.scrollTop, height: e.scrollHeight, client: e.clientHeight })) }));
+      await info.attach(`${name}-overflow`, { path, contentType: "application/json" });
+    }
     expect(moreBox.y + moreBox.height, "load more must not sit behind the floating action").toBeLessThanOrEqual(after!.y);
     await more.click({ trial: true });
   }
@@ -669,7 +674,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   const pickerGeometry = await manufacturerPicker.evaluate((dialog) => ({ scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth,
     targets: Array.from(dialog.querySelectorAll("button, input"), (element) => element.getBoundingClientRect().height) }));
   expect(pickerGeometry.scrollWidth).toBeLessThanOrEqual(pickerGeometry.clientWidth);
-  expect(pickerGeometry.targets.every((height) => height >= 44)).toBe(true);
+  expect(pickerGeometry.targets.every((height) => height >= 44), `manufacturer targets: ${JSON.stringify(pickerGeometry.targets)}`).toBe(true);
   await manufacturerPicker.getByRole("button", { name: /테스트 제조사.*새 제조사로 추가/ }).click();
   const addManufacturer = page.getByRole("dialog", { name: "새 제조사 추가", exact: true });
   const manufacturerName = addManufacturer.getByLabel("제조사명", { exact: true });
@@ -1686,6 +1691,26 @@ test("a 1,000-product catalog fetches every server page while rendering 60 rows 
   const requestCount = responses.length;
   await page.getByRole("button", { name: "품목 더 보기", exact: true }).click();
   await expect(cards).toHaveCount(120);
+  // Retained offscreen groups keep focus, modal return and native text search.
+  await cards.nth(19).focus();
+  await page.keyboard.press("Tab");
+  await expect(cards.nth(20)).toBeFocused();
+  await expect(cards.nth(20)).toBeInViewport();
+  await cards.last().focus();
+  await expect(cards.last()).toBeInViewport();
+  const focusedTop = (await cards.last().boundingBox())!.y;
+  await page.keyboard.press("Enter");
+  const offscreenDetail = page.getByRole("dialog", { name: "카탈로그 검증 제품 0120", exact: true });
+  await expect(offscreenDetail).toBeVisible();
+  await offscreenDetail.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(cards.last()).toBeFocused();
+  // Browser anchoring may adjust scrollTop when an offscreen group's estimated
+  // height becomes measured. Preserve the visible row position, not that offset.
+  await expect.poll(async () => (await cards.last().boundingBox())!.y).toBeCloseTo(focusedTop, 0);
+  expect(await page.evaluate(() => (window as unknown as { find: (text: string, matchCase: boolean, backwards: boolean, wrap: boolean) => boolean }).find("카탈로그 검증 제품 0001", false, false, true))).toBe(true);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("카탈로그 검증 제품 0001");
+  await cards.first().scrollIntoViewIfNeeded();
+  await expect(cards.first()).toBeInViewport();
   // The final product is searchable even when its card has never been rendered.
   await page.getByRole("searchbox", { name: "품목 검색", exact: true }).fill("카탈로그 검증 제품 1000");
   await expect(cards).toHaveCount(1);

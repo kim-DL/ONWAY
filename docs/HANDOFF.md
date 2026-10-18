@@ -5,6 +5,13 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-18 최초 검색·재고 상세 200ms 목표 — 구현·릴리스 검증 중
+
+- 거래처 regular/bold 글꼴 재사용으로 cold layout을 줄이고 기존32/+32를 유지한다. 재고는 전체 의존성의 목록 memo와20행 DOM 그룹/content-visibility로 상세 열기 시 화면 밖 layout을 줄인다. 기존60/+60·전체 검색·native 찾기·키보드·스크롤·실사/최신성·Callable 권한·MCP를 유지한다.
+- 같은 production demo export·합성500거래처/1000재고·600행·Chrome155·390×844·CPU4×·Fast4G의 최종 교차 측정 중앙값: 최초 검색328→144ms, 첫 상세240→208ms, warm 상세192→160ms. 각3개 새 컨텍스트, warm각9회다. 요청의 최초 검색/warm 상세 지표는200ms 미만이며 첫 상세208ms는 남은 한계다. 이전 후보의600ms 예외도 별도 보존하며 전 기기200ms 보장은 아니다. [구현·검증](field-interaction-performance-20261018.md), [개별 값](field-interaction-performance-20261018-metrics.json).
+- unit1747 PASS/기존15 SKIP, 최종 재고 관련517 PASS, lint/app·Functions typecheck, 검색 Chromium22/지도18/WebKit11, 새 재고600행 Chromium2/WebKit1 PASS. 실제 재고 static18(전체15+등록/권한 재검증3)·transaction12 PASS. 하단 그룹 상시 실측과 행 scroll margin으로360/768/1280px 하단 가림을 보완했다. WebKit fixture의 remount/History API와 새 복원 검사의 viewport 기준을 정리했고 기존 계약/timeout/skip을 유지했다. 기존 제조사44px 검사1회 실패·묶음3개 재검증 이력도 보존한다. 정확한 source CI·운영 build/배포는 새 릴리스 기록 완료 전에는 미완료다.
+- 재고 지연 JS 사전 실측25735B(+172B)에만256B 예산을 추가했다. 초기 JS140104B·거래처36851B와 초기/CSS/전체 재고사진 한도는 유지한다. 최종 운영 빌드 수치는 릴리스 기록에서 확인한다. 기존 private env·다른 worktree/branch/stash·MCP PR#4를 보존한다. 현재 배포 승인 범위는 Hosting only다.
+
 ### 2026-10-18 거래처 검색·재고 목록·스크롤 — main 저장·운영 Hosting 배포·검증 완료
 
 - 거래처 검색은 전체 검색/초성/정렬/총건수를 유지하며 32개씩 표시하고 더보기를 제공한다. 검색어·표시 개수의 세션 복원과 권한 정리를 보존했다. 재고는 전체 product/context/location/countMode의 기본 memo와 안정적인 onOpen을 사용한다. 스크롤은 진입 시 복원하고 passive 이벤트로 기록하며 cleanup에서 DOM 읽기나 중복 저장을 하지 않는다. 같은 좌표 검증은 순수 함수로 공통화했다.

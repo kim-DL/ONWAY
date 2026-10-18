@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 
 import { getCustomerChoseong, normalizeCustomerName, type Customer } from "../../../src/domain/customer";
 import type { AuthenticatedSession } from "../../../src/features/auth/auth-context";
@@ -27,5 +28,9 @@ function renderWorkspace() { root.render(
     <div className="workspace-content"><CustomerWorkspace key={workspaceVersion} session={session} requestedCustomerId={null} /></div>
   </main>,
 ); }
-(window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture = () => { workspaceVersion += 1; renderWorkspace(); };
+(window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture = () => {
+  workspaceVersion += 1;
+  // Callers must observe the replacement tree, not briefly match the old input.
+  flushSync(renderWorkspace);
+};
 renderWorkspace();

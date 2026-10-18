@@ -1,0 +1,367 @@
+{
+  "baselineSource": "98f3118be750d8061ca04f4b964cf5c98e8f6dab",
+  "browser": "155.0.8059.82",
+  "conditions": {
+    "productionExport": true,
+    "emulatorProject": "demo-inventory-e2e",
+    "syntheticCustomers": 500,
+    "syntheticInventory": 1000,
+    "renderedInventoryRows": 600,
+    "viewport": "390x844",
+    "dpr": 1,
+    "mobile": true,
+    "touch": true,
+    "cpuSlowdown": 4,
+    "network": {
+      "latency": 165,
+      "download": 1012500,
+      "upload": 168750
+    },
+    "nativeEvents": true,
+    "metric": "PerformanceEventTiming duration, max duration per interaction",
+    "firstSearch": "first 0 input in fresh context",
+    "detail": "one cold and three subsequent warm opens per context",
+    "tracing": false,
+    "liveDevice": false
+  },
+  "earlierCandidateBeforeScrollFix": {
+    "separateRuns": {
+      "before": {
+        "rows": [
+          {
+            "trial": 0,
+            "firstSearchMs": 400,
+            "cards": 32,
+            "detailMs": [
+              272,
+              216,
+              232,
+              224
+            ]
+          },
+          {
+            "trial": 1,
+            "firstSearchMs": 320,
+            "cards": 32,
+            "detailMs": [
+              224,
+              176,
+              176,
+              192
+            ]
+          },
+          {
+            "trial": 2,
+            "firstSearchMs": 304,
+            "cards": 32,
+            "detailMs": [
+              272,
+              208,
+              200,
+              176
+            ]
+          }
+        ],
+        "firstSearch": {
+          "median": 320,
+          "min": 304,
+          "max": 400
+        },
+        "coldDetail": {
+          "median": 272,
+          "min": 224,
+          "max": 272
+        },
+        "warmDetail": {
+          "median": 200,
+          "min": 176,
+          "max": 232,
+          "over200": 4
+        }
+      },
+      "after": {
+        "rows": [
+          {
+            "trial": 0,
+            "firstSearchMs": 144,
+            "cards": 32,
+            "detailMs": [
+              224,
+              160,
+              176,
+              144
+            ]
+          },
+          {
+            "trial": 1,
+            "firstSearchMs": 152,
+            "cards": 32,
+            "detailMs": [
+              192,
+              600,
+              288,
+              160
+            ]
+          },
+          {
+            "trial": 2,
+            "firstSearchMs": 152,
+            "cards": 32,
+            "detailMs": [
+              192,
+              160,
+              176,
+              176
+            ]
+          }
+        ],
+        "firstSearch": {
+          "median": 152,
+          "min": 144,
+          "max": 152
+        },
+        "coldDetail": {
+          "median": 192,
+          "min": 192,
+          "max": 224
+        },
+        "warmDetail": {
+          "median": 176,
+          "min": 144,
+          "max": 600,
+          "over200": 2
+        }
+      }
+    },
+    "alternatingRun": {
+      "before": {
+        "rows": [
+          {
+            "trial": 0,
+            "firstSearchMs": 320,
+            "cards": 32,
+            "detailMs": [
+              256,
+              168,
+              192,
+              168
+            ]
+          },
+          {
+            "trial": 2,
+            "firstSearchMs": 320,
+            "cards": 32,
+            "detailMs": [
+              224,
+              176,
+              168,
+              168
+            ]
+          },
+          {
+            "trial": 4,
+            "firstSearchMs": 384,
+            "cards": 32,
+            "detailMs": [
+              232,
+              192,
+              176,
+              176
+            ]
+          }
+        ],
+        "firstSearch": {
+          "median": 320,
+          "min": 320,
+          "max": 384
+        },
+        "coldDetail": {
+          "median": 232,
+          "min": 224,
+          "max": 256
+        },
+        "warmDetail": {
+          "median": 176,
+          "min": 168,
+          "max": 192,
+          "over200": 0
+        }
+      },
+      "after": {
+        "rows": [
+          {
+            "trial": 1,
+            "firstSearchMs": 136,
+            "cards": 32,
+            "detailMs": [
+              176,
+              144,
+              192,
+              144
+            ]
+          },
+          {
+            "trial": 3,
+            "firstSearchMs": 168,
+            "cards": 32,
+            "detailMs": [
+              208,
+              160,
+              160,
+              160
+            ]
+          },
+          {
+            "trial": 5,
+            "firstSearchMs": 136,
+            "cards": 32,
+            "detailMs": [
+              192,
+              160,
+              160,
+              160
+            ]
+          }
+        ],
+        "firstSearch": {
+          "median": 136,
+          "min": 136,
+          "max": 168
+        },
+        "coldDetail": {
+          "median": 192,
+          "min": 176,
+          "max": 208
+        },
+        "warmDetail": {
+          "median": 160,
+          "min": 144,
+          "max": 192,
+          "over200": 0
+        }
+      }
+    }
+  },
+  "alternatingRun": {
+    "order": [
+      "before",
+      "after",
+      "before",
+      "after",
+      "before",
+      "after"
+    ],
+    "before": {
+      "rows": [
+        {
+          "trial": 0,
+          "firstSearchMs": 304,
+          "cards": 32,
+          "detailMs": [
+            288,
+            240,
+            224,
+            192
+          ]
+        },
+        {
+          "trial": 2,
+          "firstSearchMs": 336,
+          "cards": 32,
+          "detailMs": [
+            240,
+            176,
+            192,
+            184
+          ]
+        },
+        {
+          "trial": 4,
+          "firstSearchMs": 328,
+          "cards": 32,
+          "detailMs": [
+            240,
+            168,
+            192,
+            184
+          ]
+        }
+      ],
+      "firstSearch": {
+        "median": 328,
+        "min": 304,
+        "max": 336
+      },
+      "coldDetail": {
+        "median": 240,
+        "min": 240,
+        "max": 288
+      },
+      "warmDetail": {
+        "median": 192,
+        "min": 168,
+        "max": 240,
+        "over200": 2
+      }
+    },
+    "after": {
+      "rows": [
+        {
+          "trial": 1,
+          "firstSearchMs": 136,
+          "cards": 32,
+          "detailMs": [
+            208,
+            160,
+            160,
+            144
+          ]
+        },
+        {
+          "trial": 3,
+          "firstSearchMs": 144,
+          "cards": 32,
+          "detailMs": [
+            208,
+            160,
+            160,
+            176
+          ]
+        },
+        {
+          "trial": 5,
+          "firstSearchMs": 152,
+          "cards": 32,
+          "detailMs": [
+            192,
+            160,
+            192,
+            160
+          ]
+        }
+      ],
+      "firstSearch": {
+        "median": 144,
+        "min": 136,
+        "max": 152
+      },
+      "coldDetail": {
+        "median": 208,
+        "min": 192,
+        "max": 208
+      },
+      "warmDetail": {
+        "median": 160,
+        "min": 144,
+        "max": 192,
+        "over200": 0
+      }
+    }
+  },
+  "limitations": [
+    "Small local sample; no field p75 claim",
+    "All samples retained including above-target outliers",
+    "Historical 448/312ms tool results are not the current matched baseline",
+    "Synthetic catalog has no photos, maps, contacts or stock lots"
+  ]
+}

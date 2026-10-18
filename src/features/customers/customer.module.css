@@ -75,27 +75,29 @@
 .cardBody { padding: 11px 4px 8px; pointer-events: none; }
 .cardHeading { align-items: flex-start; }
 .cardName { flex: 1; min-width: 0; }
-.cardHeading h2, .cardHeading h4 { min-width: 0; margin: 0; color: var(--customer-ink); font-size: 1rem; font-weight: 760; line-height: 1.4; overflow-wrap: anywhere; }
+/* Reuse regular/bold faces on the first result paint; intermediate weights
+   create additional cold font/layout work without adding an information level. */
+.cardHeading h2, .cardHeading h4 { min-width: 0; margin: 0; color: var(--customer-ink); font-size: 1rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 .region { margin: 2px 0 6px; min-width: 0; color: var(--customer-muted); font-size: .875rem; line-height: 1.45; overflow-wrap: anywhere; }
 .badges { display: inline-flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
 .badges :global(.status-badge) { min-height: 26px; padding: 4px 8px; border-radius: 8px; font-size: .6875rem; line-height: 1.35; white-space: nowrap; }
 .coreInfo { display: grid; gap: 7px; margin: 0; padding: 11px 12px; border-radius: 12px; background: var(--customer-canvas); }
 .card .coreInfo { gap: 2px; padding: 0; background: transparent; }
 .coreInfo > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: baseline; gap: 6px; }
-.coreInfo dt { color: var(--customer-muted); font-size: .75rem; font-weight: 650; line-height: 1.5; }
-.coreInfo dd { min-width: 0; margin: 0; color: var(--customer-ink); font-size: .875rem; font-weight: 600; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.coreInfo dd.password { font-size: 1rem; font-weight: 760; font-variant-numeric: tabular-nums; }
+.coreInfo dt { color: var(--customer-muted); font-size: .75rem; font-weight: 400; line-height: 1.5; }
+.coreInfo dd { min-width: 0; margin: 0; color: var(--customer-ink); font-size: .875rem; font-weight: 400; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.coreInfo dd.password { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .contactRow { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 4px; min-height: 50px; padding-top: 4px; }
 .contactActions { display: inline-flex; align-items: center; gap: 4px; min-width: max-content; }
 .contactText { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; min-width: 0; column-gap: 8px; row-gap: 2px; color: var(--customer-muted); font-size: .75rem; line-height: 1.5; }
 .contactText span { word-break: keep-all; overflow-wrap: anywhere; }
-.contactText strong { color: var(--customer-ink); font-size: .8125rem; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.contactText strong { color: var(--customer-ink); font-size: .8125rem; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
 .phoneLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #cbd6e9; border-radius: 11px; color: #263c68; background: #fff; box-shadow: 0 2px 0 #d5dfef; text-decoration: none; pointer-events: auto; }
 .phoneLink:hover { background: var(--customer-accent-soft); }
-.directionsLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 5px; min-height: 48px; padding: 9px 11px; border: 1px solid #cbd6e9; border-radius: 11px; background: #fff; box-shadow: 0 2px 0 #d5dfef; color: #263c68; font-size: .75rem; font-weight: 720; text-decoration: none; white-space: nowrap; pointer-events: auto; }
+.directionsLink { position: relative; z-index: 2; display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 5px; min-height: 48px; padding: 9px 11px; border: 1px solid #cbd6e9; border-radius: 11px; background: #fff; box-shadow: 0 2px 0 #d5dfef; color: #263c68; font-size: .75rem; font-weight: 700; text-decoration: none; white-space: nowrap; pointer-events: auto; }
 .directionsLink:hover { background: var(--customer-accent-soft); }
 .directionsLink:focus-visible { outline: 2px solid var(--customer-accent); outline-offset: 2px; }
-.directionsLink[aria-disabled="true"] { color: var(--customer-muted); background: var(--customer-canvas); box-shadow: none; font-weight: 500; }
+.directionsLink[aria-disabled="true"] { color: var(--customer-muted); background: var(--customer-canvas); box-shadow: none; font-weight: 400; }
 .card .directionsLink { padding-inline: 8px; }
 .cardChevron { flex-shrink: 0; color: var(--customer-muted); }
 @container (max-width: 18rem) {

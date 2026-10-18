@@ -17,6 +17,7 @@ vi.mock("client-only", () => ({}));
 vi.mock("./use-inventory-connection", () => ({ useInventoryConnection: () => harness.online, INVENTORY_OFFLINE_DRAFT_MESSAGE: "입력은 유지되며 연결된 뒤 다시 저장해주세요." }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { context: harness.context, list: harness.list }, inventoryErrorMessage: () => "최신 정보 확인이 필요해요." }));
 import { InventoryCard } from "./inventory-card";
+import { InventoryListChunks } from "./inventory-list-chunks";
 import { InventoryWorkspace } from "./inventory-workspace";
 
 const context: InventoryContext = { today: "2026-09-13", canWrite: true, canAdmin: false, cycle: { cycleId: "week-2026-09-07", startDate: "2026-09-07", nextDate: "2026-09-14", weekday: 1 }, settings: { weekday: 1, urgentDays: 7, revision: 0, pendingWeekday: null, effectiveDate: null, pendingCycleStartDate: null, updatedAt: null, updatedBy: null } };
@@ -309,7 +310,7 @@ describe("inventory in-memory draft lifecycle", () => {
     updateInventoryWorkspaceUi("employee-1:1:1", { limit: 180 }); cleanup();
     resetMountedInstance();
     const tree = render();
-    expect(find(tree, (type) => type === "ul")?.children).toHaveLength(180);
+    expect(find(tree, (type) => type === InventoryListChunks)?.children).toHaveLength(180);
     expect(find(tree, (_type, props) => props.children === "품목 더 보기")).not.toBeNull();
     expect(harness.list).toHaveBeenCalledOnce();
   });

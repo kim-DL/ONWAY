@@ -57,6 +57,20 @@ test("large search keeps full matching and ordering with incremental results acr
   await page.getByRole("button", { name: "거래처 더 보기", exact: true }).click();
   await expect(cards).toHaveCount(64);
   await expect(cards.last().getByRole("heading")).toHaveText("검색 검증 0064");
+  // Incremental results retain native focus, text search and all list items.
+  await expect(page.getByRole("listitem")).toHaveCount(64);
+  const lastButton = cards.last().getByRole("button");
+  await lastButton.focus();
+  await expect(lastButton).toBeInViewport();
+  await expect(lastButton).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "검색 검증 0064", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "상세 닫기" }).click();
+  await page.locator(".workspace-content").evaluate((element) => { element.scrollTop = 0; });
+  expect(await page.evaluate(() => (window as unknown as { find: (text: string) => boolean }).find("검색 검증 0064"))).toBe(true);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("검색 검증 0064");
+  await cards.last().scrollIntoViewIfNeeded();
+  await expect(cards.last()).toBeInViewport();
   await page.evaluate(() => (window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture());
   await expect(input).toHaveValue("0");
   await expect(cards).toHaveCount(64);
