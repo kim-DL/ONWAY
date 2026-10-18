@@ -24,6 +24,10 @@ export function DeliveryPhotoDeleteAction({ photo, session, onDeleted }: {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const deleted = () => {
+    window.dispatchEvent(new CustomEvent("onnuriway:delivery-photo-removed", { detail: photo.photoId }));
+    onDeleted(photo.photoId, removeDeliveryPhotoFromToday(photo));
+  };
 
   const remove = async () => {
     if (pending.current) return;
@@ -32,11 +36,11 @@ export function DeliveryPhotoDeleteAction({ photo, session, onDeleted }: {
     try {
       requestId.current ??= crypto.randomUUID();
       await deliveryPhotoDeleteRepository.remove(photo.photoId, requestId.current, session);
-      if (active.current) onDeleted(photo.photoId, removeDeliveryPhotoFromToday(photo));
+      if (active.current) deleted();
     } catch (error) {
       if (!active.current) return;
       const kind = deliveryPhotoDeleteErrorKind(error);
-      if (kind === "unavailable") onDeleted(photo.photoId, removeDeliveryPhotoFromToday(photo));
+      if (kind === "unavailable") deleted();
       else setState({ busy: false, error: kind === "permission" ? "이 사진을 삭제할 권한이 없습니다."
         : kind === "auth" ? "로그인 정보를 다시 확인해주세요."
           : "삭제하지 못했습니다. 다시 시도해 주세요." });

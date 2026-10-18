@@ -4,6 +4,7 @@ import { z } from "zod";
 import { claimsMatchAuthz } from "../auth/login-service.js";
 import { customerEmployeeIsActive, verifyCustomerTransactionActor, type CustomerActor } from "../customer/customer-authorization.js";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { fieldRead } from "../shared/field-latency.js";
 
 export type InventoryActor = CustomerActor;
 export type InventoryAccess = "read" | "write" | "admin";
@@ -32,9 +33,10 @@ export async function requireInventoryActor(request: CallableRequest<unknown>, a
   const employeeId = employeeIdSchema.safeParse(request.auth.token.employeeId);
   if (!employeeId.success) throw new HttpsError("failed-precondition", "현재 세션을 확인할 수 없습니다.");
   const db = getAdminFirestore();
-  const [authorizationSnapshot, employeeSnapshot] = await db.getAll(
-    db.doc(`authz/${request.auth.uid}`), db.doc(`employees/${employeeId.data}`),
-  );
+  const uid = request.auth.uid;
+  const [authorizationSnapshot, employeeSnapshot] = await fieldRead(() => db.getAll(
+    db.doc(`authz/${uid}`), db.doc(`employees/${employeeId.data}`),
+  ));
   const authorization = authorizationSchema.safeParse(authorizationSnapshot?.data());
   const employee = employeeSchema.safeParse(employeeSnapshot?.data());
   if (!authorization.success || !employee.success) throw new HttpsError("permission-denied", "활성 직원 계정을 확인할 수 없습니다.");

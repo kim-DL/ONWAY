@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   states: [] as unknown[], stateCursor: 0, refs: [] as Array<{ current: unknown }>, refCursor: 0,
-  remove: vi.fn(), onDeleted: vi.fn(),
+  remove: vi.fn(), onDeleted: vi.fn(), notify: vi.fn(),
 }));
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(),
   useState: (initial: unknown) => {
@@ -56,8 +56,9 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-09-24T03:00:00.000Z"));
   harness.states = []; harness.refs = []; harness.stateCursor = 0; harness.refCursor = 0;
   harness.remove.mockReset(); harness.onDeleted.mockReset();
+  harness.notify.mockReset(); vi.stubGlobal("window", { dispatchEvent: harness.notify });
 });
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function openConfirmation() {
   find(render(), (element) => element.props.children === "사진 삭제")!.props.onClick?.();
@@ -91,10 +92,12 @@ describe("delivery photo delete confirmation", () => {
   it("retries the same logical delete with the same requestId and reconciles only after success", async () => {
     harness.remove.mockRejectedValueOnce({ kind: "temporary" }).mockResolvedValueOnce({ photoId: photo.photoId, deletedAt: "2026-09-24T02:00:00.000Z" });
     find(openConfirmation(), (element) => element.props.variant === "danger")!.props.onClick?.(); await settle();
+    expect(harness.notify).not.toHaveBeenCalled();
     find(render(), (element) => element.props.variant === "danger")!.props.onClick?.(); await settle();
     expect(harness.remove).toHaveBeenCalledTimes(2);
     expect(harness.remove.mock.calls[1]?.[1]).toBe(harness.remove.mock.calls[0]?.[1]);
     expect(harness.onDeleted).toHaveBeenCalledWith(photo.photoId, expect.any(Function));
+    expect(harness.notify).toHaveBeenCalledWith(expect.objectContaining({ type: "onnuriway:delivery-photo-removed", detail: photo.photoId }));
   });
 
   it("reconciles an already unavailable photo without presenting raw backend text", async () => {

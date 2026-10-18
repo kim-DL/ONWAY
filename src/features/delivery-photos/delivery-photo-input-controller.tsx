@@ -20,7 +20,6 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
   const pending = useRef<PendingPicker | null>(null);
   const returnedFromPicker = useRef(false);
   const reading = useRef(false);
-  const sourceRead = useRef<AbortController | null>(null);
   const localJob = useRef<string | null>(null);
   const releasePicker = () => {
     pending.current = null;
@@ -29,10 +28,7 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
 
   const open = (customerId: string, source: "camera" | "album") => {
     if (!coordinator || reading.current || (pending.current && !returnedFromPicker.current)
-      || coordinator.getCustomerJob(customerId)?.status === "uploading"
-      || coordinator.getCustomerJob(customerId)?.status === "queued"
-      || coordinator.getCustomerJob(customerId)?.status === "preparing"
-      || coordinator.getCustomerJob(customerId)?.errorCategory === "retryable") return false;
+      || !coordinator.canBegin(customerId)) return false;
     const input = source === "camera" ? camera.current : album.current;
     if (!input) return false;
     // A cancelled picker may not emit `cancel` on every WebKit version. Only a
@@ -55,17 +51,20 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
     const returned = () => { if (pending.current) returnedFromPicker.current = true; };
     const visible = () => { if (document.visibilityState === "visible") returned(); };
     const cancelled = () => releasePicker();
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (localJob.current) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("focus", returned);
+    window.addEventListener("beforeunload", beforeUnload);
     document.addEventListener("visibilitychange", visible);
     cameraInput?.addEventListener("cancel", cancelled);
     albumInput?.addEventListener("cancel", cancelled);
     return () => {
       window.removeEventListener("focus", returned);
+      window.removeEventListener("beforeunload", beforeUnload);
       document.removeEventListener("visibilitychange", visible);
       cameraInput?.removeEventListener("cancel", cancelled);
       albumInput?.removeEventListener("cancel", cancelled);
-      sourceRead.current?.abort();
-      if (localJob.current) coordinator?.dismiss(localJob.current);
+      // Source copying belongs to the session coordinator. Changing workspace
+      // must not discard a photo; logout still aborts it through private cleanup.
       releasePicker();
     };
   }, [coordinator]);
@@ -78,20 +77,15 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
     const job = coordinator.begin(target.customerId, target.source);
     if (!job) { input.value = ""; releasePicker(); return; }
     localJob.current = job.jobId; reading.current = true;
-    const controller = new AbortController(); sourceRead.current = controller;
     try {
-      const preparation = await import("./delivery-photo-preparation");
-      const source = await preparation.materializeDeliveryPhotoSource(nativeFile, controller.signal);
-      // The native content provider is no longer needed after this independent copy.
-      input.value = "";
-      if (!coordinator.acceptSource(job.jobId, source)) coordinator.dismiss(job.jobId);
+      if (!await coordinator.acceptNativeSource(job.jobId, nativeFile)) coordinator.dismiss(job.jobId);
       localJob.current = null;
     } catch (error) {
       const preparation = await import("./delivery-photo-preparation");
       coordinator.failPreparation(job.jobId, preparation.deliveryPhotoPreparationMessage(error));
       localJob.current = null;
     } finally {
-      input.value = ""; sourceRead.current = null; reading.current = false; releasePicker();
+      input.value = ""; reading.current = false; releasePicker();
     }
   };
 

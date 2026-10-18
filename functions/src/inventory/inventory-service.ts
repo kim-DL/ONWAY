@@ -25,6 +25,7 @@ import { inventoryProductRecord, inventoryProductWire, summarizeInventoryLotGrou
 import { datesFromDocument, inventoryLotFromDocument, inventoryProductFromDocument, persisted, settingsFromDocument } from "./inventory-document-codec.js";
 import { projectInventoryInspection } from "./inventory-inspection-projection.js";
 import { activeSortedLots, ensureQuantity, summarizeInventoryLots } from "./inventory-lot-calculations.js";
+import { fieldStage, fieldCompute, fieldTransactionAttempt, fieldTransaction } from "../shared/field-latency.js";
 
 export { inventoryLotFromDocument, inventoryProductFromDocument } from "./inventory-document-codec.js";
 export { summarizeInventoryLots } from "./inventory-lot-calculations.js";
@@ -73,10 +74,12 @@ export class InventoryService {
     const command = Object.fromEntries(Object.entries(input).filter(([key]) => !["includeDetail", "refreshOnReplay", "includeSummary", "includeManufacturerReference"].includes(key)));
     const fingerprint = createHash("sha256").update(JSON.stringify(command)).digest("hex");
     const receiptRef = this.db.doc(`${REQUEST_PATH}/${input.requestId}`);
-    return this.db.runTransaction(async (transaction) => {
+    return fieldStage("transaction", () => this.db.runTransaction(async (realTransaction) => {
+      const transaction = fieldTransaction(realTransaction);
+      fieldTransactionAttempt();
       // Revalidate even an exact retry after the employee was disabled/revoked.
-      await verifyInventoryTransactionActor(this.db, transaction, actor, access);
-      const receipt = await transaction.get(receiptRef);
+      await fieldStage("transactionAuthorization", () => verifyInventoryTransactionActor(this.db, transaction, actor, access));
+      const receipt = await fieldStage("receipt", () => transaction.get(receiptRef));
       if (receipt.exists) {
         const stored = receipt.data()!;
         if (stored.operation !== operation || stored.actorUid !== actor.uid || stored.fingerprint !== fingerprint) {
@@ -101,7 +104,7 @@ export class InventoryService {
       const receiptResult = withoutMutationDetail(result);
       transaction.create(receiptRef, { operation, actorUid: actor.uid, fingerprint, result: receiptResult, createdAt: Timestamp.fromDate(now) });
       return result;
-    });
+    }));
   }
   private audit(transaction: Transaction, input: { requestId: string }, actor: InventoryActor, now: Date,
     eventType: string, targetId: string, changedFields: string[], reason = "",
@@ -294,10 +297,14 @@ export class InventoryService {
     return this.mutation("recordInventoryCount", input, actor, "write", async (transaction, now) => {
       // Independent reads share one wait, after membership and retry receipt
       // checks. Everything remains within this transaction and before writes.
-      const [product, settingsSnapshot, lotsSnapshot] = await Promise.all([
+      // The cycle document path is already known from the validated input.
+      // Read it alongside the other transaction documents, rather than adding
+      // another sequential network round trip after checking the cycle ID.
+      const cycleRef = this.db.doc(`${INVENTORY_CYCLE_PATH}/${input.cycleId}`);
+      const [product, settingsSnapshot, lotsSnapshot, cycleSnapshot] = await fieldStage("countReads", () => Promise.all([
         this.product(transaction, input.productId), transaction.get(this.db.doc(INVENTORY_SETTINGS_PATH)),
-        transaction.get(this.lotsQuery(input.productId)),
-      ]);
+        transaction.get(this.lotsQuery(input.productId)), transaction.get(cycleRef),
+      ]));
       checkStockRevision(product, input.expectedStockRevision);
       const settings = settingsFromDocument(settingsSnapshot.data());
       const cycle = inventoryCycle(settings, inventoryToday(now));
@@ -308,21 +315,22 @@ export class InventoryService {
       if (selected.length !== input.counts.length || selected.some((lot) => !input.counts.some((count) => count.lotId === lot.lotId))) {
         throw new HttpsError("aborted", "묶음 목록이 변경되었습니다. 현재 장소의 모든 묶음을 다시 확인해주세요.", { reason: "inventory-count-lots" });
       }
+      const quantities = new Map(input.counts.map((count) => [count.lotId, count.quantity]));
+      const selectedById = new Map(selected.map((lot) => [lot.lotId, lot]));
       const changedLots = selected.map((lot) => {
-        const quantity = input.counts.find((count) => count.lotId === lot.lotId)!.quantity;
+        const quantity = quantities.get(lot.lotId)!;
         return inventoryLotSchema.parse({ ...lot, quantity, revision: lot.revision + (quantity !== lot.quantity ? 1 : 0), updatedAt: quantity !== lot.quantity ? now.toISOString() : lot.updatedAt });
       });
-      const lines = changedLots.map((lot) => { const before = selected.find((item) => item.lotId === lot.lotId)!.quantity;
+      const lines = changedLots.map((lot) => { const before = selectedById.get(lot.lotId)!.quantity;
         return { lotId: lot.lotId, locationId: lot.locationId, before, after: lot.quantity, delta: lot.quantity - before }; });
       const changed = lines.some((line) => line.delta !== 0);
       if (input.matchOnly && changed) throw new HttpsError("aborted", "현재 수량과 일치하지 않습니다. 최신 재고를 다시 확인해주세요.", { reason: "inventory-count-mismatch" });
       if (changed && !input.reason) throw new HttpsError("invalid-argument", "실사 수량이 다르면 조정 사유를 입력해주세요.");
-      const cycleRef = this.db.doc(`${INVENTORY_CYCLE_PATH}/${cycle.cycleId}`);
-      const cycleSnapshot = await transaction.get(cycleRef);
+      // cycleRef and cycleSnapshot were read in parallel above.
       const all = [...lots.filter((lot) => lot.locationId !== input.locationId), ...changedLots];
-      const result = this.writeStock(transaction, input, actor, now, product, all,
-        changedLots.filter((lot) => selected.find((item) => item.lotId === lot.lotId)!.quantity !== lot.quantity),
-        changed ? "count_adjust" : "count_match", lines, cycle.cycleId);
+      const result = fieldCompute("countCompute", () => this.writeStock(transaction, input, actor, now, product, all,
+        changedLots.filter((lot) => selectedById.get(lot.lotId)!.quantity !== lot.quantity),
+        changed ? "count_adjust" : "count_match", lines, cycle.cycleId));
       if (!cycleSnapshot.exists) transaction.create(cycleRef, { ...cycle, createdAt: Timestamp.fromDate(now) });
       transaction.set(this.db.doc(`${INVENTORY_CYCLE_PATH}/${cycle.cycleId}/entries/${input.productId}-${input.locationId}`), {
         productId: input.productId, locationId: input.locationId, ...result.product.lastCountByLocation[input.locationId]!,

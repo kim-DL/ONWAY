@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Customer } from "@/domain/customer";
 import type { InventoryContext } from "@/domain/inventory";
+const clearOutbox = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("@/features/delivery-photos/delivery-photo-outbox-lazy", () => ({ lazyDeliveryPhotoOutbox: { clear: clearOutbox } }));
 
 vi.mock("@/features/search/search-catalog-cache", () => ({ clearSearchClientState: async () => undefined }));
 vi.mock("@/features/sales-cycle/sales-workspace-cache", () => ({ clearSalesWorkspaceClientState: async () => undefined }));
@@ -20,6 +22,7 @@ import { registerPrivateClientCleanup } from "./private-client-cleanup-registry"
 const storage = { length: 0, key: () => null, removeItem: vi.fn() };
 
 beforeEach(() => {
+  clearOutbox.mockClear();
   vi.stubGlobal("localStorage", storage);
   vi.stubGlobal("sessionStorage", storage);
 });
@@ -35,6 +38,7 @@ describe("private workspace snapshot cleanup", () => {
     await clearPrivateClientState();
 
     expect(cleanup).toHaveBeenCalledOnce();
+    expect(clearOutbox).toHaveBeenCalledOnce();
     unregister();
   });
 

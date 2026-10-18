@@ -5,6 +5,9 @@ export const PERFORMANCE_BUDGETS = {
 } as const;
 
 export type PerformanceMetricName =
+  | "deliveryPhotoPersistDuration"
+  | "deliveryPhotoPreviewDuration"
+  | "deliveryPhotoServerDuration"
   | "appBootDuration"
   | "catalogLoadDuration"
   | "searchDuration"

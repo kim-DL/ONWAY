@@ -698,7 +698,7 @@ describe("inventory transactions", () => {
       [`${INVENTORY_PRODUCT_PATH}/${state.product.productId}`], [INVENTORY_SETTINGS_PATH],
       [`${INVENTORY_PRODUCT_PATH}/${state.product.productId}/lots`], [`${INVENTORY_CYCLE_PATH}/week-2026-09-11`],
     ]);
-    expect(state.maxConcurrentReads()).toBe(3);
+    expect(state.maxConcurrentReads()).toBe(4);
     state.resetReadMetrics();
     await state.service.count(input, actor);
     expect(state.reads).toHaveLength(2);

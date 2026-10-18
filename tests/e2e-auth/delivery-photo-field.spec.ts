@@ -304,7 +304,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     const body = route.request().postDataJSON() as { data: typeof requests[number] };
     requests.push(body.data); const current = callIndex; callIndex += 1;
     if (current === 0) await firstGate;
-    await route.continue();
+    await route.continue().catch((error: unknown) => { if (!/already handled|closed/i.test(String(error))) throw error; });
   });
   try {
     const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
@@ -313,7 +313,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     const unsupportedChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "앨범에서 사진 추가" }).click();
     await (await unsupportedChooser).setFiles({ name: "unsupported.heic", mimeType: "image/heic", buffer: Buffer.from("unsupported") });
-    await expect(page.getByText(/사진 파일 형식이 실제 내용과 맞지 않아요/u)).toBeVisible();
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText(/사진 파일 형식이 실제 내용과 맞지 않아요/u)).toBeVisible();
     await search.fill("");
 
     const cancelledChooser = page.waitForEvent("filechooser");
@@ -328,8 +328,8 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     await (await firstChooser).setFiles({ name: "oriented.jpg", mimeType: "image/jpeg", buffer: oriented });
     await expect.poll(() => rapidChooserCount).toBe(1); page.off("filechooser", countRapidChooser);
     await expect.poll(() => requests.length).toBe(1);
-    await expect(page.getByText("업로드 중", { exact: true })).toBeVisible();
-    await search.fill("새봄"); await expect(page.getByText("새봄마트")).toBeVisible(); await search.fill("");
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("업로드 중", { exact: true })).toBeVisible();
+    await search.fill("새봄"); await expect(page.getByRole("button", { name: "새봄마트 사진 기록" })).toBeVisible(); await search.fill("");
 
     await chooseRowPhoto(page, names[2]!, "앨범 선택", regular, "album.jpg");
     await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
@@ -344,7 +344,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
 
     await page.locator("details").getByText("기록완료 3곳").click();
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", regular, "additional.jpg");
-    await expect(page.locator("details").getByText("사진 2장")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByText("사진 2장")).toBeVisible({ timeout: 30_000 });
     await page.reload();
     await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
     await expect(page.getByRole("heading", { name: "납품사진" })).toBeVisible();
@@ -357,12 +357,130 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
       caches: "caches" in window ? await caches.keys() : [],
     }));
     expect(`${persisted.local}\n${persisted.session}`).not.toMatch(/fileBase64|delivery-photo.*(?:job|requestId)|data:image/iu);
-    expect(persisted.databases).not.toContain("delivery-photo");
+    expect(persisted.databases).toContain("onnuriway:private:delivery-photo-outbox:v1");
     expect(persisted.caches.some((name) => /delivery-photo.*upload/iu.test(name))).toBe(false);
     expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
   } finally {
     releaseFirst(); await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!, ids[2]!, ids[3]!]);
   }
+});
+
+test("P0: unreadable native files keep capture available without sending empty photos", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]); await login(page);
+  let requests = 0;
+  page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("/createDeliveryPhoto")) requests++; });
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await chooseRowPhoto(page, "대전식품", "카메라 촬영", Buffer.alloc(0), `empty-${attempt}.jpg`);
+      await expect(page.getByRole("button", { name: "대전식품 카메라 촬영" })).toBeEnabled();
+    }
+    expect(requests).toBe(0);
+    const buffer = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#82a4b2" } }).jpeg().toBuffer();
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer);
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible({ timeout: 30_000 });
+    expect(requests).toBe(1);
+  } finally { await removePilotPhotos([ids[1]!]); }
+});
+
+test("P0: three user-triggered angles preview locally while two uploads wait for server confirmation", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]); await login(page);
+  const buffer = await sharp({ create: { width: 960, height: 640, channels: 3, background: "#82a4b2" } }).jpeg().toBuffer();
+  const requests: Array<{ requestId: string; fileBase64: string }> = [];
+  let downloads = 0; let choosers = 0;
+  page.on("request", (request) => { if (request.url().endsWith("/getDeliveryPhoto")) downloads++; });
+  page.on("filechooser", () => { choosers++; });
+  let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/createDeliveryPhoto", async (route) => { requests.push(route.request().postDataJSON().data); await gate; await route.continue().catch(() => undefined); });
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer);
+    const panel = page.getByRole("region", { name: "촬영 사진과 저장 상태" });
+    await expect(panel.locator("img")).toHaveCount(1); await expectImageReady(panel.locator("img").first());
+    expect(await panel.locator("img").first().getAttribute("src")).toMatch(/^blob:/);
+    await panel.getByRole("button", { name: "촬영 사진 1 크게 보기" }).click();
+    const viewer = page.getByRole("dialog", { name: "촬영 사진 확인", exact: true });
+    await expectImageReady(viewer.getByRole("img"));
+    expect((await new AxeBuilder({ page }).include("dialog[open]").withTags(["wcag2a", "wcag2aa"]).analyze()).violations).toEqual([]);
+    await viewer.getByRole("button", { name: "확인", exact: true }).click();
+    expect(downloads).toBe(0); expect(choosers).toBe(1);
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer, "angle-two.jpg");
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer, "angle-three.jpg");
+    await expect(panel.locator("img")).toHaveCount(3);
+    await expect.poll(() => requests.length).toBe(2);
+    await expect(panel.getByText("✓ 저장 완료", { exact: true })).toHaveCount(0);
+    expect(choosers).toBe(3); expect(downloads).toBe(0);
+    await expect(page.getByRole("button", { name: "대전식품 카메라 촬영" })).toBeDisabled();
+    release(); await expect(panel.getByText("✓ 저장 완료", { exact: true })).toHaveCount(3, { timeout: 30_000 });
+    expect(new Set(requests.map((request) => request.requestId)).size).toBe(3);
+    await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByRole("button", { name: "대전식품 카메라 촬영" })).toBeEnabled();
+    expect(downloads).toBe(0);
+    await page.setViewportSize({ width: 320, height: 800 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+    expect(accessibility.violations).toEqual([]);
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+    await page.screenshot({ path: "output/playwright/delivery-photo-p0-angles.png", fullPage: true });
+  } finally { release(); await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!]); }
+});
+
+test("P0: a reload recovers the same photo and request without waiting for the closed tab's lease", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]); await login(page);
+  const buffer = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#b6caaa" } }).jpeg().toBuffer();
+  const requests: Array<{ requestId: string; fileBase64: string }> = [];
+  let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/createDeliveryPhoto", async (route) => {
+    requests.push(route.request().postDataJSON().data);
+    if (requests.length === 1) await gate;
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer);
+    await expect.poll(() => requests.length).toBe(1);
+    await page.reload();
+    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible({ timeout: 30_000 });
+    expect(requests[1]).toEqual(requests[0]);
+    const photos = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get();
+    expect(photos.size).toBe(1);
+  } finally { release(); await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!]); }
+});
+
+test("P0: retry after a committed response is lost retains the request and never duplicates the photo", async ({ page }) => {
+  await removePilotPhotos([ids[1]!]); await login(page);
+  const buffer = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#adc4d3" } }).jpeg().toBuffer();
+  const requests: Array<{ requestId: string; fileBase64: string }> = [];
+  await page.route("**/createDeliveryPhoto", async (route) => {
+    requests.push(route.request().postDataJSON().data);
+    if (requests.length === 1) { await route.fetch(); await route.abort("failed"); }
+    else await route.continue();
+  });
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer);
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible({ timeout: 30_000 });
+    expect(requests.length).toBeGreaterThanOrEqual(2); expect(requests[1]).toEqual(requests[0]);
+    const photos = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get();
+    expect(photos.size).toBe(1);
+  } finally { await page.unroute("**/createDeliveryPhoto"); await removePilotPhotos([ids[1]!]); }
+});
+
+test("P0: switching workspace during native file copying preserves the photo", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer = async function () {
+      if (this.name === "slow-copy.jpg") await new Promise((resolve) => setTimeout(resolve, 1_000));
+      return original.call(this);
+    };
+  });
+  await removePilotPhotos([ids[1]!]); await login(page);
+  const buffer = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#82a4b2" } }).jpeg().toBuffer();
+  try {
+    await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer, "slow-copy.jpg");
+    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "거래처", exact: true }).click();
+    await expect.poll(async () => (await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get()).size, { timeout: 30_000 }).toBe(1);
+    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진", exact: true }).click();
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible();
+  } finally { await removePilotPhotos([ids[1]!]); }
 });
 
 test("Safari-style PNG fallback and late picker change save camera and album photos through the server", async ({ page }) => {
@@ -447,9 +565,9 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
     await page.locator("details").getByText("기록완료 2곳").click();
     await chooseRowPhoto(page, "대전식품", "앨범 선택", landscape, "history-2.jpg");
-    await expect(page.locator("details").getByText("사진 2장", { exact: false })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByText("사진 2장", { exact: false })).toBeVisible({ timeout: 30_000 });
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", portrait, "history-3.jpg");
-    await expect(page.locator("details").getByText("사진 3장", { exact: false })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByText("사진 3장", { exact: false })).toBeVisible({ timeout: 30_000 });
 
     const informationButton = page.getByRole("button", { name: "대전식품 사진 기록" });
     await expect(informationButton).toContainText("012345678901234567890123456789");
@@ -681,7 +799,7 @@ test("delete confirmation is permission-safe, retry-stable and reconciles the la
     await page.locator("details").getByText("기록완료 2곳").click();
     await chooseRowPhoto(page, "대전식품", "앨범 선택", photo, "delete-2.jpg");
     await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator("details").getByText("사진 2장", { exact: false })).toBeVisible();
+    await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByText("사진 2장", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "대전식품 사진 기록" }).click();
     const history = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
     await expect(history.getByText("최근 기록 2장")).toBeVisible({ timeout: 30_000 });
@@ -723,6 +841,7 @@ test("delete confirmation is permission-safe, retry-stable and reconciles the la
     await expect(confirmation.getByText("삭제하지 못했습니다. 다시 시도해 주세요.")).toBeVisible({ timeout: 30_000 });
     await confirmation.getByRole("button", { name: "사진 삭제", exact: true }).click();
     await expect(viewer).toHaveCount(0); await expect(history).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).locator("img")).toHaveCount(1);
     expect(deletes.slice(1, 3)).toEqual([deletes[0], deletes[0]]);
     await expect.poll(() => page.evaluate((urls) => urls.every((url) => ((window as unknown as { __deliveryPhotoDeleteBlobAudit: { revoked: string[] } }).__deliveryPhotoDeleteBlobAudit.revoked).includes(url)),
       [evidenceUrl, thumbnailUrl].filter((url): url is string => Boolean(url)))).toBe(true);
@@ -740,7 +859,8 @@ test("delete confirmation is permission-safe, retry-stable and reconciles the la
     releaseLast();
     await expect(viewer).toHaveCount(0); await expect(history).toHaveCount(0);
     await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
-    await expect(page.getByRole("region", { name: "오늘 남은 납품처" }).getByText("대전식품")).toBeVisible();
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).locator("img")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByRole("button", { name: "대전식품 사진 기록" })).toBeVisible();
     expect(deletes).toHaveLength(4); expect(directWrites).toEqual([]); expect(errors).toEqual([]); expect(warnings).toEqual([]);
   } finally {
     releaseLast(); await page.unroute("**/deleteDeliveryPhoto").catch(() => {}); await removePilotPhotos([ids[1]!]);
@@ -782,8 +902,8 @@ test("a lost create response retries the same request and server replay does not
   });
   try {
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", regular, "response-loss.jpg");
-    await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible({ timeout: 30_000 });
-    await page.getByRole("button", { name: "다시 시도" }).click();
+    await expect(page.getByRole("button", { name: "다시 시도", exact: true })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "다시 시도", exact: true }).click();
     await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
     expect(requests).toHaveLength(2);
     expect(requests[1]).toEqual(requests[0]);

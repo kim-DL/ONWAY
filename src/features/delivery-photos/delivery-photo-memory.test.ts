@@ -40,4 +40,14 @@ describe("delivery photo memory snapshot", () => {
       expiresAt: "2026-09-30T15:00:00.000Z", thumbnail: { width: 480, height: 640 } };
     expect(mergeConfirmedDeliveryPhoto(snapshot, photo, "2026-09-24")).toBe(snapshot);
   });
+
+  it("keeps the newest server timestamp when same-customer confirmations arrive in reverse order", () => {
+    const base = { customerId: "a", deliveryDateKey: "2026-09-23", source: "camera" as const,
+      createdByEmployeeId: "employee_1", createdByName: "합성 직원", expiresAt: "2026-09-30T01:18:00.000Z", thumbnail: { width: 640, height: 480 } };
+    const newer = { ...base, photoId: "newer", createdAt: "2026-09-23T02:00:00.000Z" };
+    const older = { ...base, photoId: "older", createdAt: "2026-09-23T01:00:00.000Z" };
+    const result = mergeConfirmedDeliveryPhoto(mergeConfirmedDeliveryPhoto(snapshot, newer, "2026-09-23"), older, "2026-09-23");
+    expect(result.today.customers[0]).toMatchObject({ count: 2, latest: newer });
+    expect(result.today.photos.map((photo) => photo.photoId)).toEqual(["newer", "older"]);
+  });
 });

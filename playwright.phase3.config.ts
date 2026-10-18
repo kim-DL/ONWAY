@@ -11,6 +11,7 @@ export default defineConfig({
     : "list",
   use: {
     ...devices["Desktop Chrome"],
+    browserName: process.env.DELIVERY_PHOTO_E2E_BROWSER === "webkit" ? "webkit" : "chromium",
     baseURL: "http://127.0.0.1:3103",
     trace: "on-first-retry",
     screenshot: "only-on-failure",

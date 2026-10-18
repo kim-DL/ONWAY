@@ -104,10 +104,11 @@ describe("delivery photo fresh WebP preparation", () => {
     const source = await materializeDeliveryPhotoSource(new File([ftyp("heic")], "camera.heic", { type: "image/heic" }));
     const prepared = await prepareDeliveryPhoto(source);
     expect(prepared).toMatchObject({ contentType: "image/jpeg", width: 1_920, height: 2_560 });
-    expect(toBlob).toHaveBeenCalledTimes(2);
+    expect(toBlob).toHaveBeenCalledTimes(3);
+    expect(prepared.preview?.size).toBeGreaterThan(0);
     expect(toBlob.mock.calls[0]?.[1]).toBe("image/webp");
     expect(toBlob.mock.calls[1]?.[1]).toBe("image/jpeg");
-    expect(drawImage).toHaveBeenCalledOnce();
+    expect(drawImage).toHaveBeenCalledTimes(2);
     expect(close).toHaveBeenCalledOnce();
     expect(canvas.width).toBe(0); expect(canvas.height).toBe(0);
   });

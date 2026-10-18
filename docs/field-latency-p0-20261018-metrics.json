@@ -1,0 +1,396 @@
+{
+  "schemaVersion": 1,
+  "baseline": "04272ec8b4a80c60dd74326cda6cd3f61f53ad36",
+  "recordedAt": "2026-10-18T01:21:02.524Z",
+  "inventoryTransaction": {
+    "recordedAt": "2026-10-18T00:06:54.351Z",
+    "scope": "Real Firestore emulator transactions. Excludes callable pre/post authorization, internet, UI and Cloud Functions cold start. Delay=120ms is explicitly injected per read RPC. Alternating phase order; synthetic records only.",
+    "node": "v22.23.2",
+    "runs": 30,
+    "warmups": 1,
+    "baselineSha256": "d3c8c6f87f43541d09b2dd4c383df26ca9ad3f40c565142ba8e21f37b82f74fe",
+    "candidateSha256": "ab113798da17cc591222705046166253f2d5ad6538ae22d9f8d76660b0e53238",
+    "cases": [
+      {
+        "lots": 1,
+        "readDelayMs": 0,
+        "summary": {
+          "before": {
+            "n": 30,
+            "p50Ms": 76.33610000000044,
+            "p95Ms": 90.86989999999969,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              7
+            ],
+            "writeAttempts": [
+              5
+            ]
+          },
+          "after": {
+            "n": 30,
+            "p50Ms": 55.1208000000006,
+            "p95Ms": 71.97069999999985,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              7
+            ],
+            "writeAttempts": [
+              5
+            ]
+          }
+        }
+      },
+      {
+        "lots": 1,
+        "readDelayMs": 120,
+        "summary": {
+          "before": {
+            "n": 30,
+            "p50Ms": 585.8938000000016,
+            "p95Ms": 596.7953000000016,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              7
+            ],
+            "writeAttempts": [
+              5
+            ]
+          },
+          "after": {
+            "n": 30,
+            "p50Ms": 445.9079999999958,
+            "p95Ms": 454.46130000000267,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              7
+            ],
+            "writeAttempts": [
+              5
+            ]
+          }
+        }
+      },
+      {
+        "lots": 200,
+        "readDelayMs": 0,
+        "summary": {
+          "before": {
+            "n": 30,
+            "p50Ms": 99.79660000000149,
+            "p95Ms": 120.8156999999992,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              206
+            ],
+            "writeAttempts": [
+              5
+            ]
+          },
+          "after": {
+            "n": 30,
+            "p50Ms": 91.22290000000066,
+            "p95Ms": 114.27620000000024,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              206
+            ],
+            "writeAttempts": [
+              5
+            ]
+          }
+        }
+      },
+      {
+        "lots": 200,
+        "readDelayMs": 120,
+        "summary": {
+          "before": {
+            "n": 30,
+            "p50Ms": 618.5242999999973,
+            "p95Ms": 631.0159000000131,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              206
+            ],
+            "writeAttempts": [
+              5
+            ]
+          },
+          "after": {
+            "n": 30,
+            "p50Ms": 474.50479999999516,
+            "p95Ms": 481.2353000000003,
+            "readBatches": [
+              6
+            ],
+            "documentReads": [
+              206
+            ],
+            "writeAttempts": [
+              5
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "inventoryClient": {
+    "scope": "Production-mode PWA with real demo callable and Firestore emulator. Trusted click to observed response/DOM; includes polling, excludes real device and Cloud Functions cold start.",
+    "browser": "151.0.7922.34",
+    "viewport": {
+      "width": 412,
+      "height": 915
+    },
+    "cpuThrottle": 4,
+    "rttMs": 120,
+    "downloadBytesPerSecond": 200000,
+    "uploadBytesPerSecond": 100000,
+    "warmups": 1,
+    "before": {
+      "recordedAt": "2026-10-18T00:49:17.243Z",
+      "n": 30,
+      "responseP50Ms": 196.70000000298023,
+      "responseP95Ms": 225.69999998807907,
+      "completedP50Ms": 230.30000001192093,
+      "completedP95Ms": 263.29999999701977
+    },
+    "after": {
+      "recordedAt": "2026-10-18T00:51:56.221Z",
+      "n": 30,
+      "responseP50Ms": 192.80000001192093,
+      "responseP95Ms": 213.8999999910593,
+      "completedP50Ms": 216.3999999910593,
+      "completedP95Ms": 249.79999999701977
+    }
+  },
+  "photo": {
+    "recordedAt": "2026-10-18T01:16:40.170Z",
+    "scope": "Real Chromium/native file input/client coordinator and image preparation; controlled loopback confirmation endpoint, not Firebase/production/camera hardware. Limits apply after startup. Times include browser actionability/DOM observation. Alternating phases, new context per trial, one unreported warmup.",
+    "browser": "151.0.7922.34",
+    "bundledSha256": {
+      "before": "43080df5ccb2eebc16906f5b694f799c00706fcb7210d41ed3d342223918625e",
+      "after": "92931daa5a4d9a317a446e457f3d54dd68094e50276b897cd9473ab35c2bea90"
+    },
+    "cpuThrottle": 4,
+    "rttMs": 120,
+    "downloadBytesPerSecond": 200000,
+    "uploadBytesPerSecond": 100000,
+    "confirmationDelayMs": 800,
+    "fixtureWidth": 640,
+    "fixtureHeight": 480,
+    "fixtureBytes": 143819,
+    "fixtureSha256": "60a7d9d18bac21c6c105cd331b45b29cecd753fb900d61074badb34dfe4a7ee3",
+    "runs": 30,
+    "summary": {
+      "before": {
+        "n": 30,
+        "nextCameraP50Ms": 2947.2000000029802,
+        "nextCameraP95Ms": 4820.100000008941,
+        "confirmedP50Ms": 2914.4000000059605,
+        "confirmedP95Ms": 2953.6000000089407,
+        "previewP50Ms": null
+      },
+      "after": {
+        "n": 30,
+        "nextCameraP50Ms": 76.09999999403954,
+        "nextCameraP95Ms": 86.30000001192093,
+        "confirmedP50Ms": 2959.4000000059605,
+        "confirmedP95Ms": 2997.2000000029802,
+        "previewP50Ms": 126.70000000298023
+      }
+    }
+  },
+  "additionalWebKitProbe": {
+    "recordedAt": "2026-10-18T01:07:34.322Z",
+    "browser": "WebKit",
+    "version": "26.5",
+    "platform": "win32",
+    "physicalDevice": false,
+    "preparation": {
+      "sourceType": "image/jpeg",
+      "type": "image/webp",
+      "width": 640,
+      "height": 480,
+      "bytes": 1106,
+      "magic": [
+        82,
+        73,
+        70,
+        70,
+        74,
+        4,
+        0,
+        0,
+        87,
+        69,
+        66,
+        80
+      ],
+      "previewBytes": 1211
+    },
+    "storage": [
+      {
+        "type": "string",
+        "ok": true
+      },
+      {
+        "type": "arraybuffer",
+        "ok": true
+      },
+      {
+        "type": "blob",
+        "ok": false,
+        "name": "UnknownError",
+        "message": "Error preparing Blob/File data to be stored in object store"
+      },
+      {
+        "type": "file",
+        "ok": false,
+        "name": "UnknownError",
+        "message": "Error preparing Blob/File data to be stored in object store"
+      }
+    ]
+  },
+  "productionBundle": {
+    "flags": {
+      "deliveryPhotos": true,
+      "inventory": true,
+      "emulators": false
+    },
+    "measurements": {
+      "initialAssetCount": 6,
+      "initialRawBytes": 468397,
+      "initialGzipBytes": 140034,
+      "largestJavascriptGzipBytes": 67128,
+      "dynamicBoundaryCount": 48,
+      "dynamicAssetCount": 64,
+      "stylesheetRawBytes": 399250,
+      "stylesheetGzipBytes": 78065,
+      "legacyStylesheetRawBytes": 231969,
+      "legacyStylesheetGzipBytes": 45135,
+      "adminInterfaceRawBytes": 64415,
+      "adminInterfaceGzipBytes": 9377,
+      "photoMorphRawBytes": 6711,
+      "photoMorphGzipBytes": 1928,
+      "customerStylesheetRawBytes": 48132,
+      "customerStylesheetGzipBytes": 9437,
+      "customerJavascriptGzipBytes": 36830,
+      "deliveryPhotoStylesheetRawBytes": 6123,
+      "deliveryPhotoStylesheetGzipBytes": 1804,
+      "deliveryPhotoJavascriptGzipBytes": 10160,
+      "deliveryPhotoHistoryStylesheetRawBytes": 5569,
+      "deliveryPhotoHistoryStylesheetGzipBytes": 1433,
+      "deliveryPhotoHistoryJavascriptGzipBytes": 2747,
+      "deliveryPhotoHistoryDatesStylesheetRawBytes": 1013,
+      "deliveryPhotoHistoryDatesStylesheetGzipBytes": 482,
+      "deliveryPhotoHistoryDatesJavascriptGzipBytes": 2091,
+      "deliveryPhotoViewerJavascriptGzipBytes": 2918,
+      "deliveryPhotoDeleteJavascriptGzipBytes": 1713,
+      "deliveryPhotoViewerAdditionalStylesheetRawBytes": 0,
+      "deliveryPhotoViewerAdditionalStylesheetGzipBytes": 0,
+      "deliveryPhotoUploadJavascriptGzipBytes": 5098,
+      "deliveryPhotoPreparationJavascriptGzipBytes": 2812,
+      "salesWorkspaceGzipBytes": 14323,
+      "inventoryStylesheetRawBytes": 28777,
+      "inventoryStylesheetGzipBytes": 6649,
+      "inventoryJavascriptGzipBytes": 25537,
+      "inventoryWorkspaceJavascriptGzipBytes": 23306,
+      "inventoryViewerJavascriptGzipBytes": 2231,
+      "inventoryManufacturerJavascriptGzipBytes": 5222,
+      "inventoryManufacturerFieldJavascriptGzipBytes": 805,
+      "inventoryManufacturerStylesheetRawBytes": 4571,
+      "inventoryManufacturerStylesheetGzipBytes": 1160,
+      "inventorySharedPhotoStylesheetRawBytes": 6711,
+      "inventorySharedPhotoStylesheetGzipBytes": 1928,
+      "inventoryWithPhotoStylesheetRawBytes": 35488,
+      "inventoryWithPhotoStylesheetGzipBytes": 8577
+    },
+    "fieldLayers": [
+      {
+        "name": "row",
+        "boundaries": [
+          "delivery-photo-row"
+        ],
+        "javascript": 2048,
+        "cssRaw": 0,
+        "cssGzip": 0,
+        "assets": [
+          "static/chunks/8440.be6aea9b917700f7.js"
+        ],
+        "measuredJavascript": 1313,
+        "measuredCssRaw": 0,
+        "measuredCssGzip": 0
+      },
+      {
+        "name": "preview",
+        "boundaries": [
+          "delivery-photo-upload-panel"
+        ],
+        "javascript": 2048,
+        "cssRaw": 2048,
+        "cssGzip": 1024,
+        "assets": [
+          "static/css/f6787add9b7e75bc.css",
+          "static/chunks/1962.efd330cb71acf236.js"
+        ],
+        "measuredJavascript": 1741,
+        "measuredCssRaw": 1970,
+        "measuredCssGzip": 660
+      },
+      {
+        "name": "durability",
+        "boundaries": [
+          "delivery-photo-outbox",
+          "delivery-photo-outbox-lazy",
+          "delivery-photo-outbox-worker"
+        ],
+        "javascript": 4096,
+        "cssRaw": 0,
+        "cssGzip": 0,
+        "assets": [
+          "static/chunks/9996.c5a3352e6e7b825c.js",
+          "static/chunks/8215.e3a7b8c548450322.js",
+          "static/chunks/3744.2fe5b8d6f5cbb77f.js"
+        ],
+        "measuredJavascript": 3116,
+        "measuredCssRaw": 0,
+        "measuredCssGzip": 0
+      },
+      {
+        "name": "relay",
+        "boundaries": [
+          "delivery-photo-create-repository"
+        ],
+        "javascript": 2048,
+        "cssRaw": 0,
+        "cssGzip": 0,
+        "assets": [
+          "static/chunks/3893.cc7a449e4c601dfb.js"
+        ],
+        "measuredJavascript": 653,
+        "measuredCssRaw": 0,
+        "measuredCssGzip": 0
+      }
+    ],
+    "hostingArtifacts": {
+      "exportedFiles": 109,
+      "precached": 96,
+      "initialAssets": 9
+    }
+  }
+}

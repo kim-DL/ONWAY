@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-viewport" aria-label="알림" aria-live="polite">
+      <div className="toast-viewport" role="region" aria-label="알림" aria-live="polite">
         {items.map((item) => (
           <div key={item.id} className="toast" data-tone={item.tone} role="status">
             <span className="toast__icon"><Icon name={item.tone === "success" ? "check" : "sparkles"} size={17} /></span>
