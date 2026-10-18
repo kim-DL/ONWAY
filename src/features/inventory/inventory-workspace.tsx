@@ -24,7 +24,7 @@ import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-i
 import { InventoryProductEditor, InventorySettingsForm } from "./inventory-forms";
 import { scheduleInventoryProductEditorPreload } from "./inventory-editor-loader";
 import { revalidationFreshnessText, type RevalidationFreshness } from "@/lib/revalidation-coordinator";
-import { restoreWorkspaceScroll } from "@/lib/workspace-scroll-memory";
+import { rememberWorkspaceScroll } from "@/lib/workspace-scroll-memory";
 import styles from "./inventory.module.css";
 
 function preferenceStorage() { try { return window.sessionStorage; } catch { return undefined; } }
@@ -243,11 +243,9 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
   useLayoutEffect(() => {
     const scroller = workspaceRef.current?.closest(".workspace-content") as HTMLElement | null;
     if (!scroller) return;
-    const remember = () => updateInventoryWorkspaceUi(sessionKey, { scrollTop: scroller.scrollTop });
-    restoreWorkspaceScroll(scroller, initialUi.scrollTop);
-    scroller.addEventListener("scroll", remember, { passive: true });
-    return () => { remember(); scroller.removeEventListener("scroll", remember); };
-  }, [sessionKey, initialUi.scrollTop]);
+    return rememberWorkspaceScroll(scroller, getInventoryWorkspaceSession(sessionKey).snapshot.ui.scrollTop,
+      (scrollTop) => updateInventoryWorkspaceUi(sessionKey, { scrollTop }));
+  }, [sessionKey]);
   useEffect(() => {
     if (!notice.message) return;
     const timer = setTimeout(() => setNotice((current) => current === notice ? { ...current, message: "" } : current), 3_400);
@@ -271,6 +269,10 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
   }, [searchableRows, query, urgentOnly, context, location, countControlsReady]);
   const selectedId = selected?.productId;
   const selectedProduct = products.find((product) => product.productId === selectedId);
+  const openProduct = useCallback((productId: string) => {
+    const product = products.find((item) => item.productId === productId);
+    if (product) setSelected({ productId, location: inventoryOpeningLocation(product, location) });
+  }, [products, location]);
   function countSaved(product: InventoryProduct, checkedLocation: InventoryLocation, detail: InventoryProductDetail) {
     if (!countMode || !countControlsReady || !context || product.status !== "active" || inventoryCountState(product, checkedLocation, context.cycle.cycleId) !== "done") return;
     const next = inventoryNextCountTarget(filtered, product, checkedLocation, location, context);
@@ -288,7 +290,7 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
     {context && countControlsReady && countRows.length > 0 && (context.today === context.cycle.startDate || countMode) ? <div className={styles.progressCard} data-count-day><div><span><Icon name="clipboard" size={15} />{context.today === context.cycle.startDate ? "오늘은 재고조사일" : "재고조사 진행 중"}</span><strong>{completed}<small> / {countRows.length}개 확인</small></strong></div><progress value={completed} max={countRows.length} aria-label={`${locationLabel} 실사 ${countRows.length}개 중 ${completed}개 완료`} /></div> : null}
     <div className={styles.filters}><label className={styles.search}><Icon name="search" size={18} /><input {...searchInputProps} aria-label="품목 검색" placeholder="상품명 · 제조사" value={query} onChange={(event) => { setQuery(event.target.value); setLimit(60); }} /></label>{context?.canWrite ? <button type="button" className={styles.optionsTrigger} aria-label="목록 옵션" aria-haspopup="dialog" aria-expanded={optionsOpen} data-active={optionsActive || undefined} onClick={() => setOptionsOpen(true)}><Icon name="sliders" size={20} /><span aria-hidden="true" /></button> : null}</div>
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}
-    {loading ? <p role="status" className={styles.message}>재고를 불러오고 있어요.</p> : <><div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div><ul className={styles.list}>{filtered.slice(0, limit).map((product) => <li key={product.productId}><InventoryCard product={product} location={location} context={calendarReady ? context : null} countMode={countMode} onOpen={(productId) => setSelected({ productId, location: inventoryOpeningLocation(product, location) })} /></li>)}</ul>{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
+    {loading ? <p role="status" className={styles.message}>재고를 불러오고 있어요.</p> : <><div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div><ul className={styles.list}>{filtered.slice(0, limit).map((product) => <li key={product.productId}><InventoryCard product={product} location={location} context={calendarReady ? context : null} countMode={countMode} onOpen={openProduct} /></li>)}</ul>{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
     {context?.canWrite ? <div className={styles.stickyActions}><GlassButton variant="primary" aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}><Icon name="plus" />새 품목</GlassButton></div> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => setSelected(null)} onSaved={saved} onCountSaved={countSaved} /> : null}
     {context?.canWrite && editorOpen ? <InventoryProductEditor product={null} location={location === "all" ? "refrigerated" : location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setEditorOpen(false)} onSaved={(product, detail) => { saved(product); setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) }); }} /> : null}

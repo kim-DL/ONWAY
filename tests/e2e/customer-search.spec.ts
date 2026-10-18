@@ -37,6 +37,42 @@ async function fixture(page: Page, width: number) {
   await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();
 }
 
+test("large search keeps full matching and ordering with incremental results across re-entry", async ({ page }) => {
+  await fixture(page, 390);
+  await page.evaluate(() => {
+    const state = window as unknown as { customerSearchFixtures: Array<Record<string, unknown>> };
+    const seed = state.customerSearchFixtures[0];
+    state.customerSearchFixtures = Array.from({ length: 500 }, (_, index) => {
+      const name = `검색 검증 ${String(index + 1).padStart(4, "0")}`;
+      return { ...seed, customerId: `SEARCH-${index}`, name, normalizedName: name.replaceAll(" ", ""), choseongName: `ㄱㅅㄱㅈ${String(index + 1).padStart(4, "0")}` };
+    });
+  });
+  await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true });
+  const cards = page.locator("[data-customer-card]");
+  await input.fill("0");
+  await expect(page.getByRole("status").filter({ hasText: "검색 결과" })).toHaveText("검색 결과 500곳");
+  await expect(cards).toHaveCount(32);
+  await expect(cards.first().getByRole("heading")).toHaveText("검색 검증 0001");
+  await page.getByRole("button", { name: "거래처 더 보기", exact: true }).click();
+  await expect(cards).toHaveCount(64);
+  await expect(cards.last().getByRole("heading")).toHaveText("검색 검증 0064");
+  await page.evaluate(() => (window as unknown as { remountCustomerSearchFixture: () => void }).remountCustomerSearchFixture());
+  await expect(input).toHaveValue("0");
+  await expect(cards).toHaveCount(64);
+  await input.fill("0500");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first().getByRole("heading")).toHaveText("검색 검증 0500");
+  await cards.first().getByRole("button").click();
+  await expect(page.getByRole("dialog", { name: "검색 검증 0500", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "상세 닫기" }).click();
+  await input.fill("0");
+  await expect(cards).toHaveCount(32);
+  await page.getByRole("button", { name: "검색어 지우기", exact: true }).click();
+  await expect(cards).toHaveCount(0);
+  await expect(input).toBeFocused();
+});
+
 for (const width of [320, 390]) {
   test(`${width}px search puts results directly below the input and restores the home when closed`, async ({ page }, info) => {
     const errors: string[] = [];

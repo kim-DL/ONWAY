@@ -5,6 +5,13 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-18 거래처 검색·재고 목록·스크롤 — 구현·전후 계측 / 릴리스 검증 중
+
+- 거래처 검색은 전체 검색/초성/정렬/총건수를 유지하며 32개씩 표시하고 더보기를 추가했다. 세션 내 검색어·표시 개수를 복원하며 권한 정리 시 초기화한다. 재고 카드는 product/context/location/countMode의 기본 memo와 안정적인 onOpen으로 재사용한다. 기존 더보기와 데이터 변경 표시는 유지한다.
+- 두 모드의 스크롤은 session 기준 진입 시 복원하고 passive 이벤트로 기록한다. 매 스크롤 값 변경 때 layout effect를 재실행하거나 cleanup에서 DOM 위치를 다시 읽지 않는다. Functions·Rules·조회 page 크기·최신성·재고 revision/감사·사진 outbox·MCP API는 바꾸지 않았다.
+- 같은 production build/합성 500거래처·1,000재고/390×844/CPU 4×/Fast 4G에서 검색 중앙값 **1,488→168ms**, 600개 더보기 **280→184ms**, 600개 상세 warm 중앙값 **456→312ms**였다. 첫 검색 392ms·큰 목록 상세 312ms의 잔여 지연은 구분한다. 운영 사용자/실제 휴대폰 성능 수치가 아니다. [구현·조건·검증](field-list-scroll-performance-20261018.md), [개별 수치](field-list-scroll-performance-20261018-metrics.json)를 참고한다.
+- 전체 unit 1,747 PASS/기존 조건부 15 SKIP, 관련 browser 22 PASS, 실제 demo 재고 static browser 18·transaction 12 PASS, 검색 성능 18 unit/5,000품목 p95 2.4ms PASS다. lint/typecheck 및 측정용 production build/번들 gate도 통과했다. 정확한 source의 CI·운영 build 및 승인된 Hosting 배포를 이어서 검증한다. 운영 배포 완료로 해석하지 않는다.
+
 ### 2026-10-18 거래처 납품사진 Pan & Zoom — main 저장·운영 Hosting 배포·검증 완료
 
 - 사용자의 추가 적용 요청에 따라 저장된 납품사진과 업로드 중 촬영 미리보기에 재고와 같은 Pan & Zoom을 연결했다. 재고 전용 계산·제스처·조작부를 `src/components/ui/photo-*`로 공통화하고 세 진입점에서 같은 자산을 지연 로딩한다. 확대 중에는 pan, 맞춤 상태에서만 기존 사진 swipe/좌우키 넘기기, 이전/다음에서 100% 초기화를 적용한다.

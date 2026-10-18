@@ -15,10 +15,10 @@ describe("customer workspace memory snapshot", () => {
   it("keeps one namespace only and never returns the previous session snapshot", () => {
     readCustomerWorkspaceSnapshot("A:1:1");
     commitCustomerCatalogRead("A:1:1", [customer()], 1_000, beginCustomerCatalogRead("A:1:1"));
-    updateCustomerWorkspaceUi("A:1:1", { query: "온누리", searchOpen: true, scrollTop: 480 });
-    expect(readCustomerWorkspaceSnapshot("A:1:1")).toMatchObject({ catalog: { customers: [customer()] }, ui: { query: "온누리", scrollTop: 480 } });
+    updateCustomerWorkspaceUi("A:1:1", { query: "온누리", searchOpen: true, scrollTop: 480, limit: 96 });
+    expect(readCustomerWorkspaceSnapshot("A:1:1")).toMatchObject({ catalog: { customers: [customer()] }, ui: { query: "온누리", scrollTop: 480, limit: 96 } });
 
-    expect(readCustomerWorkspaceSnapshot("B:1:1")).toEqual({ catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0 } });
+    expect(readCustomerWorkspaceSnapshot("B:1:1")).toEqual({ catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0, limit: 32 } });
     expect(readCustomerWorkspaceSnapshot("A:1:1").catalog).toBeNull();
   });
 

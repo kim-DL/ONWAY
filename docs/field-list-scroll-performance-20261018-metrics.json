@@ -1,0 +1,159 @@
+{
+  "date": "2026-10-18",
+  "baselineSource": "a11fee6b8be1c0ed2a96fe410206a4ee345eb9ea",
+  "conditions": {
+    "build": "Next production; original Next/Serwist configuration",
+    "data": {
+      "inventory": 1000,
+      "customers": 500
+    },
+    "viewport": "390x844 DPR 1 mobile/touch",
+    "cpuSlowdown": 4,
+    "network": "Fast 4G",
+    "backend": "local demo-inventory-e2e emulator",
+    "observedWith": "local isolated Chrome DevTools",
+    "measure": "Event Timing input to next paint; raw trace insight reports retained locally",
+    "sampleCountCustomer": 3,
+    "sampleCountDetail": 3,
+    "detailWarmupExcluded": 1
+  },
+  "customer": {
+    "before": {
+      "latencies": [
+        1584,
+        1224,
+        1488
+      ],
+      "medianMs": 1488,
+      "firstMs": 1584,
+      "domElements": 12616,
+      "cards": 500
+    },
+    "after": {
+      "latencies": [
+        392,
+        168,
+        144
+      ],
+      "medianMs": 168,
+      "firstMs": 392,
+      "domElements": 918,
+      "cards": 32
+    },
+    "reductionPercent": 88.7
+  },
+  "inventoryMore": {
+    "before": {
+      "latencies": [
+        {
+          "cards": 120,
+          "ms": 176
+        },
+        {
+          "cards": 180,
+          "ms": 176
+        },
+        {
+          "cards": 240,
+          "ms": 192
+        },
+        {
+          "cards": 300,
+          "ms": 192
+        },
+        {
+          "cards": 360,
+          "ms": 224
+        },
+        {
+          "cards": 420,
+          "ms": 240
+        },
+        {
+          "cards": 480,
+          "ms": 296
+        },
+        {
+          "cards": 540,
+          "ms": 288
+        },
+        {
+          "cards": 600,
+          "ms": 280
+        }
+      ],
+      "at600Ms": 280,
+      "maximumMs": 296
+    },
+    "after": {
+      "latencies": [
+        {
+          "cards": 120,
+          "ms": 144
+        },
+        {
+          "cards": 180,
+          "ms": 128
+        },
+        {
+          "cards": 240,
+          "ms": 136
+        },
+        {
+          "cards": 300,
+          "ms": 152
+        },
+        {
+          "cards": 360,
+          "ms": 152
+        },
+        {
+          "cards": 420,
+          "ms": 160
+        },
+        {
+          "cards": 480,
+          "ms": 184
+        },
+        {
+          "cards": 540,
+          "ms": 184
+        },
+        {
+          "cards": 600,
+          "ms": 184
+        }
+      ],
+      "at600Ms": 184,
+      "maximumMs": 184
+    },
+    "reductionPercent": 34.3
+  },
+  "inventoryDetail": {
+    "before": {
+      "warmupMs": 528,
+      "latencies": [
+        456,
+        440,
+        544
+      ],
+      "medianMs": 456
+    },
+    "after": {
+      "warmupMs": 360,
+      "latencies": [
+        312,
+        296,
+        328
+      ],
+      "medianMs": 312
+    },
+    "reductionPercent": 31.6
+  },
+  "limitations": [
+    "Small sequential local lab samples, not production p75 or real-device measurements",
+    "First customer result remains slower than warm search",
+    "Inventory retains loaded cards and native keyboard/find navigation; no virtual scrolling",
+    "No Callable, pagination, freshness, revision, audit, authentication, upload queue or MCP API changes"
+  ]
+}

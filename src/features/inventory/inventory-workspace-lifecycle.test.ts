@@ -16,6 +16,7 @@ vi.mock("react", async (original) => ({ ...await original<typeof import("react")
 vi.mock("client-only", () => ({}));
 vi.mock("./use-inventory-connection", () => ({ useInventoryConnection: () => harness.online, INVENTORY_OFFLINE_DRAFT_MESSAGE: "입력은 유지되며 연결된 뒤 다시 저장해주세요." }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { context: harness.context, list: harness.list }, inventoryErrorMessage: () => "최신 정보 확인이 필요해요." }));
+import { InventoryCard } from "./inventory-card";
 import { InventoryWorkspace } from "./inventory-workspace";
 
 const context: InventoryContext = { today: "2026-09-13", canWrite: true, canAdmin: false, cycle: { cycleId: "week-2026-09-07", startDate: "2026-09-07", nextDate: "2026-09-14", weekday: 1 }, settings: { weekday: 1, urgentDays: 7, revision: 0, pendingWeekday: null, effectiveDate: null, pendingCycleStartDate: null, updatedAt: null, updatedBy: null } };
@@ -40,12 +41,12 @@ const hasEditor = (tree: ReactNode) => find(tree, (type) => typeof type === "fun
 const catalog = () => getInventoryWorkspaceSession("employee-1:1:1").snapshot.catalog;
 const isLoading = () => find(render(), (_type, props) => props.role === "status" && props.children === "재고를 불러오고 있어요.") !== null;
 const searchField = () => find(render(), (type, props) => type === "input" && props["aria-label"] === "품목 검색")!;
-const card = (productId: string) => find(render(), (type, props) => typeof type === "function" && type.name === "InventoryCard" && (props.product as InventoryProduct).productId === productId);
+const card = (productId: string) => find(render(), (type, props) => type === InventoryCard && (props.product as InventoryProduct).productId === productId);
 function expectNoPrivateSurfaces() {
   const tree = render();
   expect(catalog()).toBeNull();
   expect(tree.props["data-write-actions"]).toBeUndefined();
-  expect(find(tree, (type) => typeof type === "function" && ["InventoryCard", "InventoryDetail", "InventoryProductEditor", "InventorySettingsForm"].includes(type.name))).toBeNull();
+  expect(find(tree, (type) => type === InventoryCard || typeof type === "function" && ["InventoryDetail", "InventoryProductEditor", "InventorySettingsForm"].includes(type.name))).toBeNull();
 }
 
 beforeEach(() => {
@@ -213,8 +214,8 @@ describe("inventory in-memory draft lifecycle", () => {
     finish([product("old-private")]); await settle();
     const tree = render(false, nextSession);
     expect(getInventoryWorkspaceSession("employee-1:1:2").snapshot.catalog?.products).toEqual([nextProduct]);
-    expect(find(tree, (type, props) => typeof type === "function" && type.name === "InventoryCard" && (props.product as InventoryProduct).productId === "old-private")).toBeNull();
-    expect(find(tree, (type) => typeof type === "function" && type.name === "InventoryCard")?.product).toEqual(nextProduct);
+    expect(find(tree, (type, props) => type === InventoryCard && (props.product as InventoryProduct).productId === "old-private")).toBeNull();
+    expect(find(tree, (type) => type === InventoryCard)?.product).toEqual(nextProduct);
     secondCleanup(); expect(windowEvents.size).toBe(0); expect(documentEvents.size).toBe(0);
   });
 

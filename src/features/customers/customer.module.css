@@ -69,6 +69,7 @@
 .adminList button:focus-visible { outline: 2px solid var(--customer-accent); outline-offset: 2px; }
 .resultCount { margin: 16px 2px 9px; color: var(--customer-muted); font-size: .8125rem; font-weight: 650; }
 .results { max-width: 48rem; }
+.searchMore { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; max-width: 48rem; margin-block: 12px; }
 .card { isolation: isolate; container-type: inline-size; }
 .cardSelect { position: absolute; z-index: 1; inset: 0; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .cardSelect:focus-visible { outline: 2px solid var(--customer-accent); outline-offset: -2px; }

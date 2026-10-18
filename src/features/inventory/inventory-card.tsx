@@ -1,9 +1,9 @@
-import { useId } from "react";
+import { memo, useId } from "react";
 import { INVENTORY_LOCATION_LABELS, type InventoryContext, type InventoryProduct } from "@/domain/inventory";
 import { INVENTORY_COUNT_LABELS, inventoryCountBadgeState, inventoryExpiryGroupCount, inventoryExpiryLabel, inventoryScopeIsUrgent, inventoryScope, inventoryUnitDisplayLabel, type InventoryLocationFilter } from "./inventory-model";
 import styles from "./inventory.module.css";
 
-export function InventoryCard({ product, location, context, countMode = false, onOpen }: { product: InventoryProduct; location: InventoryLocationFilter; context: InventoryContext | null; countMode?: boolean; onOpen: (productId: string) => void }) {
+export const InventoryCard = memo(function InventoryCard({ product, location, context, countMode = false, onOpen }: { product: InventoryProduct; location: InventoryLocationFilter; context: InventoryContext | null; countMode?: boolean; onOpen: (productId: string) => void }) {
   const statusId = useId();
   const countState = inventoryCountBadgeState(product, location, context, countMode);
   const { quantity, expiryDate, locations } = inventoryScope(product, location);
@@ -28,4 +28,4 @@ export function InventoryCard({ product, location, context, countMode = false, o
       <span className={styles.cardStock}><strong>{quantity.toLocaleString("ko-KR")}</strong><span>{unitLabel}</span></span>
     </button>
   </article>;
-}
+});

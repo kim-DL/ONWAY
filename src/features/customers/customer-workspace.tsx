@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
-import { restoreWorkspaceScroll } from "@/lib/workspace-scroll-memory";
+import { rememberWorkspaceScroll } from "@/lib/workspace-scroll-memory";
 
 import { CustomerCard, RecentCustomerCard } from "./customer-card";
 import { CustomerDetail } from "./customer-detail";
@@ -39,6 +39,8 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
   const { showToast } = useToast();
   const [query, setQuery] = useState(initialSnapshot.ui.query);
   const [searchOpen, setSearchOpen] = useState(initialSnapshot.ui.searchOpen);
+  const [limit, setLimit] = useState(initialSnapshot.ui.limit);
+  const changeQuery = useCallback((value: string) => { setQuery(value); setLimit(32); }, []);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
@@ -46,23 +48,21 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
   const workspaceRef = useRef<HTMLElement>(null);
   const [selectedId, setSelectedId] = useState(requestedCustomerId);
   const [editing, setEditing] = useState<Customer | "new" | null>(null);
-  const clearSensitiveState = useCallback(() => { setSelectedId(null); setEditing(null); setQuery(""); setDirectoryOpen(false); }, []);
+  const clearSensitiveState = useCallback(() => { setSelectedId(null); setEditing(null); changeQuery(""); setDirectoryOpen(false); }, [changeQuery]);
   const catalog = useCustomers(session, clearSensitiveState);
   const { recentCustomers, rememberCustomer, clearRecentCustomers, ready: recentsReady } = useRecentCustomers(session, catalog.customers);
   const homeRecentCustomers = customerHomeRecents(recentCustomers);
   const results = useMemo(() => searchCustomers(catalog.customers, query), [catalog.customers, query]);
   const selected = catalog.status === "ready" ? catalog.customers.find((customer) => customer.customerId === selectedId) : undefined;
   useEffect(() => {
-    updateCustomerWorkspaceUi(sessionKey, { query, searchOpen });
-  }, [sessionKey, query, searchOpen]);
+    updateCustomerWorkspaceUi(sessionKey, { query, searchOpen, limit });
+  }, [sessionKey, query, searchOpen, limit]);
   useLayoutEffect(() => {
     const scroller = workspaceRef.current?.closest(".workspace-content") as HTMLElement | null;
     if (!scroller) return;
-    const remember = () => updateCustomerWorkspaceUi(sessionKey, { scrollTop: scroller.scrollTop });
-    restoreWorkspaceScroll(scroller, initialSnapshot.ui.scrollTop);
-    scroller.addEventListener("scroll", remember, { passive: true });
-    return () => { remember(); scroller.removeEventListener("scroll", remember); };
-  }, [sessionKey, initialSnapshot.ui.scrollTop]);
+    return rememberWorkspaceScroll(scroller, readCustomerWorkspaceSnapshot(sessionKey).ui.scrollTop,
+      (scrollTop) => updateCustomerWorkspaceUi(sessionKey, { scrollTop }));
+  }, [sessionKey]);
   useEffect(() => {
     if (searchOpen) {
       searchRef.current?.focus({ preventScroll: true });
@@ -75,7 +75,7 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
   const closeSearch = () => {
     searchRef.current?.blur();
     restoreSearchFocus.current = true;
-    setQuery("");
+    changeQuery("");
     setSearchOpen(false);
   };
   const openCustomer = (customerId: string) => {
@@ -85,11 +85,11 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
   return <section ref={workspaceRef} className={`shell-page ${styles.workspace}`} aria-labelledby="customer-heading" data-customer-workspace data-search-open={searchOpen || undefined}>
     <CustomerHome greeting={`${session.displayName}님, ${greeting}.`} searchTriggerRef={searchTriggerRef} onOpenSearch={() => setSearchOpen(true)} onOpenDirectory={() => setDirectoryOpen(true)} onRegister={() => setEditing("new")} registerDisabled={catalog.status !== "ready"}
       searchContent={searchOpen ? <div className={styles.searchPanel}>
-        <label className={styles.search}><Icon name="search" size={22} /><input {...searchInputProps} name="customer-query" ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => {
+        <label className={styles.search}><Icon name="search" size={22} /><input {...searchInputProps} name="customer-query" ref={searchRef} value={query} onChange={(event) => changeQuery(event.target.value)} onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
           if (event.key === "Enter") event.currentTarget.blur();
           if (event.key === "Escape") { event.preventDefault(); closeSearch(); }
-        }} placeholder="거래처명 · 초성 검색" aria-label="거래처명 또는 초성 검색" />{query ? <button type="button" className={styles.iconButton} onClick={() => { setQuery(""); searchRef.current?.focus(); }} aria-label="검색어 지우기"><Icon name="close" size={18} /></button> : null}</label>
+        }} placeholder="거래처명 · 초성 검색" aria-label="거래처명 또는 초성 검색" />{query ? <button type="button" className={styles.iconButton} onClick={() => { changeQuery(""); searchRef.current?.focus(); }} aria-label="검색어 지우기"><Icon name="close" size={18} /></button> : null}</label>
         <button type="button" className={styles.searchClose} onClick={closeSearch} aria-label="검색 닫기">닫기</button>
       </div> : undefined} />
     {catalog.status === "error" ? <div className={styles.empty} role="alert"><Icon name="wifi-off" size={26} /><p>{catalog.message}</p><GlassButton compact onClick={catalog.retry}>다시 불러오기</GlassButton></div>
@@ -104,7 +104,7 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
             <Icon name="chevron-right" size={17} />
           </button>}
         </section>
-          : <><div className={styles.resultsHeading}><p className={styles.resultCount} role="status">검색 결과 <strong>{results.length}</strong>곳</p><button type="button" className={styles.textButton} onClick={() => setQuery("")}>최근 거래처</button></div>{results.length ? <ul className={`${fieldList.list} ${styles.results}`}>{results.map((customer) => <li key={customer.customerId}><CustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} /></li>)}</ul> : <div className={styles.empty}><Icon name="search" size={25} /><h2>등록된 거래처를 찾을 수 없습니다.</h2><p>거래처명의 일부나 초성으로 다시 찾아보세요.</p></div>}</>}</>}
+          : <><div className={styles.resultsHeading}><p className={styles.resultCount} role="status">검색 결과 <strong>{results.length}</strong>곳</p><button type="button" className={styles.textButton} onClick={() => changeQuery("")}>최근 거래처</button></div>{results.length ? <><ul className={`${fieldList.list} ${styles.results}`}>{results.slice(0, limit).map((customer) => <li key={customer.customerId}><CustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} /></li>)}</ul>{results.length > limit ? <GlassButton className={styles.searchMore} aria-label="거래처 더 보기" onClick={() => setLimit((value) => value + 32)}>거래처 더 보기 <small>{limit} / {results.length}</small></GlassButton> : null}</> : <div className={styles.empty}><Icon name="search" size={25} /><h2>등록된 거래처를 찾을 수 없습니다.</h2><p>거래처명의 일부나 초성으로 다시 찾아보세요.</p></div>}</>}</>}
     {directoryOpen ? <CustomerDirectory customers={catalog.customers} status={catalog.status} message={catalog.message} onRetry={catalog.retry} onSelect={openCustomer} onClose={() => setDirectoryOpen(false)} /> : null}
     {selected && !editing ? <CustomerDetail key={selected.customerId} customer={selected} session={session} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected)} /> : null}
     {editing && catalog.canRetainDraft ? <CustomerEditor key={editing === "new" ? "new" : `${editing.customerId}:${editing.revision}`} customer={editing === "new" ? null : editing} refreshMessage={catalog.status === "error" ? "목록 갱신이 지연되고 있어요. 작성 중인 내용은 유지됩니다." : ""} onClose={() => setEditing(null)} onSaved={(customer) => { catalog.accept(customer); setEditing(null); setSelectedId(customer.customerId); rememberCustomer(customer.customerId); catalog.retry(); showToast("거래처 정보를 저장했어요.", "success"); }} /> : null}

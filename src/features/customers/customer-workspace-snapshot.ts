@@ -7,7 +7,7 @@ export type CustomerWorkspaceSnapshot = {
     freshness: RevalidationFreshness;
     lastSuccessAt: number | null;
   };
-  ui: { query: string; searchOpen: boolean; scrollTop: number };
+  ui: { query: string; searchOpen: boolean; scrollTop: number; limit: number };
 };
 
 type CustomerSessionEntry = {
@@ -25,7 +25,7 @@ function sessionEntry(namespace: string) {
     entry = {
       namespace,
       coordinator: new RevalidationCoordinator(namespace),
-      snapshot: { catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0 } },
+      snapshot: { catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0, limit: 32 } },
       writeGeneration: 0,
     };
   }
@@ -85,6 +85,6 @@ export function clearCustomerWorkspaceSnapshot(namespace?: string) {
 export function discardCustomerWorkspaceCatalog(namespace: string) {
   if (!entry || entry.namespace !== namespace) return;
   entry.coordinator.invalidate();
-  entry.snapshot = { catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0 } };
+  entry.snapshot = { catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0, limit: 32 } };
   entry.writeGeneration += 1;
 }
