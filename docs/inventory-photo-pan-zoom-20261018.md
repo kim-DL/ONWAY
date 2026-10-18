@@ -10,7 +10,7 @@
 | --- | ---: | --- |
 | PhotoSwipe 5.4.4 | core JS 17,405B + CSS 1,466B; Lightbox loader 제외 | 줌·핀치·갤러리 기능을 제공한다. 자체 overlay와 기존 중첩 모달·뒤로가기·사진 전환 소유권을 맞추는 통합이 필요하다. |
 | react-zoom-pan-pinch 4.2.0 | 전체 exports 16,404B; 필요한 TransformWrapper/TransformComponent만 14,564B | 기존 모달 안에 넣을 수 있다. 이번 단일 사진 제스처보다 넓은 기능과 API가 포함되며 도구 버튼·보안 수명주기 연결은 앱에서 맡는다. |
-| 자체 구현 **선택** | 새 조작 경계 약 3.2KiB JS + 약 0.5KiB CSS; 최종 수치는 릴리스 기록 | 기존 BottomSheet, 사진 열기/닫기 전환과 사설 Blob URL을 재사용한다. 필요한 제스처와 해제 수명주기만 소유한다. 새 실행 의존성이 없다. |
+| 자체 구현 **선택** | 최종 production 새 조작 경계 JS 3,306B + CSS 473B gzip | 기존 BottomSheet, 사진 열기/닫기 전환과 사설 Blob URL을 재사용한다. 필요한 제스처와 해제 수명주기만 소유한다. 새 실행 의존성이 없다. |
 
 패키지 비교 수치는 통제된 번들 실험이며 해당 라이브러리를 실제 Next 앱에 통합한 최종 크기와 같다고 단정하지 않는다. [PhotoSwipe zoom levels](https://photoswipe.com/adjusting-zoom-level/), [PhotoSwipe options](https://photoswipe.com/options/), [react-zoom-pan-pinch 공식 저장소](https://github.com/BetterTyped/react-zoom-pan-pinch)를 검토했다. 원시 결과는 로컬 `output/inventory-pan-zoom-20261018/library-comparison.json`에 있다.
 
@@ -37,10 +37,10 @@
 
 - geometry 단위 10개: 비율 유지, 해상도·DPR 최대 배율, 잘못된 크기 대기, 연속 배율의 커서 좌표 보존, 가로/세로/파노라마 이동 경계, 축소 복원을 검증했다.
 - 전체 unit 1,746 PASS / 기존 emulator 조건 15 SKIP. 최초 build 동시 실행에서 기존 runtime identity 동적 import의 5초 timeout 1회 후, 테스트 변경 없이 단독 4개와 전체 순차 실행을 통과했다.
-- Chromium PC/모바일 새 브라우저 회귀는 실제 mouse wheel/drag/double click, CDP native touch의 핀치·남은 손가락 pan·더블탭·취소/재조작, 배율 한도·여러 비율·resize·Back·Escape·재열기, 320px/200% 글자/axe, compositor frame 정지, 사진을 연 채 새로고침 후 재열기/닫기를 검사한다. 반대 플랫폼 전용 2 SKIP은 해당 조작을 다른 프로젝트에서 실제 실행한 플랫폼 분리다. 최종 수치는 릴리스 기록을 따른다.
-- Windows Playwright WebKit desktop에서도 PC 조작·범위·닫기/포커스·접근성·frame 정지·새로고침을 검사한다. Chromium native touch 전용 1개는 분리한다. 실제 iPhone Safari나 설치 PWA 터치 합격으로 보고하지 않는다.
+- Chromium PC/모바일 새 브라우저 회귀 **10 PASS / 2 SKIP**: 실제 mouse wheel/drag/double click, CDP native touch의 핀치·남은 손가락 pan·더블탭·취소/재조작, 배율 한도·여러 비율·resize·Back·Escape·재열기, 320px/200% 글자/axe, compositor frame 정지, 사진을 연 채 새로고침 후 재열기/닫기를 검사했다. 반대 플랫폼 전용 2 SKIP은 해당 조작을 다른 프로젝트에서 실제 실행한 플랫폼 분리다.
+- Windows Playwright WebKit desktop **5 PASS / 1 SKIP**: PC 조작·범위·닫기/포커스·접근성·frame 정지·새로고침을 검사했다. Chromium native touch 전용 1개는 분리한다. 실제 iPhone Safari나 설치 PWA 터치 합격으로 보고하지 않는다.
 - 재고 static PWA/실제 demo Auth·Callable·Firestore·Storage 업무 회귀 18 PASS, transaction integration 12 PASS. 등록/사진·입출고·실사·교체/삭제·권한 회수·viewer 거절·1,000품목 paging을 포함한다.
 - `aside-browser`로 별도 localhost 합성 사진 화면의 실제 뷰어 컴포넌트를 열고 확대 버튼, 휠, 드래그, 더블클릭 확대/복원, 상태 문구와 화면을 직접 확인했다. Aside는 새 viewport API를 제공하지 않아 모바일 검증은 별도 네이티브 입력 회귀와 구분한다. 일부 Aside 전체 화면 캡처가 CDP timeout/clip 오류를 냈으며 이를 제품 사진 오류로 취급하지 않는다.
 - 실제 기기의 핀치·OS 제스처·설치 PWA lifecycle은 별도 현장 인수다. 운영 업무 데이터 생성·변경·삭제를 테스트에 사용하지 않는다.
 
-검증 중간 빌드의 `out`에는 식별자 `inventory-pan-zoom-local-validation`을 사용했으므로 이를 배포하면 안 된다. 승인된 이번 Hosting 릴리스는 Git에 저장한 정확한 source, 해당 CI 성공, 비공개 운영 설정과 production flags, 새 source revision으로 다시 build한 manifest를 확인한 후 진행한다. 기존 Functions·Rules·MCP 전용 Hosting은 배포 대상이 아니다.
+검증 중간 빌드에는 `inventory-pan-zoom-local-validation` 식별자를 사용했고 배포하지 않았다. 최종 제품 source `634bfdc0eb49336ebd1ecec764edab3c6e513af0`의 전체 CI 성공 후, 비공개 운영 설정·production flags·정확한 source revision으로 새로 build한 111파일 manifest를 확인해 **2026-10-18 12:59:05.130 KST Hosting 배포를 완료**했다. 기존 Functions 72개와 MCP 전용 Hosting metadata는 전후 동일하다. 실제 운영 version·전후 성능·전체 CI·양쪽 origin 검증은 [릴리스 기록](releases/2026-10-18-inventory-photo-pan-zoom.md)을 따른다.

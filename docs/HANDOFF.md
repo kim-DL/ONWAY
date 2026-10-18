@@ -5,12 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-18 재고 제품 사진 Pan & Zoom — 구현·로컬 검증 / Git·Hosting 반영 진행
+### 2026-10-18 재고 제품 사진 Pan & Zoom — main 저장·운영 Hosting 배포·검증 완료
 
 - 기존 2배 스크롤 확대를 커서 중심 휠·드래그·더블클릭 및 모바일 핀치·한 손가락 이동·더블탭으로 바꿨다. 맞춤 100%, 빠른 확대 1.8배, 최대 2.5배/충분한 실제 이미지 해상도일 때 3배다. 축별 이동 경계, 키보드, 포인터 취소, 화면 크기 변경, 창 가림의 frame 정지 복구와 Safari 닫기 포커스 복원을 포함한다.
 - PhotoSwipe 5.4.4, react-zoom-pan-pinch 4.2.0과 비교해 경량 자체 구현을 선택했다. 기존 인증된 Blob URL·BottomSheet·사진 전환을 재사용하고 새 조작부는 사진 뷰어 안에서만 지연 로딩한다. 기존 성능 상한은 유지하고 새 경계·전체 방문 흐름도 별도 작은 한도로 검사한다. 설계·패키지 실측·검증 범위는 [구현 기록](inventory-photo-pan-zoom-20261018.md)을 참고한다.
-- unit 1,746 PASS / 기존 조건부 15 SKIP, 새 Chromium PC/모바일 조작·WebKit desktop 회귀, 재고 static browser 18 PASS와 실제 transaction 12 PASS를 확인했다. Aside 직접 PC 조작 중 발견한 새로고침 후 모달 이력 충돌도 일반 브라우저에 재현한 뒤 인스턴스 이력 키와 추가 회귀로 보완한다. 실제 iPhone/설치 PWA의 터치·lifecycle 검증과 구분한다. 최종 source의 검사 수치·main CI 및 Hosting 릴리스 결과는 완료 뒤 별도 최신 항목에 기록한다.
-- 이번 요청에는 테스트 통과 후 Git 저장과 운영 Hosting 배포 승인이 포함된다. 대상은 `hosting:onnuriway`만이며 기존 Functions·Rules·MCP 작업을 보존한다. 중간 검증 `out`은 `inventory-pan-zoom-local-validation` source marker이므로 배포하지 않고 정확한 commit으로 새 production build를 만들어야 한다.
+- 제품 source `634bfdc0eb49336ebd1ecec764edab3c6e513af0`을 main과 `codex/inventory-photo-pan-zoom-20261018`에 저장했다. 정확한 main의 [Quality Gate 39094014994](https://github.com/kim-DL/ONWAY/actions/runs/39094014994)는 **2026-10-18 12:58:18 KST 전체 SUCCESS**다. unit 1,746 PASS / 조건부 15 SKIP, 일반 browser 296 PASS / 6 SKIP, 별도 NEIS 3·Rules 50·transaction 12·재고사진 4·납품사진 16 PASS다. Phase 17 browser 81 PASS / 재고 전용 18 SKIP은 최종 source의 전용 재고 static browser 18 PASS와 transaction 12 PASS로 보완했다. 새 조작 회귀는 Chromium 10 PASS / 플랫폼 분리 2 SKIP, Windows WebKit desktop 5 PASS / Chromium native touch 전용 1 SKIP이다.
+- `aside-browser`로 localhost 합성 사진의 실제 컴포넌트를 직접 조작했다. 휠·드래그·더블클릭과 닫기/포커스 복원을 확인했고, 사진 모달을 연 채 새로고침한 뒤 닫기가 무시되는 이력 충돌을 발견해 일반 Chromium PC·모바일 재현 및 추가 회귀 후 수정했다. 실제 iPhone/설치 PWA의 터치·lifecycle 합격으로 보고하지 않는다.
+- 기존 비공개 운영 설정으로 사진·재고 ON/Emulator OFF, source revision을 위 commit으로 고정한 새 production build를 배포했다. build·PWA·성능·Hosting gate PASS, export/shipped 111개·precache 98개·initial assets 9개다. initial JS gzip 140,034→140,071B(+37B), 새 지연 조작 JS 3,306B/CSS 473B이며 기존 성능 상한은 유지했다. 후보 111파일과 비공개 env 3종의 digest를 배포 전후 확인했다.
+- 사용자 승인 범위인 `--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting만 배포했다. live version **`835cf1d98b6d7230`**, release `1792295945130000`, **2026-10-18 12:59:05.130 KST** (`2026-10-18T03:59:05.130Z`), 직전 복구 version `a21113ad828fdb0a`다. 두 운영 origin의 공개 검사 각 25개 PASS, www→apex 301, 새 Chromium 로그인 화면·서비스 워커 activated·page error 0, 공개 worker와 후보 SHA-256 `35be801b5a92ed0fc5fda47c8f8e01f864022f42507ef07b680701aa3ac64357` 일치를 확인했다.
+- 전체 72개 Functions metadata, `recordInventoryCount`·`employeeMcp` API metadata, MCP 전용 Hosting version/release가 전후 동일하다. MCP 1.14.2·승인 정책과 공개 health/OAuth metadata 200도 유지한다. Rules·운영 업무 데이터는 변경하지 않았다. 상세 [릴리스 기록](releases/2026-10-18-inventory-photo-pan-zoom.md), ignored 배포/검증 증거는 `output/inventory-pan-zoom-20261018/`에 있다. 릴리스 문서는 main에 후속 저장하며 제품 source가 같아 중복 배포하지 않는다. 다른 worktree·실험 브랜치·stash·비공개 설정은 보존한다.
 
 ### 2026-10-18 현장 지연 P0 — PR #5 main 병합·운영 배포·검증 완료
 
