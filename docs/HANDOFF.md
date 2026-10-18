@@ -5,6 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-18 현장 지연 P0 — PR #5 main 병합·운영 배포·검증 완료
+
+- 사용자의 명시적 운영 반영 요청에 따라 [PR #5](https://github.com/kim-DL/ONWAY/pull/5)를 main의 `ccd8d0321230e114d93b78a8b30059c7018cbb03`으로 merge했다. PR head `1ad0b27585675003bd0b1d2c9d88e709d1dcd8b5`와 merge commit의 Git tree가 같다. 병합된 정확한 main의 [Quality Gate 39088759706](https://github.com/kim-DL/ONWAY/actions/runs/39088759706)는 **2026-10-18 11:29:26 KST 전체 SUCCESS**다. unit 1,736 PASS / 조건부 15 SKIP, 일반 browser 286 PASS / 기존 4 SKIP, 별도 NEIS 3·Rules 50·실제 재고 transaction 12·재고사진 4·납품사진 16 PASS를 확인했다. Phase 17 browser는 81 PASS / 재고 전용 18 SKIP이며 전용 재고 browser 18 PASS는 아래 구현 검증 기록을 따른다.
+- 기존 비공개 운영 설정으로 사진·재고 flag ON/Emulator OFF, PWA source revision을 위 merge SHA로 고정해 다시 build했다. Functions build, PWA·성능·Hosting artifact gate PASS이며 후보 109파일/precache 96/initial assets 9개의 digest를 배포 전후 확인했다. 비공개 env 3종의 전후 digest가 같다.
+- `--project onnuriway --only functions:recordInventoryCount --non-interactive`로 **해당 함수만** 배포했다. 서울 리전 ACTIVE revision은 `recordinventorycount-00009-yum`이고 이전은 `recordinventorycount-00008-gox`다. 런타임·서비스 계정·메모리·동시성·최대 인스턴스·기존 업무 환경변수를 보존했다. 전체 72개 중 다른 71개 함수의 CLI metadata는 전후 동일하다. 사진 서버 API는 변경하지 않아 사진 Functions 추가 배포가 필요하지 않다.
+- `--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting을 배포했다. live version **`a21113ad828fdb0a`**, release `1792290714536000`, 시각 **2026-10-18 11:31:54.536 KST** (`2026-10-18T02:31:54.536Z`), 직전 복구 version `663003d922fb2290`이다. 양쪽 운영 origin의 공개 HTTP 검사 **각 25개 PASS**, www→apex 301, 새 worker SHA-256 `af8db918595224c44633e388e4a901fa3816a542340e1acb7ee031bb55b85ae0`와 후보 일치를 확인했다. 별도 새 Chromium 세션에서도 두 origin의 로그인 화면·서비스 워커 activated·page error 0을 확인했다.
+- MCP는 **1.14.2 유지**다. `employeeMcp` revision `employeemcp-00031-muy` 및 전체 Functions API metadata, MCP 전용 Hosting version `392f487ef50a6a9c`와 release가 전후 같다. health 및 OAuth 공개 metadata 200, writesRequireApproval 유지도 확인했다. PR #4는 draft/open, `codex/mcp-1.8.0`은 `86ce19328bf0074328b43512745f284aeb7df740`으로 보존했다. 기존 worktree·실험 브랜치·stash도 유지한다.
+- 운영 업무 데이터 생성·변경·삭제를 검증에 사용하지 않았고 Rules 배포도 하지 않았다. 인증 없는 재고 Callable 요청은 전후 모두 401이다. 실제 직원 로그인/App Check 성공·실제 iPhone/설치 PWA의 카메라·업데이트/종료 복구는 이번 공개 검사와 구분한다. Windows WebKit의 격리/영구 프로필 차이와 추가 검증 결과는 [구현 기록](field-latency-p0-20261018.md)을 참고한다. 상세 [릴리스 기록](releases/2026-10-18-field-latency-p0.md), 배포 후보·전후 metadata·공개/브라우저 검증의 로컬 ignored 기록은 `output/field-p0-release-20261018/`에 있다. 이 인수인계 갱신은 문서 전용 후속 커밋이며 제품 소스가 같으므로 중복 운영 배포하지 않는다.
+
 ### 2026-10-18 현장 지연 P0 — 구현·로컬 검증 완료 / 운영 미배포
 
 - `main`과 `origin/main`은 `04272ec8b4a80c60dd74326cda6cd3f61f53ad36`으로 동기화했다. PR #1·#2·#3의 merge를 확인했다. PR #4 `codex/mcp-1.8.0`은 draft/open인 별도 8커밋 작업으로 보존하고, 기존 12커밋의 `perf/field-latency-count-photo-20261018`을 검토한 뒤 그 tracking branch에서 P0를 이어서 구현했다. 다른 worktree·실험·stash·비공개 env는 유지한다.
@@ -13,7 +22,7 @@
 - 각 30회 실험에서 실제 demo PWA의 재고 클릭→완료 p50 **230.3→216.4ms**, Firestore 읽기별 120ms 추가/200 lot 트랜잭션 p50 **618.5→474.5ms**, 통제 endpoint의 사진 다음 촬영 요청 수락 p50 **2,947.2→76.1ms**였다. 사진 서버 확인 완료는 **2,914.4→2,959.4ms**로, 업로드 자체의 가속을 주장하지 않는다. [구현·정책·재현·제한](field-latency-p0-20261018.md)과 [조건/수치/hash](field-latency-p0-20261018-metrics.json)를 확인한다. 운영·실제 카메라 성능 수치가 아니다.
 - 로컬 unit **1,736 PASS / 기존 조건부 15 SKIP**, 재고 static browser **18 PASS**와 실제 transaction integration **12 PASS**, 사진 Chromium **16개 검증**(전체 15 PASS 후 선택자 수정 1개 재실행 PASS), typecheck/lint/Functions build, 검색 성능 18 unit 및 5,000품목 p95 **1.24ms** PASS다. CI Quality Gate에도 사진 전체 회귀를 추가했으며 최종 합성 main/branch 검증 상태는 이 브랜치의 PR 체크를 확인한다.
 - 사진·재고 flag ON/Emulator OFF production-mode build와 PWA·JS/CSS·Hosting artifact gate PASS. initial JS gzip **140,034B**, 재고 **25,537B**, 사진 workspace **10,160B**, upload runtime **5,098B**로 기존 상한을 유지한다. 신규 행/미리보기/보관/전송 경계도 별도 작은 한도로 검사한다. export/shipped **109개**, precache **96개**, Hosting initial assets **9개**다. 비공개 env 3종의 전후 digest가 같다. audit는 high/critical 0, 기존 moderate 8이며 관련 patch 및 fake-indexeddb 테스트 의존성을 기록했다.
-- Windows Playwright WebKit 26.5는 최소 재현에서도 IndexedDB Blob/File 저장에 UnknownError가 나므로 대기열 통과로 보고하지 않는다. 같은 엔진의 실제 JPEG→WebP/JPEG local preview 생성은 확인했다. 실제 iPhone/설치 PWA의 촬영·저장소·종료/재실행은 현장 인수 대상으로 남긴다. main 병합, 운영 Functions/Hosting/Rules 배포와 운영 데이터 변경은 하지 않았으며 운영 배포는 별도 승인이 필요하다.
+- Windows Playwright WebKit 26.5의 기본 격리 프로필은 IndexedDB Blob/File 저장에 UnknownError가 났다. 영구 프로필에서는 실제 Blob/File 보관과 핵심 6개 회귀를 통과했으며, 별도 삭제 케이스는 기능 검사 후 Playwright의 Service Worker 차단 경고로 무경고 검사를 실패했다. 실제 iPhone/설치 PWA의 촬영·저장소·종료/재실행은 현장 인수 대상으로 남긴다. 이 항목은 구현 당시의 미배포 기록이며, 이후 승인된 main 병합과 운영 배포 결과는 위 최신 릴리스 항목을 따른다.
 
 ### 2026-10-05 리팩토링 — main 저장 및 운영 Hosting 배포 완료
 

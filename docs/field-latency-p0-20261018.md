@@ -1,6 +1,6 @@
 # 현장 지연 P0 — 2026-10-18
 
-대상 브랜치: `perf/field-latency-count-photo-20261018`. 기준선은 `main`의 `04272ec8b4a80c60dd74326cda6cd3f61f53ad36`이다. 운영 배포는 별도 승인 대상이며 이 작업에서 수행하지 않는다.
+대상 브랜치: `perf/field-latency-count-photo-20261018`. 기준선은 `main`의 `04272ec8b4a80c60dd74326cda6cd3f61f53ad36`이다. 아래는 구현·측정 당시 기록이며, 이후 사용자 승인으로 PR #5를 main에 병합하고 필요한 Functions/Hosting을 배포한 결과는 [2026-10-18 릴리스 기록](releases/2026-10-18-field-latency-p0.md)을 따른다.
 
 ## 저장소 확인
 
@@ -75,7 +75,9 @@ IndexedDB `onnuriway:private:delivery-photo-outbox:v1`의 전용 jobs/scope stor
 
 ## 검증 및 릴리스 경계
 
-Windows의 Playwright WebKit 26.5를 추가 실행했다. 별도 최소 재현에서 IndexedDB string/ArrayBuffer는 성공했으나 Blob과 File은 모두 `UnknownError: Error preparing Blob/File data to be stored in object store`로 실패했다. 이 환경의 대기열 검증을 PASS로 취급하지 않는다. 앱은 보관 실패를 표시하고 사진을 메모리에 유지하며 서버 업로드/완료 표시를 시작하지 않았다. 같은 엔진에서 실제 JPEG 복사→이미지 디코딩→WebP 전송 Blob·JPEG local preview 생성은 별도 검증을 통과했다. `webkit-capability.json`에 환경과 결과를 보존한다. 실제 Safari/iPhone의 저장소 지원 또는 실기기 카메라 검증을 이 Windows 결과로 추정하지 않는다.
+Windows의 Playwright WebKit 26.5를 추가 실행했다. 기본 격리 프로필의 별도 최소 재현에서 IndexedDB string/ArrayBuffer는 성공했으나 Blob과 File은 모두 `UnknownError: Error preparing Blob/File data to be stored in object store`로 실패했다. 이 프로필의 대기열 검증을 PASS로 취급하지 않는다. 앱은 보관 실패를 표시하고 사진을 메모리에 유지하며 서버 업로드/완료 표시를 시작하지 않았다. 같은 엔진에서 실제 JPEG 복사→이미지 디코딩→WebP 전송 Blob·JPEG local preview 생성은 별도 검증을 통과했다. `webkit-capability.json`에 환경과 결과를 보존한다.
+
+추가로 일반 영구 프로필에서는 Blob/File 저장을 확인했다(`webkit-persistent-capability.json`). 실제 IndexedDB와 demo Auth/Callable/Firestore/Storage를 사용하고 원래 assertion을 유지한 P0 5개 및 PNG fallback의 핵심 **6개 PASS**다. 지연/실패 주입을 위해 이 추가 harness에서 Service Worker를 차단했다. 별도 삭제 케이스는 기능·권한·재시도·목록·Blob URL 해제 검사 후 Playwright의 `Service Worker registration blocked by Playwright` 경고 1건으로 마지막 무경고 검사를 실패했다. 전체 7 PASS로 보고하지 않는다. 실제 Safari/iPhone의 저장소 지원 또는 실기기 카메라·설치 PWA 검증을 이 Windows 결과로 추정하지 않는다.
 
 기존 용량 상한은 유지한다. 새 촬영 행/미리보기/보관 worker/전송 경계에는 각각 gzip JS 2/2/4/2KiB, 새 미리보기 CSS에는 raw 2KiB/gzip 1KiB 한도를 추가했다. 사진 공용 CSS를 중복 계산하지 않고 전체 stylesheet의 정확한 1회 귀속·지연 로딩·PWA precache를 함께 검사한다. 기존 upload runtime 5KiB 및 inventory 25KiB 상한도 유지한다.
 
