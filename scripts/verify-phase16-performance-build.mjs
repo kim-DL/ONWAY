@@ -144,6 +144,7 @@ const deliveryPhotoPreparationJavascriptGzipBytes = [...deliveryPhotoPreparation
 const deliveryPhotoFieldLayers = [
   { name: "row", boundaries: ["delivery-photo-row"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
   { name: "preview", boundaries: ["delivery-photo-upload-panel"], javascript: 2 * 1024, cssRaw: 2 * 1024, cssGzip: 1024 },
+  { name: "inspection", boundaries: ["delivery-photo-local-preview"], javascript: 2 * 1024, cssRaw: 1024, cssGzip: 512 },
   { name: "durability", boundaries: ["delivery-photo-outbox", "delivery-photo-outbox-lazy", "delivery-photo-outbox-worker"], javascript: 4 * 1024, cssRaw: 0, cssGzip: 0 },
   { name: "relay", boundaries: ["delivery-photo-create-repository"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
 ].map((layer) => {
@@ -169,9 +170,10 @@ const adminInterfaceGzipBytes = adminInterfaceStylesheets.reduce((sum, asset) =>
 // Account for its new UI separately, never by relaxing existing app budgets.
 const inventoryWorkspaceEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-workspace"));
 const inventoryPhotoEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-photo-viewer"));
-// Pan/zoom is requested only from the already event-loaded photo dialog.
-// Keep the established workspace/viewer envelopes and charge this new feature separately.
-const inventoryPanZoomEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-photo-pan-zoom"));
+// One physical pan/zoom implementation is requested by the inventory viewer,
+// saved delivery evidence and local outbox inspection. Keep all old envelopes;
+// count the shared files once, including the outbox's shared preview stylesheet.
+const inventoryPanZoomEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/photo-pan-zoom"));
 const inventoryPanZoomAssets = new Set(inventoryPanZoomEntries.flatMap((entry) => entry.files));
 const inventoryPanZoomStylesheets = stylesheets.filter((asset) => inventoryPanZoomAssets.has(asset.asset));
 const inventoryPanZoomJavascriptGzipBytes = [...inventoryPanZoomAssets].filter((asset) => asset.endsWith(".js")).map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
@@ -289,7 +291,8 @@ for (const asset of inventoryAssetNames) {
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryEntries.includes(entry)),
     `inventory asset ${asset} must not leak into unrelated work modes`);
 }
-assertBudget(inventoryPanZoomEntries.length === 1 && inventoryPanZoomStylesheets.length === 1, "inventory pan/zoom must retain one nested boundary and isolated stylesheet");
+assertBudget(inventoryPanZoomEntries.length === 3 && inventoryPanZoomStylesheets.length === 1, "shared pan/zoom must retain its three photo-only callers and one isolated stylesheet");
+for (const entry of inventoryPanZoomEntries) assertBudget(entry.files.length === inventoryPanZoomAssets.size && entry.files.every((asset) => inventoryPanZoomAssets.has(asset)), "all photo viewers must share the same physical pan/zoom assets");
 for (const asset of inventoryPanZoomAssets) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset) && !inventoryAssetNames.has(asset), `pan/zoom asset ${asset} must wait until the photo dialog opens`);
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryPanZoomEntries.includes(entry)), `pan/zoom asset ${asset} must not leak into other screens`);
@@ -361,7 +364,7 @@ for (const layer of deliveryPhotoFieldLayers) {
     assertBudget(serviceWorker.includes(asset), `delivery photo ${layer.name} asset must remain precached`);
   }
 }
-for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-history-dates", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer", "inventory-photo-pan-zoom"]) {
+for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-history-dates", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer", "photo-pan-zoom"]) {
   const entry = dynamicEntries.find(({ boundary }) => boundary.endsWith(tool));
   assertBudget(entry?.files.every((asset) => serviceWorker.includes(asset)),
     `deferred ${tool} assets must remain in the PWA precache`);

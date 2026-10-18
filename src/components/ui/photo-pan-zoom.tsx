@@ -2,11 +2,12 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
-import { attachPhotoGestures } from "./inventory-photo-gestures";
-import styles from "./inventory-photo-pan-zoom.module.css";
+import { attachPhotoGestures } from "./photo-gestures";
+import styles from "./photo-pan-zoom.module.css";
 
-export function InventoryPhotoPanZoom({ stageRef, origin, onZoomedChange }: {
+export function PhotoPanZoom({ stageRef, origin, onZoomedChange, onSwipe }: {
   stageRef: RefObject<HTMLDivElement | null>; origin: HTMLElement | null; onZoomedChange: (zoomed: boolean) => void;
+  onSwipe?: (direction: -1 | 1) => void;
 }) {
   const api = useRef<ReturnType<typeof attachPhotoGestures> | null>(null);
   const [status, setStatus] = useState({ percent: 100, max: 2.5, ready: false, zoomed: false, atMax: false });
@@ -22,7 +23,7 @@ export function InventoryPhotoPanZoom({ stageRef, origin, onZoomedChange }: {
       const percent = Math.round(view.scale * 100);
       const atMax = view.scale >= max - .0001;
       setStatus((previous) => previous.ready && previous.percent === percent && previous.max === max && previous.zoomed === nextZoomed && previous.atMax === atMax ? previous : { percent, max, ready: true, zoomed: nextZoomed, atMax });
-    });
+    }, onSwipe);
     return () => {
       api.current?.dispose(); api.current = null; stage.classList.remove(styles.viewport!);
       if (description === null) stage.removeAttribute("aria-describedby"); else stage.setAttribute("aria-describedby", description);
@@ -33,7 +34,7 @@ export function InventoryPhotoPanZoom({ stageRef, origin, onZoomedChange }: {
         if (trigger?.isConnected) trigger.focus({ preventScroll: true });
       });
     };
-  }, [stageRef, origin, onZoomedChange, hint]);
+  }, [stageRef, origin, onZoomedChange, hint, onSwipe]);
   return <>
     <p className={styles.help} id={hint}><output aria-label="사진 배율" aria-live="off">{status.percent}%</output><span>휠 또는 두 손가락으로 확대 · 끌어서 이동 · 두 번 눌러 확대/복원</span></p>
     <BottomSheetActions className={styles.actions ?? ""}>

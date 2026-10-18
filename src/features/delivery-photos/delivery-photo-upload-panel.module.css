@@ -4,5 +4,5 @@
 .panel .preview,.placeholder{width:96px;min-width:96px;height:80px;border-radius:10px;border:1px solid #c8d2dc;overflow:hidden;background:#f1f5f9;padding:0}
 .preview img{width:100%;height:100%;object-fit:cover;display:block}.placeholder{font-size:.75rem;display:grid;place-items:center;text-align:center;color:#364152}
 .status{display:flex;flex:1;min-width:0;flex-wrap:wrap;gap:5px 8px;font-size:.875rem;line-height:1.5;overflow-wrap:anywhere}.status strong,.status span,.status small{flex-basis:100%}
-.status button,.close{min-height:44px;padding:7px 12px;border:1px solid #aab9c7;border-radius:8px;background:#fff;color:#172b44;font:inherit;cursor:pointer}
-.preview:focus-visible,.status button:focus-visible,.close:focus-visible{outline:3px solid #2563eb;outline-offset:2px}.full{display:block;max-width:100%;height:auto;margin:auto}.close{display:block;margin:12px auto}
+.status button{min-height:44px;padding:7px 12px;border:1px solid #aab9c7;border-radius:8px;background:#fff;color:#172b44;font:inherit;cursor:pointer}
+.preview:focus-visible,.status button:focus-visible{outline:3px solid #2563eb;outline-offset:2px}

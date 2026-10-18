@@ -2,15 +2,16 @@
 
 /* eslint-disable @next/next/no-img-element -- Camera previews use local revocable Blob URLs, never remote downloads. */
 import { useEffect, useState } from "react";
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import dynamic from "next/dynamic";
 import type { DeliveryPhotoUploadCoordinator } from "./delivery-photo-upload-memory";
 import { deliveryPhotoUploadStatusText, isActiveDeliveryPhotoUpload, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import styles from "./delivery-photo-upload-panel.module.css";
+const DeliveryPhotoLocalPreview = dynamic(() => import("./delivery-photo-local-preview").then((module) => module.DeliveryPhotoLocalPreview), { ssr: false });
 
 export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
   coordinator: DeliveryPhotoUploadCoordinator; jobs: readonly DeliveryPhotoUploadProjection[]; names: ReadonlyMap<string, { name: string }>;
 }) {
-  const [viewed, setViewed] = useState<string | null>(null);
+  const [viewed, setViewed] = useState<{ jobId: string; origin: HTMLElement } | null>(null);
   useEffect(() => {
     const removed = (event: Event) => {
       for (const job of coordinator.getSnapshot()) if (job.photoId === (event as CustomEvent<string>).detail) coordinator.dismiss(job.jobId);
@@ -18,7 +19,7 @@ export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
     window.addEventListener("onnuriway:delivery-photo-removed", removed);
     return () => window.removeEventListener("onnuriway:delivery-photo-removed", removed);
   }, [coordinator]);
-  const preview = viewed ? coordinator.getPreview(viewed) : null;
+  const preview = viewed ? coordinator.getPreview(viewed.jobId) : null;
   const shown = [...jobs].reverse();
   const pending = jobs.some(isActiveDeliveryPhotoUpload);
   return <section className={styles.panel} aria-label="촬영 사진과 저장 상태">
@@ -29,7 +30,7 @@ export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
       const image = coordinator.getPreview(job.jobId);
       const retryable = coordinator.canRetry(job.jobId);
       return <li key={job.jobId} className={styles.card} data-photo-job-status={job.status}>
-        {image ? <button type="button" className={styles.preview} onClick={() => setViewed(job.jobId)} aria-label={`촬영 사진 ${index + 1} 크게 보기`}>
+        {image ? <button type="button" className={styles.preview} onClick={(event) => setViewed({ jobId: job.jobId, origin: event.currentTarget })} aria-label={`촬영 사진 ${index + 1} 크게 보기`}>
           <img src={image.thumbnail} alt={`${names.get(job.customerId)?.name ?? "납품처"} 촬영 미리보기`} width={160} height={120} />
         </button> : <div className={styles.placeholder}>{job.status === "failed" ? "미리보기 없음" : "미리보기 준비 중"}</div>}
         <div className={styles.status}><strong>{names.get(job.customerId)?.name ?? "납품처"}</strong>
@@ -43,9 +44,6 @@ export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
         </div>
       </li>;
     })}</ul>
-    {preview ? <BottomSheet open title="촬영 사진 확인" onClose={() => setViewed(null)}>
-      <img className={styles.full} src={preview.full} alt="방금 촬영한 사진 크게 보기" />
-      <button type="button" className={styles.close} onClick={() => setViewed(null)}>확인</button>
-    </BottomSheet> : null}
+    {preview && viewed ? <DeliveryPhotoLocalPreview key={viewed.jobId} url={preview.full} origin={viewed.origin} onClose={() => setViewed(null)} /> : null}
   </section>;
 }

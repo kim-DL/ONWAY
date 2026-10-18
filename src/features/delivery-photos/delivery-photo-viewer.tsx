@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- Full evidence stays in a revocable, authenticated blob URL. */
 
 import dynamic from "next/dynamic";
-import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
@@ -19,6 +19,8 @@ import { useDeliveryPhotoImage } from "./use-delivery-photo-image";
 import styles from "./delivery-photo-history.module.css";
 
 const DeliveryPhotoDeleteAction = dynamic(() => import("./delivery-photo-delete-action").then((module) => module.DeliveryPhotoDeleteAction), { ssr: false });
+const PhotoPanZoom = dynamic(() => import("@/components/ui/photo-pan-zoom").then((module) => module.PhotoPanZoom), { ssr: false,
+  loading: () => <p role="status">사진 확대 조작을 준비하고 있어요.</p> });
 
 export function DeliveryPhotoViewer({ customerName, session, photos, initialIndex, origin, onClose, onDeleted }: {
   customerName: string;
@@ -32,36 +34,25 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
   const [index, setIndex] = useState(initialIndex);
   const photo = photos[index] ?? photos[0];
   const image = useDeliveryPhotoImage(photo?.photoId ?? "", "evidence", session, Boolean(photo));
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gestureStart = useRef<{ x: number; y: number } | null>(null);
+  const [zoomed, setZoomed] = useState(false);
   const { stageRef, requestClose, beforeClose } = usePhotoMorph({
     origin: index === initialIndex ? origin : null,
     identity: image.status === "ready" ? photo?.photoId ?? "missing" : `loading:${photo?.photoId ?? "missing"}`,
     onClose,
-    canReturn: index === initialIndex,
+    canReturn: index === initialIndex && !zoomed,
   });
 
   const navigate = useCallback((direction: -1 | 1) => {
+    setZoomed(false);
     setIndex((current) => Math.max(0, Math.min(photos.length - 1, current + direction)));
   }, [photos.length]);
+  useEffect(() => () => {
+    // Image changes dispose their controls; restore the trigger only when the
+    // complete viewer closes, rather than during previous/next navigation.
+    queueMicrotask(() => { if (origin?.isConnected) origin.focus({ preventScroll: true }); });
+  }, [origin]);
 
   if (!photo) return null;
-  const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.target instanceof Element && event.target.closest("button")) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    gestureStart.current ??= { x: event.clientX, y: event.clientY };
-  };
-  const pointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const start = gestureStart.current;
-    pointers.current.delete(event.pointerId);
-    if (start && pointers.current.size === 0) {
-      const deltaX = event.clientX - start.x;
-      const deltaY = event.clientY - start.y;
-      if (Math.abs(deltaX) > 60 && Math.abs(deltaX) > Math.abs(deltaY)) navigate(deltaX < 0 ? 1 : -1);
-    }
-    if (pointers.current.size === 0) gestureStart.current = null;
-  };
 
   return createPortal(<div onKeyDown={(event) => {
     event.stopPropagation();
@@ -72,12 +63,12 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
     }
   }}><BottomSheet open title={`${customerName} 납품사진 보기`} onClose={requestClose} beforeClose={beforeClose}>
     <div ref={stageRef} className={`${morphStyles.stage} ${styles.stage}`} data-photo-morph-stage data-photo-morph-state="open"
-      role="region" aria-label={`${customerName} 납품사진 크게 보기`} onPointerDown={pointerDown} onPointerUp={pointerUp}
-      onPointerCancel={() => { pointers.current.clear(); gestureStart.current = null; }}>
+      role="region" aria-label={`${customerName} 납품사진 크게 보기`} tabIndex={0} data-zoomed={zoomed}>
       {image.status === "ready" ? <img src={image.url} alt={`${customerName} 납품사진, 등록자 ${photo.createdByName}`} decoding="async" draggable={false} onError={image.fail} />
         : image.status === "error" ? <div className={styles.failure} role="alert"><p>{image.message}</p><button type="button" onClick={image.retry}>사진 다시 불러오기</button></div>
           : <p className={styles.loading} role="status">원본 사진을 불러오는 중입니다.</p>}
     </div>
+    {image.status === "ready" ? <PhotoPanZoom key={image.url} stageRef={stageRef} origin={null} onZoomedChange={setZoomed} onSwipe={navigate} /> : null}
     <div className={styles.metadata}><strong>{deliveryPhotoRegisteredAt(photo.createdAt, true)}</strong><span>등록자 {photo.createdByName}</span></div>
     <BottomSheetActions className={styles.actions ?? ""}>
       <span className={styles.position} role="status" aria-live="polite">{index + 1} / {photos.length}</span>

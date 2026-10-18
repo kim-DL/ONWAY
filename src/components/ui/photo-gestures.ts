@@ -1,9 +1,9 @@
 import { getMotionAllowed } from "@/components/ui/use-motion-permission";
-import { containPhoto, fittedPhoto, photoGeometry, zoomPhoto, type PhotoGeometry, type PhotoView } from "./inventory-photo-geometry";
+import { containPhoto, fittedPhoto, photoGeometry, zoomPhoto, type PhotoGeometry, type PhotoView } from "./photo-geometry";
 
 type Point = { x: number; y: number };
 type Gesture = { view: PhotoView; centre: Point; distance: number };
-export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView, max: number, zoomed: boolean) => void) {
+export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView, max: number, zoomed: boolean) => void, onSwipe?: (direction: -1 | 1) => void) {
   const image = stage.querySelector("img")!;
   const pointers = new Map<number, Point>();
   const savedStyle = image.getAttribute("style");
@@ -14,6 +14,7 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
   let press: { point: Point; time: number; moved: boolean } | null = null;
   let lastTap: { point: Point; time: number } | null = null;
   let lastTouch = -Infinity;
+  let swipeStart: Point | null = null;
   const point = (event: { clientX: number; clientY: number }): Point => {
     const rect = stage.getBoundingClientRect();
     return { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 };
@@ -70,7 +71,7 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
     stage.dataset.dragging = String(pointers.size > 0);
   };
   const clearPointers = () => {
-    const ids = [...pointers.keys()]; pointers.clear(); gesture = null; press = null; lastTap = null;
+    const ids = [...pointers.keys()]; pointers.clear(); gesture = null; press = null; lastTap = null; swipeStart = null;
     stage.dataset.dragging = "false";
     for (const id of ids) if (stage.hasPointerCapture(id)) stage.releasePointerCapture(id);
   };
@@ -105,8 +106,8 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
     const at = point(event); pointers.set(event.pointerId, at);
     try { stage.setPointerCapture(event.pointerId); } catch { /* A cancelled pointer may no longer be active. */ }
     if (event.pointerType !== "mouse") lastTouch = performance.now();
-    if (pointers.size === 1) press = { point: at, time: performance.now(), moved: false };
-    else { press = null; lastTap = null; }
+    if (pointers.size === 1) { press = { point: at, time: performance.now(), moved: false }; swipeStart = current.scale <= 1.001 ? at : null; }
+    else { press = null; lastTap = null; swipeStart = null; }
     rebase(); reportView();
   };
   const drag = (event: PointerEvent) => {
@@ -129,9 +130,13 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
       if (lastTap && now - lastTap.time < 320 && distance(at, lastTap.point) < 28) { toggle(at); lastTap = null; }
       else lastTap = { point: at, time: now };
     } else lastTap = null;
-    pointers.delete(event.pointerId); press = null;
+    const swipe = event.type === "pointerup" && pointers.size === 1 && swipeStart && target.scale <= 1.001
+      && Math.abs(at.x - swipeStart.x) > 60 && Math.abs(at.x - swipeStart.x) > Math.abs(at.y - swipeStart.y)
+      ? (at.x < swipeStart.x ? 1 : -1) : null;
+    pointers.delete(event.pointerId); press = null; swipeStart = null;
     if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
     rebase();
+    if (swipe) onSwipe?.(swipe);
   };
   const doubleClick = (event: MouseEvent) => {
     if (performance.now() - lastTouch < 500) return;
@@ -143,7 +148,8 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
     else if (event.key === "-" || event.key === "_") zoom(target.scale / 1.2);
     else if (event.key === "0" || event.key === "Home") move(fittedPhoto, true);
     else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
-      move({ ...target, x: target.x + (event.key === "ArrowLeft" ? 40 : event.key === "ArrowRight" ? -40 : 0),
+      if (onSwipe && target.scale <= 1.001 && (event.key === "ArrowLeft" || event.key === "ArrowRight")) onSwipe(event.key === "ArrowLeft" ? -1 : 1);
+      else move({ ...target, x: target.x + (event.key === "ArrowLeft" ? 40 : event.key === "ArrowRight" ? -40 : 0),
         y: target.y + (event.key === "ArrowUp" ? 40 : event.key === "ArrowDown" ? -40 : 0) }, false);
     } else return;
     event.preventDefault();

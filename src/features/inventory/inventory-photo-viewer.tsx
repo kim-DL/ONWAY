@@ -8,7 +8,7 @@ import { usePhotoMorph } from "@/components/ui/photo-morph";
 import morphStyles from "@/components/ui/photo-morph.module.css";
 import styles from "./inventory.module.css";
 
-const InventoryPhotoPanZoom = dynamic(() => import("./inventory-photo-pan-zoom").then((module) => module.InventoryPhotoPanZoom), { ssr: false,
+const PhotoPanZoom = dynamic(() => import("@/components/ui/photo-pan-zoom").then((module) => module.PhotoPanZoom), { ssr: false,
   loading: () => <p role="status">사진 확대 조작을 준비하고 있어요.</p> });
 
 export function InventoryPhotoViewer({ url, name, origin, onClose, onImageError }: {
@@ -20,6 +20,6 @@ export function InventoryPhotoViewer({ url, name, origin, onClose, onImageError 
     <div ref={stageRef} className={`${styles.photoViewerStage} ${morphStyles.stage}`} data-photo-morph-stage data-photo-morph-state="open" data-zoomed={zoomed} role="region" aria-label="제품 사진 보기" tabIndex={0}>
       <img src={url} alt={`${name} 제품 사진 확대`} draggable={false} decoding="async" onError={onImageError} />
     </div>
-    <InventoryPhotoPanZoom stageRef={stageRef} origin={origin} onZoomedChange={setZoomed} />
+    <PhotoPanZoom stageRef={stageRef} origin={origin} onZoomedChange={setZoomed} />
   </BottomSheet></div>, document.body);
 }

@@ -5,6 +5,12 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-18 거래처 납품사진 Pan & Zoom — 공통화·로컬 검증 / Git·Hosting 반영 진행
+
+- 사용자의 추가 적용 요청에 따라 저장된 납품사진과 업로드 중 촬영 미리보기에 재고와 같은 Pan & Zoom을 연결했다. 재고 전용 계산·제스처·조작부를 `src/components/ui/photo-*`로 공통화하고 세 진입점에서 같은 자산을 지연 로딩한다. 확대 중에는 pan, 맞춤 상태에서만 기존 사진 swipe/좌우키 넘기기, 이전/다음에서 100% 초기화를 적용한다.
+- 기존 authenticated evidence 조회·Blob URL 해제와 outbox 상태·저장 완료 판정은 보존한다. 업로드 중 확대와 서버 확인 전 pending 유지, 서버 상태 갱신 중 확대 유지도 검사했다. unit 1,746 PASS/기존 조건부 15 SKIP, Chromium 재고·납품 조작 20 PASS/플랫폼 분리 4 SKIP, WebKit desktop 10 PASS/native touch 전용 2 SKIP, lint·typecheck·운영 build·PWA/성능/Hosting gate PASS다. Aside에서도 두 납품사진 진입점을 직접 조작했다. [구현·범위·검증](delivery-photo-pan-zoom-20261018.md)을 참고한다.
+- 같은 조건에서 initial JS gzip 140,071→140,103B(+32B), 납품 workspace 10,160B 유지, 저장 사진 viewer 2,918→2,941B, 공통 조작 JS 3,408B/CSS 462B다. 모든 기존 성능 상한을 유지하고 새 local inspection에 별도 작은 한도를 뒀다. 최종 source CI·Hosting 배포 결과는 완료 후 갱신한다. 중간 demo/local-validation `out`은 운영 배포하지 않는다.
+
 ### 2026-10-18 재고 제품 사진 Pan & Zoom — main 저장·운영 Hosting 배포·검증 완료
 
 - 기존 2배 스크롤 확대를 커서 중심 휠·드래그·더블클릭 및 모바일 핀치·한 손가락 이동·더블탭으로 바꿨다. 맞춤 100%, 빠른 확대 1.8배, 최대 2.5배/충분한 실제 이미지 해상도일 때 3배다. 축별 이동 경계, 키보드, 포인터 취소, 화면 크기 변경, 창 가림의 frame 정지 복구와 Safari 닫기 포커스 복원을 포함한다.

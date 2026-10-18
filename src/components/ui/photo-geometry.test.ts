@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { containPhoto, fittedPhoto, photoGeometry, zoomPhoto } from "./inventory-photo-geometry";
+import { containPhoto, fittedPhoto, photoGeometry, zoomPhoto } from "./photo-geometry";
 
 describe("inventory photograph viewport geometry", () => {
   it("fits landscape and portrait without cropping or stretching", () => {
