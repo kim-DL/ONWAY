@@ -5,12 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-18 최초 검색·재고 상세 200ms 목표 — 구현·릴리스 검증 중
+### 2026-10-18 최초 검색·재고 상세 200ms 목표 — main 저장·운영 Hosting 배포·검증 완료
 
-- 거래처 regular/bold 글꼴 재사용으로 cold layout을 줄이고 기존32/+32를 유지한다. 재고는 전체 의존성의 목록 memo와20행 DOM 그룹/content-visibility로 상세 열기 시 화면 밖 layout을 줄인다. 기존60/+60·전체 검색·native 찾기·키보드·스크롤·실사/최신성·Callable 권한·MCP를 유지한다.
-- 같은 production demo export·합성500거래처/1000재고·600행·Chrome155·390×844·CPU4×·Fast4G의 최종 교차 측정 중앙값: 최초 검색328→144ms, 첫 상세240→208ms, warm 상세192→160ms. 각3개 새 컨텍스트, warm각9회다. 요청의 최초 검색/warm 상세 지표는200ms 미만이며 첫 상세208ms는 남은 한계다. 이전 후보의600ms 예외도 별도 보존하며 전 기기200ms 보장은 아니다. [구현·검증](field-interaction-performance-20261018.md), [개별 값](field-interaction-performance-20261018-metrics.json).
-- unit1747 PASS/기존15 SKIP, 최종 재고 관련517 PASS, lint/app·Functions typecheck, 검색 Chromium22/지도18/WebKit11, 새 재고600행 Chromium2/WebKit1 PASS. 실제 재고 static18(전체15+등록/권한 재검증3)·transaction12 PASS. 하단 그룹 상시 실측과 행 scroll margin으로360/768/1280px 하단 가림을 보완했다. WebKit fixture의 remount/History API와 새 복원 검사의 viewport 기준을 정리했고 기존 계약/timeout/skip을 유지했다. 기존 제조사44px 검사1회 실패·묶음3개 재검증 이력도 보존한다. 정확한 source CI·운영 build/배포는 새 릴리스 기록 완료 전에는 미완료다.
-- 재고 지연 JS 사전 실측25735B(+172B)에만256B 예산을 추가했다. 초기 JS140104B·거래처36851B와 초기/CSS/전체 재고사진 한도는 유지한다. 최종 운영 빌드 수치는 릴리스 기록에서 확인한다. 기존 private env·다른 worktree/branch/stash·MCP PR#4를 보존한다. 현재 배포 승인 범위는 Hosting only다.
+- 거래처 regular/bold 재사용, 재고 전체 의존성 목록 memo/20행 DOM 그룹/content-visibility로 layout을 줄였다. 마지막 그룹 실측·행 scroll margin·정렬 후 제품 ID 포커스 복원으로 하단/키보드 UX를 유지한다.32/+32·60/+60·전체 검색/native 찾기·권한/최신성/감사·사진 outbox·MCP를 보존한다.
+- 최종 동일 조건(합성500거래처/1000재고·600행·Chrome155·390×844·CPU4×·Fast4G) 교차 측정 중앙값: 최초 검색320→144ms, 반복 상세200→176ms, 첫 상세272→192ms. 변경 후 최초 검색3회/반복 상세9회 모두200ms 이내, 첫 상세3회 중1회208ms. 과거448/312ms를 이번 기준값으로 대체하지 않았다. 이전600ms 예외도 보존하며 운영p75/전 기기 보장이 아니다. [구현·검증](field-interaction-performance-20261018.md), [개별 값](field-interaction-performance-20261018-metrics.json).
+- unit1747 PASS/기존15 SKIP, 재고517·lint/typecheck·검색Chromium22/지도18/WebKit11·새 재고600행Chromium4/WebKit2 PASS. 최종 실제 재고 static18·transaction12 모두 재시도 없이 PASS. 초기 하단/포커스/제조사44px·WebKit fixture 실패 이력과 보완을 문서화했으며 기존 동작 assertion/timeout/skip을 완화하지 않았다.
+- 제품 source a5b120ea6be2d3ad96e95340b330d5fcda3c377b, [정확한 source Quality Gate 39125562195](https://github.com/kim-DL/ONWAY/actions/runs/39125562195) SUCCESS. 운영 flags사진/재고ON·EmulatorOFF, 새 build/PWA/성능/Hosting gate PASS. 초기JS140101B(-3), 거래처JS36851B 동일, 재고JS25861B(+298). 지연 재고JS에만384B 예산을 배정했고 초기/CSS/전체 재고사진 한도는 유지한다.
+- Hosting only live version ff64054ec6bac356, release 1792327592747000, 2026-10-18 21:46:32 KST. 직전 복구18c07fe9fdc79407. 두 origin 공개 HTTP각25 PASS, www301, 새 Chromium 로그인/worker activated/pageerror0, 공개 worker SHA-256 04eb59d15b209df0e6427ef60f0ba6350d87f3197a33694beb668e7a1c23b007와 후보 일치. 후보113파일/precache100/initial assets9개.
+- Functions72·실사/MCP API metadata·MCP 전용 Hosting·MCP1.14.2/승인 정책·PR#4를 유지한다. 운영 업무 데이터 쓰기/Functions/Rules/Auth 배포 없음. private env3종과 후보113파일 digest를 확인했고 기존 다른branch/worktree/stash를 보존한다. [릴리스 기록](releases/2026-10-18-field-interaction-performance.md), ignored output/field-interaction-20261018/. 릴리스 문서는 docs-only 후속 커밋으로 동기화하며 같은 제품 소스를 중복 배포하지 않는다.
 
 ### 2026-10-18 거래처 검색·재고 목록·스크롤 — main 저장·운영 Hosting 배포·검증 완료
 
