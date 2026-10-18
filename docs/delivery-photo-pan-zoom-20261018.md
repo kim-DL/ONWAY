@@ -19,7 +19,7 @@
 - `aside-browser`로 localhost 합성 사진의 실제 뷰어/업로드 패널을 직접 조작했다. 저장 사진의 180% 빠른 확대·220% 휠 확대·약 85px 이동 후 순서 유지·다음 사진 100% 초기화·닫기 포커스 복원, 촬영 미리보기의 180% 확대·확인 후 업로드 중 상태와 포커스 유지를 확인했다.
 - 전체 lint·app/Functions typecheck PASS. production-mode build·PWA·성능·Hosting artifact gate PASS. 최초 새 테스트의 중복 닫기 선택자를 header의 명시적 label로 좁혔고, 합성 브라우저 window 타입을 명시했다. 제품 동작이나 검사 assertion을 완화하지 않았다.
 
-합성 컴포넌트 회귀는 실제 viewer·image hook·upload panel·제스처를 사용하고 인증 I/O·private registry·삭제만 대체한다. 실제 인증/서버 업무는 demo emulator의 기존 납품사진 회귀와 구분해 확인한다. 실제 iPhone Safari/설치 PWA의 손가락·OS 제스처·lifecycle은 아직 확인하지 않았다. 운영 업무 데이터를 테스트에 사용하지 않는다.
+합성 컴포넌트 회귀는 실제 viewer·image hook·upload panel·제스처를 사용하고 인증 I/O·private registry·삭제만 대체한다. 최종 source의 실제 demo 인증·Callable·Firestore·Storage 납품사진 회귀 **16 PASS**, 재고 static PWA 업무 회귀 **18 PASS**와 transaction integration **12 PASS**를 별도로 확인했다. 실제 iPhone Safari/설치 PWA의 손가락·OS 제스처·lifecycle은 아직 확인하지 않았다. 운영 업무 데이터를 테스트에 사용하지 않는다.
 
 ## 성능과 운영 반영
 
@@ -27,4 +27,4 @@
 
 같은 PC·기존 운영 설정 production-mode 비교에서 initial JS gzip **140,071→140,103B(+32B)**, 납품사진 workspace **10,160→10,160B**, 저장 사진 viewer **2,918→2,941B**, 공통 Pan & Zoom **3,306→3,408B**, 공통 조작 CSS **473→462B**, 재고와 사진을 모두 연 JS **28,822→28,926B**다. 이는 용량 실측이며 현장 네트워크·기기 지연 측정은 아니다.
 
-사용자의 같은 기능 추가 적용 요청에 따라 앞선 Git/Hosting 작업 범위를 이어서 진행한다. 최종 제품 source의 정확한 CI 성공·clean main·새 production build/manifest 확인 후 `--project onnuriway --only hosting:onnuriway`로 반영한다. 로컬 demo 검증 `out`은 운영 배포하지 않는다. Functions·Rules·MCP 전용 Hosting은 배포 대상이 아니다. 최종 source·CI·운영 version과 양쪽 origin 검증은 릴리스 완료 후 인수인계와 릴리스 기록에 남긴다.
+사용자의 같은 기능 추가 적용 요청에 따라 앞선 Git/Hosting 작업 범위를 이어서 완료했다. 최종 제품 source **`3493d7b84285d9ef89aabecd7541cf50d75ad6fe`**의 전체 [Quality Gate](https://github.com/kim-DL/ONWAY/actions/runs/39099168789) 성공 후 clean main·새 production build/113파일 manifest를 확인해 **2026-10-18 14:25:33.437 KST** `--project onnuriway --only hosting:onnuriway`로 배포했다. Live version은 `b9cbb96b32a7bc6c`다. 두 origin 검사 각 25개, 새 서비스 워커 activated·page error 0을 확인했다. Functions 72개·MCP 전용 Hosting·비공개 env 3종은 전후 동일하다. 로컬 demo 빌드는 배포하지 않았다. 기존 인사 애니메이션 검사 2건의 재시도 통과 등 전체 CI 세부 결과와 공개 검증 범위는 [릴리스 기록](releases/2026-10-18-delivery-photo-pan-zoom.md)을 따른다.

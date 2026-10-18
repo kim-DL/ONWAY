@@ -5,11 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-18 거래처 납품사진 Pan & Zoom — 공통화·로컬 검증 / Git·Hosting 반영 진행
+### 2026-10-18 거래처 납품사진 Pan & Zoom — main 저장·운영 Hosting 배포·검증 완료
 
 - 사용자의 추가 적용 요청에 따라 저장된 납품사진과 업로드 중 촬영 미리보기에 재고와 같은 Pan & Zoom을 연결했다. 재고 전용 계산·제스처·조작부를 `src/components/ui/photo-*`로 공통화하고 세 진입점에서 같은 자산을 지연 로딩한다. 확대 중에는 pan, 맞춤 상태에서만 기존 사진 swipe/좌우키 넘기기, 이전/다음에서 100% 초기화를 적용한다.
 - 기존 authenticated evidence 조회·Blob URL 해제와 outbox 상태·저장 완료 판정은 보존한다. 업로드 중 확대와 서버 확인 전 pending 유지, 서버 상태 갱신 중 확대 유지도 검사했다. unit 1,746 PASS/기존 조건부 15 SKIP, Chromium 재고·납품 조작 20 PASS/플랫폼 분리 4 SKIP, WebKit desktop 10 PASS/native touch 전용 2 SKIP, lint·typecheck·운영 build·PWA/성능/Hosting gate PASS다. Aside에서도 두 납품사진 진입점을 직접 조작했다. [구현·범위·검증](delivery-photo-pan-zoom-20261018.md)을 참고한다.
-- 같은 조건에서 initial JS gzip 140,071→140,103B(+32B), 납품 workspace 10,160B 유지, 저장 사진 viewer 2,918→2,941B, 공통 조작 JS 3,408B/CSS 462B다. 모든 기존 성능 상한을 유지하고 새 local inspection에 별도 작은 한도를 뒀다. 최종 source CI·Hosting 배포 결과는 완료 후 갱신한다. 중간 demo/local-validation `out`은 운영 배포하지 않는다.
+- 같은 조건에서 initial JS gzip 140,071→140,103B(+32B), 납품 workspace 10,160B 유지, 저장 사진 viewer 2,918→2,941B, 공통 조작 JS 3,408B/CSS 462B다. 모든 기존 성능 상한을 유지하고 새 local inspection에 별도 작은 한도를 뒀다. 실제 demo 납품사진 회귀 16 PASS, 최종 source의 실제 재고 static PWA 18 PASS와 transaction 12 PASS도 확인했다.
+- 제품 source `3493d7b84285d9ef89aabecd7541cf50d75ad6fe`을 main과 `codex/delivery-photo-pan-zoom-20261018`에 저장했다. 정확한 source의 [Quality Gate 39099168789](https://github.com/kim-DL/ONWAY/actions/runs/39099168789)는 **2026-10-18 14:24:14 KST SUCCESS**다. 일반 browser는 304 PASS / 기존 인사 애니메이션 2 flaky(재시도 통과) / 8 SKIP이며 새 사진 조작은 통과했다. NEIS 3·Rules 50·Phase 17 browser 81·재고사진 4·transaction 12·납품사진 16 PASS다. 조건부 skip과 기존 flaky 범위는 릴리스 기록에 구분했다.
+- 비공개 운영 설정·사진/재고 ON·Emulator OFF·위 source revision으로 새 build 후 PWA/성능/Hosting gate를 통과한 **113파일 / precache 100 / initial assets 9개**를 배포했다. 중간 demo 빌드는 배포하지 않았다. `--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting만 배포했고 live version **`b9cbb96b32a7bc6c`**, release `1792301133437000`, 시각 **2026-10-18 14:25:33.437 KST** (`2026-10-18T05:25:33.437Z`), 직전 복구 version `835cf1d98b6d7230`다.
+- 두 운영 origin 공개 검사 **각 25개 PASS**, www→apex 301, 새 Chromium 로그인 UI·서비스 워커 activated·page error 0, 공개 worker와 후보 SHA-256 `089ddfec8fcc44a63af1434df22ff6fda231e10379b91dbe02bb54dcd93217ea` 일치를 확인했다. 전체 72개 Functions와 실사/MCP API metadata, MCP 전용 Hosting version/release는 전후 동일하다. MCP 1.14.2·승인 정책·공개 health/OAuth metadata 200을 유지한다. 비공개 env 3종과 후보 113파일의 digest도 같다.
+- 상세 [릴리스 기록](releases/2026-10-18-delivery-photo-pan-zoom.md), ignored 증거는 `output/delivery-pan-zoom-20261018/`에 있다. 이번 릴리스 문서 후속 commit은 제품 내용이 같아 중복 배포하지 않는다. 기존 worktree·실험 브랜치·stash를 보존한다. 실제 iPhone/설치 PWA의 현장 터치·lifecycle 검증과 운영 직원 로그인·업무 저장은 자동/공개 검사와 구분한다.
 
 ### 2026-10-18 재고 제품 사진 Pan & Zoom — main 저장·운영 Hosting 배포·검증 완료
 
