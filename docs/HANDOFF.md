@@ -5,12 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-18 거래처 검색·재고 목록·스크롤 — 구현·전후 계측 / 릴리스 검증 중
+### 2026-10-18 거래처 검색·재고 목록·스크롤 — main 저장·운영 Hosting 배포·검증 완료
 
-- 거래처 검색은 전체 검색/초성/정렬/총건수를 유지하며 32개씩 표시하고 더보기를 추가했다. 세션 내 검색어·표시 개수를 복원하며 권한 정리 시 초기화한다. 재고 카드는 product/context/location/countMode의 기본 memo와 안정적인 onOpen으로 재사용한다. 기존 더보기와 데이터 변경 표시는 유지한다.
-- 두 모드의 스크롤은 session 기준 진입 시 복원하고 passive 이벤트로 기록한다. 매 스크롤 값 변경 때 layout effect를 재실행하거나 cleanup에서 DOM 위치를 다시 읽지 않는다. Functions·Rules·조회 page 크기·최신성·재고 revision/감사·사진 outbox·MCP API는 바꾸지 않았다.
-- 같은 production build/합성 500거래처·1,000재고/390×844/CPU 4×/Fast 4G에서 검색 중앙값 **1,488→168ms**, 600개 더보기 **280→184ms**, 600개 상세 warm 중앙값 **456→312ms**였다. 첫 검색 392ms·큰 목록 상세 312ms의 잔여 지연은 구분한다. 운영 사용자/실제 휴대폰 성능 수치가 아니다. [구현·조건·검증](field-list-scroll-performance-20261018.md), [개별 수치](field-list-scroll-performance-20261018-metrics.json)를 참고한다.
-- 전체 unit 1,747 PASS/기존 조건부 15 SKIP, 관련 browser 22 PASS, 실제 demo 재고 static browser 18·transaction 12 PASS, 검색 성능 18 unit/5,000품목 p95 2.4ms PASS다. lint/typecheck 및 측정용 production build/번들 gate도 통과했다. 정확한 source의 CI·운영 build 및 승인된 Hosting 배포를 이어서 검증한다. 운영 배포 완료로 해석하지 않는다.
+- 거래처 검색은 전체 검색/초성/정렬/총건수를 유지하며 32개씩 표시하고 더보기를 제공한다. 검색어·표시 개수의 세션 복원과 권한 정리를 보존했다. 재고는 전체 product/context/location/countMode의 기본 memo와 안정적인 onOpen을 사용한다. 스크롤은 진입 시 복원하고 passive 이벤트로 기록하며 cleanup에서 DOM 읽기나 중복 저장을 하지 않는다. 같은 좌표 검증은 순수 함수로 공통화했다.
+- 같은 production build·합성 500거래처/1,000재고·390×844·CPU4×·Fast4G에서 최종 검색 중앙값 **1,488→144ms**, 600개 더보기 **280→176ms**, 600개 상세 warm 중앙값 **456→312ms**였다. 첫 검색448ms·큰 목록 상세312ms의 잔여 지연은 구분한다. 운영 사용자/실제 휴대폰 수치가 아니다. [구현·검증](field-list-scroll-performance-20261018.md), [개별 값](field-list-scroll-performance-20261018-metrics.json).
+- 로컬 전체 unit1,747 PASS/기존 조건부15 SKIP, 검색 Chromium22·지도18·WebKit11 PASS, 최종 demo static 재고18·transaction12 PASS, lint/typecheck 및 기존 학교검색/캐시 성능 gate PASS다. 초기 지도 float geometry와 WebKit fixture remount null 실패의 재실행 이력은 릴리스 기록에 구분했다. 기대값·timeout·skip·상한은 완화하지 않았다.
+- 제품 source **ccc544c10106b91359a4d6f200102e0b9500aede**을 main에 저장하고 정확한 source의 [Quality Gate 39107223888](https://github.com/kim-DL/ONWAY/actions/runs/39107223888) 전체 SUCCESS를 확인했다. 원래 운영 설정·사진/재고 ON·Emulator OFF·위 PWA source로 새 build/PWA/성능/Hosting gate를 통과한 후보113파일/precache100을 배포했다. initial JS gzip140,104B(+1B), customer36,851B/inventory25,563B로 기존 한도를 유지한다.
+- Hosting only, project onnuriway/target hosting:onnuriway. live version **18c07fe9fdc79407**, release 1792309552741000, **2026-10-18 16:45:52 KST**, 직전 복구 version b9cbb96b32a7bc6c이다. 두 origin 공개 HTTP 각25개 PASS, www301, 새 Chromium 로그인/worker activated/page error0, 공개 worker SHA-256 1eebd1ef345b6dccec882bd82502525ae510e9c4f6e8e40846c292473b37e4e3와 후보 일치를 확인했다.
+- 전체 Functions72와 실사/MCP API metadata, MCP 전용 Hosting version/release가 전후 같다. MCP1.14.2·승인 정책·PR#4 draft/open/head86ce19328bf0074328b43512745f284aeb7df740을 유지한다. Functions/Rules/Auth 배포와 운영 업무 데이터 쓰기는 하지 않았다. 비공개 env3종과 후보113파일 digest가 같다.
+- [릴리스 기록](releases/2026-10-18-field-list-scroll-performance.md), ignored 증거 output/field-list-perf-20261018/에 있다. 문서는 docs-only 후속 커밋으로 main과 PC를 동기화하며 제품 코드가 같아 중복 배포하지 않는다. 다른 작업 트리·브랜치·stash를 보존한다. 실제 iPhone/설치 PWA 현장 인수는 자동/공개 검증과 구분한다.
 
 ### 2026-10-18 거래처 납품사진 Pan & Zoom — main 저장·운영 Hosting 배포·검증 완료
 

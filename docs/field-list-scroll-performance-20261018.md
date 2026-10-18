@@ -22,19 +22,19 @@ DevTools에서 content-visibility 적용도 별도 임시 비교했지만 최종
 
 | 측정 | 변경 전 | 변경 후 | 감소 |
 |---|---:|---:|---:|
-| 거래처 500곳 검색, 3회 중앙값 | 1,488ms | 168ms | 88.7% |
-| 거래처 첫 검색 | 1,584ms | 392ms | 75.3% |
-| 거래처 검색 DOM 요소 | 12,616 | 918 | 92.7% |
-| 재고 더보기 540→600개 | 280ms | 184ms | 34.3% |
+| 거래처 500곳 검색, 3회 중앙값 | 1,488ms | 144ms | 90.3% |
+| 거래처 첫 검색 | 1,584ms | 448ms | 71.7% |
+| 거래처 검색 DOM 요소 | 12,616 | 917 | 92.7% |
+| 재고 더보기 540→600개 | 280ms | 176ms | 37.1% |
 | 재고 더보기 9회 중 최장 | 296ms | 184ms | 37.8% |
 | 재고 600개 상태 상세 열기, warm 3회 중앙값 | 456ms | 312ms | 31.6% |
 
-- 거래처 개별 값: before 1,584/1,224/1,488ms → after 392/168/144ms. trusted 실제 키 입력과 결과 카드 500→32를 확인했다. 전체 결과는 500개로 같다.
-- 상세는 양쪽 모두 첫 1회를 warmup으로 별도 보존하고 다음 3회를 집계했다. before 456/440/544ms → after 312/296/328ms.
+- 거래처 개별 값: before 1,584/1,224/1,488ms → after 448/144/136ms. trusted 실제 키 입력과 결과 카드 500→32를 확인했다. 전체 결과는 500개로 같다.
+- 상세는 양쪽 모두 첫 1회를 warmup으로 별도 보존하고 다음 3회를 집계했다. before 456/440/544ms → after 312/328/312ms.
 - 더보기 trace의 스크롤 저장 함수에 귀속된 forced reflow: before trace 전체 452ms, after insight에서는 문제 없음. 이 시간을 개별 클릭에서 제거한 시간으로 해석하지 않는다.
 - [조건·개별 수치](field-list-scroll-performance-20261018-metrics.json). 원본 계측/trace 분석 응답·실험·로그는 ignored `output/field-list-perf-20261018/`에 보존한다. raw trace 원본을 파일로 내보냈다는 의미는 아니다.
 
-이는 작은 로컬 lab 표본이며 운영 사용자 p75나 실제 iPhone/설치 PWA 수치가 아니다. 최초 검색 392ms, 큰 목록 상세 312ms는 여전히 200ms를 넘는다. 변경 후 모두 200ms 이하라고 주장하지 않는다. 사진/GPS/연락처/lot가 없는 합성 데이터이며 실제 사진/지도/서버 내부 지연은 별도다.
+이는 작은 로컬 lab 표본이며 운영 사용자 p75나 실제 iPhone/설치 PWA 수치가 아니다. 최초 검색 448ms, 큰 목록 상세 312ms는 여전히 200ms를 넘는다. 변경 후 모두 200ms 이하라고 주장하지 않는다. 사진/GPS/연락처/lot가 없는 합성 데이터이며 실제 사진/지도/서버 내부 지연은 별도다.
 
 ## 검증
 
@@ -42,7 +42,11 @@ DevTools에서 content-visibility 적용도 별도 임시 비교했지만 최종
 - 전체 unit 1,747 PASS / 기존 조건부 15 SKIP.
 - 관련 고객/재고 lifecycle/스크롤 unit 311 PASS.
 - PC·모바일 Chromium 거래처 검색 browser 22 PASS: 새 500곳 검색/마지막 결과/32→64/재진입/검색 초기화, 기존 초성·IME/Enter/Escape·포커스·320~1280px·200% 글자·접근성 포함.
-- 측정용 production build 성공, 기존 PWA/성능 envelope 유지. demo build의 initial JS gzip 140,103B, customer JS 36,830B, inventory JS 25,518B로 기존 상한을 완화하지 않았다.
+- 최종 운영 설정 production build 및 기존 PWA/성능/Hosting gate PASS. initial JS gzip 140,104B(+1B), customer JS 36,851B, inventory JS 25,563B로 기존 상한을 유지했다.
 - 실제 demo 재고 static browser 18 PASS, transaction integration 12 PASS. 1,000품목 전체 페이지/최초 60행/더보기/검색/모드 복귀 스크롤, 수량 변경·실사 연속 진행, 사진 및 역할/권한 회수 경계를 실제 Callable로 검증했다. 전후 측정에 사용한 동일 demo build의 out을 보존해 guarded runner에서 재사용했다.
-- 검색/캐시 성능 18 unit 및 5,000품목 검색 p95 2.4ms PASS. 정확한 source의 CI·운영 build/배포 결과는 릴리스 기록에 갱신한다.
+- 검색/캐시 성능 18 unit 및 5,000학교 검색 p95 2.4ms PASS. 정확한 source의 CI·운영 build/배포 결과는 릴리스 기록에 갱신한다.
 
+
+## 운영 반영 완료
+
+제품 source ccc544c10106b91359a4d6f200102e0b9500aede의 CI 전체 SUCCESS 후 2026-10-18 16:45:52 KST에 Hosting만 배포했다. live version 18c07fe9fdc79407, 직전 복구 version b9cbb96b32a7bc6c이다. 두 origin 각25개·browser worker/로그인 검증과 Functions/MCP 전후 metadata 검증을 통과했다. [릴리스 기록](releases/2026-10-18-field-list-scroll-performance.md)을 참고한다.
