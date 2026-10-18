@@ -24,6 +24,7 @@ import { InventoryManufacturerService } from "./inventory-manufacturer-service.j
 import { InventoryPhotoDependencyError, InventoryPhotoService, inventoryPhotoErrorDiagnostic } from "./inventory-photo-service.js";
 import { InventoryService } from "./inventory-service.js";
 import { inventorySummaryResponse } from "./inventory-stock-summary.js";
+import { fieldStage, fieldCompute, observeFieldCount } from "../shared/field-latency.js";
 
 const options = { enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true", region: "asia-northeast3" as const, maxInstances: 6 };
 function safeInventoryError(error: unknown): HttpsError {
@@ -42,20 +43,20 @@ function handler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, ac
   return async (request: CallableRequest<unknown>): Promise<R> => {
     setPrivateCallableResponse(request);
     try {
-      const actor = await requireInventoryActor(request, access);
+      const actor = await fieldStage("authorizationBefore", () => requireInventoryActor(request, access));
       const input = inputSchema.safeParse(request.data);
       if (!input.success) throw new HttpsError("invalid-argument", "입력한 재고 정보를 확인해주세요.");
       const result = await action(input.data, actor);
       // A session revoked during I/O must not receive private data. Mutations
       // are additionally revalidated inside their committing transaction.
-      await requireInventoryActor(request, access);
+      await fieldStage("authorizationAfter", () => requireInventoryActor(request, access));
       const includeSummary = input.data !== null && typeof input.data === "object" && "includeSummary" in input.data && input.data.includeSummary === true;
       const includeManufacturerReference = input.data !== null && typeof input.data === "object"
         && "includeManufacturerReference" in input.data && input.data.includeManufacturerReference === true;
       const wireResult = filterProductCompatibility
         ? inventorySummaryResponse(result, includeSummary, includeManufacturerReference)
         : result;
-      return resultSchema.parse(wireResult);
+      return fieldCompute("responseValidation", () => resultSchema.parse(wireResult));
     } catch (error) { throw safeInventoryError(error); }
   };
 }
@@ -67,7 +68,8 @@ export const listInventoryProducts = onCall(options, handler(inventoryListWithMa
 export const getInventoryProduct = onCall(options, handler(getInventoryProductWithManufacturerInputSchema, inventoryProductDetailWithManufacturerSchema, "read", (input, actor) => new InventoryService().detail(input.productId, actor)));
 export const saveInventoryProduct = onCall(options, handler(saveInventoryProductWithManufacturerInputSchema, inventoryProductSaveResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().save(input, actor)));
 export const recordInventoryMovement = onCall(options, handler(inventoryMovementWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().move(input, actor)));
-export const recordInventoryCount = onCall(options, handler(inventoryCountWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().count(input, actor)));
+const countHandler = handler(inventoryCountWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().count(input, actor));
+export const recordInventoryCount = onCall(options, (request) => observeFieldCount(() => countHandler(request)));
 export const updateInventoryLot = onCall(options, handler(updateInventoryLotWithManufacturerInputSchema, inventoryMutationResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().updateLot(input, actor)));
 export const setInventoryProductStatus = onCall(options, handler(setInventoryProductStatusWithManufacturerInputSchema, inventoryProductWithManufacturerSchema, "write", (input, actor) => new InventoryService().status(input, actor)));
 export const deleteInventoryProduct = onCall(options, handler(deleteInventoryProductWithManufacturerInputSchema, inventoryProductWithManufacturerSchema, "write", (input, actor) => new InventoryService().status(input, actor, true)));

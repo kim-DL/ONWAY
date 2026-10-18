@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import { customerSchema, getCustomerChoseong, normalizeCustomerName, type Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
-import { DeliveryPhotoRow, DeliveryPhotoWorkspace } from "./delivery-photo-workspace";
+import { DeliveryPhotoRow } from "./delivery-photo-row";
+import { DeliveryPhotoWorkspace } from "./delivery-photo-workspace";
 
 const session: AuthenticatedSession = {
   uid: "uid_1",
@@ -73,11 +74,14 @@ describe("delivery photo field workspace", () => {
     expect(html).toContain('aria-label="농진 카메라 촬영"');
   });
 
-  it("does not add a persistent business-state or background queue dependency", () => {
+  it("keeps photo bytes out of browser key-value stores and service worker caches; only the explicit outbox may persist unsent files", () => {
     const files = ["delivery-photo-workspace.tsx", "delivery-photo-domain.ts", "delivery-photo-upload-state.ts", "delivery-photo-memory.ts",
       "delivery-photo-upload-memory.ts", "delivery-photo-input-controller.tsx", "delivery-photo-preparation.ts", "use-delivery-photo-data.ts",
       "delivery-photo-history.tsx", "delivery-photo-thumbnail.tsx", "delivery-photo-viewer.tsx", "use-delivery-photo-image.ts"];
     const source = files.map((file) => readFileSync(fileURLToPath(new URL(`./${file}`, import.meta.url)), "utf8")).join("\n");
     expect(source).not.toMatch(/localStorage|sessionStorage|indexedDB|serviceWorker|CacheStorage|BackgroundSync/u);
+    const outbox = readFileSync(fileURLToPath(new URL("./delivery-photo-outbox.ts", import.meta.url)), "utf8");
+    expect(outbox).toContain("onnuriway:private:delivery-photo-outbox:v1");
+    expect(outbox).not.toMatch(/localStorage|sessionStorage|CacheStorage|BackgroundSync|fileBase64/u);
   });
 });

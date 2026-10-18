@@ -22,7 +22,7 @@ async function eventually(assertion: () => void) {
 }
 
 function metadata(customerId: string, photoId = crypto.randomUUID()) {
-  return { photoId, customerId, deliveryDateKey: "2026-09-24", source: "camera" as const,
+  return { photoId, customerId, deliveryDateKey: "2026-09-24", source: "camera" as "camera" | "album",
     createdAt: "2026-09-24T01:00:00.000Z", createdByEmployeeId: "employee_1", createdByName: "등록자",
     expiresAt: "2026-10-01T01:00:00.000Z", thumbnail: { width: 640, height: 480 } };
 }
@@ -49,7 +49,7 @@ describe("delivery photo memory upload coordinator", () => {
     const prepare = vi.fn(() => preparations[preparationIndex++]!.promise);
     const create = vi.fn((input: DeliveryPhotoCreateInput) => relays[input.customerId as keyof typeof relays].promise);
     const { coordinator } = setup({ prepare, create: create as DeliveryPhotoUploadDependencies["create"] });
-    const a = coordinator.begin("a", "camera")!; coordinator.acceptSource(a.jobId, source("a"));
+    const a = coordinator.begin("a", "camera")!; await coordinator.acceptSource(a.jobId, source("a"));
     const another = coordinator.begin("a", "album");
     expect(another).not.toBeNull();
     expect(another?.requestId).not.toBe(a.requestId);
@@ -61,15 +61,15 @@ describe("delivery photo memory upload coordinator", () => {
     // preparations so their pending state cannot affect the relay checks.
     expect(coordinator.dismiss(another!.jobId)).toBe(true);
     expect(coordinator.dismiss(third!.jobId)).toBe(true);
-    const b = coordinator.begin("b", "album")!; coordinator.acceptSource(b.jobId, source("b"));
-    const c = coordinator.begin("c", "camera")!; coordinator.acceptSource(c.jobId, source("c"));
+    const b = coordinator.begin("b", "album")!; await coordinator.acceptSource(b.jobId, source("b"));
+    const c = coordinator.begin("c", "camera")!; await coordinator.acceptSource(c.jobId, source("c"));
     expect(prepare).toHaveBeenCalledTimes(1);
     preparations[0]!.resolve(prepared("a")); await eventually(() => expect(prepare).toHaveBeenCalledTimes(2));
     preparations[1]!.resolve(prepared("b")); await eventually(() => expect(prepare).toHaveBeenCalledTimes(3));
     preparations[2]!.resolve(prepared("c")); await eventually(() => expect(create).toHaveBeenCalledTimes(2));
-    expect(coordinator.getCustomerJob("c")?.status).toBe("queued");
+    await eventually(() => expect(coordinator.getSnapshot().find((job) => job.customerId === "c")?.status).toBe("queued"));
     relays.a.resolve(metadata("a")); await eventually(() => expect(create).toHaveBeenCalledTimes(3));
-    relays.b.resolve(metadata("b")); relays.c.resolve(metadata("c"));
+    relays.b.resolve({ ...metadata("b"), source: "album" }); relays.c.resolve(metadata("c"));
     await eventually(() => expect(coordinator.getSnapshot().filter((job) => job.status === "completed")).toHaveLength(3));
   });
 
@@ -83,9 +83,9 @@ describe("delivery photo memory upload coordinator", () => {
     });
     const { coordinator } = setup({ create: create as DeliveryPhotoUploadDependencies["create"] });
     const a = coordinator.begin("same", "camera")!;
-    coordinator.acceptSource(a.jobId, source("front"));
+    await coordinator.acceptSource(a.jobId, source("front"));
     const b = coordinator.begin("same", "camera")!;
-    coordinator.acceptSource(b.jobId, source("back"));
+    await coordinator.acceptSource(b.jobId, source("back"));
     await eventually(() => expect(create).toHaveBeenCalledTimes(2));
     expect(coordinator.getPendingCount("same")).toBe(2);
     expect(created[0]!.requestId).not.toBe(created[1]!.requestId);
@@ -105,9 +105,9 @@ describe("delivery photo memory upload coordinator", () => {
       return metadata(input.customerId, "4e4f92fc-c902-4d7f-8e7c-718c8be0c866");
     });
     const { coordinator } = setup({ create: create as DeliveryPhotoUploadDependencies["create"] });
-    const first = coordinator.begin("a", "camera")!; coordinator.acceptSource(first.jobId, source("same bytes"));
-    await eventually(() => expect(coordinator.getCustomerJob("a")?.status).toBe("failed"));
-    expect(coordinator.retry(first.jobId)).toBe(true);
+    const first = coordinator.begin("a", "camera")!; await coordinator.acceptSource(first.jobId, source("same bytes"));
+    await eventually(() => expect(coordinator.getSnapshot().find((job) => job.customerId === "a")?.status).toBe("failed"));
+    expect(await coordinator.retry(first.jobId)).toBe(true);
     await eventually(() => expect(coordinator.getSnapshot().find((job) => job.jobId === first.jobId)?.status).toBe("completed"));
     const [initial, retry] = create.mock.calls.map((call) => call[0] as { requestId: string; fileBase64: string });
     expect(retry).toEqual(initial);
@@ -119,12 +119,12 @@ describe("delivery photo memory upload coordinator", () => {
     const a = deferred<ReturnType<typeof metadata>>(); const b = deferred<ReturnType<typeof metadata>>();
     const create = vi.fn((input: DeliveryPhotoCreateInput) => input.customerId === "a" ? a.promise : b.promise);
     const { coordinator } = setup({ create: create as DeliveryPhotoUploadDependencies["create"] });
-    const first = coordinator.begin("a", "camera")!; coordinator.acceptSource(first.jobId, source("a"));
-    const second = coordinator.begin("b", "album")!; coordinator.acceptSource(second.jobId, source("b"));
+    const first = coordinator.begin("a", "camera")!; await coordinator.acceptSource(first.jobId, source("a"));
+    const second = coordinator.begin("b", "album")!; await coordinator.acceptSource(second.jobId, source("b"));
     await eventually(() => expect(create).toHaveBeenCalledTimes(2));
     a.reject({ code: "functions/unauthenticated" });
     await eventually(() => expect(coordinator.getSnapshot().every((job) => job.status === "failed" && job.errorCategory === "auth")).toBe(true));
-    expect(coordinator.retry(first.jobId)).toBe(false);
+    expect(await coordinator.retry(first.jobId)).toBe(false);
     b.resolve(metadata("b")); await new Promise((resolve) => setTimeout(resolve, 0));
     expect(coordinator.getSnapshot().some((job) => job.status === "completed")).toBe(false);
   });

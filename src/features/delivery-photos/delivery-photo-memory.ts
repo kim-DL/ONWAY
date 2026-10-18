@@ -49,11 +49,14 @@ export function mergeConfirmedDeliveryPhoto(
     return { ...snapshot, today: { ...snapshot.today, photos, customers }, refreshedAt: Date.now() };
   }
   const prior = snapshot.today.customers.find((summary) => summary.customerId === photo.customerId);
-  const nextSummary = { customerId: photo.customerId, count: (prior?.count ?? 0) + 1, latest: photo };
+  const newer = (a: DeliveryPhotoMetadata, b: DeliveryPhotoMetadata) =>
+    Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.photoId.localeCompare(b.photoId);
+  const nextSummary = { customerId: photo.customerId, count: (prior?.count ?? 0) + 1,
+    latest: prior?.latest && newer(prior.latest, photo) > 0 ? prior.latest : photo };
   const customers = prior
     ? snapshot.today.customers.map((summary) => summary.customerId === photo.customerId ? nextSummary : summary)
     : [nextSummary, ...snapshot.today.customers];
-  return { ...snapshot, today: { ...snapshot.today, photos: [photo, ...snapshot.today.photos], customers }, refreshedAt: Date.now() };
+  return { ...snapshot, today: { ...snapshot.today, photos: [photo, ...snapshot.today.photos].sort((a, b) => newer(b, a)), customers }, refreshedAt: Date.now() };
 }
 export function clearDeliveryPhotoSnapshot(key?: string) {
   if (memory && (!key || memory.key === key)) memory = null;

@@ -9,6 +9,7 @@ export const DELIVERY_PHOTO_TRANSPORT_JPEG_QUALITY = 0.88;
 
 export type PreparedDeliveryPhoto = {
   blob: Blob;
+  preview?: Blob;
   contentType: "image/webp" | "image/jpeg";
   width: number;
   height: number;
@@ -198,7 +199,17 @@ export async function prepareDeliveryPhoto(source: File, signal?: AbortSignal): 
     const { blob, contentType } = await canvasTransport(canvas);
     signal?.throwIfAborted();
     if (blob.size <= 0 || blob.size > DELIVERY_PHOTO_MAX_BYTES) throw preparationError("delivery-photo/output-too-large");
-    return { blob, contentType, width: target.width, height: target.height };
+    // Reuse the decoded pixels. No server download and no second full decode.
+    const previewCanvas = document.createElement("canvas");
+    const ratio = Math.min(1, 320 / Math.max(target.width, target.height));
+    previewCanvas.width = Math.max(1, Math.round(target.width * ratio));
+    previewCanvas.height = Math.max(1, Math.round(target.height * ratio));
+    try {
+      const previewContext = previewCanvas.getContext("2d");
+      if (previewContext) previewContext.drawImage(canvas, 0, 0, previewCanvas.width, previewCanvas.height);
+      const preview = previewContext ? await canvasBlob(previewCanvas, "image/jpeg", 0.75) : null;
+      return { blob, contentType, width: target.width, height: target.height, ...(preview?.size ? { preview } : {}) };
+    } finally { previewCanvas.width = 0; previewCanvas.height = 0; }
   } finally {
     decoded.close();
     canvas.width = 0; canvas.height = 0;
@@ -217,4 +228,10 @@ export function deliveryPhotoPreparationMessage(error: unknown): string {
   if (code === "delivery-photo/output-too-large") return "처리한 사진이 10MB를 넘어요. 다른 사진으로 다시 시도해주세요.";
   if (code === "delivery-photo/cancelled" || code === "AbortError") return "사진 준비가 취소되었습니다.";
   return "사진을 안전한 전송 형식으로 준비하지 못했어요. 다시 촬영하거나 선택해주세요.";
+}
+
+export async function encodeDeliveryPhotoBlob(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer()); let binary = "";
+  for (let start = 0; start < bytes.length; start += 8_192) binary += String.fromCharCode(...bytes.subarray(start, start + 8_192));
+  return btoa(binary);
 }

@@ -126,7 +126,7 @@ const deliveryPhotoViewerAdditionalStylesheets = stylesheets.filter((asset) =>
   deliveryPhotoViewerAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset));
 const deliveryPhotoViewerAdditionalStylesheetRawBytes = deliveryPhotoViewerAdditionalStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const deliveryPhotoViewerAdditionalStylesheetGzipBytes = deliveryPhotoViewerAdditionalStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-// Phase 3B keeps the memory-only upload coordinator outside the existing
+// Phase 3B keeps the upload coordinator outside the existing
 // workspace entry and loads image decoding/canvas encoding only after a picker
 // returns a file. Account for both deferred layers without raising the Phase 3A
 // workspace ceiling.
@@ -138,6 +138,23 @@ const deliveryPhotoPreparationEntries = dynamicEntries.filter((entry) => entry.b
 const deliveryPhotoPreparationAssetNames = new Set(deliveryPhotoPreparationEntries.flatMap((entry) => entry.files));
 const deliveryPhotoPreparationJavascriptGzipBytes = [...deliveryPhotoPreparationAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
+// P0 adds separately deferred field-row, local-preview UI and durable worker.
+// Give these new capabilities explicit small envelopes; keep every existing
+// workspace/runtime/legacy ceiling unchanged and account for all new assets.
+const deliveryPhotoFieldLayers = [
+  { name: "row", boundaries: ["delivery-photo-row"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
+  { name: "preview", boundaries: ["delivery-photo-upload-panel"], javascript: 2 * 1024, cssRaw: 2 * 1024, cssGzip: 1024 },
+  { name: "durability", boundaries: ["delivery-photo-outbox", "delivery-photo-outbox-lazy", "delivery-photo-outbox-worker"], javascript: 4 * 1024, cssRaw: 0, cssGzip: 0 },
+  { name: "relay", boundaries: ["delivery-photo-create-repository"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
+].map((layer) => {
+  const assets = [...new Set(dynamicEntries.filter((entry) => layer.boundaries.some((name) => entry.boundary.endsWith(`/${name}`)))
+    .flatMap((entry) => entry.files))];
+  const css = stylesheets.filter((asset) => assets.includes(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset));
+  return { ...layer, assets, measuredJavascript: assets.filter((asset) => asset.endsWith(".js")).map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0),
+    measuredCssRaw: css.reduce((sum, asset) => sum + asset.rawBytes, 0), measuredCssGzip: css.reduce((sum, asset) => sum + asset.gzipBytes, 0) };
+});
+const deliveryPhotoFieldAssetNames = new Set(deliveryPhotoFieldLayers.flatMap((layer) => layer.assets));
+const deliveryPhotoFieldStylesheets = stylesheets.filter((asset) => deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset));
 // Phase 40 moves the entire retired global admin layer into a scoped, lazy UI.
 // Measure the dock, forms and dialogs together: webpack combines their modules.
 // Employee/login boundaries must never acquire these styles.
@@ -185,7 +202,7 @@ const inventoryManufacturerFieldJavascriptGzipBytes = [...inventoryManufacturerF
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryManufacturerStylesheetRawBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryManufacturerStylesheetGzipBytes = inventoryManufacturerStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -218,7 +235,8 @@ for (const asset of deliveryPhotoAssetNames) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo asset ${asset} must stay deferred`);
 }
 for (const asset of deliveryPhotoExclusiveAssetNames) {
-  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => deliveryPhotoEntries.includes(entry)),
+  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => deliveryPhotoEntries.includes(entry)
+    || asset.endsWith(".css") && entry.boundary.endsWith("/delivery-photo-row")),
     `delivery photo asset ${asset} must not load with unrelated work modes`);
 }
 for (const [label, assets, owners] of [
@@ -275,7 +293,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 4 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the four approved photo viewers");
 }
-const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
+const stylesheetPartitions = [...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -320,6 +338,15 @@ for (const boundary of requiredBoundaries) {
   );
 }
 const serviceWorker = readFileSync(join(projectRoot, "public/sw.js"), "utf8");
+for (const layer of deliveryPhotoFieldLayers) {
+  assertBudget(layer.assets.length > 0 && layer.boundaries.every((name) => dynamicEntries.some((entry) => entry.boundary.endsWith(`/${name}`))), `missing delivery photo ${layer.name} boundary`);
+  assertBudget(layer.measuredJavascript <= layer.javascript, `delivery photo ${layer.name} JavaScript gzip ${layer.measuredJavascript}B exceeds ${layer.javascript}B`);
+  assertBudget(layer.measuredCssRaw <= layer.cssRaw && layer.measuredCssGzip <= layer.cssGzip, `delivery photo ${layer.name} CSS exceeds its own envelope`);
+  for (const asset of layer.assets) {
+    assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `delivery photo ${layer.name} asset must stay deferred`);
+    assertBudget(serviceWorker.includes(asset), `delivery photo ${layer.name} asset must remain precached`);
+  }
+}
 for (const tool of ["sales-route-planner", "sales-claim-picker", "admin-workspace", ...customerBoundaries, "delivery-photo-workspace", "delivery-photo-history", "delivery-photo-history-dates", "delivery-photo-viewer", "delivery-photo-upload-memory", "delivery-photo-preparation", "inventory-workspace", "inventory-photo-viewer"]) {
   const entry = dynamicEntries.find(({ boundary }) => boundary.endsWith(tool));
   assertBudget(entry?.files.every((asset) => serviceWorker.includes(asset)),
@@ -494,6 +521,7 @@ const report = {
     manufacturerFieldAssets: [...inventoryManufacturerFieldAssetNames].map(sizeAsset),
     note: "Shared photo styles count once in global totals; inventoryWithPhoto measurements describe the complete visited flow, not an additional budget charge.",
   },
+  deliveryPhotoFieldLayers,
   initial,
   dynamicEntries,
   stylesheets,

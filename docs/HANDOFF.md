@@ -1,9 +1,19 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-05
+기준일: 2026-10-18
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-18 현장 지연 P0 — 구현·로컬 검증 완료 / 운영 미배포
+
+- `main`과 `origin/main`은 `04272ec8b4a80c60dd74326cda6cd3f61f53ad36`으로 동기화했다. PR #1·#2·#3의 merge를 확인했다. PR #4 `codex/mcp-1.8.0`은 draft/open인 별도 8커밋 작업으로 보존하고, 기존 12커밋의 `perf/field-latency-count-photo-20261018`을 검토한 뒤 그 tracking branch에서 P0를 이어서 구현했다. 다른 worktree·실험·stash·비공개 env는 유지한다.
+- 재고 실사 cycle 읽기를 같은 트랜잭션의 product/settings/lots 읽기와 병렬화하고 lot 반복 탐색을 Map으로 줄였다. `recordInventoryCount`에 개인정보 없는 단계별 시간·읽기/쓰기 시도·재시도 계측을 추가했다. 기존 Callable/App Check/전후·트랜잭션 내부 인가, revision, request receipt, 감사 이력은 유지한다.
+- 납품사진은 사용자 클릭으로만 카메라를 열고, 독립 복사→기기 IndexedDB 보관→준비 1장/전송 2장의 대기열로 처리한다. 거래처당 3장/전체 8장/96MiB 한도, 재시도 시 동일 request ID·바이트, reload 복구, 날짜가 지난 사진의 명시적 전송 확인, 로그아웃 시 정리를 적용했다. local 썸네일/확대, 사진별 보관·업로드·서버 저장 완료 표시와 짧은 가이드를 제공한다. 서버 저장 확인 전 완료 처리하지 않으며 서버 삭제 후 local preview도 제거한다.
+- 각 30회 실험에서 실제 demo PWA의 재고 클릭→완료 p50 **230.3→216.4ms**, Firestore 읽기별 120ms 추가/200 lot 트랜잭션 p50 **618.5→474.5ms**, 통제 endpoint의 사진 다음 촬영 요청 수락 p50 **2,947.2→76.1ms**였다. 사진 서버 확인 완료는 **2,914.4→2,959.4ms**로, 업로드 자체의 가속을 주장하지 않는다. [구현·정책·재현·제한](field-latency-p0-20261018.md)과 [조건/수치/hash](field-latency-p0-20261018-metrics.json)를 확인한다. 운영·실제 카메라 성능 수치가 아니다.
+- 로컬 unit **1,736 PASS / 기존 조건부 15 SKIP**, 재고 static browser **18 PASS**와 실제 transaction integration **12 PASS**, 사진 Chromium **16개 검증**(전체 15 PASS 후 선택자 수정 1개 재실행 PASS), typecheck/lint/Functions build, 검색 성능 18 unit 및 5,000품목 p95 **1.24ms** PASS다. CI Quality Gate에도 사진 전체 회귀를 추가했으며 최종 합성 main/branch 검증 상태는 이 브랜치의 PR 체크를 확인한다.
+- 사진·재고 flag ON/Emulator OFF production-mode build와 PWA·JS/CSS·Hosting artifact gate PASS. initial JS gzip **140,034B**, 재고 **25,537B**, 사진 workspace **10,160B**, upload runtime **5,098B**로 기존 상한을 유지한다. 신규 행/미리보기/보관/전송 경계도 별도 작은 한도로 검사한다. export/shipped **109개**, precache **96개**, Hosting initial assets **9개**다. 비공개 env 3종의 전후 digest가 같다. audit는 high/critical 0, 기존 moderate 8이며 관련 patch 및 fake-indexeddb 테스트 의존성을 기록했다.
+- Windows Playwright WebKit 26.5는 최소 재현에서도 IndexedDB Blob/File 저장에 UnknownError가 나므로 대기열 통과로 보고하지 않는다. 같은 엔진의 실제 JPEG→WebP/JPEG local preview 생성은 확인했다. 실제 iPhone/설치 PWA의 촬영·저장소·종료/재실행은 현장 인수 대상으로 남긴다. main 병합, 운영 Functions/Hosting/Rules 배포와 운영 데이터 변경은 하지 않았으며 운영 배포는 별도 승인이 필요하다.
 
 ### 2026-10-05 리팩토링 — main 저장 및 운영 Hosting 배포 완료
 
