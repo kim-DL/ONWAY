@@ -71,3 +71,9 @@ Firebase의 [기기 로그인 유지](https://firebase.google.com/docs/auth/web/
 - 원래 공유 GlassButton의 opacity 전환은 사진 준비 후 disabled가 제거된 첫 프레임에도 opacity 0.55를 남긴다. 실제 공유 CSS를 읽는 Chromium fixture에서 이를 재현했고, opacity 전환을 제외하면 같은 프레임에 1이 된다. 정착 전 opacity만 제외하도록 사진 조작부의 CSS Module에 범위를 제한했다. transform·shadow 전환, disabled 상태와 동작은 유지한다.
 - 로컬 demo의 동일한 정적 사진 이력 테스트 1개가 수정 후 PASS했다. Axe 위반 없음, 사진 경계·44px 조작부·지연 증거 조회·Blob URL 해제·이전/다음·포커스 복귀 검사는 원래대로다. assertion·timeout·skip을 완화하지 않았다. `button-opacity-repro.json`, `photo-contrast-focused.log`, `ci-c523bf6-attempt1-summary.json`에 증거를 구분했다.
 - 수정 후 lint와 운영 형식 build·PWA·성능·Hosting gate가 모두 PASS했다. 이 검토와 로컬 검증까지 마친 새 제품 커밋을 고정한 다음 전체 CI를 실행한다.
+
+## 최종 운영 반영
+
+제품 source `a934d515cee6b57620cae3903356ed34cca7c2a5`의 [전체 Quality Gate](https://github.com/kim-DL/ONWAY/actions/runs/39582354656)가 같은 source의 attempt 2에서 SUCCESS다. 첫 attempt의 검색 Listen-channel 간헐 실패와 로컬 단독 재현, 변경 없는 재실행을 [릴리스 기록](releases/2026-10-21-mobile-session-resume.md)에 구분했다. 최종 실행은 일반 browser 312 PASS/8 SKIP/0 flaky, Phase 17 browser 83 PASS/18 기존 조건부 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다.
+
+2026-10-21 20:01:47 KST Hosting only로 version `c4e035caf38f7259`를 배포했고 두 origin 각 25개 공개 검사와 새 Chromium UI/worker/오류 0, 후보 해시 일치를 확인했다. Functions 72·MCP·전용 Hosting·비공개 설정과 기존 작업은 유지한다. 실제 직원 휴대폰 인수와 CI job 분리·검색 transport 검사 유지보수는 별도 후속 사항이다.

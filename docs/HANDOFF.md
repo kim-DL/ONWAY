@@ -5,15 +5,20 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-21 모바일 홈 복귀·로그인 유지 — 로컬 구현·검증 완료, 운영 미배포
+### 2026-10-21 모바일 홈 복귀·로그인 유지 — main 저장·운영 Hosting 배포·검증 완료
 
 - 직원 피드백에 따라 시간 경과·홈 이동·일시적 통신 실패를 로그아웃 사유로 삼지 않도록 세션 복구를 정리했다. Firebase가 저장된 UID를 복원하면 최근 서버 검증 직원 세션으로 화면을 먼저 열고 토큰·authz를 뒤에서 확인한다. 관리자 캐시는 제외하며, 서버 비활성화·버전 불일치·명시적 인증 거부는 기존대로 반영한다. 화면 복구 캐시의 기존 24시간 보관 한도는 로그인 만료 시간이 아니며, 오래된 캐시로 오프라인이면 인증을 지우지 않고 연결 복구 후 PIN 없이 이어진다.
 - 거래처의 일시적 offline 전환은 같은 세션의 목록·검색·선택·입력을 메모리에 유지하고, 연결 복구 후 갱신한다. 오프라인에서는 사진 업로드·저장 요청 전에 막으며 자동 저장 큐를 추가하지 않았다. 마지막 업무 모드·탭만 UID·세션/권한 버전에 묶어 복원한다. 거래처·재고 원문이나 사진·편집 초안을 새로 디스크에 저장하지 않았다. 기존 Callable·App Check·Rules·revision·request ID·감사와 사진 outbox/서버 확인 후 완료 판정은 보존한다.
 - 전체 unit 1,771 PASS / 기존 조건부 15 SKIP, 후속 오류 처리 공통화·offline listener 정리의 최종 customer 280개 PASS, 앱/Functions typecheck·lint PASS다. Chromium 인증·거래처 14 PASS, 정적 demo build의 복귀/재시작 Chromium 2·Windows WebKit 2 PASS다. Emulator 함수 발견·worker 최초 준비, 테스트의 취소된 route/서비스 워커 우회/WebKit 이전 Listen 취소와 용량 초과 후보의 실패·재실행은 [구현·검증 기록](mobile-session-resume-20261021.md)에 구분했다. 검사 시간·skip·기존 용량 상한을 완화하지 않았다.
-- 최종 운영 형식 build·PWA·성능·Hosting gate PASS, 사진/재고 ON·Emulator OFF다. initial JS gzip 140,104B / customer 36,834B / inventory 25,861B, 산출물 113개·precache 100·initial assets 9개다. 이 값은 로컬 산출물/브라우저 검증이며 현장 지연 SLO나 실제 iPhone·설치 PWA 인수 결과가 아니다. OS가 프로세스를 완전히 종료하면 짧은 앱 초기화와 메모리 데이터 재조회는 남는다.
-- 사용자가 2026-10-21 커밋·전체 CI·Hosting 운영 배포·배포 후 검증·로컬 동기화를 승인했다. 로컬 검증을 마친 `codex/mobile-resume-20261021` 제품 소스를 확정하는 단계이며, 운영 반영 결과는 후속 릴리스 기록에 남긴다. 운영 데이터·자격 증명·Functions/Rules/Auth 설정은 변경하지 않는다. 기존 `AGENTS.md` 사용자 변경 7줄은 보존한다. ignored 로컬 검증 증거는 `output/playwright/mobile-resume-20261021/`에 있다.
+- 최종 운영 형식 build·PWA·성능·Hosting gate PASS, 사진/재고 ON·Emulator OFF다. initial JS gzip 140,103B / customer 36,834B / inventory 25,861B, 산출물 113개·precache 100·initial assets 9개다. 이 값은 로컬 산출물/브라우저 검증이며 현장 지연 SLO나 실제 iPhone·설치 PWA 인수 결과가 아니다. OS가 프로세스를 완전히 종료하면 짧은 앱 초기화와 메모리 데이터 재조회는 남는다.
+- 사용자 승인 범위인 Hosting만 운영 배포했다. 제품 source `a934d515cee6b57620cae3903356ed34cca7c2a5`의 [Quality Gate 39582354656](https://github.com/kim-DL/ONWAY/actions/runs/39582354656) attempt 2 전체 SUCCESS다. unit 1,771 PASS/15 기존 조건부 SKIP, 일반 browser 312 PASS/8 SKIP/0 flaky, Phase 17 browser 83 PASS/18 기존 조건부 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다. 처음 실패와 재시도는 아래 및 릴리스 기록에 구분한다.
 - 최초 제품 source `ccb5249`의 [Quality Gate 39578039882](https://github.com/kim-DL/ONWAY/actions/runs/39578039882)는 기존 lock의 Vite high 취약점으로 audit 단계에서 중단됐다. 로컬 재현 후 `vite 8.2.2→8.2.4`의 lock 3개 필드만 갱신하고 깨끗한 의존성 설치·기존 high/critical audit·전체 unit 1,771 PASS / 15 SKIP·검색/캐시 성능 PASS를 확인했다. moderate 9개, npm `edgesOut` 및 설치 완료 전 unit 시작 실패를 구현 기록에 구분했다. 앱/Functions 의존성과 CI 검사 기준은 유지한다.
-- `c523bf6`의 [Quality Gate 39579369157](https://github.com/kim-DL/ONWAY/actions/runs/39579369157)는 Phase 17 사진 이력의 색상 대비 1개 실패(82 PASS/18 조건부 SKIP)로 중단됐다. 기존 버튼의 disabled→enabled opacity 전환이 원인이며 실제 CSS 첫 프레임 0.55→1 재현 후 사진 조작부에만 전환을 한정했다. 동일한 정적 demo 사진 이력 1개·lint·운영 build/PWA/성능/Hosting gate PASS다. 일반 browser 310 PASS/2 flaky/8 SKIP와 이 실패·보완을 구분하고, 검사 기준은 유지한다. 새 최종 source의 전체 CI와 운영 결과는 후속 릴리스 기록에 남긴다.
+- `c523bf6`의 [Quality Gate 39579369157](https://github.com/kim-DL/ONWAY/actions/runs/39579369157)는 Phase 17 사진 이력의 색상 대비 1개 실패(82 PASS/18 조건부 SKIP)로 중단됐다. 기존 버튼의 disabled→enabled opacity 전환이 원인이며 실제 CSS 첫 프레임 0.55→1 재현 후 사진 조작부에만 전환을 한정했다. 동일한 정적 demo 사진 이력 1개·lint·운영 build/PWA/성능/Hosting gate PASS다. 일반 browser 310 PASS/2 flaky/8 SKIP와 이 실패·보완을 구분하고, 검사 기준은 유지한다. 최종 결과와 배포 증거는 [릴리스 기록](releases/2026-10-21-mobile-session-resume.md)에 있다.
+
+- 최종 source의 첫 CI 실행은 검색 중 기존 Listen 채널이 잡혀 1개 실패했다. 같은 테스트의 로컬 2 PASS/1 FAIL과 별도 입력 관찰 5회 통신 0, 앞선 동일 auth/search source의 통과를 확인해 코드·검사 기준을 바꾸지 않고 같은 job을 한 번 재실행했다. 정확한 Listen 메시지 원인은 미확정이며 마지막 실행은 전체 SUCCESS/내부 flaky 0이다.
+- live version **c4e035caf38f7259**, release **1792580507302000**, **2026-10-21 20:01:47 KST**, 직전 복구 **ff64054ec6bac356**다. 두 origin 공개 검사 각 25 PASS, www301, 새 Chromium 로그인/worker activated/pageerror 0, 공개 worker와 후보 SHA-256 `33c05e0e1383a6c4decdb7ec99f80ad8cd4479c9551aacaa68903058015f9b49` 일치다.
+- Functions 72개·실사/MCP API metadata·MCP 전용 Hosting·MCP 1.14.2/승인 정책·PR #4는 유지한다. 운영 업무 데이터 쓰기와 Functions/Rules/Auth 배포가 없다. 비공개 env·후보 113파일 digest는 배포 전후 같다. [릴리스 기록](releases/2026-10-21-mobile-session-resume.md)과 ignored `output/mobile-resume-release-20261021/`에 증거를 남겼다.
+- 제품 source는 main/기능 branch의 로컬·원격에 저장했다. 릴리스 문서 전용 후속 commit은 제품 코드가 같아 [skip ci]로 중복 CI·배포를 만들지 않는다. 기존 `AGENTS.md` 사용자 변경 7줄은 정확히 복구했고, 다른 branch/worktree·기존 stash는 보존한다. 실제 직원 기기의 촬영→홈→복귀·설치 PWA 현장 인수는 아직 별도 확인 사항이다.
 
 ### 2026-10-18 최초 검색·재고 상세 200ms 목표 — main 저장·운영 Hosting 배포·검증 완료
 
