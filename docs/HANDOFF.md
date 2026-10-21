@@ -5,12 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-21 Quality Gate 병렬화 — 로컬 검증 완료, 최종 커밋 CI 확인 예정
+### 2026-10-21 Quality Gate 병렬화 — main 저장·최종 전체 CI 통과
 
 - 기존 단일 `verify`의 14개 검사 명령·환경 변수·검사 기준을 유지하면서 12개 독립 작업으로 분리했다. 기존 이름 `verify`는 모든 작업이 성공해야 통과하는 최종 판정으로 유지한다. 취소·skip·누락도 통과시키지 않는다.
 - 실패 시 GitHub Actions **Re-run jobs → Re-run failed jobs**로 실패한 작업과 후속 `verify`만 다시 실행한다. 재실행 단위는 테스트 케이스가 아닌 작업 묶음이며, 코드가 바뀌면 새 커밋의 전체 CI를 확인한다.
-- 기존 명령/환경/trigger/권한/도구 버전 대조·actionlint PASS, 판정 회귀 26 PASS, lint·앱/Functions typecheck PASS다. 실제 병렬 실행·시간과 최종 커밋 CI는 별도 확인 후 기록한다. [구성·검증·재실행 안내](ci-parallel-20261021.md).
-- 첫 병렬 CI `39593170549`는 12개 동시 실행·11개 PASS 후 브라우저의 헤더 HTML 생성 의존성 누락으로 실패했다. 브라우저 작업에 기존 생성 unit 7개를 추가하고 관련 Chromium 28개·actionlint·명령/환경/그래프 대조 PASS를 확인했다. 최종 판정은 실제 실패를 올바르게 차단했으며, 보완한 새 커밋의 CI를 확인한다. 실패와 내부 flaky 이력은 위 기록에 구분한다.
+- 기존 명령/환경/trigger/권한/도구 버전 대조·actionlint PASS, 판정 회귀 26 PASS, lint·앱/Functions typecheck PASS다. [구성·검증·재실행 안내](ci-parallel-20261021.md).
+- 첫 병렬 CI `39593170549`는 12개 동시 실행·11개 PASS 후 브라우저의 헤더 HTML 생성 의존성 누락으로 실패했다. 브라우저 작업에 기존 생성 unit 7개를 추가하고 관련 Chromium 28개·actionlint·명령/환경/그래프 대조 PASS를 확인했다. 최종 판정은 실제 실패를 올바르게 차단했다. 실패와 내부 flaky 이력은 위 기록에 구분한다.
+- 최종 source `7c9a0b2b8f02d451b559ec26612eafa6e8bfa77d`의 [Quality Gate 39594520586](https://github.com/kim-DL/ONWAY/actions/runs/39594520586)는 attempt 1 검사 12개+최종 verify **전체 SUCCESS**다. unit 1,797 PASS/기존 15 SKIP, 일반 browser 312 PASS/기존 8 SKIP, Phase 17 browser 83 PASS/기존 조건부 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS, 내부 flaky 0이다. 직전 성공 직렬 작업 25분 30초 대비 첫 작업 시작→최종 판정 완료 **9분 59초(약 61% 단축)**, workflow 생성→완료 표시는 10분 5초다. 실행 슬롯 등으로 미래 시간을 보장하지 않는다.
+- 최종 기록은 문서 전용 `[skip ci]` 후속 커밋으로 저장해 중복 CI를 만들지 않는다. main·작업 branch 로컬/원격 동기화, 기존 AGENTS 사용자 수정·다른 worktree·stash를 보존한다. CI 구성만 변경하며 운영 Hosting/Functions/Rules 배포와 업무 데이터 쓰기는 없다.
 
 ### 2026-10-21 모바일 홈 복귀·로그인 유지 — main 저장·운영 Hosting 배포·검증 완료
 

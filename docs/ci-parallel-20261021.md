@@ -50,4 +50,14 @@ GitHub Actions에서 해당 실행을 열고 **Re-run jobs → Re-run failed job
 - 첫 구성 `0c637d2`의 [Quality Gate 39593170549](https://github.com/kim-DL/ONWAY/actions/runs/39593170549)는 12개 작업이 동시에 시작했고 11개가 통과했다. unit 1,797 PASS/기존 조건부 15 SKIP, 재고사진 4·transaction 12·납품사진 16·지연도구 2 PASS다.
 - `browser`는 앞선 unit이 만들던 헤더 HTML 16개가 없는 깨끗한 runner에서 ENOENT로 28개 실패했다. 그 밖에 281 PASS/8 기존 SKIP/3 내부 재시도 통과(재고 focus 1·인사 정지 2)다. 작업 분리 때 놓친 산출물 의존성으로 확인해 브라우저 작업 자체에 기존 생성 unit을 명시했다. 테스트 기대값을 낮추거나 실패 검사를 제외하지 않았다.
 - 나머지 작업은 브라우저 실패 뒤에도 완료됐고 최종 `verify`는 올바르게 실패했다. 소스 보완이 필요해 같은 잘못된 커밋을 재실행하지 않고 보완한 새 커밋으로 전체 CI를 확인한다.
-- 최종 소스 CI 결과와 소요 시간은 완료 후 기록한다.
+- 최종 구성 source `7c9a0b2b8f02d451b559ec26612eafa6e8bfa77d`의 [Quality Gate 39594520586](https://github.com/kim-DL/ONWAY/actions/runs/39594520586)는 attempt 1 **전체 SUCCESS**다. 12개 검사와 최종 `verify` 13개 모두 통과했고 workflow 재실행이 없다. 최종 browser와 Phase 17에 내부 flaky 보고도 없다.
+- unit 1,797 PASS/기존 조건부 15 SKIP, 브라우저 준비 unit 7 PASS, 일반 browser 312 PASS/기존 8 SKIP, Phase 17 NEIS 3·Rules 50·browser 83 PASS/기존 조건부 18 SKIP, 재고사진 4·transaction 12·납품사진 16·지연도구 2 PASS다. 기존 audit·lint·앱/Functions typecheck·검색/캐시 성능·Functions build·운영 build/PWA/용량 gate도 모두 PASS다.
+
+## 실측 시간과 저장소 상태
+
+- 이전 직렬 기준: [Quality Gate 39582354656](https://github.com/kim-DL/ONWAY/actions/runs/39582354656)의 성공 attempt 2 `verify` 작업은 10:34:40–11:00:10 UTC, **25분 30초**였다. 이전 실패/재실행에 든 전체 대기 시간과 이 성공 작업의 시간을 구분한다.
+- 최종 병렬 실행: 12개 검사가 11:47:07–08 UTC에 시작했고 최종 판정은 11:57:06 UTC에 완료됐다. 작업 시작부터 최종 판정 완료까지 **9분 59초**, 직렬 기준보다 **15분 31초 / 약 61% 단축**이다. 실행 생성→workflow 완료 표시 기준은 11:47:05–11:57:10 UTC(한국 시간 20:47:05–20:57:10), **10분 5초**다.
+- 가장 긴 Phase 17은 준비 포함 9분 47초, 일반 browser 9분 43초다. 납품사진 4분 3초·재고사진 3분 8초·운영 build/PWA/용량 1분 19초가 이들과 병렬로 끝났고 최종 판정은 10초다. 헤더 HTML 준비는 약 1초다.
+- 1회의 실제 Actions 비교이며 미래 실행의 완료 시간을 보장하지 않는다. 합산 runner 작업 시간은 25분 30초→34분 43초로 늘지만 동시 실행으로 사용자가 기다리는 시간을 줄인다. 계정 실행 슬롯·외부 다운로드·서버 상태에 따라 차이가 난다.
+- 실행 source, job별 시작/완료/결과와 계산값은 ignored `output/ci-parallel-20261021/final-ci-results.json`에 있다. 실패한 작업만 재실행하는 동작은 GitHub의 기본 job 재실행 기능과 독립 그래프를 이용한다. 최종 실행에 실패가 없어 실제 실패 작업 재실행은 하지 않았으며, 실패 차단은 첫 CI의 `Required checks did not succeed: browser`와 CLI 회귀 26개로 확인했다.
+- 최종 결과 문서만 후속 `[skip ci]` 커밋으로 저장한다. 검증된 CI 구성/테스트 소스를 바꾸지 않고 중복 전체 CI를 만들지 않는다. main과 작업 branch의 로컬·원격을 동기화하고 사용자 기존 `AGENTS.md` 수정 7줄, 다른 worktree·stash를 보존한다.
