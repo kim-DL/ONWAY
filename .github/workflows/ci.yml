@@ -97,6 +97,9 @@ jobs:
         uses: ./.github/actions/setup-ci
         with:
           chromium: "true"
+      # The serial workflow received these HTML fixtures from the earlier unit run.
+      - name: Prepare header browser fixtures
+        run: npx vitest run src/features/app-shell/app-shell-header.test.ts
       - name: Safe configuration browser tests
         run: npm run test:e2e
   deferred-tools:

@@ -23,7 +23,7 @@
 
 - 14개 기존 검사 명령, 단계별 환경 변수, 테스트 선택 조건, assertion, timeout, skip, audit high/critical 기준, PWA 및 JS/CSS 예산은 그대로다. 기존 테스트·실행 스크립트·의존성 lock을 변경하지 않는다.
 - 각 검사 작업은 기존처럼 Ubuntu와 45분 제한을 사용한다. `.nvmrc`·`npm ci`·npm 다운로드 캐시, checkout/setup-node v7, Java 21/setup-java v5, Chromium 설치 명령을 공통 composite action으로 옮겼다. Java·Chromium은 필요한 작업에만 설치한다.
-- 빌드와 그 산출물을 검사하는 PWA·용량 gate는 같은 `production-build` 작업 안에서 순서대로 실행한다. 다른 검사 runner들은 자기 실행 스크립트에서 필요한 빌드·에뮬레이터·정적 서버를 준비한다. 다른 작업의 변경 파일이나 로컬 산출물에 의존하지 않는다.
+- 빌드와 그 산출물을 검사하는 PWA·용량 gate는 같은 `production-build` 작업 안에서 순서대로 실행한다. 브라우저 작업은 `npx vitest run src/features/app-shell/app-shell-header.test.ts`를 먼저 실행해 기존 헤더 검증 HTML을 생성한다. 이 파일은 직렬 CI에서 앞선 unit 작업이 생성하던 산출물이다. 같은 7개 테스트를 준비 단계에서 추가 실행하고 전체 unit 검사도 유지한다. 다른 검사 runner들은 자기 실행 스크립트에서 필요한 빌드·에뮬레이터·정적 서버를 준비한다. 다른 작업의 변경 파일이나 로컬 산출물에 의존하지 않는다.
 - 검사 작업 사이에는 `needs`가 없다. 한 작업의 실패로 다른 검사가 취소되지 않는다. 전체 결과를 모으는 `verify`만 12개 작업을 모두 기다리고 `always()`로 실행한다. 검사 결과가 모두 `success`여야 통과하며 실패·취소·skip·누락·알 수 없는 작업·잘못된 JSON을 허용하지 않는다. 최종 판정에만 5분 제한을 둔다.
 - workflow 이름 `Quality Gate`, 기존 check 이름 `verify`, main push/PR trigger, contents read 권한을 보존한다. 브랜치 보호 설정은 변경하지 않았다. API로 기존 보호 규칙을 조회하는 것은 integration 권한 403으로 불가능했으므로 보호 규칙의 현재 설정 자체는 확인 결과로 주장하지 않는다.
 - job 단위로 독립 runner와 설치가 필요하므로 총 runner 사용량은 늘 수 있다. 실제 동시 실행 수와 대기 시간은 계정·조직의 GitHub Actions 실행 슬롯에 영향을 받는다. 모든 실행의 완료 시간을 보장하지 않는다.
@@ -42,6 +42,12 @@ GitHub Actions에서 해당 실행을 열고 **Re-run jobs → Re-run failed job
 - 공식 배포 checksum을 확인한 actionlint v1.7.12: PASS.
 - 최종 판정 CLI의 실제 프로세스를 실행하는 unit: 26 PASS. 각 12개 작업의 개별 실패, 취소·skip 등 성공 외 결과, 누락/알 수 없는 작업과 잘못된 JSON 거부를 확인했다.
 - `npm run lint`, 앱·Functions `npm run typecheck`: PASS.
+- 첫 CI에서 발견한 헤더 HTML 생성 의존성을 보완한 뒤 기존 생성 unit 7개, 해당 파일을 사용하는 mobile/desktop Chromium 28개 PASS(42.5초), actionlint·명령/환경/그래프 대조·diff check PASS다. 기존 브라우저 assertion·timeout·재시도 설정은 바꾸지 않았다.
 - 사용자 기존 `AGENTS.md` 7줄 변경과 다른 worktree·기존 stash를 보존한다. CI 구성만 변경하며 Hosting·Functions·Rules·업무 데이터에 대한 배포/쓰기는 없다.
 
-실제 GitHub 실행 결과와 소요 시간은 최종 소스 CI 완료 후 별도로 기록한다.
+## 실제 실행 이력
+
+- 첫 구성 `0c637d2`의 [Quality Gate 39593170549](https://github.com/kim-DL/ONWAY/actions/runs/39593170549)는 12개 작업이 동시에 시작했고 11개가 통과했다. unit 1,797 PASS/기존 조건부 15 SKIP, 재고사진 4·transaction 12·납품사진 16·지연도구 2 PASS다.
+- `browser`는 앞선 unit이 만들던 헤더 HTML 16개가 없는 깨끗한 runner에서 ENOENT로 28개 실패했다. 그 밖에 281 PASS/8 기존 SKIP/3 내부 재시도 통과(재고 focus 1·인사 정지 2)다. 작업 분리 때 놓친 산출물 의존성으로 확인해 브라우저 작업 자체에 기존 생성 unit을 명시했다. 테스트 기대값을 낮추거나 실패 검사를 제외하지 않았다.
+- 나머지 작업은 브라우저 실패 뒤에도 완료됐고 최종 `verify`는 올바르게 실패했다. 소스 보완이 필요해 같은 잘못된 커밋을 재실행하지 않고 보완한 새 커밋으로 전체 CI를 확인한다.
+- 최종 소스 CI 결과와 소요 시간은 완료 후 기록한다.
