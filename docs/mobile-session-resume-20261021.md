@@ -63,3 +63,11 @@ Firebase의 [기기 로그인 유지](https://firebase.google.com/docs/auth/web/
 - npm 10.9.8의 직접 갱신은 현재 폴더와 깨끗한 별도 manifest 폴더에서 모두 `edgesOut` 계산 오류로 실패했다. Vite만 둔 별도 폴더에서 npm이 정상 생성한 lock 항목을 사용했으며, 다른 모든 package metadata가 기존과 같다는 assertion을 통과했다. 변경한 전체 lock의 깨끗한 `npm ci --ignore-scripts --engine-strict=true`와 기존 high/critical audit 기준이 통과했다. moderate 9개는 남아 있다.
 - 의존성 재설치 완료 전에 실행한 unit 명령 1회는 `vitest` 실행 파일을 찾지 못해 시작하지 못했다. 설치 완료 후의 실제 테스트 결과와 구분한다. 상세 증거는 ignored `output/mobile-resume-release-20261021/`에 보관한다.
 - 재설치 완료 후 전체 unit 1,771 PASS / 기존 조건부 15 SKIP, 검색·캐시 성능 gate PASS다. 최초 제품 커밋의 CI를 그대로 재실행하지 않고 이 수정까지 포함한 새 최종 커밋에서 전체 CI를 실행한다.
+
+## 통합 검사에서 발견한 사진 버튼 대비 전환
+
+- `c523bf6315b55dc1540207c2adfc90a5ed7ef912`의 [Quality Gate 39579369157](https://github.com/kim-DL/ONWAY/actions/runs/39579369157)는 unit·보안·타입·build·PWA·성능과 일반 browser 310 PASS / 2 flaky / 8 SKIP, 영업 도구 2개를 통과했다. 기존 재고 목록 키보드 복귀와 인사 애니메이션의 2개 flaky는 재시도로 통과한 결과이며 clean pass와 구분한다.
+- Phase 17의 서버 gate·NEIS 3개·Rules 50개는 통과했지만 브라우저 82 PASS / 1 FAIL / 기존 재고 조건부 18 SKIP이었다. 실패는 `delivery-photo-field.spec.ts`의 최근 거래처 사진 이력 접근성 검사다. 활성화된 1.8배 버튼이 흰 바탕에 `#7d908c`, 대비 3.36으로 측정되어 기존 4.5 기준에 미달했다. 이후 CI의 재고사진·납품사진 단계는 이 실패로 실행되지 않았다.
+- 원래 공유 GlassButton의 opacity 전환은 사진 준비 후 disabled가 제거된 첫 프레임에도 opacity 0.55를 남긴다. 실제 공유 CSS를 읽는 Chromium fixture에서 이를 재현했고, opacity 전환을 제외하면 같은 프레임에 1이 된다. 정착 전 opacity만 제외하도록 사진 조작부의 CSS Module에 범위를 제한했다. transform·shadow 전환, disabled 상태와 동작은 유지한다.
+- 로컬 demo의 동일한 정적 사진 이력 테스트 1개가 수정 후 PASS했다. Axe 위반 없음, 사진 경계·44px 조작부·지연 증거 조회·Blob URL 해제·이전/다음·포커스 복귀 검사는 원래대로다. assertion·timeout·skip을 완화하지 않았다. `button-opacity-repro.json`, `photo-contrast-focused.log`, `ci-c523bf6-attempt1-summary.json`에 증거를 구분했다.
+- 수정 후 lint와 운영 형식 build·PWA·성능·Hosting gate가 모두 PASS했다. 이 검토와 로컬 검증까지 마친 새 제품 커밋을 고정한 다음 전체 CI를 실행한다.
