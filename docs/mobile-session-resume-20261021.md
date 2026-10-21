@@ -55,3 +55,11 @@ Firebase의 [기기 로그인 유지](https://firebase.google.com/docs/auth/web/
 자동 브라우저와 에뮬레이터 결과는 실제 iPhone·설치 PWA 현장 인수 결과가 아니다. 운영 반영 후 한 번 PIN 로그인 → 촬영·홈 이동·앱 복귀 반복, 장시간 백그라운드 후 복귀, 비행기 모드 전환과 입력 유지, 직접 로그아웃 후 PIN 화면과 비공개 상태 정리를 실제 직원 기기에서 확인해야 한다. 카메라는 기존대로 사용자의 버튼 조작으로만 열린다.
 
 커밋·push·전체 CI·운영 배포는 이번 로컬 검증과 별도 상태로 보고한다. 기존 `AGENTS.md` 사용자 변경은 수정하지 않았다.
+
+## 릴리스 준비 중 확인한 의존성 검사 실패
+
+- 첫 제품 커밋 `ccb5249b73340479b59d7b795550aff4b3a74bfb`의 [Quality Gate 39578039882](https://github.com/kim-DL/ONWAY/actions/runs/39578039882)는 dependency audit에서 중단됐다. 로컬에서도 9 moderate / 1 high가 재현됐고, high 항목은 Vitest가 사용하는 `vite 8.2.2`였다. 모바일 기능 테스트까지 도달한 실패가 아니다.
+- [GitHub 보안 공지 GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm)의 수정 버전 `vite 8.2.4`로 제한해 잠금 파일의 version/resolved/integrity 3개 필드만 갱신했다. 앱/Functions 의존성, package.json, CI 보안 기준과 용량 상한은 바꾸지 않는다.
+- npm 10.9.8의 직접 갱신은 현재 폴더와 깨끗한 별도 manifest 폴더에서 모두 `edgesOut` 계산 오류로 실패했다. Vite만 둔 별도 폴더에서 npm이 정상 생성한 lock 항목을 사용했으며, 다른 모든 package metadata가 기존과 같다는 assertion을 통과했다. 변경한 전체 lock의 깨끗한 `npm ci --ignore-scripts --engine-strict=true`와 기존 high/critical audit 기준이 통과했다. moderate 9개는 남아 있다.
+- 의존성 재설치 완료 전에 실행한 unit 명령 1회는 `vitest` 실행 파일을 찾지 못해 시작하지 못했다. 설치 완료 후의 실제 테스트 결과와 구분한다. 상세 증거는 ignored `output/mobile-resume-release-20261021/`에 보관한다.
+- 재설치 완료 후 전체 unit 1,771 PASS / 기존 조건부 15 SKIP, 검색·캐시 성능 gate PASS다. 최초 제품 커밋의 CI를 그대로 재실행하지 않고 이 수정까지 포함한 새 최종 커밋에서 전체 CI를 실행한다.

@@ -12,6 +12,7 @@
 - 전체 unit 1,771 PASS / 기존 조건부 15 SKIP, 후속 오류 처리 공통화·offline listener 정리의 최종 customer 280개 PASS, 앱/Functions typecheck·lint PASS다. Chromium 인증·거래처 14 PASS, 정적 demo build의 복귀/재시작 Chromium 2·Windows WebKit 2 PASS다. Emulator 함수 발견·worker 최초 준비, 테스트의 취소된 route/서비스 워커 우회/WebKit 이전 Listen 취소와 용량 초과 후보의 실패·재실행은 [구현·검증 기록](mobile-session-resume-20261021.md)에 구분했다. 검사 시간·skip·기존 용량 상한을 완화하지 않았다.
 - 최종 운영 형식 build·PWA·성능·Hosting gate PASS, 사진/재고 ON·Emulator OFF다. initial JS gzip 140,104B / customer 36,834B / inventory 25,861B, 산출물 113개·precache 100·initial assets 9개다. 이 값은 로컬 산출물/브라우저 검증이며 현장 지연 SLO나 실제 iPhone·설치 PWA 인수 결과가 아니다. OS가 프로세스를 완전히 종료하면 짧은 앱 초기화와 메모리 데이터 재조회는 남는다.
 - 사용자가 2026-10-21 커밋·전체 CI·Hosting 운영 배포·배포 후 검증·로컬 동기화를 승인했다. 로컬 검증을 마친 `codex/mobile-resume-20261021` 제품 소스를 확정하는 단계이며, 운영 반영 결과는 후속 릴리스 기록에 남긴다. 운영 데이터·자격 증명·Functions/Rules/Auth 설정은 변경하지 않는다. 기존 `AGENTS.md` 사용자 변경 7줄은 보존한다. ignored 로컬 검증 증거는 `output/playwright/mobile-resume-20261021/`에 있다.
+- 최초 제품 source `ccb5249`의 [Quality Gate 39578039882](https://github.com/kim-DL/ONWAY/actions/runs/39578039882)는 기존 lock의 Vite high 취약점으로 audit 단계에서 중단됐다. 로컬 재현 후 `vite 8.2.2→8.2.4`의 lock 3개 필드만 갱신하고 깨끗한 의존성 설치·기존 high/critical audit·전체 unit 1,771 PASS / 15 SKIP·검색/캐시 성능 PASS를 확인했다. moderate 9개, npm `edgesOut` 및 설치 완료 전 unit 시작 실패를 구현 기록에 구분했다. 앱/Functions 의존성과 CI 검사 기준은 유지한다.
 
 ### 2026-10-18 최초 검색·재고 상세 200ms 목표 — main 저장·운영 Hosting 배포·검증 완료
 
