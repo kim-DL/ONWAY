@@ -19,6 +19,11 @@ const harness = vi.hoisted(() => ({
   signInWithCustomToken: vi.fn<() => Promise<unknown>>(),
   signInWithPopup: vi.fn<() => Promise<unknown>>(),
   writeVerifiedOfflineSession: vi.fn(),
+  readVerifiedOfflineSession: vi.fn(),
+  probeNetworkReachability: vi.fn<() => Promise<boolean>>(),
+  retry: undefined as (() => void) | undefined,
+  retryCleanup: vi.fn(),
+  currentState: { status: "resolving" } as AuthState,
 }));
 
 // Execute the actual provider effect with controlled SDK callbacks. This tests
@@ -54,14 +59,18 @@ vi.mock("@/lib/firebase/client", () => ({
 }));
 vi.mock("@/lib/performance/performance-monitor", () => ({ recordFirestoreReads: vi.fn() }));
 vi.mock("@/features/pwa/network-status", () => ({
-  probeNetworkReachability: async () => true, subscribeToNetworkRecovery: vi.fn(),
+  probeNetworkReachability: harness.probeNetworkReachability,
+}));
+vi.mock("./session-recovery", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./session-recovery")>(),
+  subscribeToSessionRetry: (retry: () => void) => { harness.retry = retry; return harness.retryCleanup; },
 }));
 vi.mock("./offline-session", () => ({
-  readVerifiedOfflineSession: () => null, writeVerifiedOfflineSession: harness.writeVerifiedOfflineSession,
+  readVerifiedOfflineSession: harness.readVerifiedOfflineSession, writeVerifiedOfflineSession: harness.writeVerifiedOfflineSession,
 }));
 vi.mock("./private-client-state", () => ({ clearPrivateClientState: harness.clearPrivateClientState }));
 
-import { AuthProvider } from "./auth-context";
+import { AuthProvider, type AuthState } from "./auth-context";
 
 function mountObserver() {
   AuthProvider({ children: null });
@@ -113,6 +122,13 @@ beforeEach(() => {
   harness.employeeLogout.mockReset().mockResolvedValue({ data: { ok: true } });
   harness.signInWithCustomToken.mockReset().mockResolvedValue(undefined);
   harness.signInWithPopup.mockReset().mockResolvedValue(undefined);
+  harness.readVerifiedOfflineSession.mockReset().mockReturnValue(null);
+  harness.probeNetworkReachability.mockReset().mockResolvedValue(true);
+  harness.retry = undefined;
+  harness.currentState = { status: "resolving" };
+  harness.setState.mockImplementation((next: AuthState | ((current: AuthState) => AuthState)) => {
+    harness.currentState = typeof next === "function" ? next(harness.currentState) : next;
+  });
 });
 
 function deferred<T>() {
@@ -120,6 +136,109 @@ function deferred<T>() {
   const promise = new Promise<T>((finish) => { resolve = finish; });
   return { promise, resolve };
 }
+
+describe("mobile session continuity", () => {
+  const cachedSession = { uid: "A", displayName: "직원 A", claims: {
+    employeeId: "EMP-A", roleScopes: ["sales"], sessionVersion: 1, permissionsVersion: 1,
+  } };
+
+  it("restores a verified employee before a slow network probe and still verifies server authorization", async () => {
+    const network = deferred<boolean>();
+    harness.probeNetworkReachability.mockReturnValueOnce(network.promise);
+    harness.readVerifiedOfflineSession.mockReturnValue(cachedSession);
+    const cleanup = mountObserver();
+    await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void;
+    tokenCallback(user("A"));
+    expect(harness.currentState).toEqual({ status: "authenticated", session: cachedSession });
+    expect(harness.onSnapshot).not.toHaveBeenCalled();
+    expect(harness.writeVerifiedOfflineSession).not.toHaveBeenCalled();
+
+    network.resolve(true);
+    await flushCallbacks();
+    expect(harness.probeNetworkReachability).toHaveBeenCalledTimes(1);
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    snapshotCallback({ ...authz("A"), metadata: { fromCache: true }, exists: () => false });
+    expect(harness.signOut).not.toHaveBeenCalled();
+    snapshotCallback(authz("A"));
+    expect(harness.writeVerifiedOfflineSession).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it("does not use a cached admin session to bypass online verification", async () => {
+    harness.probeNetworkReachability.mockResolvedValue(false);
+    harness.readVerifiedOfflineSession.mockReturnValue({ ...cachedSession, claims: { ...cachedSession.claims, roleScopes: ["admin"] } });
+    const cleanup = mountObserver(); await flushCallbacks();
+    (harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void)(user("A"));
+    await flushCallbacks();
+    expect(harness.currentState.status).toBe("resolving");
+    expect(harness.signOut).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("keeps Firebase signed in when the display cache expires offline and resumes without PIN on recovery", async () => {
+    harness.probeNetworkReachability.mockResolvedValue(false);
+    const cleanup = mountObserver(); await flushCallbacks();
+    (harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void)(user("A"));
+    await flushCallbacks();
+    expect(harness.currentState).toMatchObject({ status: "resolving", message: expect.stringContaining("로그인은 유지") });
+    expect(harness.signOut).not.toHaveBeenCalled();
+    expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
+    harness.probeNetworkReachability.mockResolvedValue(true);
+    harness.retry!(); await flushCallbacks();
+    (harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    expect(harness.currentState.status).toBe("authenticated");
+    expect(harness.employeeLogin).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("keeps the screen mounted across token refresh and retries a temporary token failure", async () => {
+    const cleanup = mountObserver(); await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void;
+    tokenCallback(user("A")); await flushCallbacks();
+    (harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    const previous = harness.currentState;
+    const getIdTokenResult = vi.fn().mockRejectedValueOnce(new FirebaseError("auth/network-request-failed", "temporary"))
+      .mockResolvedValue(await user("A").getIdTokenResult());
+    tokenCallback({ ...user("A"), getIdTokenResult }); await flushCallbacks();
+    expect(harness.currentState).toBe(previous);
+    expect(harness.signOut).not.toHaveBeenCalled();
+    expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
+    harness.retry!(); await flushCallbacks();
+    expect(getIdTokenResult).toHaveBeenLastCalledWith(true);
+    (harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    expect(harness.currentState.status).toBe("authenticated");
+    cleanup();
+  });
+
+  it("retries temporary authz errors while retaining the screen, but honors server revocation", async () => {
+    harness.readVerifiedOfflineSession.mockReturnValue(cachedSession);
+    const cleanup = mountObserver(); await flushCallbacks();
+    (harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void)(user("A")); await flushCallbacks();
+    (harness.onSnapshot.mock.calls[0]![2] as (error: unknown) => void)({ code: "unavailable" });
+    expect(harness.currentState.status).toBe("authenticated");
+    expect(harness.signOut).not.toHaveBeenCalled();
+    harness.retry!(); await flushCallbacks();
+    (harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void)({ ...authz("A"), exists: () => false });
+    expect(harness.currentState.status).toBe("invalid");
+    await flushCallbacks();
+    expect(harness.signOut).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it("ignores a queued recovery callback after explicit logout", async () => {
+    harness.probeNetworkReachability.mockResolvedValue(false);
+    const context = renderProvider(); const cleanup = harness.effect?.(); await flushCallbacks();
+    (harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void)(user("A")); await flushCallbacks();
+    const queuedRetry = harness.retry!;
+    await context.logout();
+    harness.probeNetworkReachability.mockClear();
+    queuedRetry(); await flushCallbacks();
+    expect(harness.probeNetworkReachability).not.toHaveBeenCalled();
+    expect(harness.currentState.status).toBe("unauthenticated");
+    if (cleanup) cleanup();
+  });
+});
 
 describe("private-screen session termination", () => {
   it("hides a revoked session before deferred private cleanup and ignores queued authz/token callbacks", async () => {

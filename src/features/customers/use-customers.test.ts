@@ -65,14 +65,14 @@ describe("memory-only customer view lifecycle", () => {
     expect(clear).toHaveBeenCalledOnce();
   });
 
-  it("clears private records, selection, and editor as soon as offline is reported", () => {
+  it("keeps the authenticated in-memory list and selection during a mobile network handoff", () => {
     const clear = vi.fn();
     useCustomers(session, clear); harness.effects[0]!(); harness.onData!([customer], 1_000);
-    vi.stubGlobal("navigator", { onLine: false }); listeners.get("offline")!();
-    expect(harness.states[0]).toMatchObject({ status: "error", customers: [], canRetainDraft: false });
-    expect(clear).toHaveBeenCalledOnce();
+    vi.stubGlobal("navigator", { onLine: false }); harness.onError!({ code: "functions/unavailable" }, true);
+    expect(harness.states[0]).toMatchObject({ status: "ready", customers: [customer], canRetainDraft: true, freshness: "stale-error" });
+    expect(clear).not.toHaveBeenCalled();
     harness.onData!([customer], 2_000);
-    expect(harness.states[0]).toMatchObject({ customers: [], canRetainDraft: false });
+    expect(harness.states[0]).toMatchObject({ customers: [customer], lastSuccessAt: 1_000, freshness: "stale-error" });
   });
 
   it("ignores late network responses after unmount", () => {

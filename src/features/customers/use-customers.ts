@@ -25,9 +25,9 @@ export function useCustomers(session: AuthenticatedSession, onSensitiveStateClea
     const hasSnapshot = readCustomerWorkspaceSnapshot(key).catalog !== null;
     const offline = () => {
       if (!active) return;
-      onSensitiveStateCleared?.();
-      discardCustomerWorkspaceCatalog(key);
-      setState({ key, status: "error", customers: [], message: "거래처 정보는 인터넷 연결 후 확인할 수 있어요.", canRetainDraft: false, freshness: "idle", lastSuccessAt: null });
+      setState((current) => current.key === key && current.status === "ready"
+        ? { ...current, freshness: "stale-error" }
+        : { key, status: "error", customers: [], message: "거래처 정보는 인터넷 연결 후 확인할 수 있어요.", canRetainDraft: false, freshness: "idle", lastSuccessAt: null });
     };
     const unsubscribe = customerRepository.subscribe(key, (customers, refreshedAt) => {
       if (!active) return;
@@ -36,7 +36,7 @@ export function useCustomers(session: AuthenticatedSession, onSensitiveStateClea
     }, (error, hadData) => {
       if (!active) return;
       const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-      const canRetainDraft = navigator.onLine && !["permission-denied", "unauthenticated", "failed-precondition"].some((reason) => code.endsWith(reason));
+      const canRetainDraft = !["permission-denied", "unauthenticated", "failed-precondition"].some((reason) => code.endsWith(reason));
       if (!canRetainDraft) { discardCustomerWorkspaceCatalog(key); onSensitiveStateCleared?.(); }
       setState((current) => canRetainDraft && (hadData || current.customers.length > 0) && current.key === key
         ? { ...current, status: "ready", message: "", canRetainDraft, freshness: "stale-error" }
@@ -47,9 +47,9 @@ export function useCustomers(session: AuthenticatedSession, onSensitiveStateClea
         ? { ...current, freshness: freshness.status, lastSuccessAt: freshness.lastSuccessAt ?? current.lastSuccessAt }
         : current);
     }, { hasData: hasSnapshot, forceInitial: attempt > 0 });
-    window.addEventListener("offline", offline);
-    if (!navigator.onLine) offline();
-    return () => { active = false; unsubscribe(); window.removeEventListener("offline", offline); };
+    // The repository owns offline events and immediately reports them through
+    // onError; avoid a second listener racing the same retained screen state.
+    return () => { active = false; unsubscribe(); };
   }, [key, attempt, onSensitiveStateCleared]);
   const current = state.key === key ? state : { key, status: "loading" as const, customers: [], message: "", canRetainDraft: false, freshness: "idle" as const, lastSuccessAt: null };
   return { ...current, accept: (customer: Customer) => {

@@ -21,6 +21,10 @@ import {
 
 export type CustomerRevalidationState = { status: RevalidationFreshness; lastSuccessAt: number | null };
 
+function customerFailure(code: "unauthenticated" | "unavailable" | "resource-exhausted") {
+  return Object.assign(new Error(code), { code });
+}
+
 export function customerErrorMessage(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   if (code.endsWith("aborted")) return "다른 직원이 먼저 수정했어요. 목록을 새로 확인한 뒤 다시 수정해주세요.";
@@ -30,13 +34,14 @@ export function customerErrorMessage(error: unknown): string {
   if (code.endsWith("invalid-argument")) return "입력한 거래처 정보를 다시 확인해주세요.";
   if (code.endsWith("not-found")) return "거래처 정보가 변경되었어요. 목록을 다시 불러와주세요.";
   if (code.endsWith("resource-exhausted")) return "요청이 많아 잠시 쉬고 있어요. 잠시 후 다시 시도해주세요.";
-  if (typeof navigator !== "undefined" && !navigator.onLine) return "인터넷 연결 후 다시 시도해주세요. 거래처 정보는 기기에 저장하지 않아요.";
+  if (typeof navigator !== "undefined" && !navigator.onLine) return "인터넷 연결 후 다시 시도해주세요. 입력한 내용은 유지됩니다.";
   return "거래처 정보를 불러오거나 저장하지 못했어요. 잠시 후 다시 시도해주세요.";
 }
 
 function servicesForCustomer() {
   const services = getFirebaseClientServices();
-  if (!services?.auth.currentUser) throw Object.assign(new Error("Customer authentication required."), { code: "unauthenticated" });
+  if (!services?.auth.currentUser) throw customerFailure("unauthenticated");
+  if (navigator.onLine === false) throw customerFailure("unavailable");
   return services;
 }
 
@@ -49,18 +54,18 @@ async function list(): Promise<Customer[]> {
   const seen = new Set<string>();
   do {
     const result = customerListPageSchema.parse((await callable({ afterId, includeOverviewPhoto: true })).data);
-    if (services.auth.currentUser?.uid !== uid) throw Object.assign(new Error("Customer session changed."), { code: "unauthenticated" });
+    if (services.auth.currentUser?.uid !== uid) throw customerFailure("unauthenticated");
     for (const customer of result.customers) {
       if (!seen.has(customer.customerId)) {
         customers.push(customer);
         seen.add(customer.customerId);
       }
     }
-    if (result.nextCursor === afterId && afterId !== null) throw new Error("Invalid customer cursor.");
+    if (result.nextCursor === afterId && afterId !== null) throw new Error("Invalid cursor");
     afterId = result.nextCursor;
     // Internal company scale is hundreds. Reject rather than silently truncate
     // an unexpectedly unbounded response or retain megabytes of sensitive data.
-    if (afterId && customers.length >= 5_000) throw Object.assign(new Error("Customer list limit."), { code: "resource-exhausted" });
+    if (afterId && customers.length >= 5_000) throw customerFailure("resource-exhausted");
   } while (afterId);
   return customers;
 }
@@ -72,7 +77,7 @@ function subscribe(namespace: string, onData: (customers: Customer[], refreshedA
   const services = getFirebaseClientServices();
   if (!services?.auth.currentUser) {
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) onError(Object.assign(new Error("Customer authentication required."), { code: "unauthenticated" }), false); });
+    queueMicrotask(() => { if (!cancelled) onError(customerFailure("unauthenticated"), false); });
     return () => { cancelled = true; };
   }
   const uid = services.auth.currentUser.uid;
@@ -148,8 +153,17 @@ function subscribe(namespace: string, onData: (customers: Customer[], refreshedA
   };
   const onVisibility = () => { if (document.visibilityState === "visible") void refresh(); };
   const onOffline = () => {
-    clear();
-    onError(Object.assign(new Error("Customer connection unavailable."), { code: "unavailable" }), false);
+    // Suspension and mobile network handoffs are not authorization changes.
+    // Keep only this authenticated session's memory; discard in-flight results
+    // and force a fresh read on reconnect without blanking the current screen.
+    generation += 1;
+    coordinator.invalidate();
+    clearTimeout(timer);
+    if (!loaded) onData([], Date.now());
+    const status = loaded ? "stale-error" : "idle";
+    updateCustomerCatalogFreshness(namespace, status, null);
+    onFreshness({ status, lastSuccessAt: null });
+    onError(customerFailure("unavailable"), loaded);
   };
   const onOnline = () => void refresh();
   const stopAuth = onAuthStateChanged(services.auth, (user) => {
@@ -176,7 +190,7 @@ async function save(input: SaveCustomerInput): Promise<Customer> {
   const services = servicesForCustomer();
   const uid = services.auth.currentUser!.uid;
   const response = await httpsCallable<SaveCustomerInput, unknown>(services.functions, "saveCustomer")(saveCustomerInputSchema.parse({ ...input, includeOverviewPhoto: true }));
-  if (services.auth.currentUser?.uid !== uid) throw Object.assign(new Error("Customer session changed."), { code: "unauthenticated" });
+  if (services.auth.currentUser?.uid !== uid) throw customerFailure("unauthenticated");
   return customerSchema.parse(response.data);
 }
 

@@ -40,6 +40,7 @@ export function readVerifiedOfflineSession(uid: string): OfflineSession | null {
     if (
       !parsed.success
       || parsed.data.uid !== uid
+      || parsed.data.verifiedAt > Date.now()
       || Date.now() - parsed.data.verifiedAt > OFFLINE_SESSION_MAX_AGE_MS
     ) {
       localStorage.removeItem(key);

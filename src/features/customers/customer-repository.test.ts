@@ -12,7 +12,7 @@ vi.mock("firebase/auth", () => ({ onAuthStateChanged: (_auth: unknown, callback:
 
 import { customerDraftSchema, customerSchema, getCustomerChoseong, normalizeCustomerName, type SaveCustomerInput } from "@/domain/customer";
 import { customerErrorMessage, customerRepository } from "./customer-repository";
-import { clearCustomerWorkspaceSnapshot } from "./customer-workspace-snapshot";
+import { clearCustomerWorkspaceSnapshot, readCustomerWorkspaceSnapshot } from "./customer-workspace-snapshot";
 
 const customer = customerSchema.parse({
   customerId: "one", companyId: "onnuri", name: "강은유통", normalizedName: normalizeCustomerName("강은유통"), choseongName: getCustomerChoseong("강은유통"),
@@ -79,15 +79,27 @@ describe("sensitive customer repository lifecycle", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(receive).not.toHaveBeenCalled(); expect(error).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
   });
-  it("clears sensitive memory on offline and authentication changes", async () => {
+  it("retains the authenticated list offline, refreshes on recovery, and clears it on sign-out", async () => {
     const receive = vi.fn(); const error = vi.fn();
     cleanups.push(customerRepository.subscribe("one:1:1", receive, error));
     await vi.advanceTimersByTimeAsync(0);
     expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
     connection.onLine = false; viewport.dispatchEvent(new Event("offline"));
-    expect(receive).toHaveBeenLastCalledWith([], expect.any(Number)); expect(error).toHaveBeenCalled();
+    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
+    expect(readCustomerWorkspaceSnapshot("one:1:1").catalog?.customers).toEqual([customer]);
+    expect(error).toHaveBeenLastCalledWith(expect.objectContaining({ code: "unavailable" }), true);
+    connection.onLine = true; viewport.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sdk.call).toHaveBeenCalledTimes(2);
     auth.currentUser = null; sdk.authListener?.(null);
     expect(receive).toHaveBeenLastCalledWith([], expect.any(Number));
+    expect(readCustomerWorkspaceSnapshot("one:1:1").catalog).toBeNull();
+  });
+  it("does not send offline writes from a retained editor", async () => {
+    connection.onLine = false;
+    expect(customerErrorMessage(null)).toContain("입력한 내용은 유지");
+    await expect(customerRepository.save({} as SaveCustomerInput)).rejects.toMatchObject({ code: "unavailable" });
+    expect(sdk.call).not.toHaveBeenCalled();
   });
   it("revalidates on focus while avoiding overlapping and hidden-page polling", async () => {
     cleanups.push(customerRepository.subscribe("one:1:1", vi.fn(), vi.fn()));

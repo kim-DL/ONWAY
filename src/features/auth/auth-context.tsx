@@ -40,9 +40,9 @@ import { APP_METADATA } from "@/lib/app-metadata";
 import { recordFirestoreReads } from "@/lib/performance/performance-monitor";
 import {
   probeNetworkReachability,
-  subscribeToNetworkRecovery,
 } from "@/features/pwa/network-status";
 import { readVerifiedOfflineSession, writeVerifiedOfflineSession } from "./offline-session";
+import { isSessionRejection, subscribeToSessionRetry } from "./session-recovery";
 import { clearPrivateClientState } from "./private-client-state";
 import { classifyPinLoginError, type PinLoginStage } from "./pin-login-error";
 
@@ -53,7 +53,7 @@ export type AuthenticatedSession = {
 };
 
 export type AuthState =
-  | { status: "resolving" }
+  | { status: "resolving"; message?: string }
   | { status: "unconfigured" }
   | { status: "unauthenticated"; message?: string }
   | { status: "invalid"; message: string }
@@ -178,20 +178,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const restoreVerifiedSessionOffline = (verifyWhenOnline: () => void) => {
+        const restoreVerifiedSession = () => {
           const offlineSession = readVerifiedOfflineSession(user.uid);
-          if (!offlineSession || offlineSession.claims.roleScopes.includes("admin")) {
+          if (adminActivationRef.current || !offlineSession || offlineSession.claims.roleScopes.includes("admin")) {
             return false;
           }
 
           invalidReasonRef.current = null;
-          setState({ status: "authenticated", session: offlineSession });
-          onlineTokenRefreshCleanup?.();
-          onlineTokenRefreshCleanup = subscribeToNetworkRecovery(() => {
-            onlineTokenRefreshCleanup = undefined;
-            if (active && generation === authGenerationRef.current) verifyWhenOnline();
-          });
+          setState((current) => current.status === "authenticated" && current.session.uid === user.uid
+            ? current
+            : { status: "authenticated", session: offlineSession });
           return true;
+        };
+
+        const retryVerification = () => {
+          onlineTokenRefreshCleanup?.();
+          onlineTokenRefreshCleanup = subscribeToSessionRetry(() => {
+            onlineTokenRefreshCleanup = undefined;
+            if (active && generation === authGenerationRef.current) checkConnection(true);
+          });
+          setState((current) => current.status === "authenticated" && current.session.uid === user.uid
+            ? current
+            : { status: "resolving", message: "로그인은 유지되어 있어요. 연결이 돌아오면 자동으로 이어집니다." });
         };
 
         const resolveRemoteSession = (forceRefresh = false) => {
@@ -223,88 +231,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 displayName: user.displayName ?? "급식길 직원",
                 claims: parsedClaims.data,
               };
-              const restoreCachedSessionOffline = () => restoreVerifiedSessionOffline(
-                () => resolveRemoteSession(true),
-              );
-              const verifyAuthorization = () => {
-                authzUnsubscribe?.();
-                authzUnsubscribe = undefined;
-                void probeNetworkReachability().then((reachable) => {
+              authzUnsubscribe?.();
+              authzUnsubscribe = onSnapshot(
+                doc(services.firestore, "authz", user.uid),
+                (snapshot) => {
                   if (!active || generation !== authGenerationRef.current) return;
-                  if (!reachable) {
-                    restoreCachedSessionOffline();
+                  // Only server snapshots can confirm or revoke authorization.
+                  if (snapshot.metadata.fromCache) return;
+                  recordFirestoreReads("auth", 1);
+                  const parsedAuthz = clientAuthzSchema.safeParse(snapshot.data());
+                  if (
+                    !snapshot.exists() ||
+                    !parsedAuthz.success ||
+                    !authzMatchesSession(parsedAuthz.data, parsedClaims.data)
+                  ) {
+                    void invalidate("세션이 변경되었습니다. 다시 로그인해주세요.");
                     return;
                   }
 
-                  authzUnsubscribe = onSnapshot(
-                    doc(services.firestore, "authz", user.uid),
-                    (snapshot) => {
-                      if (!active || generation !== authGenerationRef.current) return;
-                      // Authorization is confirmed only by a server snapshot. A
-                      // previously cached missing/stale document must never sign a
-                      // freshly authenticated user out before Firestore reconnects.
-                      if (snapshot.metadata.fromCache) return;
-                      recordFirestoreReads("auth", 1);
-                      const parsedAuthz = clientAuthzSchema.safeParse(snapshot.data());
-                      if (
-                        !snapshot.exists() ||
-                        !parsedAuthz.success ||
-                        !authzMatchesSession(parsedAuthz.data, parsedClaims.data)
-                      ) {
-                        void invalidate("세션이 변경되었습니다. 다시 로그인해주세요.");
-                        return;
-                      }
-
-                      invalidReasonRef.current = null;
-                      writeVerifiedOfflineSession(cachedSession);
-                      setState({ status: "authenticated", session: cachedSession });
-                    },
-                    () => {
-                      void probeNetworkReachability().then((stillReachable) => {
-                        if (!active || generation !== authGenerationRef.current) return;
-                        if (!stillReachable) {
-                          restoreCachedSessionOffline();
-                          return;
-                        }
-                        void invalidate("세션을 확인할 수 없습니다. 다시 로그인해주세요.");
-                      });
-                    },
-                  );
-                });
-              };
-              verifyAuthorization();
+                  invalidReasonRef.current = null;
+                  onlineTokenRefreshCleanup?.();
+                  onlineTokenRefreshCleanup = undefined;
+                  writeVerifiedOfflineSession(cachedSession);
+                  setState({ status: "authenticated", session: cachedSession });
+                },
+                (error) => {
+                  if (!active || generation !== authGenerationRef.current) return;
+                  if (isSessionRejection(error)) {
+                    void invalidate("세션을 확인할 수 없습니다. 다시 로그인해주세요.");
+                    return;
+                  }
+                  retryVerification();
+                },
+              );
             })
-            .catch(() => {
-              void probeNetworkReachability().then((reachable) => {
-                if (!active || generation !== authGenerationRef.current) return;
-                if (!reachable && restoreVerifiedSessionOffline(
-                  () => resolveRemoteSession(true),
-                )) return;
+            .catch((error: unknown) => {
+              if (!active || generation !== authGenerationRef.current) return;
+              if (isSessionRejection(error)) {
                 void invalidate("세션을 확인할 수 없습니다. 다시 로그인해주세요.");
-              });
+                return;
+              }
+              retryVerification();
             });
         };
 
-        // Firebase may keep getIdTokenResult() pending while requests are
-        // blocked even when navigator.onLine is true. Probe a non-cached
-        // endpoint first, restore only the last server-verified UID-bound
-        // session offline, and perform token -> authz verification on recovery.
+        // Firebase first establishes the persisted UID. A recent server-verified
+        // employee session can then resume immediately, including online cold
+        // starts. Revalidation never renews this cache until authz confirms it.
         setState((current) => current.status === "authenticated" && current.session.uid === user.uid
           ? current
           : { status: "resolving" });
-        void probeNetworkReachability().then((reachable) => {
-          if (!active || generation !== authGenerationRef.current) return;
-          if (!reachable) {
-            if (!restoreVerifiedSessionOffline(() => resolveRemoteSession(true))) {
-              setState({
-                status: "invalid",
-                message: "인터넷에 연결한 뒤 다시 로그인해주세요.",
-              });
+        restoreVerifiedSession();
+        function checkConnection(forceRefresh = false) {
+          void probeNetworkReachability().then((reachable) => {
+            if (!active || generation !== authGenerationRef.current) return;
+            if (!reachable) {
+              retryVerification();
+              return;
             }
-            return;
-          }
-          resolveRemoteSession();
-        });
+            resolveRemoteSession(forceRefresh);
+          });
+        }
+        checkConnection();
       });
     };
 

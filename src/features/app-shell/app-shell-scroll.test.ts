@@ -18,9 +18,10 @@ vi.mock("react", async (importOriginal) => ({
   useEffect: (effect: () => void, dependencies: readonly unknown[]) => {
     harness.effects.push({ effect, dependencies });
   },
-  useState: (initial: unknown) => [harness.stateIndex++ === 2 ? harness.school : initial, vi.fn()],
+  useState: (initial: unknown) => [harness.stateIndex++ === 3 ? harness.school : typeof initial === "function" ? initial() : initial, vi.fn()],
   useRef: (initial: unknown) => ({ current: initial }),
   useMemo: (compute: () => unknown) => compute(),
+  useCallback: (callback: unknown) => callback,
   useSyncExternalStore: () => null,
 }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));

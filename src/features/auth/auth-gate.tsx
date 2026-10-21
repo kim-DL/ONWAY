@@ -35,14 +35,14 @@ function Brand() {
   );
 }
 
-function AuthSplash() {
+function AuthSplash({ message }: { message?: string | undefined }) {
   return (
     <main className="auth-shell auth-shell--center" aria-busy="true">
       <div className="auth-splash" role="status" aria-live="polite">
         <h1 className="sr-only">급식길 로그인 확인 중</h1>
         <Brand />
         <OnnuriLoader size="large" decorative />
-        <p>안전하게 로그인 정보를 확인하고 있어요.</p>
+        <p>{message ?? "안전하게 로그인 정보를 확인하고 있어요."}</p>
       </div>
     </main>
   );
@@ -207,9 +207,9 @@ export function AuthGate() {
     }
   }, [state.status]);
 
-  if (state.status === "resolving") return <AuthSplash />;
+  if (state.status === "resolving") return <AuthSplash message={state.message} />;
   if (state.status === "unconfigured") return <Unconfigured />;
   if (state.status === "invalid") return <InvalidSession message={state.message} />;
   if (state.status === "unauthenticated") return <PinLogin initialError={state.message ?? null} />;
-  return <AppShell session={state.session} />;
+  return <AppShell key={`${state.session.uid}:${state.session.claims.sessionVersion}:${state.session.claims.permissionsVersion}`} session={state.session} />;
 }

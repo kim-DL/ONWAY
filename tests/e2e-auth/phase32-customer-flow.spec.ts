@@ -182,16 +182,18 @@ test("map failure keeps access information, delivery address and telephone avail
   await expect(detail.getByRole("link", { name: /전화/ }).first()).toHaveAttribute("href", "tel:01000001234");
 });
 
-test("offline clears sensitive views and explicit logout removes customer selection", async ({ page, context }) => {
+test("mobile network handoff preserves the current customer and explicit logout clears private state", async ({ page, context }) => {
   await login(page);
   await page.getByRole("searchbox").fill("강은");
   await page.getByRole("button", { name: "강은유통 상세 정보" }).click();
   await expect(page.getByRole("dialog", { name: "강은유통" })).toBeVisible();
   await context.setOffline(true);
-  await expect(page.locator("[data-customer-detail]")).toHaveCount(0);
-  await expect(page.locator("[data-customer-card]")).toHaveCount(0);
-  await expect(page.locator("body")).not.toContainText("0012*");
+  await expect(page.getByRole("dialog", { name: "강은유통" })).toBeVisible();
+  await expect(page.getByRole("searchbox")).toHaveValue("강은");
+  await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toHaveCount(0);
   await context.setOffline(false);
+  await expect(page.getByRole("dialog", { name: "강은유통" })).toBeVisible();
+  await page.goBack();
   await page.getByRole("button", { name: "설정", exact: true }).click();
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await page.getByRole("dialog", { name: "로그아웃할까요?" }).getByRole("button", { name: "로그아웃", exact: true }).click();

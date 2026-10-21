@@ -17,6 +17,7 @@ function callback(name: string, context: Record<string, unknown>) {
   if (!declaration) throw new Error(`Missing editor callback ${name}`);
   const definition = ts.isVariableDeclaration(declaration) ? `const ${declaration.getText(source)};` : declaration.getText(source);
   const compiled = ts.transpileModule(`${definition}; globalThis.callback = ${name};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  if (!("navigator" in context)) context.navigator = { onLine: true };
   const sandbox = createContext(context);
   runInContext(compiled, sandbox);
   return sandbox.callback as (...input: unknown[]) => unknown;
@@ -62,6 +63,17 @@ function locationContext() {
 }
 
 describe("customer editor address-first location workflow", () => {
+  it("keeps the draft and request ID without uploading a photo or saving while offline", async () => {
+    const context = photoSaveContext();
+    context.photoSelection = { file: {} as File, uploadId: "offline-selection" };
+    context.customerErrorMessage = () => "입력한 내용은 유지됩니다.";
+    await callback("submit", { ...context, navigator: { onLine: false } })({ preventDefault: vi.fn() });
+    expect(context.customerPhotoRepository.upload).not.toHaveBeenCalled();
+    expect(context.customerRepository.save).not.toHaveBeenCalled();
+    expect(context.saving.current).toBe(false);
+    expect(context.requestId.current).toBe("790d4c21-50fa-49f3-b0b3-e804588b5c16");
+    expect(context.setError).toHaveBeenCalledWith(expect.stringContaining("입력한 내용은 유지"));
+  });
   it("initializes new records with empty regions and preserves legacy regions for edits", () => {
     const initialize = callback("initialDraft", {});
     expect(initialize(null)).toMatchObject({ district: "", administrativeDong: "" });

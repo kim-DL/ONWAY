@@ -1,9 +1,17 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-18
+기준일: 2026-10-21
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-21 모바일 홈 복귀·로그인 유지 — 로컬 구현·검증 완료, 운영 미배포
+
+- 직원 피드백에 따라 시간 경과·홈 이동·일시적 통신 실패를 로그아웃 사유로 삼지 않도록 세션 복구를 정리했다. Firebase가 저장된 UID를 복원하면 최근 서버 검증 직원 세션으로 화면을 먼저 열고 토큰·authz를 뒤에서 확인한다. 관리자 캐시는 제외하며, 서버 비활성화·버전 불일치·명시적 인증 거부는 기존대로 반영한다. 화면 복구 캐시의 기존 24시간 보관 한도는 로그인 만료 시간이 아니며, 오래된 캐시로 오프라인이면 인증을 지우지 않고 연결 복구 후 PIN 없이 이어진다.
+- 거래처의 일시적 offline 전환은 같은 세션의 목록·검색·선택·입력을 메모리에 유지하고, 연결 복구 후 갱신한다. 오프라인에서는 사진 업로드·저장 요청 전에 막으며 자동 저장 큐를 추가하지 않았다. 마지막 업무 모드·탭만 UID·세션/권한 버전에 묶어 복원한다. 거래처·재고 원문이나 사진·편집 초안을 새로 디스크에 저장하지 않았다. 기존 Callable·App Check·Rules·revision·request ID·감사와 사진 outbox/서버 확인 후 완료 판정은 보존한다.
+- 전체 unit 1,771 PASS / 기존 조건부 15 SKIP, 후속 오류 처리 공통화·offline listener 정리의 최종 customer 280개 PASS, 앱/Functions typecheck·lint PASS다. Chromium 인증·거래처 14 PASS, 정적 demo build의 복귀/재시작 Chromium 2·Windows WebKit 2 PASS다. Emulator 함수 발견·worker 최초 준비, 테스트의 취소된 route/서비스 워커 우회/WebKit 이전 Listen 취소와 용량 초과 후보의 실패·재실행은 [구현·검증 기록](mobile-session-resume-20261021.md)에 구분했다. 검사 시간·skip·기존 용량 상한을 완화하지 않았다.
+- 최종 운영 형식 build·PWA·성능·Hosting gate PASS, 사진/재고 ON·Emulator OFF다. initial JS gzip 140,104B / customer 36,834B / inventory 25,861B, 산출물 113개·precache 100·initial assets 9개다. 이 값은 로컬 산출물/브라우저 검증이며 현장 지연 SLO나 실제 iPhone·설치 PWA 인수 결과가 아니다. OS가 프로세스를 완전히 종료하면 짧은 앱 초기화와 메모리 데이터 재조회는 남는다.
+- 사용자가 2026-10-21 커밋·전체 CI·Hosting 운영 배포·배포 후 검증·로컬 동기화를 승인했다. 로컬 검증을 마친 `codex/mobile-resume-20261021` 제품 소스를 확정하는 단계이며, 운영 반영 결과는 후속 릴리스 기록에 남긴다. 운영 데이터·자격 증명·Functions/Rules/Auth 설정은 변경하지 않는다. 기존 `AGENTS.md` 사용자 변경 7줄은 보존한다. ignored 로컬 검증 증거는 `output/playwright/mobile-resume-20261021/`에 있다.
 
 ### 2026-10-18 최초 검색·재고 상세 200ms 목표 — main 저장·운영 Hosting 배포·검증 완료
 

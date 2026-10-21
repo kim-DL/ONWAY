@@ -202,6 +202,10 @@ export function CustomerEditor({ customer, onClose, onSaved, refreshMessage = ""
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving.current || photoReading.current) return;
+    if (!navigator.onLine) {
+      setError(customerErrorMessage(null));
+      return;
+    }
     const point = parsePoint(latitude, longitude);
     if ((latitude.trim() || longitude.trim()) && !point) {
       setError("위도와 경도를 모두 올바르게 입력해주세요.");

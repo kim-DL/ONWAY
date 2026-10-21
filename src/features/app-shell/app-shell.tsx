@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -40,6 +40,7 @@ import { AppBrand } from "./app-brand";
 import { ShellHeader } from "./app-shell-header";
 import { useHeaderMotionPreference } from "./header-motion-preference";
 import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
+import { readShellResume, shellResumeKey, writeShellResume } from "./shell-resume";
 
 const subscribeToStoredMode = () => () => undefined;
 
@@ -285,11 +286,13 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     },
     () => null,
   );
-  const [chosenMode, setChosenMode] = useState<WorkMode | null>(null);
+  const resumeKey = shellResumeKey(session.uid, session.claims.sessionVersion, session.claims.permissionsVersion);
+  const [resumedLocation] = useState(() => readShellResume(resumeKey, availableModes));
+  const [chosenMode, setChosenMode] = useState<WorkMode | null>(resumedLocation?.mode ?? null);
   const mode = chosenMode && availableModes.includes(chosenMode)
     ? chosenMode
     : getInitialMode(session.claims.roleScopes, storedMode);
-  const [view, setView] = useState<ShellView>("schools");
+  const [view, setView] = useState<ShellView>(resumedLocation?.view ?? "schools");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [customerDetailRequest, setCustomerDetailRequest] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -302,7 +305,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [selectedSchoolId]);
 
-  const writeHistory = (
+  const writeHistory = useCallback((
     next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean },
     replace = false,
   ) => {
@@ -313,12 +316,13 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     // Workspace modes share one URL; do not request a Next route restoration.
     if (replace) window.history.replaceState(state, "");
     else window.history.pushState(state, "");
-  };
+    writeShellResume(resumeKey, next.mode, next.view);
+  }, [resumeKey]);
 
   useEffect(() => {
     if (!historyReadyRef.current) {
       historyReadyRef.current = true;
-      writeHistory({ mode, view: "schools", school: null, searchOpen: false }, true);
+      writeHistory({ mode, view, school: null, searchOpen: false }, true);
     }
     const restore = (event: PopStateEvent) => {
       const snapshot = event.state?.onnuriwayShell as {
@@ -348,10 +352,11 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
       const nextSearchOpen = isSchoolWorkMode(restoredMode) && snapshot.searchOpen === true && restoredSchool === null;
       if (nextSearchOpen) setSearchMounted(true);
       setSearchOpen(nextSearchOpen);
+      writeShellResume(resumeKey, restoredMode, restoredView);
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [availableModes, mode, session.claims.roleScopes]);
+  }, [availableModes, mode, resumeKey, session.claims.roleScopes, view, writeHistory]);
 
   const openSearch = () => {
     setSearchMounted(true);
