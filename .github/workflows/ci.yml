@@ -1,90 +1,188 @@
 name: Quality Gate
-
 on:
   push:
-    branches: [main]
-  pull_request:
-
+    branches:
+      - main
+  pull_request: null
 permissions:
   contents: read
-
 jobs:
-  verify:
+  # Independent jobs keep successful checks reusable when a failed job is rerun.
+  audit:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Dependency audit (high and critical)
         run: npm run audit
-
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Lint
         run: npm run lint
-
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Typecheck
         run: npm run typecheck
-
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Unit tests
         run: npm test
-
+  search-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Search and cache performance
         run: npm run test:performance
-
+  functions-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Functions build
         run: npm run functions:build
-
+  production-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
       - name: Production build
         run: npm run build
         env:
           NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS: "true"
           NEXT_PUBLIC_ENABLE_INVENTORY: "true"
-          # Synthetic 32-character key keeps the public map bundle representative
-          # without exposing the production Kakao key to CI or the repository.
-          NEXT_PUBLIC_KAKAO_MAP_JAVASCRIPT_KEY: "8b609fb6a2f7dc3b747711f747136e6a"
-
+          # Synthetic key keeps the map bundle representative without a production secret.
+          NEXT_PUBLIC_KAKAO_MAP_JAVASCRIPT_KEY: 8b609fb6a2f7dc3b747711f747136e6a
       - name: PWA artifact gate
         run: npm run verify:pwa:build
-
       - name: JavaScript and CSS budget gate
         run: npm run verify:performance:build
-
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          chromium: "true"
       - name: Safe configuration browser tests
         run: npm run test:e2e
-
+  deferred-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          java: "true"
+          chromium: "true"
       - name: Deferred sales tools regression
         run: npm run test:e2e:ux
         env:
           ONNURIWAY_E2E_UX_SUITE: optimization
           ONNURIWAY_E2E_GREP: loads on first open
-
+  phase17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          java: "true"
+          chromium: "true"
       - name: Phase 17 emulator and production journey
         run: npm run test:acceptance:emulator
-
+  inventory-photos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          java: "true"
+          chromium: "true"
       - name: Inventory photo regression
         run: npm run test:e2e:inventory
         env:
           INVENTORY_E2E_STATIC: "true"
-          INVENTORY_E2E_GREP: "HEIC product capture|PIN user registers a photographed product"
-
+          INVENTORY_E2E_GREP: HEIC product capture|PIN user registers a photographed product
+  delivery-photos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          java: "true"
+          chromium: "true"
       - name: Delivery photo field and durable queue regression
         run: node scripts/firebase-emulators.mjs delivery-photo-frontend-e2e
+  verify:
+    # Preserve the existing required check; failure, cancellation and skips must fail it.
+    if: ${{ always() }}
+    needs:
+      - audit
+      - lint
+      - typecheck
+      - unit
+      - search-performance
+      - functions-build
+      - production-build
+      - browser
+      - deferred-tools
+      - phase17
+      - inventory-photos
+      - delivery-photos
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Require every check to succeed
+        run: node scripts/verify-ci-results.mjs
+        env:
+          CI_RESULTS: ${{ toJSON(needs) }}

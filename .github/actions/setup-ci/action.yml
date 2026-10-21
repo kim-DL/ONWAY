@@ -1,0 +1,30 @@
+name: Set up CI runtime
+description: Install the pinned Node dependencies and the tools this check needs.
+inputs:
+  java:
+    description: Install Java 21 for Firebase emulators.
+    default: "false"
+  chromium:
+    description: Install Chromium and its system dependencies for browser tests.
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js 22
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+    - name: Set up Java 21
+      if: inputs.java == 'true'
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 21
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+    - name: Install Chromium
+      if: inputs.chromium == 'true'
+      shell: bash
+      run: npx playwright install --with-deps chromium
