@@ -1,6 +1,6 @@
-# 거래처 모션·재고 인사 타이포 — 로컬 구현
+# 거래처 모션·재고 인사 타이포 — 구현·운영 반영
 
-기준일: 2026-10-22. 로컬 릴리스 준비 검증 완료이며 CI·운영 배포 결과는 후속 릴리스 기록에 남긴다.
+기준일: 2026-10-22. 제품 source `b91a55b`의 병렬 CI 13개 전체 성공 후 Hosting 운영 배포·공개 검증을 완료했다. 상세 실패·재시도·배포·동기화 증거는 [릴리스 기록](releases/2026-10-22-welcome-modes.md)에 있다.
 
 ## 확정한 방향
 
@@ -25,4 +25,5 @@
 - 재고 pending → typing → complete, 공통 모션 정지/재개, reduced motion, 거래처 검색 시 장식 제거, 화면 밖 정지/재개 PASS. visibilityState를 바꾼 합성 이벤트의 정지/재개도 PASS다.
 - 새 탭 전환 실험에서는 해당 자동 브라우저가 visible 상태를 유지했다. 이를 실제 백그라운드 검증으로 주장하지 않는다. 실제 직원 기기·설치 PWA의 홈 복귀 인수는 별도다.
 - 공개 비교판은 `http://127.0.0.1:4318/`이며 ignored `output/welcome-reference-20261022/`에 생성했다. 정적 합성 목록·보관 장소와 실제 인사/홈 컴포넌트를 사용한다. `output/playwright/welcome-modes-20261022.png`에 시각 검토 자료를 보관했다.
-- 사용자가 이 변경의 커밋·병렬 CI·Hosting 운영 배포·배포 후 검증·로컬 동기화를 승인했다. 최종 커밋에서 기존 검증 기준과 병렬 CI 정책을 따르며 실제 CI·배포·동기화 결과는 후속 릴리스 기록에서 구분한다.
+- 사용자가 이 변경의 커밋·병렬 CI·Hosting 운영 배포·배포 후 검증·로컬 동기화를 승인했다. 정확한 source의 Quality Gate `39744025075`는 attempt 1 전체 SUCCESS다. unit 1,798 PASS/15 기존 SKIP, 일반 browser 310 PASS/2 내부 flaky/8 기존 SKIP, Phase 17 browser 83 PASS/18 기존 조건부 SKIP다. job 실패·재실행은 없고 모션 정지 transform 비교의 내부 자동 재시도 2개를 별도 기록했다. assertion·timeout·skip·성능 상한을 변경하지 않았다.
+- 운영 version `a5bffa3fda8b9f8b`에 반영했다. 두 origin 공개 25개씩, 새 Chromium 로그인·서비스 워커 활성화·pageerror 0, worker와 후보 일치 PASS다. Functions 72개·MCP 전용 Hosting·비공개 설정은 전후 동일하며 업무 데이터 쓰기는 없다. 제품 코드가 같은 문서 전용 후속 커밋은 `[skip ci]`로 저장해 전체 CI·배포를 반복하지 않는다.

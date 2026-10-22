@@ -5,11 +5,14 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-22 거래처 네 원 모션·재고 인사 타이포 — 로컬 구현
+### 2026-10-22 거래처 네 원 모션·재고 인사 타이포 — main 저장·운영 Hosting 배포·검증 완료
 
 - 사용자 최종 결정은 캐릭터 철회, 재고는 장식 없이 개인 인사 타이핑만, 거래처는 학교납품·영업과 같은 네 원 장식의 정제된 마감이다. 거래처 문구 바로 뒤 8px/96px 장식 영역, 느린 독립 궤도와 작은 정적 명암을 적용했고 학교납품·영업 기본 변형은 유지한다.
 - 관련 단위 138 PASS, lint·앱/Functions typecheck PASS. 실제 컴포넌트의 합성 UI에서 320/390/740px 배치·검색 시 장식 접기·모션 정지/재개·동작 줄이기·재고 타이핑·화면 밖 정지 PASS. 백그라운드는 합성 visibility 이벤트만 확인했으며 실제 기기 인수와 구분한다.
-- 운영 형식 build/PWA/성능/Hosting gate와 welcome Chromium 25개가 PASS다. 스타일 분리·중복 정리로 기존 용량 상한을 유지했다. 사용자가 커밋·병렬 CI·Hosting 배포·운영 확인·동기화를 승인했으며 결과는 릴리스 기록에 구분해 남긴다. [결정·구현·검증 범위](welcome-customer-inventory-20261022.md), 로컬 미리보기 `http://127.0.0.1:4318/`.
+- 운영 형식 build/PWA/성능/Hosting gate와 welcome Chromium 25개가 PASS다. 스타일 분리·중복 정리로 기존 용량 상한을 유지했다. 제품 source `b91a55ba33605f59b06712070445306f9f86793b`의 [Quality Gate 39744025075](https://github.com/kim-DL/ONWAY/actions/runs/39744025075)는 attempt 1, 독립 검사 12개+최종 verify **13개 전체 SUCCESS**다. unit 1,798 PASS/기존 15 SKIP, 일반 browser 310 PASS/2 내부 flaky/기존 8 SKIP, Phase 17 browser 83 PASS/기존 조건부 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다. 실패한 job 및 job 재실행은 없다. 모션 정지 직후 transform 비교 2개는 기존 자동 재시도로 통과했으며 첫 실패·미확정 원인은 릴리스 기록에 구분한다.
+- 사용자 승인으로 `--project onnuriway --only hosting:onnuriway --non-interactive`만 배포했다. live version **a5bffa3fda8b9f8b**, release **1792656502986000**, **2026-10-22 17:08:22.986 KST**, 직전 복구 version **c4e035caf38f7259**다. 두 origin 공개 검사 각 25 PASS, www301, 새 Chromium의 로그인 UI·worker activated·pageerror 0, 공개 worker SHA-256 `22ea834184db8fc06824ce97e1c249c3c4019f617b86785d3172269ac284284a`와 후보 일치를 확인했다.
+- 배포 후보 113파일과 비공개 env가 전후 같고, 전체 Functions 72개 metadata와 MCP 전용 Hosting version/release도 전후 같다. 운영 업무 데이터 쓰기는 없다. 제품 source는 main과 `codex/welcome-modes-20261022`의 로컬·원격에 저장했다. 릴리스 기록은 문서 전용 `[skip ci]` 후속 커밋으로 동기화하며 제품 코드가 같아 전체 CI·배포를 반복하지 않는다. 다른 worktree·기존 stash를 보존한다. 실제 직원 기기·설치 PWA 현장 인수와 공개·자동 검증을 구분한다.
+- [결정·구현·검증 범위](welcome-customer-inventory-20261022.md), [릴리스 기록](releases/2026-10-22-welcome-modes.md), ignored 증거 `output/welcome-release-20261022/`, 로컬 미리보기 `http://127.0.0.1:4318/`.
 
 ### 2026-10-21 Quality Gate 병렬화 — main 저장·최종 전체 CI 통과
 
