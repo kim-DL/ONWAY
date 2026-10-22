@@ -4,6 +4,7 @@ import styles from "./quantum-cloud-loader.module.css";
 interface QuantumCloudLoaderProps {
   paused?: boolean;
   className?: string;
+  finish?: "standard" | "refined";
 }
 
 const particles = (
@@ -24,11 +25,12 @@ const particles = (
 );
 
 /** Ambient artwork based on the supplied Quantum Cloud reference, not a loading state. */
-export function QuantumCloudLoader({ paused = true, className }: QuantumCloudLoaderProps) {
+export function QuantumCloudLoader({ paused = true, className, finish = "standard" }: QuantumCloudLoaderProps) {
   return (
     <span
       className={cn(styles.cloud, className)}
       data-quantum-cloud
+      data-finish={finish}
       data-motion={paused ? "paused" : "running"}
       aria-hidden="true"
     >

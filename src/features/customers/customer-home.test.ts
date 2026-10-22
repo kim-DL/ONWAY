@@ -18,7 +18,9 @@ describe("customer home", () => {
     expect(html).not.toContain("납품 정보,");
     expect(html).not.toContain("주소</small>");
     expect(html).not.toContain("거래처 등록");
-    expect(html).not.toContain("data-welcome-greeting");
+    expect(html).toContain('data-welcome-variant="customer"');
+    expect(html).toContain('data-finish="refined"');
+    expect(html.match(/data-quantum-particle=/g)).toHaveLength(4);
   });
 
   it("exposes employee registration with a native disabled state when unavailable", () => {
@@ -47,5 +49,6 @@ describe("customer home", () => {
     expect(html).not.toContain("거래처 등록");
     expect(html).not.toContain("거래처 전체보기");
     expect(html).not.toContain("거래처 이름으로 찾기");
+    expect(html).not.toContain("data-quantum-cloud");
   });
 });

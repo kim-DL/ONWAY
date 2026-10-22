@@ -3,6 +3,7 @@
 import type { ReactNode, Ref } from "react";
 
 import { Icon } from "@/components/ui/icon";
+import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
 
 import styles from "./customer-home.module.css";
 
@@ -25,8 +26,9 @@ export function CustomerHome({ greeting, onOpenSearch, onRegister, onOpenDirecto
 
   return <header className={styles.hero} data-customer-home>
     <div className={styles.intro}>
-      <p className={styles.greeting}>{greeting}</p>
-      <h1 id="customer-heading">거래처 정보를 <span>한눈에.</span></h1>
+      <WelcomeGreeting variant="customer" className={styles.greeting ?? ""} titleId="customer-heading" title="거래처 정보를" accent="한눈에.">
+        {greeting}
+      </WelcomeGreeting>
     </div>
     <div className={styles.actions}>
       <button ref={searchTriggerRef} className={styles.searchTrigger} type="button" onClick={onOpenSearch}>

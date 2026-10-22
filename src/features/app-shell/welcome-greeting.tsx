@@ -28,13 +28,13 @@ function subscribeToMotionEnvironment(onChange: () => void) {
 // Never flash an animated frame before the saved/OS motion preference is known.
 const serverMotionRestricted = () => 3;
 
-export function WelcomeGreeting({ children, title, accent, titleId, className = "" }: {
+type WelcomeGreetingProps = {
   children?: string;
-  title: string;
-  accent: string;
-  titleId: string;
   className?: string;
-}) {
+} & ({ variant: "copy"; title?: never; accent?: never; titleId?: never }
+  | { variant?: "default" | "customer"; title: string; accent: string; titleId: string });
+
+export function WelcomeGreeting({ children, title, accent, titleId, className = "", variant = "default" }: WelcomeGreetingProps) {
   const mascotRef = useRef<HTMLSpanElement>(null);
   const copyRef = useRef<HTMLParagraphElement>(null);
   const { paused } = useHeaderMotionPreference();
@@ -45,7 +45,7 @@ export function WelcomeGreeting({ children, title, accent, titleId, className = 
   useEffect(() => {
     const target = mascotRef.current;
     const copy = copyRef.current;
-    if (!target || !copy) return;
+    if (!copy) return;
     if (typeof IntersectionObserver === "undefined") {
       const frame = requestAnimationFrame(() => { setInView(true); setCopyInView(true); });
       return () => cancelAnimationFrame(frame);
@@ -56,29 +56,29 @@ export function WelcomeGreeting({ children, title, accent, titleId, className = 
         if (entry.target === copy) setCopyInView(entry.isIntersecting);
       }
     }, { threshold: 0 });
-    observer.observe(target);
+    if (target) observer.observe(target);
     observer.observe(copy);
     return () => observer.disconnect();
-  }, []);
+  }, [variant]);
 
   const running = !paused && environment === 0 && inView;
 
   return (
-    <div className={styles.greeting} data-welcome-greeting>
+    <div className={styles.greeting} data-welcome-greeting data-welcome-variant={variant}>
       <p ref={copyRef} className={`${className} ${styles.copy}`} data-greeting-copy>
         <TypingGreeting text={children ?? ""} disabled={paused || (environment & 2) !== 0} active={copyInView && (environment & 1) === 0} />
       </p>
-      <div className={styles.headline} data-welcome-headline>
+      {variant !== "copy" ? <div className={styles.headline} data-welcome-headline>
         <h1 id={titleId} className={styles.title} data-welcome-title>
           <span className={styles.leadRow} data-welcome-lead-row>
             <span className={styles.lead} data-welcome-title-lead>{title}</span>
             <span ref={mascotRef} className={styles.mascot} aria-hidden="true" data-welcome-mascot data-motion={running ? "running" : "paused"}>
-              <QuantumCloudLoader paused={!running} />
+              <QuantumCloudLoader paused={!running} finish={variant === "customer" ? "refined" : "standard"} />
             </span>
           </span>
           <em className={styles.accent} data-welcome-title-accent>{accent}</em>
         </h1>
-      </div>
+      </div> : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, type InventoryContext, type InventoryLocation, type InventoryProductDetail, type InventoryProduct } from "@/domain/inventory";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { InventoryListChunks } from "./inventory-list-chunks";
+import { InventoryGreeting } from "./inventory-greeting";
 import { restoreInventoryProductFocus } from "./inventory-focus";
 import { GlassButton } from "@/components/ui/glass-button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -287,6 +288,7 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
   const optionsActive = showInactive || urgentOnly || countMode;
   return <section ref={workspaceRef} className={admin ? styles.workspace : `shell-page ${styles.workspace}`} data-admin={admin || undefined} data-write-actions={context?.canWrite || undefined} aria-label="재고 관리">
     <h1 className={styles.hiddenInput}>재고 관리</h1>
+    {!admin ? <InventoryGreeting displayName={session.displayName} /> : null}
     {notice.message ? <p role="status" className={styles.success}>{notice.message}</p> : null}
     {context && online && !calendarReady ? <div className={styles.notice} role={calendarError ? "alert" : "status"}><p>{calendarRefreshing ? "날짜가 바뀌어 유통기한·실사 기준을 확인하고 있어요." : "날짜 기준을 갱신하지 못했어요. 기준을 다시 확인한 뒤 실사를 저장해주세요."}</p><p className={styles.muted}>기준 확인 전에는 유통기한·실사 필터를 잠시 멈추고 전체 품목을 보여드려요.</p>{calendarError ? <><p className={styles.muted}>{calendarError}</p><GlassButton disabled={calendarRefreshing} onClick={() => calendarWatcher.current?.refresh()}>날짜 기준 다시 확인</GlassButton></> : null}</div> : null}
     <div className={styles.locations} data-catalog role="group" aria-label="보관 장소">{(["all", ...INVENTORY_LOCATIONS] as const).map((item) => <button key={item} type="button" aria-pressed={location === item} onClick={() => { setLocation(item); setLimit(60); }}>{item === "all" ? "전체" : INVENTORY_LOCATION_LABELS[item]}</button>)}</div>
