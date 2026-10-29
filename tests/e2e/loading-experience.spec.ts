@@ -138,6 +138,20 @@ test("logout, cleanup and external sign-in start a fresh wait", async ({ page })
   }
 });
 
+test("connection recovery keeps one static status instead of an indefinite loader", async ({ page }) => {
+  await fixture(page, "pin");
+  const message = "로그인은 유지되어 있어요. 연결이 돌아오면 자동으로 이어집니다.";
+  await page.evaluate(message => window.dispatchEvent(new CustomEvent("fixture-auth-state", {
+    detail: { status: "resolving", waitingForConnection: true, message },
+  })), message);
+  await page.clock.runFor(5_000);
+  await expect(page.locator("[data-auth-stage='connection']")).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText(message);
+  await expect(page.locator("[data-loading-indicator]")).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("fixture-auth-state", { detail: { status: "unauthenticated" } })));
+  await expect(page.getByLabel("직원 PIN")).toBeEditable();
+});
+
 test("a submitted PIN keeps its elapsed time when Firebase starts resolving", async ({ page }) => {
   await fixture(page, "pin");
   await page.getByLabel("직원 PIN").fill("123456");

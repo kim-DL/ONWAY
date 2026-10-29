@@ -18,8 +18,8 @@ const AppShell = dynamic(
   { loading: AppShellFallback },
 );
 
-function AuthSplash({ message }: { message?: string | undefined }) {
-  return <AuthLoadingScreen stage="session" message={message} />;
+function AuthSplash({ message, waitingForConnection }: { message?: string | undefined; waitingForConnection?: boolean | undefined }) {
+  return <AuthLoadingScreen stage="session" message={message} waitingForConnection={waitingForConnection} />;
 }
 
 function PinIndicator({ length }: { length: number }) {
@@ -207,7 +207,7 @@ export function AuthGate() {
     }
   }, [state.status]);
 
-  if (state.status === "resolving") return <AuthSplash message={state.message} />;
+  if (state.status === "resolving") return <AuthSplash message={state.message} waitingForConnection={state.waitingForConnection} />;
   if (state.status === "unconfigured") return <Unconfigured />;
   if (state.status === "invalid") return <InvalidSession message={state.message} />;
   if (state.status === "unauthenticated") return <PinLogin initialError={state.message ?? null} />;

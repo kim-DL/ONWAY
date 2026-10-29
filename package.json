@@ -89,14 +89,21 @@
     "@serwist/window": "^9.5.12",
     "firebase": "^12.18.0",
     "idb": "^8.0.3",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "overrides": {
     "@serwist/next": {
-      "browserslist": "4.28.9"
+      "browserslist": "4.28.9",
+      "zod": "$zod"
+    },
+    "@serwist/build": {
+      "zod": "$zod"
+    },
+    "@serwist/webpack-plugin": {
+      "zod": "$zod"
     },
     "braces": "file:vendor/braces",
     "@firebase/firestore": {

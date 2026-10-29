@@ -181,7 +181,7 @@ describe("mobile session continuity", () => {
     const cleanup = mountObserver(); await flushCallbacks();
     (harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void)(user("A"));
     await flushCallbacks();
-    expect(harness.currentState).toMatchObject({ status: "resolving", message: expect.stringContaining("로그인은 유지") });
+    expect(harness.currentState).toMatchObject({ status: "resolving", waitingForConnection: true, message: expect.stringContaining("로그인은 유지") });
     expect(harness.signOut).not.toHaveBeenCalled();
     expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
     harness.probeNetworkReachability.mockResolvedValue(true);

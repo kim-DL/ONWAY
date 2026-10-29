@@ -55,13 +55,14 @@ const launchDetails = {
   workspace: "업무 화면을 준비하고 있습니다.",
 };
 
-export function AuthLoadingScreen({ stage, message }: {
+export function AuthLoadingScreen({ stage, message, waitingForConnection = false }: {
   stage: keyof typeof launchLabels;
   message?: string | undefined;
+  waitingForConnection?: boolean | undefined;
 }) {
   const { startedAt } = useLaunchTiming();
   return (
-    <main className="auth-shell auth-shell--launch" data-auth-stage={stage}>
+    <main className="auth-shell auth-shell--launch" data-auth-stage={waitingForConnection ? "connection" : stage}>
       <AuthHeader />
       <section className="auth-launch-content" aria-label="급식길 준비">
         <h1 className="sr-only">급식길</h1>
@@ -69,6 +70,7 @@ export function AuthLoadingScreen({ stage, message }: {
           label={message ?? launchLabels[stage]}
           detail={message ? undefined : launchDetails[stage]}
           startedAt={startedAt}
+          indicator={!waitingForConnection}
         />
       </section>
     </main>
