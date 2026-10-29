@@ -328,7 +328,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     await (await firstChooser).setFiles({ name: "oriented.jpg", mimeType: "image/jpeg", buffer: oriented });
     await expect.poll(() => rapidChooserCount).toBe(1); page.off("filechooser", countRapidChooser);
     await expect.poll(() => requests.length).toBe(1);
-    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("업로드 중", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("사진 등록 중", { exact: true })).toBeVisible();
     await search.fill("새봄"); await expect(page.getByRole("button", { name: "새봄마트 사진 기록" })).toBeVisible(); await search.fill("");
 
     await chooseRowPhoto(page, names[2]!, "앨범 선택", regular, "album.jpg");

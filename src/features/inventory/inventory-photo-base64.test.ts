@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("client-only", () => ({}));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: {}, inventoryErrorMessage: () => "사진 오류" }));
-import { inventoryPhotoBase64 } from "./inventory-photo";
+import { inventoryPhotoBase64 } from "./inventory-photo-picker";
 
 type Mode = "read" | "error" | "abort" | "invalid";
 function reader(mode: Mode) {

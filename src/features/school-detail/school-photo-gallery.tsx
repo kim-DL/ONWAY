@@ -19,7 +19,8 @@ import { FirebaseError } from "firebase/app";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingIndicator } from "@/components/ui/loading-indicator";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { usePhotoMorph } from "@/components/ui/photo-morph";
 import morphStyles from "@/components/ui/photo-morph.module.css";
 import viewerStyles from "./school-photo-viewer.module.css";
@@ -93,7 +94,7 @@ function PhotoImage({
           decoding="async"
         />
       ) : null}
-      {state.status === "idle" || state.status === "loading" ? <span className={galleryStyles.loading}><OnnuriLoader size="small" tone="delivery" label="사진 불러오는 중" decorative />사진 불러오는 중</span> : null}
+      {state.status === "idle" || state.status === "loading" ? <span className={galleryStyles.loading}><Icon name="camera" />사진 불러오는 중</span> : null}
       {state.status === "error" ? <span className={galleryStyles.loading}><Icon name="camera" />사진을 불러오지 못했어요</span> : null}
     </button>
   );
@@ -185,13 +186,9 @@ function PhotoUploader({
     }
   };
 
-  const savingLabel = uploadStage === "preparing"
-    ? "업로드 준비 중…"
-    : uploadStage === "encoding"
-      ? "사진 전송 중…"
-      : uploadStage === "processing"
-        ? "서버에서 마무리 중…"
-        : "저장 중…";
+  const savingLabel = uploadStage === "preparing" || uploadStage === "encoding"
+    ? "사진 준비 중"
+    : uploadStage === "processing" ? "사진 등록 중" : "저장 중";
 
   return (
     <form id={formId} className="photo-uploader" onSubmit={submit}>
@@ -201,8 +198,8 @@ function PhotoUploader({
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => { event.preventDefault(); void selectFile(event.dataTransfer.files.item(0)); }}
       >
-        {previewUrl ? <img src={previewUrl} alt="업로드할 사진 미리보기" width={800} height={1_200} decoding="async" /> : <span><Icon name="camera" size={30} /><strong>{optimizing ? "사진을 빠르게 최적화하는 중" : "등록할 현장 사진"}</strong><small>{optimizing ? "해상도와 전송 용량을 안전하게 줄이고 있어요." : "앨범 또는 카메라를 선택해주세요. PC에서는 끌어놓기도 가능합니다."}</small></span>}
-        {optimizing ? <span className="photo-dropzone__progress"><i />모바일 전송 크기로 줄이는 중…</span> : null}
+        {previewUrl ? <img src={previewUrl} alt="업로드할 사진 미리보기" width={800} height={1_200} decoding="async" /> : <span><Icon name="camera" size={30} /><strong>등록할 현장 사진</strong><small>앨범 또는 카메라를 선택해주세요. PC에서는 끌어놓기도 가능합니다.</small></span>}
+        {optimizing ? <LoadingStatus className="photo-dropzone__progress" label="사진 준비 중" detail="사진 크기와 용량을 줄이고 있습니다." /> : null}
       </div>
       <div className="photo-source-actions" aria-label="사진 가져오기 방법">
         <label htmlFor={galleryInputId}><Icon name="upload" /><span><strong>앨범에서 선택</strong><small>휴대폰 갤러리 · 파일</small></span></label>
@@ -213,9 +210,11 @@ function PhotoUploader({
       {photoInfo ? <p className="photo-optimization-result"><Icon name="check" />{photoInfo.optimized ? `${formatPhotoBytes(photoInfo.originalBytes)} → ${formatPhotoBytes(photoInfo.file.size)}로 최적화` : `${formatPhotoBytes(photoInfo.file.size)} · 추가 압축 없이 사용`}<span>{photoInfo.width} × {photoInfo.height}</span></p> : null}
       <label className="photo-caption-field"><span>사진 설명</span><input value={caption} maxLength={2_000} onChange={(event) => setCaption(event.target.value)} placeholder={SLOT_LABELS[slotId]} /></label>
       <div className="photo-privacy-note"><Icon name="sparkles" /><p><strong>개인정보를 한 번 더 확인해주세요.</strong><small>학생 얼굴, 차량번호, 연락처, 문서가 보이는 사진은 등록하지 않습니다.</small></p></div>
+      {saving ? <LoadingStatus label={<span className="sr-only">{savingLabel}</span>} indicator={false}
+        detail={uploadStage === "processing" ? "사진을 전송하고 서버의 등록 결과를 기다리고 있습니다." : "선택한 사진을 등록할 수 있도록 준비하고 있습니다."} /> : null}
       <BottomSheetActions className="photo-uploader__actions" busy={saving}>
         {uploadError ? <p className="sheet-action-error" role="alert">{uploadError}</p> : null}
-        <GlassButton variant="primary" type="submit" form={formId} disabled={saving || optimizing || !file}>{saving ? savingLabel : photo ? "새 사진으로 교체" : "현장 사진 등록"}</GlassButton>
+        <GlassButton variant="primary" type="submit" form={formId} disabled={saving || optimizing || !file}>{saving ? <LoadingIndicator size="small" tone="inherit" decorative /> : null}{saving ? savingLabel : photo ? "새 사진으로 교체" : "현장 사진 등록"}</GlassButton>
       </BottomSheetActions>
     </form>
   );
@@ -304,7 +303,7 @@ function PhotoViewer({
     }
   }}><BottomSheet open title="현장 사진 크게 보기" onClose={requestClose} beforeClose={beforeClose}>
     <div ref={stageRef} className={`${morphStyles.stage} ${viewerStyles.schoolStage}`} data-photo-morph-stage data-photo-morph-state="open" data-zoomed={scale > 1} style={{ "--photo-scale": scale } as CSSProperties} tabIndex={scale > 1 ? 0 : -1} aria-label="현장사진 보기" role="region" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { pointers.current.clear(); gestureStart.current = null; }} onDoubleClick={() => setScale((value) => value > 1 ? 1 : 2.5)}>
-      {imageUrl ? <img src={imageUrl} alt={photo.caption ?? SLOT_LABELS[photo.slotId]} width={800} height={1_200} decoding="async" draggable={false} /> : preview.status === "error" ? <span className={viewerStyles.schoolLoading}><Icon name="camera" /><span>사진을 불러오지 못했어요. 닫고 다시 열어주세요.</span></span> : <span className={viewerStyles.schoolLoading}><OnnuriLoader size="medium" tone="delivery" label="사진을 불러오는 중" decorative /><span role="status">사진을 불러오는 중</span></span>}
+      {imageUrl ? <img src={imageUrl} alt={photo.caption ?? SLOT_LABELS[photo.slotId]} width={800} height={1_200} decoding="async" draggable={false} /> : preview.status === "error" ? <span className={viewerStyles.schoolLoading} role="alert"><Icon name="camera" /><span>사진을 불러오지 못했어요. 닫고 다시 열어주세요.</span></span> : <LoadingStatus key={`${photo.slotId}:${photo.currentVersionId}`} className={viewerStyles.schoolLoadingStatus} label="사진 불러오는 중" detail="확대할 사진을 확인하고 있습니다." />}
       {photos.length > 1 && scale === 1 ? <><button className={viewerStyles.schoolNavigation} data-direction="previous" type="button" onClick={() => navigate(-1)} aria-label="이전 사진"><Icon name="arrow-left" /></button><button className={viewerStyles.schoolNavigation} data-direction="next" type="button" onClick={() => navigate(1)} aria-label="다음 사진"><Icon name="chevron-right" /></button></> : null}
     </div>
     <p className={viewerStyles.schoolCaption}><strong>{photo.caption ?? SLOT_LABELS[photo.slotId]}</strong><small>{scale > 1 ? "사진을 밀어 좌우와 위아래를 살펴보세요." : "두 번 탭하거나 확대 버튼으로 출입구를 확인하세요."}</small></p>

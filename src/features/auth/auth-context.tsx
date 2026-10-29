@@ -53,7 +53,7 @@ export type AuthenticatedSession = {
 };
 
 export type AuthState =
-  | { status: "resolving"; message?: string }
+  | { status: "resolving"; message?: string; waitingForConnection?: boolean }
   | { status: "unconfigured" }
   | { status: "unauthenticated"; message?: string }
   | { status: "invalid"; message: string }
@@ -199,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
           setState((current) => current.status === "authenticated" && current.session.uid === user.uid
             ? current
-            : { status: "resolving", message: "로그인은 유지되어 있어요. 연결이 돌아오면 자동으로 이어집니다." });
+            : { status: "resolving", waitingForConnection: true, message: "로그인은 유지되어 있어요. 연결이 돌아오면 자동으로 이어집니다." });
         };
 
         const resolveRemoteSession = (forceRefresh = false) => {
@@ -413,7 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authGenerationRef.current += 1;
     invalidReasonRef.current = null;
     // Do not leave private content visible during the server logout timeout.
-    setState({ status: "resolving" });
+    setState({ status: "resolving", message: "로그아웃 중" });
     const employeeLogout = httpsCallable<void, { ok: boolean }>(
       services.functions,
       "employeeLogout",

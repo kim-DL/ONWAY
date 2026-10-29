@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GlassButton } from "@/components/ui/glass-button";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { INVENTORY_LOCATION_LABELS, type InventoryEvent } from "@/domain/inventory";
 import { inventoryErrorMessage, inventoryRepository } from "./inventory-repository";
 import { inventoryUnitDisplayLabel } from "./inventory-model";
@@ -48,9 +49,9 @@ export function InventoryHistory({ productId }: { productId: string }) {
     setRequest({ productId, page: nextPage, retry: retryFailed || nextPage === page ? retry + 1 : 0 });
   }
 
-  return <div className={styles.sheet} aria-busy={busy}>
+  return <div className={styles.sheet}>
     {events.map((event) => <article key={event.eventId} className={styles.lotCard}><div className={styles.row}><strong>{EVENT_LABELS[event.kind]}</strong><time className={styles.muted} dateTime={event.createdAt}>{eventTime.format(new Date(event.createdAt))}</time></div>{event.lines.map((line) => <p key={`${line.lotId}:${line.locationId}`} className={styles.muted}>{INVENTORY_LOCATION_LABELS[line.locationId]} · {line.before} → {line.after} {inventoryUnitDisplayLabel(event.unitLabel)} ({line.delta > 0 ? "+" : ""}{line.delta})</p>)}{event.reason ? <p className={styles.muted}>{event.reason}</p> : null}</article>)}
-    {busy ? <p role="status">기록을 불러오고 있어요.</p> : !events.length && !error ? <p className={styles.muted}>아직 기록이 없어요.</p> : null}
+    {busy ? <LoadingStatus key={requestKey} label="기록 불러오는 중" detail="입출고와 실사 내역을 확인하고 있습니다." /> : !events.length && !error ? <p className={styles.muted}>아직 기록이 없어요.</p> : null}
     {error ? <><p className={styles.error} role="alert">{error}</p><GlassButton onClick={() => load(events.length ? page : null, true)}>기록 다시 불러오기</GlassButton></> : cursor ? <GlassButton disabled={busy} onClick={() => load(cursor, false)}>이전 기록 더 보기</GlassButton> : null}
   </div>;
 }

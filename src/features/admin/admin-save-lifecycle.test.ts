@@ -54,6 +54,7 @@ vi.mock("./admin-repository", () => ({
 }));
 vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ showToast: harness.showToast }) }));
 vi.mock("@/features/auth/auth-context", () => ({ useAuth: () => ({ logout: vi.fn() }) }));
+vi.mock("@/features/auth/auth-loading", () => ({ useLaunchTiming: () => ({ startedAt: 42 }) }));
 vi.mock("./admin-interaction", () => ({
   useAdminInteraction: () => ({ begin: harness.begin, canNavigate: harness.canNavigate }),
   AdminInteractionProvider: ({ children }: { children: ReactNode }) => children,
@@ -236,6 +237,22 @@ describe("admin pending-save controls", () => {
 });
 
 describe("admin workspace request and navigation safety", () => {
+  it("continues the launch clock for the initial request and starts a new clock for retry", async () => {
+    const element = workspaceElement();
+    expect(component(render(element), "LoadingStatus").props.startedAt).toBe(42);
+    const retry = deferred<AdminWorkspaceData>();
+    harness.load.mockReturnValueOnce(retry.promise);
+    const state = frame(["overview", null, "error", false]);
+    const failed = render(element, state);
+    const now = vi.spyOn(Date, "now").mockReturnValue(5_000);
+    try {
+      invoke(action(failed, "다시 시도"), "onClick");
+      expect(component(render(element, state), "LoadingStatus").props.startedAt).toBe(5_000);
+      retry.resolve(data);
+      await flush();
+    } finally { now.mockRestore(); }
+  });
+
   it.each(["success", "failure"] as const)("ignores an older Cycle response after a newer request succeeds (%s)", async (outcome) => {
     const older = deferred<AdminWorkspaceData>();
     const newer = deferred<AdminWorkspaceData>();

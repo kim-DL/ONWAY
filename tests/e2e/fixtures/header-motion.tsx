@@ -4,7 +4,7 @@ import { ShellHeader } from "../../../src/features/app-shell/app-shell-header";
 import { WelcomeGreeting } from "../../../src/features/app-shell/welcome-greeting";
 import { useHeaderMotionPreference } from "../../../src/features/app-shell/header-motion-preference";
 import type { WorkMode } from "../../../src/features/app-shell/shell-policy";
-import { OnnuriLoader } from "../../../src/components/ui/onnuri-loader";
+import { LoadingIndicator as OnnuriLoader } from "../../../src/components/ui/loading-indicator";
 
 function HeaderMotionFixture() {
   const [mode, setMode] = useState<WorkMode>("customer");

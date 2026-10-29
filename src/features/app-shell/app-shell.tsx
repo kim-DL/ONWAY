@@ -6,14 +6,14 @@ import dynamic from "next/dynamic";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { SkeletonCard } from "@/components/ui/skeleton-card";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { SoftCard } from "@/components/ui/soft-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
+import { useLaunchTiming } from "@/features/auth/auth-loading";
 import { usePwa } from "@/features/pwa/pwa-provider";
 import { isVerifiedAdminSession } from "@/domain/auth";
 import {
@@ -41,50 +41,49 @@ import { ShellHeader } from "./app-shell-header";
 import { useHeaderMotionPreference } from "./header-motion-preference";
 import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
 import { readShellResume, shellResumeKey, writeShellResume } from "./shell-resume";
+import { WorkspaceFeatureLoading } from "./workspace-feature-loading";
+import { InitialWorkspaceTiming } from "./initial-workspace-timing";
 
 const subscribeToStoredMode = () => () => undefined;
 
+function AdminWorkspaceLoading() {
+  const { startedAt } = useLaunchTiming();
+  return <LoadingStatus className="admin-loading" label="관리자 화면 여는 중" detail="관리자 화면을 준비하고 있습니다." startedAt={startedAt} />;
+}
+
 const AdminWorkspace = dynamic(
   () => import("@/features/admin/admin-workspace").then((module) => module.AdminWorkspace),
-  { loading: () => <div className="admin-loading" role="status">관리자 화면을 준비하고 있습니다.</div> },
+  { loading: AdminWorkspaceLoading },
 );
-
-function WorkspaceFeatureLoading({ label = "업무 화면을 준비하고 있습니다." }: { label?: string }) {
-  return (
-    <section className="shell-page shell-feature-loading" role="status" aria-label={label}>
-      <div className="field-loading"><SkeletonCard /><SkeletonCard /></div>
-    </section>
-  );
-}
 
 const SalesActivityWorkspace = dynamic(
   () => import("@/features/sales-cycle/sales-activity-workspace").then((module) => module.SalesActivityWorkspace),
-  { loading: () => <WorkspaceFeatureLoading label="업무 목록을 준비하고 있습니다." /> },
+  { loading: () => <WorkspaceFeatureLoading mode="activity" /> },
 );
 
 const SchoolDetail = dynamic(
   () => import("@/features/school-detail/school-detail").then((module) => module.SchoolDetail),
-  { loading: () => <WorkspaceFeatureLoading label="학교 상세정보를 준비하고 있습니다." /> },
+  { loading: () => <WorkspaceFeatureLoading mode="detail" /> },
 );
 
 const SalesWorkspace = dynamic(
   () => import("@/features/sales-cycle/sales-workspace").then((module) => module.SalesWorkspace),
-  { loading: () => <WorkspaceFeatureLoading label="영업 화면을 준비하고 있습니다." /> },
+  { loading: () => <WorkspaceFeatureLoading mode="sales" /> },
 );
 
 const CustomerWorkspace = dynamic(
   () => import("@/features/customers/customer-workspace").then((module) => module.CustomerWorkspace),
-  { loading: () => <WorkspaceFeatureLoading label="거래처 화면을 준비하고 있습니다." /> },
+  { loading: () => <WorkspaceFeatureLoading mode="customer" /> },
 );
 
 const DeliveryPhotoWorkspace = dynamic(
   () => import("@/features/delivery-photos/delivery-photo-workspace").then((module) => module.DeliveryPhotoWorkspace),
-  { loading: () => <WorkspaceFeatureLoading label="납품사진 화면을 준비하고 있습니다." /> },
+  { loading: () => <WorkspaceFeatureLoading mode="delivery" /> },
 );
 
 const InventoryWorkspace = dynamic(
   () => import("@/features/inventory/inventory-workspace").then((module) => module.InventoryWorkspace),
-  { loading: () => <WorkspaceFeatureLoading label="재고 화면을 준비하고 있습니다." /> },
+  { loading: () => <WorkspaceFeatureLoading mode="inventory" /> },
 );
 
 const SchoolSearch = dynamic(
@@ -93,9 +92,8 @@ const SchoolSearch = dynamic(
     loading: () => (
       <div className="school-search-layer" role="dialog" aria-modal="true" aria-label="학교 검색 준비 중">
         <span className="school-search-backdrop" />
-        <section className="school-search-panel school-search-panel--loading" role="status">
-          <OnnuriLoader size="large" decorative />
-          <strong>이 기기의 학교 지도를 여는 중이에요.</strong>
+        <section className="school-search-panel school-search-panel--loading">
+          <LoadingStatus label="학교 검색 여는 중" detail="학교 목록을 불러오고 있습니다." />
         </section>
       </div>
     ),
@@ -270,6 +268,7 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
 }
 
 function AppShellContent({ session }: { session: AuthenticatedSession }) {
+  const { startedAt } = useLaunchTiming();
   const availableModes = useMemo(
     () => getAvailableModes(session.claims.roleScopes),
     [session.claims.roleScopes],
@@ -448,7 +447,10 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         onDetailBack={selectedSchool ? closeSchool : undefined}
       />
       <ShellNavigation mode={mode} view={view} onNavigate={navigate} />
-      <div className="workspace-content">{content}</div>
+      <div className="workspace-content"><InitialWorkspaceTiming startedAt={startedAt}
+        navigationKey={JSON.stringify([mode, view, selectedSchoolId ?? null, searchOpen])}>
+        {content}
+      </InitialWorkspaceTiming></div>
       {searchMounted && isSchoolWorkMode(mode) ? (
         <SchoolSearch
           open={searchOpen}

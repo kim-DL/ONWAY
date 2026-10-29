@@ -50,8 +50,7 @@ async function chooseMode(page: Page, mode: string) {
 async function waitForAuthenticatedBoundary(page: Page) {
   const modeUi = page.getByRole("button", { name: /^업무 모드 변경, 현재 / })
     .or(page.getByRole("group", { name: "업무 모드" }));
-  const authenticatedShellFallback = page.getByRole("status")
-    .filter({ hasText: "저장된 업무 화면을 여는 중이에요." });
+  const authenticatedShellFallback = page.locator('[data-auth-stage="workspace"]');
   const authFailure = page.locator("#pin-error").filter({ hasText: /\S/ });
 
   // The emulator's first callable can take 4–5 seconds. Wait for AuthGate to
@@ -81,7 +80,7 @@ async function login(page: Page, pin: string) {
   const authorization = response.request().headers().authorization;
   expect(authorization).toMatch(/^Bearer /);
   await expect(page.getByRole("region", { name: "재고 관리", exact: true })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "재고를 불러오고" })).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "재고 불러오는 중" })).toHaveCount(0);
   return authorization!;
 }
 async function loginAdmin(page: Page) {

@@ -1,9 +1,19 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-22
+기준일: 2026-10-29
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-29 앱 전체 로딩·로그인 개선 — 구현·전체 CI 완료, 운영 미배포
+
+- 사용자 확정 계획에 따라 네 캡슐 로더와 사진 shimmer를 제거하고 상단 브랜드·오프화이트/흰색·먹색/청색 강조를 적용했다. PIN 입력·관리자 버튼·도움말 배치, 업무별 색상·인사 모션은 유지한다. 1초 표시/3초 보조 안내만 지연하며 실제 작업·완료 전환은 지연하지 않는다.
+- 코드 준비→세션 확인→최초 업무의 대기 시각을 이어가고 이후 탐색·실패 후 재시도는 새로 시작한다. 업무별 정적 자리 표시자, 단일 상태 낭독, 사진 준비/등록/연결 대기 구분을 적용했다. 연결 복구를 기다리는 인증 상태는 기존 안내만 정적으로 표시한다. 72~95px 사진 슬롯은 정적이며 큰 확대 영역에서 진행을 표시한다. 인증 정책·Callable·request ID·revision·서버 확인 후 완료 계약은 유지한다.
+- 재고 사진 선택/준비 코드를 기존 지연 품목 편집기 전용 모듈로 분리해 기존 용량 상한을 유지했다. 최종 운영 형식 build/PWA/성능/Hosting gate, 앱·Functions typecheck/lint PASS. 새 의존성 unit 1,826 PASS/기존 15 SKIP, 최종 인증 55·로딩 Chromium 24·거래처 사진 표현 56 PASS다. 최초 로딩·헤더·사진 선택 82 및 사진 선택 후속 16 PASS, 정적 인증의 79 PASS/4 FAIL/기존 18 SKIP 후 실패 4개 재검증 PASS 이력은 구현 기록에 남겼다.
+- 최초 CI `ccd028f`/40873497573에서 인증 83·재고/납품 사진·unit·타입·린트·운영 빌드 등은 통과했으나 기존 의존성 audit와 손상 사진의 옛 접근성 역할을 기대한 browser 2개가 실패했다. 오류 `alert`/로딩 상태 부재 검사를 보완하고 Next 16.4.3·Zod 4.6.7 및 필요한 전이 의존성을 갱신했다. Serwist는 9.5.12를 유지하며 세 빌드 패키지만 Zod override한다. `npm ci --engine-strict=true`와 audit의 high/critical 0 확인, moderate 14는 남아 있다.
+- 최종 제품 소스 `25c1effb518b03983c307d939e93d2cf6666f4e4`의 [Quality Gate 40877913374](https://github.com/kim-DL/ONWAY/actions/runs/40877913374) attempt 1은 검사 12개와 verify 전부 SUCCESS다. unit 1,826 PASS/기존 15 SKIP, 일반 browser 336 PASS/기존 8 SKIP, Phase 17 browser 83 PASS/기존 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS, 실패·내부 flaky 0이다. 결과 문서만 후속 `[skip ci]` 커밋으로 저장하고 제품 코드·lock은 동결한다. [검토용 PR #6](https://github.com/kim-DL/ONWAY/pull/6)에 변경과 전후 자료를 모았다.
+- 최종 의존성과 연결 대기 표시까지 반영해 동일 합성 backend·CPU 4배·지연 120ms·390×844에서 전후 각 5회를 다시 측정했다. 저장 세션 복귀 후 재고 검색 입력 가능 중앙값 3,721→3,720ms, 반복 복귀 3,718→3,717ms로 사실상 동일하다. 최초 브랜드 위치 안정 1,665→1,329ms, PIN 입력 가능 3,863→3,944ms다. 이전 후보의 78ms 개선을 최종 수치로 사용하지 않는다. Next/Zod 갱신도 포함한 로컬 비교이며 실제 기기·운영 p75 개선으로 일반화하지 않는다.
+- 브랜치 `codex/loading-experience-20261029`. 운영 배포·main 병합은 하지 않는다. [구현·전후 화면·검증과 한계](loading-experience-20261029.md), [개별 측정값·전환 기록](loading-experience-20261029-metrics.json), ignored 원본 로그 `output/loading-experience-20261029/`를 참고한다. 실제 설치 PWA의 OS 시작 화면과 직원 기기 인수는 별도다.
 
 ### 2026-10-22 거래처 네 원 모션·재고 인사 타이포 — main 저장·운영 Hosting 배포·검증 완료
 

@@ -32,8 +32,8 @@ export function deliveryPhotoUploadStatusText(job: DeliveryPhotoUploadProjection
   if (job.status === "persisting") return "기기에 보관 중";
   if (job.status === "paused") return job.message || "이전 날짜 사진 · 날짜 확인 후 전송해주세요";
   if (job.status === "preparing") return "사진 준비 중";
-  if (job.status === "queued") return "업로드 대기";
-  if (job.status === "uploading") return "업로드 중";
+  if (job.status === "queued") return "등록 대기 중";
+  if (job.status === "uploading") return "사진 등록 중";
   if (job.status === "completed") return "✓ 저장 완료";
   return job.message || "사진을 등록하지 못했어요.";
 }

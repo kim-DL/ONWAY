@@ -67,7 +67,7 @@ export function InventoryProductEditor(props: InventoryProductEditorProps) {
   // Latch the component type for this form's lifetime. Switching a mounted lazy
   // editor to its resolved component would discard the employee's draft.
   const [Editor] = useState(() => getLoadedInventoryProductEditor() ?? InventoryProductEditorImpl);
-  return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면을 준비하고 있어요.</p></BottomSheet>}><Editor {...props} /></Suspense>;
+  return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면 여는 중</p></BottomSheet>}><Editor {...props} /></Suspense>;
 }
 
 export function QuantityFields({ product, value, onChange, disabled, minimum = 0, label = "수량" }: { product: Pick<InventoryProduct, "unitLabel">; value: number; onChange: (value: number) => void; disabled: boolean; minimum?: number; label?: string }) {

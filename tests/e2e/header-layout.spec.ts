@@ -243,7 +243,7 @@ test("independent orb breathing explores wider paths without touching the greeti
   }
 });
 
-test("four-piece loader preserves readable status, three compact sizes and inherited work-mode palettes", async ({ page }, info) => {
+test("loading indicators preserve status, compact geometry and a consistent accent", async ({ page }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 320, height: 840 });
@@ -255,7 +255,9 @@ test("four-piece loader preserves readable status, three compact sizes and inher
   for (const size of ["small", "medium", "large"]) {
     const loader = catalog.getByRole("status", { name: `${size} 정보 불러오는 중`, exact: true });
     await expect(loader).toHaveAttribute("data-size", size);
-    await expect(loader.locator("[data-loader-piece]")).toHaveCount(4);
+    await expect(loader.locator("[data-loader-piece]")).toHaveCount(0);
+    await expect(loader).toHaveAttribute("data-visible", "true");
+    await expect(loader).toHaveAttribute("data-variant", size === "small" ? "circular" : "linear");
     const bounds = (await loader.boundingBox())!;
     expect(bounds.width).toBeGreaterThan(0);
     expect(bounds.width).toBeLessThanOrEqual(160);
@@ -271,8 +273,8 @@ test("four-piece loader preserves readable status, three compact sizes and inher
   for (const mode of ["customer", "delivery", "sales"]) {
     await page.getByRole("group", { name: "검증용 업무 모드" }).locator(`[data-mode="${mode}"]`).click();
     await expect(page.locator("main")).toHaveAttribute("data-mode", mode);
-    const autoPiece = catalog.locator("[data-loader-piece]").first();
-    const explicitPiece = explicit.locator(`[data-tone="${mode}"] [data-loader-piece]`).first();
+    const autoPiece = catalog.locator("[data-loading-segment]").first();
+    const explicitPiece = explicit.locator(`[data-tone="${mode}"] [data-loading-segment]`).first();
     const appearance = (element: Element) => { const style = getComputedStyle(element); return `${style.backgroundColor}|${style.backgroundImage}|${style.color}`; };
     await expect.poll(() => autoPiece.evaluate(appearance), `${mode} inherited loader palette`).toBe(await explicitPiece.evaluate(appearance));
     const current = await autoPiece.evaluate(appearance);
@@ -280,7 +282,8 @@ test("four-piece loader preserves readable status, three compact sizes and inher
     colors.push(current);
     await page.screenshot({ path: `output/playwright/header-layout/loader-${mode}-${info.project.name}.png` });
   }
-  expect(new Set(colors).size).toBe(3);
+  expect(new Set(colors).size).toBe(1);
+  expect(colors[0]).toContain("rgb(11, 90, 132)");
   await explicit.getByRole("button", { name: "저장 상태", exact: true }).click();
   await expect(page.getByLabel("검증용 버튼 입력 횟수", { exact: true })).toHaveText("1");
   await page.addStyleTag({ content: "html{font-size:200%}" });
@@ -289,12 +292,12 @@ test("four-piece loader preserves readable status, three compact sizes and inher
   expect(errors).toEqual([]);
 });
 
-test("four-piece loader moves naturally and respects explicit pause, hidden tabs, reduced motion and forced colors", async ({ page }) => {
+test("loading indicators respect explicit pause, hidden tabs, reduced motion and forced colors", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 840 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await liveMotionFixture(page, "loader");
   const loader = page.getByRole("status", { name: "medium 정보 불러오는 중", exact: true });
-  const piece = loader.locator("[data-loader-piece]").first();
+  const piece = loader.locator("[data-loading-segment]");
   await expect(loader).toHaveAttribute("data-motion", "running");
   const previous = await piece.evaluate((element) => getComputedStyle(element).transform);
   await expect.poll(() => piece.evaluate((element) => getComputedStyle(element).transform)).not.toBe(previous);

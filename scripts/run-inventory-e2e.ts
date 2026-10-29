@@ -56,7 +56,8 @@ try {
   const response = await fetch(INVENTORY_E2E_ORIGIN, { signal: AbortSignal.timeout(120_000) });
   if (!response.ok) throw new Error(`Inventory E2E app failed to start: HTTP ${response.status}.`);
   if (process.env.INVENTORY_BENCHMARK === "true") {
-    if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "field-count") await import("./benchmark-field-count-client");
+    if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "loading") await import("./benchmark-loading");
+    else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "field-count") await import("./benchmark-field-count-client");
     else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "profile-final") { await import("./inventory-search-profile"); await import("./inventory-editor-profile"); }
     else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "progressive-check") await import("./inventory-pagination-progressive-check");
     else if (process.env.INVENTORY_BENCHMARK_CAMPAIGN === "profile-editor") await import("./inventory-editor-profile");

@@ -8,7 +8,8 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { FloatingContextBar } from "@/components/ui/floating-context-bar";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingStatus } from "@/components/ui/loading-status";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { SchoolTypeMark } from "@/components/school/school-type-mark";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
@@ -38,8 +39,8 @@ const SchoolPhotoGallery = dynamic(
   () => import("./school-photo-gallery").then((module) => module.SchoolPhotoGallery),
   {
     loading: () => (
-      <section className={styles.photoLoading} role="status" aria-label="현장 사진 준비 중">
-        <div><OnnuriLoader decorative /><strong>저장된 현장 사진을 준비하고 있어요.</strong></div>
+      <section className={styles.photoLoading} aria-label="현장 사진 준비 중">
+        <LoadingStatus label="현장 사진 화면 여는 중" detail="등록된 사진을 표시할 화면을 준비하고 있습니다." />
       </section>
     ),
   },
@@ -47,12 +48,12 @@ const SchoolPhotoGallery = dynamic(
 
 const SalesCollaboration = dynamic(
   () => import("@/features/sales-history/sales-collaboration").then((module) => module.SalesCollaboration),
-  { loading: () => <div className="sales-deferred-loading" role="status">협업 정보를 준비하고 있습니다.</div> },
+  { loading: () => <LoadingStatus className="sales-deferred-loading" label="협업 화면 여는 중" detail="담당자 간 협업 정보를 표시할 화면을 준비하고 있습니다." /> },
 );
 
 const SalesHistoryTimeline = dynamic(
   () => import("@/features/sales-history/sales-history-timeline").then((module) => module.SalesHistoryTimeline),
-  { loading: () => <div className="sales-deferred-loading" role="status">방문 이력을 준비하고 있습니다.</div> },
+  { loading: () => <LoadingStatus className="sales-deferred-loading" label="방문 이력 화면 여는 중" detail="이전 방문 기록을 표시할 화면을 준비하고 있습니다." /> },
 );
 
 const SalesVisitSheet = dynamic(
@@ -60,7 +61,7 @@ const SalesVisitSheet = dynamic(
   {
     loading: () => (
       <BottomSheet open dismissible={false} title="방문 기록 준비 중" description="입력 화면을 안전하게 불러오고 있습니다." onClose={() => undefined}>
-        <div className="sales-deferred-loading" role="status">잠시만 기다려주세요.</div>
+        <LoadingStatus className="sales-deferred-loading" label="방문 기록 화면 여는 중" detail="방문 내용을 입력할 화면을 준비하고 있습니다." />
       </BottomSheet>
     ),
   },
@@ -331,7 +332,7 @@ export function SchoolDetail({
         profile ? <DeliveryFieldBrief profile={profile} schoolPhone={school.phone} canEdit={canEdit} onEdit={() => openFieldEditor("all")} /> :
         <section className={styles.state} aria-labelledby="field-workspace-title" role={detailState.status === "error" ? "alert" : undefined}>
           <h2 id="field-workspace-title">납품 현장정보</h2>
-          {detailState.status === "loading" ? <div role="status"><OnnuriLoader label="현장정보를 불러오는 중" /></div> :
+          {detailState.status === "loading" ? <LoadingSkeleton kind="text" /> :
             detailState.status === "error" ? <><p>현장정보를 불러오지 못했어요. 인터넷 연결을 확인해주세요.</p><GlassButton compact onClick={detailState.refresh}>다시 불러오기</GlassButton></> :
               <><p>검수시간과 급식실 위치를 아직 등록하지 않았어요.</p>{canEdit ? <GlassButton compact onClick={() => openFieldEditor("all")}>현장정보 등록</GlassButton> : null}</>}
           {school.phone ? <a href={phoneHref(school.phone)}>학교 대표 전화 · {school.phone}</a> : null}
@@ -348,11 +349,11 @@ export function SchoolDetail({
           canEdit={canEdit}
           onRefresh={detailState.refresh}
         />
-      ) : (
-        <section className={styles.photoLoading} role="status" aria-label="현장 사진 정보 불러오는 중">
-          <div><OnnuriLoader decorative /><strong>현장 사진 정보를 확인하고 있어요.</strong></div>
+      ) : detailState.status === "loading" ? (
+        <section className={styles.photoLoading} aria-label="현장 사진 정보 불러오는 중">
+          <LoadingStatus label="현장정보와 사진 불러오는 중" detail="학교의 현장정보와 등록된 사진 목록을 확인하고 있습니다." />
         </section>
-      )}
+      ) : mode === "sales" ? <section className={styles.photoLoading} role="alert"><p>현장정보와 사진을 불러오지 못했어요.</p><GlassButton compact onClick={detailState.refresh}>다시 불러오기</GlassButton></section> : null}
 
       {mode === "sales" && salesData && visitAssignment ? (
         <SalesCollaboration

@@ -19,6 +19,7 @@ vi.mock("./inventory-repository", () => ({ inventoryRepository: { context: harne
 import { InventoryCard } from "./inventory-card";
 import { InventoryListChunks } from "./inventory-list-chunks";
 import { InventoryWorkspace } from "./inventory-workspace";
+vi.mock("@/features/app-shell/initial-workspace-timing", () => ({ useInitialWorkspaceStartedAt: () => undefined }));
 
 const context: InventoryContext = { today: "2026-09-13", canWrite: true, canAdmin: false, cycle: { cycleId: "week-2026-09-07", startDate: "2026-09-07", nextDate: "2026-09-14", weekday: 1 }, settings: { weekday: 1, urgentDays: 7, revision: 0, pendingWeekday: null, effectiveDate: null, pendingCycleStartDate: null, updatedAt: null, updatedBy: null } };
 const session = { uid: "employee-1", displayName: "가상 직원", claims: { roleScopes: ["delivery"], sessionVersion: 1, permissionsVersion: 1 } } as AuthenticatedSession;
@@ -40,7 +41,7 @@ function resetMountedInstance() { harness.states = []; harness.refs = []; harnes
 async function settle() { for (let index = 0; index < 12; index += 1) await Promise.resolve(); }
 const hasEditor = (tree: ReactNode) => find(tree, (type) => typeof type === "function" && type.name === "InventoryProductEditor") !== null;
 const catalog = () => getInventoryWorkspaceSession("employee-1:1:1").snapshot.catalog;
-const isLoading = () => find(render(), (_type, props) => props.role === "status" && props.children === "재고를 불러오고 있어요.") !== null;
+const isLoading = () => find(render(), (type, props) => typeof type === "function" && type.name === "LoadingStatus" && props.label === "재고 불러오는 중") !== null;
 const searchField = () => find(render(), (type, props) => type === "input" && props["aria-label"] === "품목 검색")!;
 const card = (productId: string) => find(render(), (type, props) => type === InventoryCard && (props.product as InventoryProduct).productId === productId);
 function expectNoPrivateSurfaces() {

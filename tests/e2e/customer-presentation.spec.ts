@@ -242,7 +242,8 @@ test("corrupt JPEG fails before preview, offers retry and recovers after another
   const retry = page.getByRole("button", { name: "다시 준비", exact: true });
   await expect(retry).toBeVisible();
   await expect(page.getByRole("img", { name: "선택한 거래처 전경사진 미리보기", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("status").filter({ hasText: "사진을 준비하지 못했어요" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "사진을 준비하지 못했어요" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "사진 준비 중" })).toHaveCount(0);
   expect((await retry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await retry.click();
   await expect(retry).toBeVisible();

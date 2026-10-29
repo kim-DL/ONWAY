@@ -5,9 +5,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { useToast } from "@/components/ui/toast";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
+import { useLaunchTiming } from "@/features/auth/auth-loading";
 import { SalesExportWorkspace } from "@/features/export/sales-export-workspace";
 import { INVENTORY_ENABLED } from "@/features/inventory/inventory-feature";
 
@@ -38,6 +39,7 @@ const InventoryWorkspace = dynamic(
 
 function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
   const { showToast } = useToast();
+  const { startedAt } = useLaunchTiming();
   const [view, setView] = useState<AdminView>("overview");
   const [data, setData] = useState<AdminWorkspaceData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
@@ -46,12 +48,13 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
   const loadGeneration = useRef(0);
+  const [loadingStartedAt, setLoadingStartedAt] = useState(startedAt);
   const interaction = useAdminInteraction();
 
   const load = useCallback(
     async (cycleId: string | null = null, silent = false) => {
       const generation = ++loadGeneration.current;
-      if (!silent) setStatus("loading");
+      if (!silent) { setLoadingStartedAt(Date.now()); setStatus("loading"); }
       else setRefreshing(true);
       setRefreshError(false);
       try {
@@ -103,11 +106,7 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
     content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} admin />;
   else if (status === "loading")
     content = (
-      <div className="admin-loading" role="status">
-        <OnnuriLoader size="large" decorative />
-        <strong>운영 데이터를 안전하게 불러오는 중</strong>
-        <p>권한과 최신 버전을 서버에서 함께 확인합니다.</p>
-      </div>
+      <LoadingStatus className="admin-loading" label="운영 데이터 불러오는 중" detail="현재 권한과 최신 데이터를 확인하고 있습니다." startedAt={loadingStartedAt} />
     );
   else if (status === "error" || !data)
     content = (

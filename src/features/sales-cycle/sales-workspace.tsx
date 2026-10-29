@@ -7,7 +7,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { SkeletonCard } from "@/components/ui/skeleton-card";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { SoftCard } from "@/components/ui/soft-card";
 import { useToast } from "@/components/ui/toast";
 import type { SalesCycle } from "@/domain/sales";
@@ -15,6 +15,7 @@ import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
+import { WorkspaceFeatureLoading } from "@/features/app-shell/workspace-feature-loading";
 import { canPlanRouteForSchool } from "@/features/sales-route/sales-route-location";
 import type { ActiveSalesRoute } from "@/features/sales-route/sales-route-contract";
 import { readActiveSalesRoute, readLatestActiveSalesRoute, writeActiveSalesRoute } from "@/features/sales-route/sales-route-storage";
@@ -34,9 +35,7 @@ const SalesRoutePlanner = dynamic(
   () => import("@/features/sales-route/sales-route-planner").then((module) => module.SalesRoutePlanner),
   {
     loading: () => (
-      <div className="sales-claim-loading" role="status">
-        <Icon name="refresh" /><span>방문 동선 입력 화면을 준비하고 있어요.</span>
-      </div>
+      <LoadingStatus className="sales-claim-loading" label="방문 동선 화면 여는 중" detail="입력 화면을 준비하고 있습니다." />
     ),
   },
 );
@@ -45,9 +44,7 @@ const SalesClaimPicker = dynamic(
   () => import("./sales-claim-picker").then((module) => module.SalesClaimPicker),
   {
     loading: () => (
-      <div className="sales-claim-loading" role="status">
-        <Icon name="refresh" /><span>학교 선택 화면을 준비하고 있어요.</span>
-      </div>
+      <LoadingStatus className="sales-claim-loading" label="학교 선택 화면 여는 중" detail="입력 화면을 준비하고 있습니다." />
     ),
   },
 );
@@ -66,15 +63,6 @@ function cycleStatusLabel(cycle: SalesCycle) {
   if (cycle.status === "active") return "현재 진행 중";
   if (cycle.status === "draft") return "배정 초안";
   return "종료 · 읽기 전용";
-}
-
-function WorkspaceSkeleton() {
-  return (
-    <section className="shell-page sales-cycle-page" aria-label="월별 배정 불러오는 중">
-      <div className="sales-cycle-skeleton__hero" />
-      <div className="assignment-grid">{[0, 1, 2].map((item) => <SkeletonCard key={item} />)}</div>
-    </section>
-  );
 }
 
 export function SalesWorkspace({
@@ -183,7 +171,7 @@ export function SalesWorkspace({
     };
   }, [activeRoute, district, scope, session.claims.employeeId, workspace]);
 
-  if (data.status === "loading" && !workspace) return <WorkspaceSkeleton />;
+  if (data.status === "loading" && !workspace) return <WorkspaceFeatureLoading mode="sales" label="월별 배정 불러오는 중" />;
   if (data.status === "error" || !workspace || !model) {
     const setupRequired = data.issue === "setup-required";
     return (

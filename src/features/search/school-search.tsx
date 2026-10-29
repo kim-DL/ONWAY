@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingIndicator } from "@/components/ui/loading-indicator";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { lockBodyScroll } from "@/components/ui/body-scroll-lock";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { searchInputProps } from "@/components/ui/search-input-props";
@@ -94,7 +95,7 @@ function ResultButton({
           <span data-active={item.photoCount > 0}>사진 {item.photoCount}</span>
         </span>
       </span>
-      <span className="school-search-result__action">{pending ? <OnnuriLoader size="small" decorative /> : <Icon name="chevron-right" size={20} />}</span>
+      <span className="school-search-result__action">{pending ? <LoadingIndicator size="small" decorative /> : <Icon name="chevron-right" size={20} />}</span>
     </button>
   );
 }
@@ -288,9 +289,7 @@ export function SchoolSearch({
         <div id="school-search-results" className="school-search-results" role="listbox" aria-label="학교 검색 결과">
           {catalogState.status === "loading" ? (
             <div className="school-search-state" aria-label="검색 카탈로그 불러오는 중">
-              <OnnuriLoader size="large" decorative />
-              <strong>이 기기의 학교 지도를 준비하고 있어요.</strong>
-              <p>저장된 카탈로그를 먼저 확인한 뒤 최신 버전을 살펴봅니다.</p>
+              <LoadingStatus label="학교 목록 불러오는 중" detail="저장된 목록과 최신 버전을 확인하고 있습니다." />
             </div>
           ) : catalogState.status === "error" ? (
             <div className="school-search-state" role="alert">

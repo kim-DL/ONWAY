@@ -43,7 +43,8 @@ describe("compact inventory detail actions", () => {
     const options = { initialProduct: snapshot, countMode: true };
     let tree = render(context, options);
     expect(text(tree)).toContain("29봉"); expect(text(tree)).toContain("온누리");
-    expect(text(tree)).toContain("최신 재고를 확인하고 있어요.");
+    const pending = find(tree, (type, props) => typeof type === "function" && type.name === "LoadingStatus" && props.label === "최신 재고 확인 중");
+    expect(pending?.detail).toBe("선택한 품목의 현재 수량과 유통기한 정보를 확인하고 있습니다.");
     expect(find(tree, (_, props) => props.title === product.name)).not.toBeNull();
     expect(find(tree, (type) => typeof type === "function" && type.name === "InventoryPhoto")).toBeNull();
     for (const label of ["출고", "입고", "조정", "수량 일치 확인", "품목 정보 수정"]) expect(button(tree, label)?.disabled).toBe(true);

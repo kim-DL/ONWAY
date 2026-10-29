@@ -62,7 +62,7 @@
 .sales-claim-empty > span { width: 3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 15px; color: var(--shell-accent-deep); background: #e7f1ea; }
 .sales-claim-empty h3 { margin: .25rem 0 0; color: var(--shell-ink); font-size: 1.05rem; }
 .sales-claim-empty p { max-width: 31rem; margin: 0; font-size: .82rem; line-height: 1.65; word-break: keep-all; }
-.sales-claim-loading { min-height: 12rem; grid-template-columns: auto auto; }
+.sales-claim-loading { min-height: 12rem; }
 
 
 

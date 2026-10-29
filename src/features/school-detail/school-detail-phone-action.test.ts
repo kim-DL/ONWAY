@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
-const harness = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, ready: true, phone: null as string | null }));
+const harness = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, ready: true, error: false, phone: null as string | null }));
 vi.mock("react", async (importOriginal) => ({
   ...await importOriginal<typeof import("react")>(),
   useState: (initial: unknown) => {
@@ -20,12 +20,13 @@ vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ showToast: vi.fn() 
 vi.mock("./school-detail-repository", () => ({ schoolDetailRepository: {} }));
 vi.mock("./use-school-detail", () => ({
   useSchoolDetail: (school: School) => ({
-    status: harness.ready ? "ready" : "loading", refresh: vi.fn(), refreshing: false, stale: false,
+    status: harness.error ? "error" : harness.ready ? "ready" : "loading", refresh: vi.fn(), refreshing: false, stale: false,
     detail: harness.ready ? { school: { ...school, phone: harness.phone }, fieldProfile: null, salesData: null, photos: [] } : null,
   }),
 }));
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { SchoolDetail } from "./school-detail";
 
 type Element = ReactElement<Record<string, unknown>>;
@@ -44,7 +45,7 @@ function phoneButton(node: ReactNode, label: string) {
   if (!button) throw new Error("Expected contextual phone button is missing");
   return button;
 }
-function render(role: "sales" | "viewer" = "sales") {
+function render(role: "sales" | "viewer" = "sales", mode: "sales" | "delivery" = "sales") {
   harness.cursor = 0;
   return SchoolDetail({
     school: {
@@ -52,11 +53,30 @@ function render(role: "sales" | "viewer" = "sales") {
       address: { road: "대전 서구", jibun: null }, location: { matchStatus: "unmatched" },
     } as School,
     session: { claims: { roleScopes: [role], employeeId: "EMP-PHONE" } } as AuthenticatedSession,
-    mode: "sales",
+    mode,
   });
 }
 
-beforeEach(() => { harness.values = []; harness.cursor = 0; harness.ready = true; harness.phone = null; });
+beforeEach(() => { harness.values = []; harness.cursor = 0; harness.ready = true; harness.error = false; harness.phone = null; });
+
+describe("school detail request feedback", () => {
+  it.each(["delivery", "sales"] as const)("announces the shared field and photo request once in %s", (mode) => {
+    harness.ready = false;
+    const statuses = all(render("sales", mode)).filter((element) => element.type === LoadingStatus);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.label).toBe("현장정보와 사진 불러오는 중");
+    expect(statuses[0]?.props.detail).toBeTruthy();
+  });
+
+  it.each(["delivery", "sales"] as const)("stops loading feedback and offers retry after a %s request fails", (mode) => {
+    harness.ready = false;
+    harness.error = true;
+    const elements = all(render("sales", mode));
+    expect(elements.some((element) => element.type === LoadingStatus)).toBe(false);
+    expect(elements.filter((element) => element.props.role === "alert")).toHaveLength(1);
+    expect(elements.some((element) => text(element) === "다시 불러오기" && typeof element.props.onClick === "function")).toBe(true);
+  });
+});
 
 describe("school contextual phone action", () => {
   it("opens the contact form directly for an editable school without a telephone number", () => {

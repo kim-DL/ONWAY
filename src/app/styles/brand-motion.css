@@ -63,8 +63,7 @@
   65% { opacity: 1; transform: translateX(1px) scale(1.02); }
 }
 
-.workspace-shell .app-brand__mark,
-.auth-brand__mark {
+.workspace-shell .app-brand__mark {
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -72,8 +71,7 @@
   background: #f7fbff;
   box-shadow: 0 9px 24px rgba(28, 92, 146, .13), inset 0 1px 0 rgba(255, 255, 255, .92);
 }
-.app-brand__mark::after,
-.auth-brand__mark::after {
+.app-brand__mark::after {
   position: absolute;
   z-index: 2;
   inset: -45%;
@@ -83,10 +81,8 @@
   pointer-events: none;
   transform: translateX(-260%) rotate(18deg);
 }
-.app-brand__wordmark small,
-.auth-brand small { letter-spacing: .055em; }
-.app-brand__mark .app-icon-mark,
-.auth-brand__mark .app-icon-mark {
+.app-brand__wordmark small { letter-spacing: .055em; }
+.app-brand__mark .app-icon-mark {
   position: relative;
   z-index: 1;
   transform-origin: center;
@@ -108,16 +104,11 @@
 .workspace-shell .status-badge--attention { color: #76423b; background: #f3e3df; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .app-brand__mark,
-  .auth-brand__mark { animation: brand-mark-arrive 460ms cubic-bezier(.18, .82, .24, 1) backwards; }
-  .app-brand__mark::after,
-  .auth-brand__mark::after { animation: brand-mark-sheen 820ms 360ms cubic-bezier(.2, .7, .2, 1) both; }
-  .app-brand__wordmark,
-  .auth-brand > span:last-child { animation: brand-copy-arrive 420ms 90ms ease-out backwards; }
+  .app-brand__mark { animation: brand-mark-arrive 460ms cubic-bezier(.18, .82, .24, 1) backwards; }
+  .app-brand__mark::after { animation: brand-mark-sheen 820ms 360ms cubic-bezier(.2, .7, .2, 1) both; }
+  .app-brand__wordmark { animation: brand-copy-arrive 420ms 90ms ease-out backwards; }
 
   .workspace-content > .shell-page { animation: workspace-page-arrive 300ms cubic-bezier(.2, .78, .24, 1) backwards; }
-  .login-story__copy { animation: workspace-page-arrive 520ms 100ms cubic-bezier(.2, .78, .24, 1) backwards; }
-  .login-card { animation: login-card-arrive 520ms 140ms cubic-bezier(.18, .82, .24, 1) backwards; }
 
   .shell-hero > div:first-child,
   .sales-cycle-hero > div:first-child,
@@ -172,9 +163,6 @@
 }
 @keyframes workspace-page-arrive {
   from { transform: translateY(7px); }
-}
-@keyframes login-card-arrive {
-  from { transform: translateY(10px) scale(.985); }
 }
 @keyframes hero-copy-arrive {
   from { transform: translateY(9px); }

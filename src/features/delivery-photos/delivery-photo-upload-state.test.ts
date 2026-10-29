@@ -10,7 +10,7 @@ describe("memory-only delivery photo upload state", () => {
 
   it("labels preparation, queue, relay, completion and failure without fake progress", () => {
     expect(["preparing", "queued", "uploading", "completed"].map((status) => deliveryPhotoUploadStatusText(job(status as DeliveryPhotoUploadProjection["status"])))).toEqual([
-      "사진 준비 중", "업로드 대기", "업로드 중", "✓ 저장 완료",
+      "사진 준비 중", "등록 대기 중", "사진 등록 중", "✓ 저장 완료",
     ]);
     expect(deliveryPhotoUploadStatusText(job("failed", "retryable"))).toBe("network");
   });

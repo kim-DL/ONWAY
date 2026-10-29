@@ -28,8 +28,7 @@
 .photo-source-actions strong { font-size: .9rem; }
 .photo-source-actions small { color: var(--shell-ink-soft); font-size: .75rem; }
 .photo-dropzone { cursor: default; }
-.photo-dropzone__progress { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: .65rem; color: #244c42; background: rgba(237,246,243,.9); font-size: .85rem; font-weight: 780; backdrop-filter: blur(8px); }
-.photo-dropzone__progress i { width: 1.6rem; aspect-ratio: 1; border: 3px solid rgba(31,107,89,.18); border-top-color: var(--shell-accent); border-radius: 50%; animation: auth-spin 760ms linear infinite; }
+.photo-dropzone__progress { position: absolute; inset: auto 12px 12px; padding: 12px 16px; color: #191f28; background: rgba(255,255,255,.96); border: 1px solid #e6ebf0; border-radius: 8px; font-size: .875rem; }
 .photo-optimization-result { min-height: 2.6rem; display: flex; align-items: center; gap: .45rem; margin: 0; padding: .55rem .7rem; border-radius: 13px; color: #245c4f; background: #e7f5f0; font-size: .8rem; font-weight: 740; }
 .photo-optimization-result > span { margin-left: auto; color: #56736c; font-size: .72rem; font-weight: 650; }
 
@@ -155,7 +154,7 @@
 .delivery-recents__empty small { color: var(--shell-ink-soft); font-size: .74rem; line-height: 1.45; }
 .delivery-recents__empty > svg { color: var(--palette-soil-deep); }
 .delivery-recents__loading { min-height: 5.4rem; display: grid; grid-template-columns: 2.4rem 1fr 4rem; align-items: center; gap: .75rem; border-block: 1px solid var(--shell-line); }
-.delivery-recents__loading i { height: .65rem; border-radius: 999px; background: #e3e3e1; animation: skeleton-shimmer 1.2s ease-in-out infinite; }
+.delivery-recents__loading i { height: .65rem; border-radius: 4px; background: #e6ebf0; }
 
 /* Sales detail: muted multi-accent surfaces and a deliberate information sequence. */
 
@@ -234,10 +233,8 @@
 .workspace-shell .aurora-background i:nth-child(3) { background: #eaa894; opacity: .1; }
 
 .app-icon-mark,
-.app-brand__mark svg,
-.auth-brand__mark svg { width: 100%; height: 100%; display: block; }
-.workspace-shell .app-brand__mark,
-.auth-brand__mark {
+.app-brand__mark svg { width: 100%; height: 100%; display: block; }
+.workspace-shell .app-brand__mark {
   overflow: hidden;
   padding: 0;
   border-radius: 17px;
@@ -682,31 +679,6 @@
   .sales-visit-form__identity { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); }
   .sales-visit-form__identity > p { grid-column: 1 / -1; }
 }
-
-/* Login carries the same fresh palette as the field workspace. */
-.auth-shell { color: #273248; background: #fbfcf8; }
-.login-story {
-  color: #273248;
-  background:
-    radial-gradient(circle at 92% 18%, rgba(234,168,148,.28), transparent 15rem),
-    radial-gradient(circle at 75% 92%, rgba(104,174,147,.22), transparent 24rem),
-    linear-gradient(145deg,#eef5ff 0%,#f5f0ff 55%,#fff7f2 100%);
-}
-.login-story::before { border-color: rgba(140,134,199,.14); }
-.login-story::after { background: rgba(234,168,148,.22); }
-.login-story .auth-eyebrow { color: #3569c7; }
-.login-story h1 em { color: #e97132; }
-.login-story__copy > p:last-child { color: #687389; }
-.route-motif { color: #687389; }
-.route-motif::before { background: rgba(93,90,145,.2); }
-.route-motif i { background: rgba(93,90,145,.36); }
-.login-panel {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(216,229,99,.2), transparent 22rem),
-    radial-gradient(circle at 10% 90%, rgba(234,168,148,.14), transparent 24rem),
-    #fffdf9;
-}
-.pin-form button:not(:disabled) { background: linear-gradient(135deg,#3569c7,#5d5a91); box-shadow: 0 13px 28px rgba(69,89,157,.22); }
 
 /* 2026-09-03 interaction and contrast pass · explicit choices, no duplicate detail chrome */
 .visit-binary-choice {

@@ -17,9 +17,10 @@ describe("administrator navigation contract", () => {
     expect(avatar).toContain("width: 36px");
     expect(avatar).toContain("height: 36px");
     expect(avatar).toContain("font-weight: 750");
-    expect(css).toMatch(/\.auth-brand__mark\s*\{\s*position: relative;\s*isolation: isolate;/);
-    expect(css).toContain(".auth-brand__mark::after { animation: brand-mark-sheen");
-    expect(css).toContain(".auth-brand > span:last-child { animation: brand-copy-arrive");
+    expect(css).toContain(".auth-shell .auth-brand__mark {");
+    expect(css).not.toContain(".auth-brand__mark::after { animation:");
+    expect(css).not.toContain(".auth-brand > span:last-child { animation:");
+    expect(css).toContain(".app-brand__mark::after { animation: brand-mark-sheen");
   });
 
   it("keeps all nine destinations and partitions four quick destinations from five additional tools", () => {

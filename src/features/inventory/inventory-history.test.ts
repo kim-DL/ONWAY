@@ -23,6 +23,7 @@ function articles(tree: ReactNode): string[] {
   return tree.type === "article" ? [String(tree.key)] : articles(tree.props.children);
 }
 function render(productId = "product-1") { harness.cursor = 0; harness.refCursor = 0; harness.effects = []; return InventoryHistory({ productId }); }
+function isLoading(tree: ReactNode) { return find(tree, (type, props) => typeof type === "function" && type.name === "LoadingStatus" && props.label === "기록 불러오는 중") !== null; }
 function click(tree: ReactNode, label: string) { (find(tree, (_type, props) => props.children === label)!.onClick as () => void)(); }
 function run() { return harness.effects[0]!() as () => void; }
 async function settle() { for (let index = 0; index < 8; index += 1) await Promise.resolve(); }
@@ -30,22 +31,28 @@ const event = (eventId: string, kind: InventoryEvent["kind"] = "receive"): Inven
 beforeEach(() => { harness.states = []; harness.refs = []; harness.cursor = 0; harness.refCursor = 0; harness.effects = []; harness.history.mockReset(); });
 
 describe("inventory history recovery", () => {
+  it("announces request progress outside a busy subtree", () => {
+    const tree = render();
+    expect(tree.props["aria-busy"]).toBeUndefined();
+    expect(isLoading(tree)).toBe(true);
+    expect(find(tree, (type) => typeof type === "function" && type.name === "LoadingStatus")?.detail).toBe("입출고와 실사 내역을 확인하고 있습니다.");
+  });
   it("finishes initial loading after failure and retries the initial page explicitly", async () => {
     harness.history.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ events: [event("one")], nextCursor: null });
     render(); run(); await settle();
-    let tree = render(); expect(tree.props["aria-busy"]).toBe(false);
+    let tree = render(); expect(isLoading(tree)).toBe(false);
     expect(find(tree, (_type, props) => props.role === "alert")).not.toBeNull();
-    click(tree, "기록 다시 불러오기"); tree = render(); expect(tree.props["aria-busy"]).toBe(true); run(); await settle();
-    tree = render(); expect(tree.props["aria-busy"]).toBe(false); expect(articles(tree)).toEqual(["one"]);
+    click(tree, "기록 다시 불러오기"); tree = render(); expect(isLoading(tree)).toBe(true); run(); await settle();
+    tree = render(); expect(isLoading(tree)).toBe(false); expect(articles(tree)).toEqual(["one"]);
     expect(harness.history.mock.calls).toEqual([["product-1", null], ["product-1", null]]);
   });
 
   it("retries the same failed older page without losing loaded rows or duplicating records", async () => {
     harness.history.mockResolvedValueOnce({ events: [event("one")], nextCursor: "older" }).mockRejectedValueOnce(new Error("timeout")).mockResolvedValueOnce({ events: [event("one"), event("two"), event("two")], nextCursor: null });
     render(); run(); await settle(); let tree = render(); click(tree, "이전 기록 더 보기"); render(); run(); await settle();
-    tree = render(); expect(tree.props["aria-busy"]).toBe(false); expect(articles(tree)).toEqual(["one"]);
+    tree = render(); expect(isLoading(tree)).toBe(false); expect(articles(tree)).toEqual(["one"]);
     click(tree, "기록 다시 불러오기"); render(); run(); await settle(); tree = render();
-    expect(tree.props["aria-busy"]).toBe(false); expect(articles(tree)).toEqual(["one", "two"]);
+    expect(isLoading(tree)).toBe(false); expect(articles(tree)).toEqual(["one", "two"]);
     expect(harness.history.mock.calls).toEqual([["product-1", null], ["product-1", "older"], ["product-1", "older"]]);
   });
 
@@ -54,7 +61,7 @@ describe("inventory history recovery", () => {
     const tree = render(); click(tree, "기록 다시 불러오기"); click(tree, "기록 다시 불러오기");
     expect(harness.states[0]).toMatchObject({ retry: 1 });
     harness.history.mockResolvedValueOnce({ events: [], nextCursor: null }); render(); run(); await settle();
-    expect(harness.history).toHaveBeenCalledTimes(2); expect(render().props["aria-busy"]).toBe(false);
+    expect(harness.history).toHaveBeenCalledTimes(2); expect(isLoading(render())).toBe(false);
   });
 
   it("ignores late results after unmount and starts a different product at the first page", async () => {
@@ -79,7 +86,7 @@ describe("inventory history recovery", () => {
     render(); run(); await settle(); const tree = render();
     expect(find(tree, (type, props) => type === "strong" && props.children === "유통기한 정보 수정")).not.toBeNull();
     harness.history.mockResolvedValueOnce({ events: [], nextCursor: null }); render("empty-product"); run(); await settle();
-    const empty = render("empty-product"); expect(empty.props["aria-busy"]).toBe(false);
+    const empty = render("empty-product"); expect(isLoading(empty)).toBe(false);
     expect(find(empty, (_type, props) => props.children === "아직 기록이 없어요.")).not.toBeNull();
   });
 });

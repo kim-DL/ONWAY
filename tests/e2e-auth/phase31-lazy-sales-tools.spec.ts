@@ -19,8 +19,8 @@ function toolAsset(tool: string) {
 }
 
 for (const tool of [
-  { module: "sales-route-planner", trigger: /방문 동선/, dialog: "방문 동선 만들기", loading: "방문 동선 입력 화면을 준비하고 있어요.", ready: ".sales-route-candidates" },
-  { module: "sales-claim-picker", trigger: /학교 추가/, dialog: "담당 학교 가져오기", loading: "학교 선택 화면을 준비하고 있어요.", ready: ".assignment-picker" },
+  { module: "sales-route-planner", trigger: /방문 동선/, dialog: "방문 동선 만들기", loading: "방문 동선 화면 여는 중", ready: ".sales-route-candidates" },
+  { module: "sales-claim-picker", trigger: /학교 추가/, dialog: "담당 학교 가져오기", loading: "학교 선택 화면 여는 중", ready: ".assignment-picker" },
 ] as const) {
   test(`${tool.module} loads on first open and can close safely before its code arrives`, async ({ page }) => {
     if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -49,7 +49,7 @@ for (const tool of [
       const trigger = page.getByRole("toolbar", { name: "담당 학교 작업" }).getByRole("button", { name: tool.trigger });
       await trigger.click();
       const dialog = page.getByRole("dialog", { name: tool.dialog });
-      await expect(dialog.getByRole("status")).toHaveText(tool.loading);
+      await expect(dialog.getByRole("status").locator(":scope > span").first()).toHaveText(tool.loading);
       await expect.poll(() => requests).toBe(1);
       await expect(dialog.getByRole("button", { name: "닫기", exact: true })).toBeEnabled();
       await dialog.getByRole("button", { name: "닫기", exact: true }).click();

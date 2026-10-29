@@ -1,0 +1,881 @@
+{
+  "baselineRevision": "4f06e3c60f3215c3a772c8f5e9cd74ff07fabef7",
+  "candidate": "Final loading UI, including static offline connection-wait presentation, with the required security dependency update; measured before final commit",
+  "candidateSnapshot": {
+    "basedOnRevision": "ccd028fafa2eb75b2082552d5ee63974bca1702f",
+    "sourceScope": "Tracked src, functions/src, next.config.ts, package.json, functions/package.json, package-lock.json working-tree contents, sorted by path",
+    "sourceSha256": "1362832ac30a0af196938881acc67b75f9055f8beb1176655646d490a991685a",
+    "lockfileSha256": "c2b609298b81722312ae94a87fbb84a8f3fdc28757ee74495d566904dd0a0083",
+    "benchmarkScriptSha256": "b3e3c96200a56b2111a51bd1b5bfca7ad4266c425a638679907ca2325f5e5602"
+  },
+  "measuredAt": {
+    "before": "2026-10-29T12:53:58.645Z",
+    "after": "2026-10-29T12:56:25.598Z"
+  },
+  "definition": {
+    "firstStableSurface": "Brand rectangle unchanged for three consecutive requestAnimationFrame observations; a launch-layout proxy, not all pixels or data ready",
+    "workReady": "Inventory search input rendered enabled; actual fill/clear verified",
+    "cache": "Service worker blocked, HTTP cache disabled by localhost-only request routing; repeat is same-context repeat",
+    "order": "Fresh isolated candidate build, then cached baseline 5 and cached candidate 5, each after one excluded warmup; serial local runs without concurrent build/test workloads",
+    "statistic": "Median of five valid samples per journey; ranges preserve observed variation",
+    "dependencyBoundary": "Baseline frontend uses the preserved 4f06e3c static assets built with Next 16.3.8 and Zod 4.4.3; candidate frontend uses Next 16.4.3 and Zod 4.6.7. Both runs use the same current Functions source and installed backend dependencies. This measures the final candidate including dependency changes, not the isolated causal effect of loading UI changes.",
+    "limitations": "Synthetic local browser and emulator comparison, not real-device or production p75 evidence. Five serial samples do not establish a statistically reliable speed improvement."
+  },
+  "dependencies": {
+    "baselineFrontend": {
+      "next": "16.3.8",
+      "zod": "4.4.3"
+    },
+    "candidateFrontend": {
+      "next": "16.4.3",
+      "zod": "4.6.7"
+    },
+    "backend": {
+      "sameCurrentSourceAndDependenciesForBoth": true,
+      "zod": "4.6.7",
+      "node": "v22.23.2"
+    }
+  },
+  "artifacts": {
+    "baseline": {
+      "directory": "output/playwright/inventory-benchmark/loading-before-built",
+      "indexSha256": "efb6f0a7f894a78d1894ed860606b6ee611f838fa76e437e6ce8012aa7908088",
+      "serviceWorkerSha256": "1797e732ccdf543cb13e22c47d8af1e859345ee731b47b73fb010e69de352178"
+    },
+    "candidate": {
+      "directory": "output/playwright/inventory-benchmark/loading-after-security-reviewed-built",
+      "indexSha256": "dad08928381abbede040e88159125f9cf495c146a749a9a9fad3e5eade6025f4",
+      "serviceWorkerSha256": "1c229de00cd07bafb1df3901fbc9a74fb46589c45d77e52f26226286d1eba2d1"
+    },
+    "originalProductionArtifactsUnchanged": true,
+    "beforeRaw": "output/loading-experience-20261029/loading-before-security-reviewed/timings.json",
+    "afterRaw": "output/loading-experience-20261029/loading-after-security-reviewed/timings.json"
+  },
+  "comparison": [
+    {
+      "journey": "resume-cold-assets",
+      "firstStableSurface": {
+        "beforeMs": 1104,
+        "afterMs": 1125,
+        "deltaMs": 21,
+        "beforeRangeMs": [
+          1098,
+          1123
+        ],
+        "afterRangeMs": [
+          1092,
+          1130
+        ]
+      },
+      "shellReady": {
+        "beforeMs": 3269,
+        "afterMs": 3305,
+        "deltaMs": 36,
+        "beforeRangeMs": [
+          3256,
+          3314
+        ],
+        "afterRangeMs": [
+          3284,
+          3371
+        ]
+      },
+      "workReady": {
+        "beforeMs": 3721,
+        "afterMs": 3720,
+        "deltaMs": -1,
+        "beforeRangeMs": [
+          3702,
+          3777
+        ],
+        "afterRangeMs": [
+          3705,
+          3805
+        ]
+      }
+    },
+    {
+      "journey": "resume-repeat",
+      "firstStableSurface": {
+        "beforeMs": 1100,
+        "afterMs": 1077,
+        "deltaMs": -23,
+        "beforeRangeMs": [
+          1092,
+          1155
+        ],
+        "afterRangeMs": [
+          1065,
+          1099
+        ]
+      },
+      "shellReady": {
+        "beforeMs": 3274,
+        "afterMs": 3311,
+        "deltaMs": 37,
+        "beforeRangeMs": [
+          3259,
+          3311
+        ],
+        "afterRangeMs": [
+          3283,
+          3337
+        ]
+      },
+      "workReady": {
+        "beforeMs": 3718,
+        "afterMs": 3717,
+        "deltaMs": -1,
+        "beforeRangeMs": [
+          3710,
+          3759
+        ],
+        "afterRangeMs": [
+          3699,
+          3753
+        ]
+      }
+    },
+    {
+      "journey": "anonymous-cold",
+      "firstStableSurface": {
+        "beforeMs": 1665,
+        "afterMs": 1329,
+        "deltaMs": -336,
+        "beforeRangeMs": [
+          1645,
+          1695
+        ],
+        "afterRangeMs": [
+          1260,
+          1347
+        ]
+      },
+      "pinReady": {
+        "beforeMs": 3863,
+        "afterMs": 3944,
+        "deltaMs": 81,
+        "beforeRangeMs": [
+          3808,
+          3899
+        ],
+        "afterRangeMs": [
+          3828,
+          4614
+        ]
+      }
+    }
+  ],
+  "before": {
+    "method": {
+      "source": "isolated static demo build, real emulator authentication",
+      "browser": "151.0.7922.34",
+      "viewport": [
+        390,
+        844
+      ],
+      "cpu": 4,
+      "latencyMs": 120,
+      "downloadBytesPerSecond": 200000,
+      "serviceWorker": "blocked for asset comparison",
+      "httpCache": "disabled by local-host-only request interception; repeat is the same context, not warm HTTP cache",
+      "samplesPerJourney": 5,
+      "warmup": "one excluded journey",
+      "timing": "requestAnimationFrame DOM observation from navigation; firstSurface is the brand appearing, firstStableSurface is its rectangle unchanged for three consecutive animation frames, shellReady is the header, workReady is inventory search input (fill and clear verified), not data freshness or all-workflow readiness",
+      "limitations": "Synthetic local data, emulator warmed; not real-device or production p75 evidence."
+    },
+    "samples": [
+      {
+        "iteration": 0,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1073
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3269
+            },
+            {
+              "name": "work-ready",
+              "at": 3721
+            }
+          ],
+          "firstSurface": 1073,
+          "firstStableSurface": 1098,
+          "shellReady": 3269,
+          "workReady": 3721
+        }
+      },
+      {
+        "iteration": 0,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1076
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3273
+            },
+            {
+              "name": "work-ready",
+              "at": 3717
+            }
+          ],
+          "firstSurface": 1076,
+          "firstStableSurface": 1100,
+          "shellReady": 3273,
+          "workReady": 3717
+        }
+      },
+      {
+        "iteration": 0,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1047
+            },
+            {
+              "name": "pin",
+              "at": 3899
+            }
+          ],
+          "firstSurface": 1047,
+          "firstStableSurface": 1695,
+          "pinReady": 3899
+        }
+      },
+      {
+        "iteration": 1,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1077
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3268
+            },
+            {
+              "name": "work-ready",
+              "at": 3719
+            }
+          ],
+          "firstSurface": 1077,
+          "firstStableSurface": 1102,
+          "shellReady": 3268,
+          "workReady": 3719
+        }
+      },
+      {
+        "iteration": 1,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1074
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3274
+            },
+            {
+              "name": "work-ready",
+              "at": 3718
+            }
+          ],
+          "firstSurface": 1074,
+          "firstStableSurface": 1100,
+          "shellReady": 3274,
+          "workReady": 3718
+        }
+      },
+      {
+        "iteration": 1,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1058
+            },
+            {
+              "name": "pin",
+              "at": 3868
+            }
+          ],
+          "firstSurface": 1058,
+          "firstStableSurface": 1691,
+          "pinReady": 3868
+        }
+      },
+      {
+        "iteration": 2,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1044
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3256
+            },
+            {
+              "name": "work-ready",
+              "at": 3702
+            }
+          ],
+          "firstSurface": 1044,
+          "firstStableSurface": 1123,
+          "shellReady": 3256,
+          "workReady": 3702
+        }
+      },
+      {
+        "iteration": 2,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1065
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3308
+            },
+            {
+              "name": "work-ready",
+              "at": 3759
+            }
+          ],
+          "firstSurface": 1065,
+          "firstStableSurface": 1155,
+          "shellReady": 3308,
+          "workReady": 3759
+        }
+      },
+      {
+        "iteration": 2,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1068
+            },
+            {
+              "name": "pin",
+              "at": 3854
+            }
+          ],
+          "firstSurface": 1068,
+          "firstStableSurface": 1665,
+          "pinReady": 3854
+        }
+      },
+      {
+        "iteration": 3,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1078
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3305
+            },
+            {
+              "name": "work-ready",
+              "at": 3757
+            }
+          ],
+          "firstSurface": 1078,
+          "firstStableSurface": 1104,
+          "shellReady": 3305,
+          "workReady": 3757
+        }
+      },
+      {
+        "iteration": 3,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1066
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3259
+            },
+            {
+              "name": "work-ready",
+              "at": 3710
+            }
+          ],
+          "firstSurface": 1066,
+          "firstStableSurface": 1135,
+          "shellReady": 3259,
+          "workReady": 3710
+        }
+      },
+      {
+        "iteration": 3,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1053
+            },
+            {
+              "name": "pin",
+              "at": 3863
+            }
+          ],
+          "firstSurface": 1053,
+          "firstStableSurface": 1645,
+          "pinReady": 3863
+        }
+      },
+      {
+        "iteration": 4,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1076
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3314
+            },
+            {
+              "name": "work-ready",
+              "at": 3777
+            }
+          ],
+          "firstSurface": 1076,
+          "firstStableSurface": 1108,
+          "shellReady": 3314,
+          "workReady": 3777
+        }
+      },
+      {
+        "iteration": 4,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1063
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3311
+            },
+            {
+              "name": "work-ready",
+              "at": 3755
+            }
+          ],
+          "firstSurface": 1063,
+          "firstStableSurface": 1092,
+          "shellReady": 3311,
+          "workReady": 3755
+        }
+      },
+      {
+        "iteration": 4,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1079
+            },
+            {
+              "name": "pin",
+              "at": 3808
+            }
+          ],
+          "firstSurface": 1079,
+          "firstStableSurface": 1651,
+          "pinReady": 3808
+        }
+      }
+    ]
+  },
+  "after": {
+    "method": {
+      "source": "isolated static demo build, real emulator authentication",
+      "browser": "151.0.7922.34",
+      "viewport": [
+        390,
+        844
+      ],
+      "cpu": 4,
+      "latencyMs": 120,
+      "downloadBytesPerSecond": 200000,
+      "serviceWorker": "blocked for asset comparison",
+      "httpCache": "disabled by local-host-only request interception; repeat is the same context, not warm HTTP cache",
+      "samplesPerJourney": 5,
+      "warmup": "one excluded journey",
+      "timing": "requestAnimationFrame DOM observation from navigation; firstSurface is the brand appearing, firstStableSurface is its rectangle unchanged for three consecutive animation frames, shellReady is the header, workReady is inventory search input (fill and clear verified), not data freshness or all-workflow readiness",
+      "limitations": "Synthetic local data, emulator warmed; not real-device or production p75 evidence."
+    },
+    "samples": [
+      {
+        "iteration": 0,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1074
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3346
+            },
+            {
+              "name": "work-ready",
+              "at": 3732
+            }
+          ],
+          "firstSurface": 1074,
+          "firstStableSurface": 1130,
+          "shellReady": 3346,
+          "workReady": 3732
+        }
+      },
+      {
+        "iteration": 0,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1065
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3337
+            },
+            {
+              "name": "work-ready",
+              "at": 3753
+            }
+          ],
+          "firstSurface": 1065,
+          "firstStableSurface": 1082,
+          "shellReady": 3337,
+          "workReady": 3753
+        }
+      },
+      {
+        "iteration": 0,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1049
+            },
+            {
+              "name": "pin",
+              "at": 4614
+            }
+          ],
+          "firstSurface": 1049,
+          "firstStableSurface": 1347,
+          "pinReady": 4614
+        }
+      },
+      {
+        "iteration": 1,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1019
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3284
+            },
+            {
+              "name": "work-ready",
+              "at": 3720
+            }
+          ],
+          "firstSurface": 1019,
+          "firstStableSurface": 1092,
+          "shellReady": 3284,
+          "workReady": 3720
+        }
+      },
+      {
+        "iteration": 1,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1048
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3295
+            },
+            {
+              "name": "work-ready",
+              "at": 3708
+            }
+          ],
+          "firstSurface": 1048,
+          "firstStableSurface": 1065,
+          "shellReady": 3295,
+          "workReady": 3708
+        }
+      },
+      {
+        "iteration": 1,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1012
+            },
+            {
+              "name": "pin",
+              "at": 3879
+            }
+          ],
+          "firstSurface": 1012,
+          "firstStableSurface": 1260,
+          "pinReady": 3879
+        }
+      },
+      {
+        "iteration": 2,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1037
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3288
+            },
+            {
+              "name": "work-ready",
+              "at": 3705
+            }
+          ],
+          "firstSurface": 1037,
+          "firstStableSurface": 1095,
+          "shellReady": 3288,
+          "workReady": 3705
+        }
+      },
+      {
+        "iteration": 2,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1050
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3320
+            },
+            {
+              "name": "work-ready",
+              "at": 3732
+            }
+          ],
+          "firstSurface": 1050,
+          "firstStableSurface": 1077,
+          "shellReady": 3320,
+          "workReady": 3732
+        }
+      },
+      {
+        "iteration": 2,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1044
+            },
+            {
+              "name": "pin",
+              "at": 3828
+            }
+          ],
+          "firstSurface": 1044,
+          "firstStableSurface": 1312,
+          "pinReady": 3828
+        }
+      },
+      {
+        "iteration": 3,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1054
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3371
+            },
+            {
+              "name": "work-ready",
+              "at": 3805
+            }
+          ],
+          "firstSurface": 1054,
+          "firstStableSurface": 1125,
+          "shellReady": 3371,
+          "workReady": 3805
+        }
+      },
+      {
+        "iteration": 3,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1044
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3311
+            },
+            {
+              "name": "work-ready",
+              "at": 3717
+            }
+          ],
+          "firstSurface": 1044,
+          "firstStableSurface": 1099,
+          "shellReady": 3311,
+          "workReady": 3717
+        }
+      },
+      {
+        "iteration": 3,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1040
+            },
+            {
+              "name": "pin",
+              "at": 3944
+            }
+          ],
+          "firstSurface": 1040,
+          "firstStableSurface": 1329,
+          "pinReady": 3944
+        }
+      },
+      {
+        "iteration": 4,
+        "journey": "resume-cold-assets",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1064
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3305
+            },
+            {
+              "name": "work-ready",
+              "at": 3708
+            }
+          ],
+          "firstSurface": 1064,
+          "firstStableSurface": 1126,
+          "shellReady": 3305,
+          "workReady": 3708
+        }
+      },
+      {
+        "iteration": 4,
+        "journey": "resume-repeat",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1056
+            },
+            {
+              "name": "workspace-placeholder",
+              "at": 3283
+            },
+            {
+              "name": "work-ready",
+              "at": 3699
+            }
+          ],
+          "firstSurface": 1056,
+          "firstStableSurface": 1072,
+          "shellReady": 3283,
+          "workReady": 3699
+        }
+      },
+      {
+        "iteration": 4,
+        "journey": "anonymous-cold",
+        "timings": {
+          "stages": [
+            {
+              "name": "launch",
+              "at": 1040
+            },
+            {
+              "name": "pin",
+              "at": 4023
+            }
+          ],
+          "firstSurface": 1040,
+          "firstStableSurface": 1341,
+          "pinReady": 4023
+        }
+      }
+    ]
+  }
+}
