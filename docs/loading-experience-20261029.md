@@ -2,7 +2,7 @@
 
 기준일: 2026-10-29
 
-상태: 구현·로컬 검증·최종 제품 소스의 전체 CI 완료. 제품 소스 `25c1effb518b03983c307d939e93d2cf6666f4e4`, [PR #6](https://github.com/kim-DL/ONWAY/pull/6), [Quality Gate 40877913374](https://github.com/kim-DL/ONWAY/actions/runs/40877913374) 필수 검사 12개와 최종 verify 모두 SUCCESS다. 운영 배포와 main 병합은 하지 않았다.
+상태: 구현·로컬 검증·최종 제품 소스의 전체 CI 완료. 제품 소스 `25c1effb518b03983c307d939e93d2cf6666f4e4`, [PR #6](https://github.com/kim-DL/ONWAY/pull/6), [Quality Gate 40877913374](https://github.com/kim-DL/ONWAY/actions/runs/40877913374) 필수 검사 12개와 최종 verify 모두 SUCCESS다. 2026-10-30 사용자 후속 승인으로 main 병합·동일 파일 내용의 병합 커밋 CI 확인·Hosting 운영 배포를 완료했다. [릴리스 기록](releases/2026-10-30-loading-experience.md)에 최종 운영 결과를 구분한다.
 
 ## 결정과 레퍼런스
 
@@ -128,4 +128,4 @@ PIN 비교는 이전·이후 정적 demo 앱을 같은 Chromium에서 촬영했�
 - 글자 확대 검사는 HTML 기본 크기를 200%로 조정하고 px로 정의된 상태 문구는 확대 전 계산 크기의 2배를 직접 적용한다. 실제 브라우저 확대 메뉴를 200%로 조작하거나 실제 기기 접근성 설정을 인수한 결과는 아니다. 시각 자료는 로딩 지표·보조 문구의 노출을 확인한 뒤 fixture 조작 버튼을 제외한 `main` 영역을 촬영한다.
 - `appBootDuration`은 앱 쉘 준비와 실제 업무 데이터 준비가 다를 수 있으므로 이 값 하나로 체감 속도 개선을 주장하지 않는다. 실측 수치는 측정한 조건과 함께 제시한다.
 - 실제 iPhone·Android 설치 PWA의 OS 시작 화면, OS가 앱을 종료한 후의 복귀, 실제 스크린리더 낭독과 현장 사용자 체감은 별도 인수 항목이다.
-- 이 작업에서는 운영 배포를 하지 않는다. 사용자 승인 후 검증된 소스·빌드로 Hosting만 배포할 경우 기존 릴리스 절차와 배포 후 확인·복구 정보를 별도 기록한다.
+- 구현 단계에서는 운영 배포를 하지 않았다. 2026-10-30 사용자 후속 승인으로 Hosting만 배포했고 [릴리스 기록](releases/2026-10-30-loading-experience.md)에 검증·복구 정보를 남겼다. 실제 설치 기기의 확인 범위는 위 한계를 유지한다.

@@ -1,9 +1,15 @@
 # 급식길 개발 인수인계
 
-기준일: 2026-10-29
+기준일: 2026-10-30
 대상: 이전 대화 없이 이어서 작업할 새 Codex 스레드
 
 ## 1. 먼저 알아야 할 상태
+
+### 2026-10-30 로딩·로그인 개선 — PR #6 main 병합·Hosting 운영 배포 완료
+
+- 사용자 승인으로 [PR #6](https://github.com/kim-DL/ONWAY/pull/6)을 main에 병합했다. 배포 소스 `72b243b2fe98faf9d69396225c1fdd5d40b40d32`는 PR head와 전체 tree가 동일하다. 해당 커밋의 [Quality Gate 40928837270](https://github.com/kim-DL/ONWAY/actions/runs/40928837270) attempt 1은 검사 12개+verify 전부 SUCCESS다. unit 1,826 PASS/기존 15 SKIP, 일반 browser 334 PASS/2 내부 flaky/기존 8 SKIP, 정적 인증 83 PASS/기존 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다. 모션 정지 직후 transform 비교 2개의 자동 재시도 통과를 릴리스 기록에 구분했다.
+- 병합 소스로 운영 build/PWA/성능/Hosting gate PASS 후 project `onnuriway` / `hosting:onnuriway`만 배포했다. live version **0daafb880d5e16f4**, release **1793298248156000**, **2026-10-30 03:24:08.156 KST**, 복구 version **a5bffa3fda8b9f8b**다. 두 origin 공개 검사 각 25 PASS, www301, 새 Chromium 로그인·worker activated·pageerror 0이다. 공개 worker SHA-256 `1acc10774d34d70c106bdcf24d4d08652e08eb3a65628454a55a4327cb56beb5`가 후보와 같다.
+- 후보 113파일·비공개 env digest, Functions 72개 metadata와 MCP 전용 Hosting이 전후 동일하다. Functions/Rules/Auth 배포와 운영 업무 데이터 쓰기는 없다. 실제 직원 기기·설치 PWA 인수는 별도다. 결과 문서만 `[skip ci]` 후속 커밋으로 기록한다. [릴리스 기록](releases/2026-10-30-loading-experience.md), ignored 증거 `output/loading-release-20261030/`를 참고한다.
 
 ### 2026-10-29 앱 전체 로딩·로그인 개선 — 구현·전체 CI 완료, 운영 미배포
 
