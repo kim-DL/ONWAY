@@ -2,7 +2,7 @@
 
 기준일: 2026-10-29
 
-상태: 구현과 로컬 검증 완료, 최종 커밋의 전체 CI 확인 대기. 최종 소스 커밋·CI 결과는 아래 항목에 후속 기록한다. 운영 배포는 이 작업의 승인 범위에 포함되지 않는다.
+상태: 구현·로컬 검증·최종 제품 소스의 전체 CI 완료. 제품 소스 `25c1effb518b03983c307d939e93d2cf6666f4e4`, [PR #6](https://github.com/kim-DL/ONWAY/pull/6), [Quality Gate 40877913374](https://github.com/kim-DL/ONWAY/actions/runs/40877913374) 필수 검사 12개와 최종 verify 모두 SUCCESS다. 운영 배포와 main 병합은 하지 않았다.
 
 ## 결정과 레퍼런스
 
@@ -66,12 +66,12 @@
 | 인증·업무 회귀 | 로컬 emulator/합성 데이터로 PIN 정상·오류·토큰 교환 실패, 기존 세션 복귀, 오프라인 복구, 저장·사진 재시도·완료 확인 | 첫 정적 Phase 17: 79 PASS / 4 FAIL / 기존 18 SKIP. 아래 원인 보완 후 실패했던 4개만 재실행하여 4 PASS(26.1초), 재시도 0 |
 | 성능 비교 | 동일한 로컬 요청 경로·브라우저·네트워크/CPU 조건에서 변경 전후 각 5회 비교. 안정된 브랜드 위치와 재고 검색 입력 가능 시점을 구분 | 아래 중앙값·전체 개별값 참조. 인위적인 작업 지연 0 |
 | 운영 형식 빌드 | build 후 PWA·성능·Hosting gate, 기존 예산 유지 | build/PWA/성능/Hosting PASS. 사진·재고 ON, Emulator OFF |
-| CI | 최종 코드와 로컬 검증을 확정한 커밋으로 전체 필수 job 및 최종 verify 확인 | TBD |
+| CI | 최종 코드와 로컬 검증을 확정한 커밋으로 전체 필수 job 및 최종 verify 확인 | `25c1eff` / Quality Gate 40877913374 attempt 1: 검사 12개 + verify 전부 SUCCESS. unit 1,826 PASS/기존 15 SKIP, 일반 browser 336 PASS/기존 8 SKIP, Phase 17 browser 83 PASS/기존 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS. 실패·내부 flaky 0 |
 
 - 검증 명령: `npm test`, `npm run typecheck`, `npm run lint`, `npx playwright test tests/e2e/loading-experience.spec.ts tests/e2e/header-layout.spec.ts tests/e2e/photo-source-picker.spec.ts --workers=2`, `npm run build`, `npm run verify:pwa:build`, `npm run verify:performance:build`, `npm run verify:hosting:build`.
 - 변경 전/후 화면·전환 증거: [개별 측정값과 단계 기록](loading-experience-20261029-metrics.json), [화면 파일](assets/loading-experience-20261029/), ignored 로그 `output/loading-experience-20261029/`.
-- 최종 제품 소스 커밋: TBD
-- 최종 CI 실행과 결과: TBD
+- 최종 제품 소스 커밋: `25c1effb518b03983c307d939e93d2cf6666f4e4`
+- 최종 CI 실행과 결과: [Quality Gate 40877913374](https://github.com/kim-DL/ONWAY/actions/runs/40877913374), 전체 SUCCESS. 결과 문서만 후속 `[skip ci]` 커밋으로 저장하며 제품 소스·lock·빌드 설정은 동일하다.
 
 초기 검사에서 이전 로더 조각 수·광택 효과·문구를 요구하는 테스트가 새 표현과 맞지 않아 실패했다. 관련 기대값을 승인된 디자인과 실제 상태에 맞춰 갱신하되 접근성·재시도·인증·완료 판정 기준을 완화하지 않는다. 격리 브라우저 fixture에는 이미지 경로와 esbuild 가상 모듈의 React 해석 경로 보완이 필요했다. 최종 실패·재실행 내역은 위 결과와 함께 구분해 기록한다.
 
@@ -93,6 +93,8 @@
 실제 재고 조작 가능 시간은 사실상 같고 최초 PIN 입력 가능 중앙값은 81ms 증가했다. 후보 PIN 표본 범위는 3,828~4,614ms이며 개별값과 모든 범위는 JSON에 남겼다. 이 5회 로컬 측정만으로 통계적으로 유의한 속도 향상이나 운영 p75 개선을 주장하지 않는다. 보안 의존성 변경을 포함한 전체 후보의 비교이므로 디자인만의 인과 효과와도 구분한다. 이번 변화의 핵심은 반복 등장·광택·여러 로더의 동시 움직임을 없애고, 실제 화면 가까이에서 현재 작업을 설명하는 것이다. 이전 후보의 78ms 개선 수치는 최종 결과로 사용하지 않는다.
 
 최종 운영 형식 산출물의 gzip: initial JS 143,611B / 160KiB, customer JS 36,831B / 36KiB, sales workspace 14,334B / 14KiB, inventory JS 22,961B / 25.375KiB. 기존 예산·정적/지연 로딩 경계 검사를 모두 그대로 통과했다. 산출물 113파일, precache 100개다.
+
+동일 제품 소스의 Linux CI 빌드도 같은 상한을 통과했다. initial JS 143,583B, customer JS 36,832B, sales 14,334B, inventory 22,961B로 로컬 산출물 수치와 구분한다.
 
 ### 화면 비교
 
@@ -118,7 +120,7 @@ PIN 비교는 이전·이후 정적 demo 앱을 같은 Chromium에서 촬영했�
 - 첫 시간 측정 이후 숨김 h1의 중복 복구 문구 제거, 연결 대기 상태의 정적 표시, 보안 의존성 갱신이 추가되어 최종 비교를 다시 측정했다. baseline 프런트 산출물은 기존 커밋이고 양쪽의 합성 backend는 같은 현재 의존성을 사용한다. 소스·lock·측정 도구와 산출물 hash도 개별 측정 자료에 명시하며 디자인 변경만의 효과로 해석하지 않는다.
 - 재고 사진 파일 분리 뒤 단위·제품 typecheck에서 제외되는 브라우저 fixture의 옛 import가 남아 사진 테스트 준비 단계가 실패했다. fixture import만 새 경로로 연결하고 실제 파일 읽기·취소·재시도·바이트 스냅샷 16개를 그대로 재검증해 통과했다.
 - 최초 소스 `ccd028f`의 [Quality Gate 40873497573](https://github.com/kim-DL/ONWAY/actions/runs/40873497573)는 audit·browser와 최종 verify가 실패했다. unit 1,826·정적 인증 83·재고사진 4/transaction 12·납품사진 16 PASS, typecheck/lint/Functions/운영 빌드/성능/지연 영업 도구는 통과했다. 일반 browser는 329 PASS/2 FAIL/3 flaky/기존 8 SKIP이었다. 실패 2개는 손상 JPEG 오류를 이전 `status` 역할로 찾던 mobile/desktop 검사다. 실제 오류 `alert`를 검사하고 오류 뒤 `사진 준비 중` status가 0개인지 확인하도록 보완했다. 기존 미리보기·재시도·44px·복구·timeout 조건은 유지한다. 별도 flaky 3개는 screenshot 프로토콜 오류 1개와 기존 환영 장식의 정지 직후 프레임 차이 2개이며 성공으로 숨기지 않는다.
-- 같은 CI의 audit는 기존 lock에서 critical 1/high 7/moderate 14를 보고했다. [Next 보안 권고](https://github.com/advisories/GHSA-673q-mjm6-r5xr), [Zod 보안 권고](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)에 따라 Next 16.3.8→16.4.3, root/Functions Zod 최소 4.6.7, body-parser·re2js·undici의 호환 범위 내 lock 갱신을 적용했다. Serwist 9.5.12는 유지하고 Zod를 정확히 고정하던 next/build/webpack-plugin 세 패키지만 root Zod 버전을 참조하도록 override했다. `npm audit fix --force`의 Serwist 다운그레이드는 사용하지 않았으며 high/critical 기준도 유지한다. 갱신한 lock의 사전 audit는 high/critical 0, moderate 14다. 새 의존성 설치와 최종 검증 결과는 위 표에 반영한다.
+- 같은 CI의 audit는 기존 lock에서 critical 1/high 7/moderate 14를 보고했다. [Next 보안 권고](https://github.com/advisories/GHSA-673q-mjm6-r5xr), [Zod 보안 권고](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)에 따라 Next 16.3.8→16.4.3, root/Functions Zod 최소 4.6.7, body-parser·re2js·undici의 호환 범위 내 lock 갱신을 적용했다. Serwist 9.5.12는 유지하고 Zod를 정확히 고정하던 next/build/webpack-plugin 세 패키지만 root Zod 버전을 참조하도록 override했다. `npm audit fix --force`의 Serwist 다운그레이드는 사용하지 않았으며 high/critical 기준도 유지한다. 새 lock의 `npm ci --engine-strict=true`·전체 unit·타입·린트·운영 빌드/PWA/성능/Hosting 검증을 통과했다. 최종 로컬과 CI audit는 high/critical 0, moderate 14다.
 
 ## 증거의 한계와 배포
 
