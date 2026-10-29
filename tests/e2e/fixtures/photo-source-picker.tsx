@@ -1,7 +1,7 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CustomerPhotoPicker } from "../../../src/features/customers/customer-photo-picker";
-import { InventoryPhotoPicker } from "../../../src/features/inventory/inventory-photo";
+import { InventoryPhotoPicker } from "../../../src/features/inventory/inventory-photo-picker";
 import { prepareCustomerPhoto } from "../../../src/features/customers/customer-photo-preparation";
 
 function Fixture() {

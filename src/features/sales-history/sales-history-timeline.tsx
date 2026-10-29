@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/icon";
-import { SkeletonCard } from "@/components/ui/skeleton-card";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import type { Product, TagDefinition } from "@/domain/catalog";
 import type { EmployeeDirectory } from "@/domain/identity";
 import type { SalesVisit } from "@/domain/sales";
@@ -143,7 +144,7 @@ export function SalesHistoryTimeline({
         <div><h2 id="sales-history-title">이전 대화가, 다음 방문의 맥락이 됩니다.</h2></div>
         <span><Icon name="clock" size={16} />최근 기록부터</span>
       </div>
-      {history.status === "loading" ? <div className="sales-history__loading" aria-label="방문 기록 불러오는 중"><SkeletonCard /><SkeletonCard /></div> : null}
+      {history.status === "loading" ? <div className="sales-history__loading"><LoadingStatus label="방문 기록 불러오는 중" detail="학교의 이전 방문 기록을 확인하고 있습니다." /><LoadingSkeleton kind="row" /><LoadingSkeleton kind="row" /></div> : null}
       {history.status === "error" ? (
         <div className="sales-history__empty" role="alert"><Icon name="clock" /><strong>방문 기록을 불러오지 못했어요.</strong><p>연결을 확인한 뒤 다시 시도해주세요.</p><button type="button" onClick={history.refresh}>다시 불러오기</button></div>
       ) : null}

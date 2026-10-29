@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 
 import { Icon } from "@/components/ui/icon";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import type { Customer } from "@/domain/customer";
 import { useAuth } from "@/features/auth/auth-context";
 
@@ -71,8 +71,10 @@ function AuthenticatedPhoto({ customer, variant = "preview", className = "", exp
       {variant === "preview" && expandable ? <button type="button" className={styles.expandPhoto} aria-label={`${customer.name} 전경사진 크게 보기`} onClick={() => { if (photo.url) setExpanded({ url: photo.url, origin: hostRef.current }); }}><span><Icon name="zoom-in" size={17} />크게 보기</span></button> : null}
       {variant === "preview" && expandable && photo.url && expanded?.url === photo.url ? <CustomerPhotoViewer url={photo.url} name={customer.name} origin={expanded.origin} onClose={() => setExpanded(null)} onImageError={() => { setFailedImage(photo.url); setExpanded(null); }} /> : null}
     </> : <span className={styles.placeholder}>
-      {photo.status === "loading" && online ? <OnnuriLoader size={variant === "thumbnail" ? "small" : "medium"} tone="customer" decorative /> : <CustomerStorefrontIcon />}
-      {variant === "preview" ? <span role="status">{!online ? "사진은 온라인에서 확인할 수 있어요." : failed ? "사진을 불러오지 못했어요." : "사진을 불러오고 있어요."}</span> : null}
+      {photo.status === "loading" && online && variant === "preview" ? <LoadingStatus as="span" label="사진 불러오는 중" detail="사진을 확인하고 있습니다." /> : <>
+        <CustomerStorefrontIcon />
+        {variant === "preview" ? <span role="status">{!online ? "사진은 온라인에서 확인할 수 있어요." : failed ? "사진을 불러오지 못했어요." : "사진 준비 중"}</span> : null}
+      </>}
       {variant === "preview" && failed && online ? <button type="button" onClick={photo.retry}><Icon name="refresh" size={16} />다시 불러오기</button> : null}
     </span>}
   </span>;

@@ -4,6 +4,7 @@ import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { INVENTORY_LOCATION_LABELS, inventoryExpiryDays, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryProduct, type InventoryProductDetail } from "@/domain/inventory";
 import { inventoryRepository, inventoryErrorMessage } from "./inventory-repository";
 import { INVENTORY_COUNT_LABELS, inventoryCountBadgeState, inventoryExpiryLabel, inventoryLocationsFor, inventoryLotDateLabel, inventoryUnitDisplayLabel } from "./inventory-model";
@@ -102,7 +103,7 @@ export function InventoryDetail({ productId, initialProduct, initialDetail, init
   }
   return <><div className={styles.detailSurface}><BottomSheet open title={product?.name ?? "품목 상세"} onClose={onClose}>
     <div className={`${styles.sheet} ${styles.detailBody}`}>
-      {loading ? <p role="status">최신 재고를 확인하고 있어요.</p> : null}
+      {loading ? <LoadingStatus key={`${openingKey}:${version}`} label="최신 재고 확인 중" detail="선택한 품목의 현재 수량과 유통기한 정보를 확인하고 있습니다." /> : null}
       {error ? <div className={styles.message} role="alert">{error}<GlassButton onClick={() => { setLoading(true); setVersion((value) => value + 1); }}>다시 확인</GlassButton></div> : null}
       {product ? <>
         <div className={styles.detailSummary}>
@@ -141,6 +142,6 @@ export function InventoryDetail({ productId, initialProduct, initialDetail, init
       {context.canWrite ? <><GlassButton className={styles.detailStatusAction} disabled={!online || loading} onClick={() => setAction("status")}><Icon name={product.status === "active" ? "close" : "refresh"} size={18} /><span>{product.status === "active" ? "비활성화" : "다시 활성화"}</span><Icon name="chevron-right" size={16} /></GlassButton><GlassButton className={styles.detailDeleteAction} variant="danger" disabled={!online || loading} onClick={() => setAction("delete")}><Icon name="trash" size={18} /><span>품목 삭제</span><Icon name="chevron-right" size={16} /></GlassButton></> : null}
     </div></BottomSheet> : null}
     {confirmed && product && (action === "status" || action === "delete") ? <InventoryStatusForm product={product} remove={action === "delete"} onClose={() => setAction(null)} onSaved={saved} /> : null}
-    {action === "history" ? <BottomSheet open title="입출고·실사 기록" onClose={() => setAction(null)}><Suspense fallback={<p role="status">기록을 준비하고 있어요.</p>}><InventoryHistory productId={productId} /></Suspense></BottomSheet> : null}
+    {action === "history" ? <BottomSheet open title="입출고·실사 기록" onClose={() => setAction(null)}><Suspense fallback={<LoadingStatus label="기록 화면 여는 중" detail="입출고와 실사 기록을 표시할 화면을 준비하고 있습니다." />}><InventoryHistory productId={productId} /></Suspense></BottomSheet> : null}
   </>;
 }

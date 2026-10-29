@@ -26,6 +26,7 @@ vi.mock("react", async (importOriginal) => ({
 }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));
 vi.mock("@/features/auth/auth-context", () => ({ useAuth: vi.fn() }));
+vi.mock("@/features/auth/auth-loading", () => ({ useLaunchTiming: () => ({ startedAt: undefined }) }));
 vi.mock("@/features/pwa/pwa-provider", () => ({ usePwa: vi.fn() }));
 
 import { AppShell } from "./app-shell";

@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import { Icon } from "@/components/ui/icon";
 import { searchInputProps } from "@/components/ui/search-input-props";
 import { customerDraftSchema, type Customer, type CustomerContact, type CustomerDraft, type CustomerPoint, type LocationCandidate, type SaveCustomerInput } from "@/domain/customer";
@@ -327,7 +327,7 @@ export function CustomerEditor({ customer, onClose, onSaved, refreshMessage = ""
       </fieldset>
       <BottomSheetActions busy={busy} className={styles.saveActions ?? ""}>
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
-        <GlassButton disabled={busy} onClick={close}>취소</GlassButton><GlassButton form={formId} type="submit" variant="primary" disabled={busy || readingPhoto}>{busy || readingPhoto ? <OnnuriLoader size="small" tone="inherit" decorative /> : null}{readingPhoto ? "사진 가져오는 중…" : busy ? saveStage === "photo" ? "사진 저장 중…" : "저장 중…" : retryOnly ? "저장 결과 다시 확인" : "거래처 저장"}</GlassButton>
+        <GlassButton disabled={busy} onClick={close}>취소</GlassButton><GlassButton form={formId} type="submit" variant="primary" disabled={busy || readingPhoto}>{busy || readingPhoto ? <LoadingIndicator size="small" tone="inherit" decorative /> : null}{readingPhoto ? "사진 준비 중" : busy ? saveStage === "photo" ? "사진 등록 중" : "저장 중…" : retryOnly ? "저장 결과 다시 확인" : "거래처 저장"}</GlassButton>
       </BottomSheetActions>
     </form>
   </BottomSheet>;

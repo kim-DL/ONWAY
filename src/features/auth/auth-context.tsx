@@ -413,7 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authGenerationRef.current += 1;
     invalidReasonRef.current = null;
     // Do not leave private content visible during the server logout timeout.
-    setState({ status: "resolving" });
+    setState({ status: "resolving", message: "로그아웃 중" });
     const employeeLogout = httpsCallable<void, { ok: boolean }>(
       services.functions,
       "employeeLogout",

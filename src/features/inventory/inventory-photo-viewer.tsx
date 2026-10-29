@@ -4,12 +4,13 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { usePhotoMorph } from "@/components/ui/photo-morph";
 import morphStyles from "@/components/ui/photo-morph.module.css";
 import styles from "./inventory.module.css";
 
 const PhotoPanZoom = dynamic(() => import("@/components/ui/photo-pan-zoom").then((module) => module.PhotoPanZoom), { ssr: false,
-  loading: () => <p role="status">사진 확대 조작을 준비하고 있어요.</p> });
+  loading: () => <LoadingStatus label="사진 확대 준비 중" detail="확대·이동 기능을 준비하고 있습니다." /> });
 
 export function InventoryPhotoViewer({ url, name, origin, onClose, onImageError }: {
   url: string; name: string; origin: HTMLElement | null; onClose: () => void; onImageError: () => void;

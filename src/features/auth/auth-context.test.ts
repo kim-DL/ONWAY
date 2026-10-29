@@ -339,7 +339,7 @@ describe("private-screen session termination", () => {
     harness.writeVerifiedOfflineSession.mockClear();
 
     const attempt = context.logout();
-    expect(harness.setState).toHaveBeenLastCalledWith({ status: "resolving" });
+    expect(harness.setState).toHaveBeenLastCalledWith({ status: "resolving", message: "로그아웃 중" });
     expect(harness.employeeLogout).toHaveBeenCalledTimes(1);
     expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
     harness.setState.mockClear();
@@ -388,7 +388,7 @@ describe("private-screen session termination", () => {
     const context = renderProvider();
     harness.signOut.mockRejectedValueOnce(new Error("private storage detail"));
     await expect(context.logout()).rejects.toThrow("private storage detail");
-    expect(harness.setState).toHaveBeenNthCalledWith(1, { status: "resolving" });
+    expect(harness.setState).toHaveBeenNthCalledWith(1, { status: "resolving", message: "로그아웃 중" });
     expect(harness.setState).toHaveBeenLastCalledWith({
       status: "invalid", message: "로그아웃을 완료하지 못했습니다. 앱을 다시 열어 로그인해주세요.",
     });

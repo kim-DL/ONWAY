@@ -100,6 +100,28 @@ function renderGallery(canEdit: boolean, caption = "학교 · 접근") {
 }
 
 describe("school photo gallery presentation", () => {
+  it("keeps loading thumbnails static while retaining the photo-opening control", () => {
+    const declaration = source.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === "PhotoImage")!;
+    const context = createContext({
+      createElement: (type: string, props: Record<string, unknown> | null, ...children: unknown[]) => ({ type, props: props ?? {}, children }),
+      useSchoolPhoto: () => ({ status: "loading", url: null }), useEffect: () => {},
+      galleryStyles: { image: "image", loading: "loading" }, SLOT_LABELS: { "01": "학교 · 접근" },
+      Icon: "Icon", LoadingIndicator: "LoadingIndicator", LoadingStatus: "LoadingStatus",
+    });
+    runInContext(ts.transpileModule(`${declaration.getText(source)}\nglobalThis.renderPhoto = PhotoImage;`, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "createElement" },
+    }).outputText, context);
+    const render = context.renderPhoto as (props: Record<string, unknown>) => GalleryElement;
+    const onOpen = vi.fn();
+    const tree = render({ photo: { slotId: "01" }, sessionNamespace: "test", variant: "thumbnail", enabled: true, onOpen });
+    expect(tree.type).toBe("button");
+    expect(JSON.stringify(tree)).not.toMatch(/LoadingIndicator|LoadingStatus/);
+    expect(JSON.stringify(tree)).toContain("사진 불러오는 중");
+    const origin = {};
+    (tree.props.onClick as (event: unknown) => void)({ currentTarget: origin });
+    expect(onOpen).toHaveBeenCalledWith(origin);
+  });
+
   it("keeps photo actions outside the image and removes decorative status/duplicate captions", () => {
     const view = renderGallery(true);
     expect(view.text).not.toMatch(/슬롯 비어 있음|사진 준비 완료|아직 등록되지 않았어요/);

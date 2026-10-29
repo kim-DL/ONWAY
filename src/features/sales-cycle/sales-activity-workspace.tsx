@@ -5,13 +5,13 @@ import { useMemo, useState } from "react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { SoftCard } from "@/components/ui/soft-card";
 import type { SalesAssignment } from "@/domain/sales";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
+import { WorkspaceFeatureLoading } from "@/features/app-shell/workspace-feature-loading";
 import { useSalesWorkspace } from "./use-sales-workspace";
 import { ActivityRow } from "./sales-school-cards";
 
@@ -65,7 +65,7 @@ export function SalesActivityWorkspace({
   }, [data.workspace, queue, session.claims.employeeId]);
 
   if (data.status === "loading" && !model) {
-    return <section className="shell-page sales-activity-page" aria-label="업무 목록 불러오는 중"><div className="sales-activity-loading"><SkeletonCard /><SkeletonCard /></div></section>;
+    return <WorkspaceFeatureLoading mode="activity" label="업무 목록 불러오는 중" />;
   }
   if (!model) {
     const setupRequired = data.issue === "setup-required";

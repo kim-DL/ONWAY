@@ -394,8 +394,6 @@
 }
 
 .skeleton-card span { display: block; overflow: hidden; border-radius: 8px; background: #e9edf4; }
-.skeleton-card span::after { display: block; width: 50%; height: 100%; content: ""; background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent); animation: skeleton-shimmer 1.2s ease-in-out infinite; }
 .skeleton-card__mark { width: 2.3rem; height: 2.3rem; }
 .skeleton-card__line { width: 72%; height: 0.72rem; margin-top: 0.7rem; }
 .skeleton-card__line--strong { width: 86%; height: 1.15rem; margin-top: 3.2rem; }
-@keyframes skeleton-shimmer { from { transform: translateX(-100%); } to { transform: translateX(200%); } }

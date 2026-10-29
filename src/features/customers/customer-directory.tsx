@@ -4,7 +4,7 @@ import { useId, useMemo, useRef, useState } from "react";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import fieldList from "@/components/ui/field-list.module.css";
 import { Icon } from "@/components/ui/icon";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { searchInputProps } from "@/components/ui/search-input-props";
 import type { Customer } from "@/domain/customer";
 import { CustomerCard } from "./customer-card";
@@ -58,10 +58,10 @@ export function CustomerDirectory({ customers, onSelect, onClose, status = "read
         </div>
         {regions.pendingCount ? <p className={styles.regionStatus} role="status">납품 좌표로 행정동을 확인하고 있어요 · {regions.pendingCount}곳</p> : regions.failedCount ? <p className={styles.regionStatus}>행정동 미확인 {regions.failedCount}곳<button type="button" onClick={regions.retry}>다시 확인</button></p> : null}
       </div>
-      {status !== "ready" ? <div className={shared.empty} role={status === "error" ? "alert" : "status"}>
-        {status === "error" ? <Icon name="wifi-off" size={26} /> : <OnnuriLoader tone="customer" decorative />}<p>{status === "error" ? message : "거래처 목록을 새로 확인하고 있어요."}</p>
-        {status === "error" && onRetry ? <button type="button" className={shared.textButton} onClick={onRetry}>다시 불러오기</button> : null}
-      </div> : <section aria-labelledby={`${id}-results`}>
+      {status === "error" ? <div className={shared.empty} role="alert">
+        <Icon name="wifi-off" size={26} /><p>{message}</p>
+        {onRetry ? <button type="button" className={shared.textButton} onClick={onRetry}>다시 불러오기</button> : null}
+      </div> : status === "loading" ? <LoadingStatus className={shared.empty} label="거래처 불러오는 중" detail="전체 거래처 목록을 확인하고 있습니다." /> : <section aria-labelledby={`${id}-results`}>
         <header className={styles.resultHeading}><h3 id={`${id}-results`}>{dong || district || "전체 거래처"}</h3><span role="status" aria-live="polite">{results.length}곳</span></header>
         {results.length ? <ul className={`${fieldList.list} ${styles.list}`}>{results.slice(0, visibleCount).map((customer) => <li key={customer.customerId}>
           <CustomerCard customer={customer} compact onSelect={() => onSelect(customer.customerId)} />

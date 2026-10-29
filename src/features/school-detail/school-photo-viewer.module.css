@@ -13,4 +13,5 @@
 .schoolActions > span { color: #526970; font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .schoolActions > button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border: 1px solid #d1dfdb; border-radius: 12px; background: #f0f6f4; color: #285e53; font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; }
 .schoolLoading { display: grid; justify-items: center; gap: 12px; color: #e4eeef; font-size: .8125rem; }
+.schoolLoadingStatus { align-items: center; max-width: calc(100% - 112px); padding: 16px; border-radius: 12px; background: #fff; text-align: center; }
 @media (forced-colors: active) { .schoolStage, .schoolNavigation, .schoolActions > button { border-color: CanvasText; } }

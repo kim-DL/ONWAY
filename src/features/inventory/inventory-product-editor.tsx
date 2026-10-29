@@ -4,7 +4,7 @@ import { lazy, Suspense, useId, useRef, useState, type FormEvent } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryLocation, type InventoryLotDraft, type InventoryProductSaveResult, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
-import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo";
+import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo-picker";
 import { inventoryRepository } from "./inventory-repository";
 import { useInventoryEditorReady } from "./use-inventory-editor-ready";
 import { FormFooter, LotFields, QuantityFields, blankLot, useInventoryAction, validLotDraft, type InventoryProductEditorProps } from "./inventory-forms";
@@ -88,6 +88,6 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       {action.error ? <p role="alert" className={styles.error}>{action.error}</p> : null}
     </form><FormFooter id={id} busy={busy} onClose={onClose} label={product ? "변경 저장" : "품목 등록"} />
     {specificationPicker ? <BottomSheet open title="규격 선택" onClose={() => setSpecificationPicker(false)}><PresetChoices label="규격" presets={SPECIFICATION_PRESETS} selected={isCustom("specification", SPECIFICATION_PRESETS) ? null : draft.specification} disabled={busy} onSelect={(value) => { selectPreset("specification", value); setSpecificationPicker(false); }} /></BottomSheet> : null}
-    </> : <p role="status" className={`${styles.sheet} ${styles.muted}`}>품목 입력 화면을 준비하고 있어요.</p>}
+    </> : <p role="status" className={`${styles.sheet} ${styles.muted}`}>품목 입력 화면 여는 중</p>}
   </BottomSheet>;
 }

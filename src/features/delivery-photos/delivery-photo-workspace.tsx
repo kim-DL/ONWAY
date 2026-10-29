@@ -96,13 +96,13 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       if (data.error) data.refresh();
       if (catalog.status === "error") catalog.retry();
     }}>다시 시도</button></div> : null}
-    {data.loading && snapshot ? <p className={styles.freshness}>최신 목록을 확인하는 중입니다.</p> : null}
+    {data.loading && snapshot ? <p className={styles.freshness}>최신 목록 확인 중</p> : null}
     {snapshot?.today.truncated ? <p className={styles.notice}>오늘 사진이 많아 기록완료 수가 정확하지 않을 수 있습니다. 관리자에게 확인하세요.</p> : null}
     <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
     {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
       {searchResults.length ? <ul className={styles.list}>{searchResults.filter((customer) => customer.customerId !== captureId).map((customer) => renderRow(customer.customerId, true))}</ul>
         : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
-    {!snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처를 불러오는 중입니다.</p> : null}
+    {!snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처 불러오는 중</p> : null}
     {captureId && byId.has(captureId) ? <section className={styles.section} aria-label="추가 촬영 납품처">
         <h2>촬영 중인 납품처</h2><ul className={styles.list}>{renderRow(captureId)}</ul>
         <button type="button" onClick={() => setCaptureId(null)}>촬영 영역 닫기</button>

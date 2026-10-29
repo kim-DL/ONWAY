@@ -195,7 +195,7 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
     <div className={styles.picker}>
       {mode === "select" ? <>
         {pickerFeedback ? <p className={pickerFeedback.tone === "error" ? styles.error : styles.success} role={pickerFeedback.tone === "error" ? "alert" : "status"}>{pickerFeedback.message}</p> : null}
-        {loading ? <p className={styles.status} role="status">제조사 목록을 불러오고 있어요.</p> : null}
+        {loading ? <p className={styles.status} role="status">제조사 목록 불러오는 중</p> : null}
         {loadError ? <div className={styles.section} role="alert"><p className={styles.error}>{loadError}</p><GlassButton onClick={() => { setLoading(true); setLoadError(""); setAttempt((value) => value + 1); }}>다시 시도</GlassButton></div> : null}
         {!loading && !loadError ? <>
           {currentIsMissing ? <p className={styles.current}><strong>현재 제조사 · {resolvedCurrent.name || "이름 없음"}</strong>비활성 또는 현재 선택 목록에 없는 연결을 유지하고 있어요.</p> : null}

@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { SchoolAssignmentPicker } from "@/components/assignment/school-assignment-picker";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useSchoolSearchCatalog } from "@/features/search/use-school-search-catalog";
 
@@ -36,7 +37,7 @@ export function SalesClaimPicker({
     : [], [assignedSchoolIds, catalogItems]);
 
   if (catalog.status === "loading") {
-    return <div className="sales-claim-loading" role="status"><Icon name="refresh" /><span>전체 학교 목록을 준비하고 있어요.</span></div>;
+    return <LoadingStatus className="sales-claim-loading" label="학교 목록 불러오는 중" detail="영업 대상으로 선택할 학교 목록을 확인하고 있습니다." />;
   }
   if (catalog.status === "error") {
     return (

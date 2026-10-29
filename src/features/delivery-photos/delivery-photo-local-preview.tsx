@@ -7,7 +7,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import styles from "./delivery-photo-local-preview.module.css";
 
 const PhotoPanZoom = dynamic(() => import("@/components/ui/photo-pan-zoom").then((module) => module.PhotoPanZoom), { ssr: false,
-  loading: () => <p role="status">사진 확대 조작을 준비하고 있어요.</p> });
+  loading: () => <p role="status">사진 확대 준비 중</p> });
 const retainZoom = () => {};
 
 export function DeliveryPhotoLocalPreview({ url, origin, onClose }: { url: string; origin: HTMLElement; onClose: () => void }) {

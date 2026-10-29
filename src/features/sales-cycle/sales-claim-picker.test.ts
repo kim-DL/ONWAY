@@ -31,7 +31,7 @@ describe("deferred sales claim picker", () => {
     useCatalog.mockReturnValue({ status: "loading" });
     const html = renderToStaticMarkup(createElement(SalesClaimPicker, props));
     expect(html).toContain('role="status"');
-    expect(html).toContain("전체 학교 목록을 준비하고 있어요.");
+    expect(html).toContain("학교 목록 불러오는 중");
     expect(picker).not.toHaveBeenCalled();
     expect(useCatalog).toHaveBeenCalledWith(session, "sales");
   });

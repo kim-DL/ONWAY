@@ -1,24 +1,16 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
-import { AppIconMark } from "@/components/ui/app-icon-mark";
-import { OnnuriLoader } from "@/components/ui/onnuri-loader";
+import { LoadingIndicator } from "@/components/ui/loading-indicator";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import { useAuth } from "./auth-context";
+import { AuthBrand, AuthHeader, AuthLoadingScreen, useLaunchTiming } from "./auth-loading";
 
 function AppShellFallback() {
-  return (
-    <main className="auth-shell auth-shell--center" aria-busy="true">
-      <div className="auth-splash" role="status" aria-live="polite">
-        <h1 className="sr-only">급식길 업무 화면 준비 중</h1>
-        <Brand />
-        <OnnuriLoader size="large" decorative />
-        <p>저장된 업무 화면을 여는 중이에요.</p>
-      </div>
-    </main>
-  );
+  return <AuthLoadingScreen stage="workspace" />;
 }
 
 const AppShell = dynamic(
@@ -26,26 +18,8 @@ const AppShell = dynamic(
   { loading: AppShellFallback },
 );
 
-function Brand() {
-  return (
-    <div className="auth-brand" aria-label="급식길">
-      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark /></span>
-      <span><strong>급식길</strong><small>온누리종합식품</small></span>
-    </div>
-  );
-}
-
 function AuthSplash({ message }: { message?: string | undefined }) {
-  return (
-    <main className="auth-shell auth-shell--center" aria-busy="true">
-      <div className="auth-splash" role="status" aria-live="polite">
-        <h1 className="sr-only">급식길 로그인 확인 중</h1>
-        <Brand />
-        <OnnuriLoader size="large" decorative />
-        <p>{message ?? "안전하게 로그인 정보를 확인하고 있어요."}</p>
-      </div>
-    </main>
-  );
+  return <AuthLoadingScreen stage="session" message={message} />;
 }
 
 function PinIndicator({ length }: { length: number }) {
@@ -60,6 +34,7 @@ function PinIndicator({ length }: { length: number }) {
 
 function PinLogin({ initialError = null }: { initialError?: string | null }) {
   const { login, loginWithGoogle } = useAuth();
+  const { startedAt, restart, consumeSubmission } = useLaunchTiming();
   const [pin, setPin] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
@@ -77,11 +52,13 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
     if (pin.length !== 6 || submitting || adminSubmitting || submissionLockRef.current) return;
 
     submissionLockRef.current = true;
+    restart(true);
     setSubmitting(true);
     setError(null);
     try {
       await login(pin);
     } catch (caught) {
+      consumeSubmission();
       submissionLockRef.current = false;
       setPin("");
       setError(caught instanceof Error ? caught.message : "PIN을 확인해주세요.");
@@ -92,11 +69,13 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
   const submitAdmin = async () => {
     if (adminSubmitting || submitting || submissionLockRef.current) return;
     submissionLockRef.current = true;
+    restart(true);
     setAdminSubmitting(true);
     setError(null);
     try {
       await loginWithGoogle();
     } catch (caught) {
+      consumeSubmission();
       submissionLockRef.current = false;
       setError(caught instanceof Error ? caught.message : "관리자 로그인을 완료하지 못했습니다.");
       setAdminSubmitting(false);
@@ -104,16 +83,13 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
   };
 
   return (
-    <main className="auth-shell">
+    <main className="auth-shell auth-shell--login">
+      <AuthHeader />
       <section className="login-story" aria-label="급식길 소개">
-        <Brand />
         <div className="login-story__copy">
-          <p className="auth-eyebrow">SCHOOL MEAL FIELD OPERATIONS</p>
-          <h1>오늘의 현장으로<br /><em>빠르게.</em></h1>
-          <p>학교 급식실 납품과 영업 업무를 한 길로 연결합니다.</p>
-        </div>
-        <div className="route-motif" aria-hidden="true">
-          <span>출발</span><i /><i /><i /><span>현장</span>
+          <p className="auth-eyebrow">온누리종합식품 현장 업무</p>
+          <h1>오늘의 업무를<br /><em>시작합니다.</em></h1>
+          <p>납품부터 재고까지, 필요한 업무를 한곳에서.</p>
         </div>
       </section>
 
@@ -148,21 +124,32 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
             </div>
             <p id="pin-help" className="sr-only">숫자 6자리 PIN</p>
             {error ? <p id="pin-error" className="pin-error" role="alert" aria-live="assertive">{error}</p> : null}
-            <button type="submit" disabled={pin.length !== 6 || submitting || adminSubmitting}>
-              <span>{submitting ? "확인 중" : "급식길 시작하기"}</span>
-              {submitting ? <OnnuriLoader size="small" tone="inherit" decorative /> : <span aria-hidden="true">→</span>}
+            <button type="submit" aria-busy={submitting} disabled={pin.length !== 6 || submitting || adminSubmitting}>
+              <span>{submitting ? "로그인 확인 중" : "급식길 시작하기"}</span>
+              {submitting ? <LoadingIndicator size="small" tone="inherit" decorative startedAt={startedAt} /> : <span aria-hidden="true">→</span>}
             </button>
           </form>
           <div className="admin-login-separator"><span>또는</span></div>
           <button
             className="admin-google-login"
             type="button"
+            aria-busy={adminSubmitting}
             disabled={adminSubmitting || submitting}
             onClick={() => void submitAdmin()}
           >
-            {adminSubmitting ? <OnnuriLoader size="small" decorative /> : <span className="google-mark" aria-hidden="true">G</span>}
-            {adminSubmitting ? "관리자 확인 중…" : "Google로 관리자 로그인"}
+            {adminSubmitting ? <LoadingIndicator size="small" decorative startedAt={startedAt} /> : <span className="google-mark" aria-hidden="true">G</span>}
+            {adminSubmitting ? "관리자 로그인 확인 중" : "Google로 관리자 로그인"}
           </button>
+          <div className="login-progress">
+            {submitting || adminSubmitting ? (
+              <LoadingStatus
+                label={<span className="sr-only">{adminSubmitting ? "관리자 로그인 확인 중" : "로그인 확인 중"}</span>}
+                detail={adminSubmitting ? "관리자 로그인 응답을 기다리고 있습니다." : "로그인 상태를 확인하고 있습니다."}
+                startedAt={startedAt}
+                indicator={false}
+              />
+            ) : null}
+          </div>
         </div>
         <p className="login-support">PIN을 잊으셨나요? 운영 관리자에게 문의해주세요.</p>
       </section>
@@ -189,7 +176,7 @@ function Unconfigured() {
   return (
     <main className="auth-shell auth-shell--center">
       <section className="session-card" role="alert">
-        <Brand />
+        <AuthBrand />
         <p className="auth-eyebrow">CONFIGURATION REQUIRED</p>
         <h1>앱 연결 설정이<br />필요합니다.</h1>
         <p>Firebase 공개 환경 변수를 설정한 뒤 앱을 다시 시작해주세요.</p>
@@ -200,6 +187,19 @@ function Unconfigured() {
 
 export function AuthGate() {
   const { state } = useAuth();
+  const { restart, consumeSubmission } = useLaunchTiming();
+  const previousStatus = useRef(state.status);
+
+  useLayoutEffect(() => {
+    // A submitted PIN/Google request continues its clock into session resolution.
+    // Logout, cleanup, and a sign-in from another tab start fresh feedback.
+    if (state.status === "resolving" && previousStatus.current !== "resolving") {
+      if (!consumeSubmission()) restart();
+    } else if (state.status !== "resolving") {
+      consumeSubmission();
+    }
+    previousStatus.current = state.status;
+  }, [consumeSubmission, restart, state.status]);
 
   useEffect(() => {
     if (state.status !== "resolving" && state.status !== "authenticated") {

@@ -14,7 +14,7 @@ vi.mock("@/features/customers/customer-photo-preparation", () => ({ CUSTOMER_PHO
 vi.mock("@/features/auth/auth-context", () => ({ useAuth: vi.fn() }));
 vi.mock("@/features/auth/private-client-state", () => ({ registerPrivateBlobUrl: h.register, forgetPrivateBlobUrl: h.forget }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: { uploadPhoto: h.upload }, inventoryErrorMessage: () => "사진 오류" }));
-import { InventoryPhotoPicker } from "./inventory-photo";
+import { InventoryPhotoPicker } from "./inventory-photo-picker";
 
 type ElementProps = { children?: ReactNode; type?: string; src?: string; role?: string; onChange?: (event: unknown) => Promise<void>; onClick?: () => void };
 function find(tree: ReactNode, predicate: (props: ElementProps) => boolean): ElementProps | null {
