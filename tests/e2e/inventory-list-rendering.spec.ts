@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { readStylesheet } from "../helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../helpers/read-stylesheet";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 let script = "";
@@ -31,7 +31,7 @@ test.beforeAll(async () => {
     createRoot(document.getElementById('root')).render(<App/>);
   ` }, outfile: "inventory-list.js", bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent", define: { "process.env.NODE_ENV": '"production"' } });
   script = result.outputFiles.find((file) => file.path.endsWith(".js"))!.text;
-  css = readStylesheet(new URL("../../src/app/globals.css", import.meta.url)) + result.outputFiles.find((file) => file.path.endsWith(".css"))!.text;
+  css = readApplicationStylesheet() + result.outputFiles.find((file) => file.path.endsWith(".css"))!.text;
 });
 
 test("closing a detail restores the same product after a reorder moves it to another group", async ({ page }) => {
@@ -67,7 +67,7 @@ test("offscreen inventory groups retain list semantics, keyboard traversal and d
     await cards.first().focus();
     await cards.last().focus();
     await expect(cards.last()).toBeInViewport();
-    expect(await cards.last().evaluate((button) => getComputedStyle(button).outlineOffset)).toBe("-3px");
+    await expect(cards.last()).toHaveCSS("outline-offset", "-3px");
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: "목록 검증 0600 긴 제품 이름", exact: true });
     await expect(dialog).toBeVisible();

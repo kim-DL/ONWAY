@@ -1,4 +1,4 @@
-import { readStylesheet } from "../helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../helpers/read-stylesheet";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
@@ -11,7 +11,7 @@ import type { CachedSchoolDetail } from "../../src/features/school-detail/school
 type SchoolDetailFixtureState = { profile: SchoolFieldProfile | null; photos: SchoolPhoto[]; salesData?: CachedSchoolDetail["salesData"]; saves: { schoolId: string; expectedRevision: number; patch: SchoolFieldProfilePatch }[]; holdSave?: boolean; rejectSave?: boolean; releaseSave?: () => void };
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
+const globals = readApplicationStylesheet();
 let script = "";
 let css = "";
 let smallJpeg: Buffer;

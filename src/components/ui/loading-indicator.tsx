@@ -28,7 +28,7 @@ export function LoadingIndicator({
   const motionAllowed = useMotionAllowed();
   const offset = startedAt === undefined ? 0 : Math.min(0, startedAt + LOADING_INDICATOR_DELAY - mountedAt);
   return (
-    <span className={cn(styles.indicator, className)} data-loading-indicator data-onnuri-loader
+    <span className={cn(styles.indicator, className)} data-loading-indicator
       style={stage > 0 && offset ? { "--loading-offset": `${offset}ms` } as CSSProperties : undefined}
       data-size={size} data-tone={tone} data-variant={variant} data-visible={stage > 0}
       data-motion={stage > 0 && motionAllowed ? "running" : "paused"}

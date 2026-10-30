@@ -74,9 +74,8 @@ try {
     await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
     await page.getByRole("button", { name: "급식길 시작하기", exact: true }).click();
     await expect(page.locator(".school-search-trigger")).toBeEnabled();
-    const trigger = page.getByRole("button", { name: /^업무 모드 변경, 현재 / });
-    await trigger.click();
-    await page.getByRole("dialog", { name: "업무 모드 선택", exact: true }).locator('button[data-mode="inventory"]').click();
+    await page.getByRole("group", { name: "업무 모드", exact: true })
+      .getByRole("button", { name: "재고", exact: true }).click();
     await ready(page);
     await cdp.send("Network.clearBrowserCache");
     // Request interception intentionally blocks external hosts and disables HTTP cache.

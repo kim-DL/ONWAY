@@ -71,7 +71,6 @@
 .assignment-release-confirm strong { font-size: .88rem; }
 .assignment-release-confirm small { color: #79685e; font-size: .75rem; line-height: 1.5; }
 
-
 .sales-activity-page { max-width: 76rem; }
 .sales-activity-hero { min-height: 20rem; display: grid; grid-template-columns: minmax(0,1.35fr) minmax(15rem,.65fr); align-items: end; gap: 2rem; overflow: hidden; padding: clamp(1.6rem,4vw,3.1rem); border-radius: 30px 30px 30px 8px; color: #f6fbf7; background: linear-gradient(125deg,#123c32 0%,#1b5c4a 66%,#39705b 100%); box-shadow: 0 25px 65px rgba(20,65,53,.16); }
 .sales-activity-hero .shell-kicker { color: #dce86f; }
@@ -102,7 +101,6 @@
 .sales-activity-empty h3, .sales-activity-error h1 { margin: .25rem 0 0; font-size: 1.05rem; }
 .sales-activity-empty p, .sales-activity-error p { max-width: 32rem; margin: 0 0 .5rem; color: #687872; font-size: .8rem; line-height: 1.6; word-break: keep-all; }
 .sales-activity-error__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; margin-top: .35rem; }
-.sales-activity-loading { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding-top: 1rem; }
 
 @media (max-width: 760px) {
   .workspace-navigation {
@@ -135,5 +133,4 @@
   .sales-task-row { grid-template-columns: auto minmax(0,1fr) auto; gap: .65rem; padding-inline: .75rem; }
   .sales-task-row .status-badge { grid-column: 2; justify-self: start; }
   .sales-task-row > svg { grid-column: 3; grid-row: 1 / span 2; }
-  .sales-activity-loading { grid-template-columns: 1fr; }
 }

@@ -1,7 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
-vi.mock("./inventory-thumbnail", () => ({ InventoryThumbnail: () => null }));
+import { describe, expect, it } from "vitest";
 import { inventoryLocationMap, inventoryProductSchema, type InventoryContext } from "@/domain/inventory";
 import { InventoryCard } from "./inventory-card";
 import { inventoryCountBadgeState, inventoryCountEligible, inventoryExpiryGroupCount } from "./inventory-model";

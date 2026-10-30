@@ -1,4 +1,4 @@
-import { readStylesheet } from "../../tests/helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../../tests/helpers/read-stylesheet";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -7,7 +7,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { SoftCard } from "@/components/ui/soft-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-const css = readStylesheet(new URL("./globals.css", import.meta.url));
+const css = readApplicationStylesheet();
 
 describe("global stylesheet cleanup boundaries", () => {
   it("does not ship the retired, unmatchable sales palette", () => {

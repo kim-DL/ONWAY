@@ -1,4 +1,4 @@
-import { readStylesheet } from "../helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../helpers/read-stylesheet";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { build } from "esbuild";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
+const globals = readApplicationStylesheet();
 let script = "";
 let css = "";
 test.beforeAll(async () => {

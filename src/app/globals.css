@@ -1,15 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../");
 @import "./styles/base.css";
-@import "./styles/sales-route.css";
-@import "./styles/assignment-navigation.css";
-@import "./styles/app-shell.css";
-@import "./styles/sales-workspace.css";
-@import "./styles/export-center.css";
 @import "./styles/pwa.css";
-@import "./styles/assignment-picker.css";
-@import "./styles/field-theme.css";
-@import "./styles/brand-motion.css";
-@import "./styles/field-density.css";
-@import "./styles/field-controls.css";
 @import "./styles/auth-loading.css";
-@source not "../../output";

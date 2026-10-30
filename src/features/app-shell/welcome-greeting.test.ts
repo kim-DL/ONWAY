@@ -1,4 +1,4 @@
-import { readStylesheet } from "../../../tests/helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../../../tests/helpers/read-stylesheet";
 import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import { renderToString } from "react-dom/server";
@@ -38,7 +38,7 @@ describe("welcome quantum artwork", () => {
   });
 
   it("preserves the work-mode headline palettes independently of the glass navigation", () => {
-    const globals = readStylesheet(new URL("../../app/globals.css", import.meta.url));
+    const globals = readApplicationStylesheet();
     const greeting = readFileSync(new URL("./welcome-greeting.module.css", import.meta.url), "utf8");
     for (const [mode, color] of [["delivery", "#1b64da"], ["customer", "#274a94"], ["sales", "#FA6F42"]]) {
       expect(globals).toContain(`--mode-${mode}-text: ${color}`);

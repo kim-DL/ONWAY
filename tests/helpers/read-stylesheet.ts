@@ -1,5 +1,11 @@
 import { readFileSync } from "node:fs";
 
+/** Component fixtures render an authenticated workspace without Next's CSS loader. */
+export function readApplicationStylesheet(): string {
+  return readStylesheet(new URL("../../src/app/globals.css", import.meta.url))
+    + readStylesheet(new URL("../../src/app/workspace.css", import.meta.url));
+}
+
 /** Inline local imports for fixtures that inject source CSS into a style tag. */
 export function readStylesheet(file: URL, ancestors: readonly string[] = []): string {
   if (ancestors.includes(file.href)) throw new Error(`Circular stylesheet import: ${file.href}`);

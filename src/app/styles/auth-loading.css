@@ -84,8 +84,9 @@
   background: #fff;
   border-top: 1px solid #e8edf2;
 }
-.login-card, .login-support { }
 .login-card h2 { margin: 0; font-size: clamp(1.75rem, 2.6vw, 2.5rem); line-height: 1.3; letter-spacing: -.045em; font-weight: 720; }
+.login-card h2 + .pin-form { margin-top: 1.6rem; }
+.pin-form > button { margin-top: .85rem; }
 .pin-form > label { display: block; margin-bottom: .65rem; color: #3d4959; font-size: .8125rem; font-weight: 600; }
 .pin-field { position: relative; min-height: 5.2rem; display: grid; place-items: center; border: 1px solid #aab5c2; border-radius: .75rem; background: #fff; cursor: text; transition: border-color 160ms ease, box-shadow 160ms ease; }
 .pin-field:focus-within { border-color: #0b5a84; box-shadow: 0 0 0 3px #e6eff5; }
@@ -118,14 +119,15 @@
 .pin-form button:focus-visible,
 .session-card button:focus-visible,
 .admin-google-login:focus-visible { outline: 3px solid #0b5a84; outline-offset: 3px; }
-.admin-login-separator { color: #596575; font-size: .75rem; font-weight: 500; }
-.admin-google-login { padding: .75rem; color: #3d4959; border-color: #aab5c2; border-radius: .75rem; background: #fff; font-size: .8125rem; font-weight: 600; transition: border-color 150ms ease; }
+.admin-login-separator { display: flex; align-items: center; gap: .7rem; margin: .9rem 0 .7rem; color: #596575; font-size: .75rem; font-weight: 500; }
+.admin-login-separator::before, .admin-login-separator::after { height: 1px; flex: 1; content: ""; background: var(--line); }
+.admin-google-login { width: 100%; min-height: 3.25rem; display: flex; align-items: center; justify-content: center; gap: .7rem; padding: .75rem; color: #3d4959; border: 1px solid #aab5c2; border-radius: .75rem; background: #fff; font-size: .8125rem; font-weight: 600; cursor: pointer; transition: border-color 150ms ease; }
 .admin-google-login:hover:not(:disabled) { border-color: #0b5a84; box-shadow: none; transform: none; }
-.admin-google-login:disabled { color: #596575; background: #f8fafc; opacity: 1; }
-.google-mark { border: 0; }
-.login-support { width: min(100%, 25rem); color: #596575; font-size: .75rem; line-height: 1.5; text-align: center; }
+.admin-google-login:disabled { color: #596575; background: #f8fafc; opacity: 1; cursor: progress; }
+.google-mark { width: 1.55rem; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 50%; color: #4285f4; background: white; font-family: Arial,sans-serif; font-size: .8rem; font-weight: 900; }
+.login-support { width: min(100%, 25rem); margin-top: 1rem; color: #596575; font-size: .75rem; line-height: 1.5; text-align: center; }
 .login-progress { min-height: 2.5rem; padding-top: .75rem; }
-.pin-error { color: var(--danger); font-size: .8125rem; line-height: 1.5; font-weight: 700; }
+.pin-error { min-height: 0; margin: .6rem 0 0; color: var(--danger); font-size: .8125rem; line-height: 1.5; font-weight: 700; }
 .auth-shell--center { grid-template-columns: minmax(0, 1fr); place-items: center; padding: 1.5rem; }
 .session-card { width: min(100%, 34rem); padding: clamp(2rem, 5vw, 4rem); border: 1px solid #d8dfe7; border-radius: 1rem; background: #fff; }
 .session-card .auth-brand { margin-bottom: 3rem; }
@@ -145,11 +147,17 @@
 @media (max-width: 760px) {
   .auth-header { min-height: 4.7rem; margin-left: 0; padding: .8rem 1rem; }
   .login-story { padding: 1.25rem 1rem 1.75rem; }
+  .login-story__copy { padding: 1.2rem 0 0; }
+  .login-card h2 + .pin-form { margin-top: 1.25rem; }
+  .login-support { margin-top: .8rem; }
   .login-panel { padding-inline: 1rem; }
   .pin-field { min-height: 4.4rem; }
 }
 @media (max-width: 359px) {
   .auth-header { padding-inline: .75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-google-login { animation: none; transition: none; }
 }
 @media (forced-colors: active) {
   .auth-shell .auth-brand__mark { filter: none; }

@@ -69,6 +69,17 @@ describe("MemorySearchIndex", () => {
     expect(results.map((result) => result.matchType)).toEqual(["officialExact", "fuzzy"]);
   });
 
+  it("keeps typo thresholds in Unicode characters and chooses the closest alias", () => {
+    const unicode = item({ schoolId: "unicode", name: "확장한자학교", shortName: "가𠀀나" });
+    const aliases = item({ schoolId: "aliases", name: "별칭학교", aliases: ["전혀다른이름", "둔산초", "둔산여자고"] });
+    const candidates = new MemorySearchIndex([unicode, aliases]);
+    expect(candidates.search("가𠀁나")).toMatchObject([{ item: { schoolId: "unicode" }, matchType: "fuzzy", score: 480 }]);
+    expect(candidates.search("𠀁나")).toEqual([]);
+    expect(candidates.search("둔산쵸")).toMatchObject([{ item: { schoolId: "aliases" }, score: 480 }]);
+    expect(candidates.search("둔산여지교")).toMatchObject([{ item: { schoolId: "aliases" }, score: 460 }]);
+    expect(candidates.search("ㄷㅅㄷ")).toEqual([]);
+  });
+
   it("finds exact short names across a 500-school catalog", () => {
     const items = Array.from({ length: 500 }, (_, index) => item({
       schoolId: `SCH-NEIS-G1${String(index).padStart(8, "0")}`,

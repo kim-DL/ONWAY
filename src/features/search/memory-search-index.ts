@@ -26,7 +26,10 @@ type IndexedSchool = {
   aliases: string[];
   initials: string;
   aliasInitials: string[];
+  fuzzyCandidates: string[][];
 };
+
+const names = new Intl.Collator("ko-KR");
 
 const MATCH_SCORE: Record<Exclude<SearchMatchType, "fuzzy">, number> = {
   officialExact: 1_000,
@@ -40,14 +43,13 @@ const MATCH_SCORE: Record<Exclude<SearchMatchType, "fuzzy">, number> = {
   initialsContains: 600,
 };
 
-function boundedEditDistance(left: string, right: string, limit: number): number | null {
-  const leftCharacters = Array.from(left);
-  const rightCharacters = Array.from(right);
+function boundedEditDistance(leftCharacters: readonly string[], rightCharacters: readonly string[], limit: number): number | null {
   if (Math.abs(leftCharacters.length - rightCharacters.length) > limit) return null;
 
   let previous = Array.from({ length: rightCharacters.length + 1 }, (_, index) => index);
+  let current = new Array<number>(rightCharacters.length + 1);
   for (let leftIndex = 1; leftIndex <= leftCharacters.length; leftIndex += 1) {
-    const current = [leftIndex];
+    current[0] = leftIndex;
     let rowMinimum = leftIndex;
     for (let rightIndex = 1; rightIndex <= rightCharacters.length; rightIndex += 1) {
       const substitutionCost = leftCharacters[leftIndex - 1] === rightCharacters[rightIndex - 1] ? 0 : 1;
@@ -60,15 +62,13 @@ function boundedEditDistance(left: string, right: string, limit: number): number
       rowMinimum = Math.min(rowMinimum, value);
     }
     if (rowMinimum > limit) return null;
-    previous = current;
+    const completed = current;
+    current = previous;
+    previous = completed;
   }
 
   const distance = previous[rightCharacters.length] ?? Number.POSITIVE_INFINITY;
   return distance <= limit ? distance : null;
-}
-
-function isInitialsQuery(query: string) {
-  return query.length > 0 && Array.from(query).every((character) => /[ㄱ-ㅎ]/u.test(character));
 }
 
 function exactOrPrefixMatch(entry: IndexedSchool, query: string): SchoolSearchResult | null {
@@ -94,13 +94,9 @@ function exactOrPrefixMatch(entry: IndexedSchool, query: string): SchoolSearchRe
   return null;
 }
 
-function fuzzyMatch(entry: IndexedSchool, query: string): SchoolSearchResult | null {
-  const queryLength = Array.from(query).length;
-  if (queryLength < 3 || isInitialsQuery(query)) return null;
-  const limit = queryLength <= 4 ? 1 : 2;
-  const candidates = [entry.shortName, ...entry.aliases].filter((value): value is string => value !== null);
+function fuzzyMatch(entry: IndexedSchool, query: readonly string[], limit: number): SchoolSearchResult | null {
   let minimumDistance: number | null = null;
-  for (const candidate of candidates) {
+  for (const candidate of entry.fuzzyCandidates) {
     const distance = boundedEditDistance(query, candidate, limit);
     if (distance !== null && (minimumDistance === null || distance < minimumDistance)) {
       minimumDistance = distance;
@@ -116,13 +112,16 @@ export class MemorySearchIndex {
   constructor(items: readonly SchoolSearchItem[]) {
     this.entries = items.map((item) => {
       const aliases = item.aliases.map(normalizeSearchText);
+      const shortName = item.shortName ? normalizeSearchText(item.shortName) : null;
       return {
         item,
         name: normalizeSearchText(item.name),
-        shortName: item.shortName ? normalizeSearchText(item.shortName) : null,
+        shortName,
         aliases,
         initials: normalizeSearchText(item.initials),
         aliasInitials: aliases.map(getKoreanInitials),
+        // Keep derived private strings with this index; typing allocates no candidate arrays.
+        fuzzyCandidates: (shortName === null ? aliases : [shortName, ...aliases]).map((name) => Array.from(name)),
       };
     });
   }
@@ -143,16 +142,19 @@ export class MemorySearchIndex {
 
     const compareMatches = (left: SchoolSearchResult, right: SchoolSearchResult) =>
         right.score - left.score ||
-        left.item.normalizedName.localeCompare(right.item.normalizedName, "ko-KR") ||
+        names.compare(left.item.normalizedName, right.item.normalizedName) ||
         left.item.schoolId.localeCompare(right.item.schoolId);
 
     directMatches.sort(compareMatches);
     if (directMatches.length >= limit) return directMatches.slice(0, limit);
 
+    const queryCharacters = Array.from(query);
+    if (queryCharacters.length < 3 || /^[ㄱ-ㅎ]+$/u.test(query)) return directMatches.slice(0, limit);
+    const editLimit = queryCharacters.length <= 4 ? 1 : 2;
     const fuzzyMatches: SchoolSearchResult[] = [];
     for (const entry of this.entries) {
       if (directlyMatchedEntries.has(entry)) continue;
-      const match = fuzzyMatch(entry, query);
+      const match = fuzzyMatch(entry, queryCharacters, editLimit);
       if (match) fuzzyMatches.push(match);
     }
     return [...directMatches, ...fuzzyMatches.sort(compareMatches)].slice(0, limit);

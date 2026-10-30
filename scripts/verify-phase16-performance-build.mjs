@@ -221,6 +221,17 @@ const customerStylesheetGzipBytes = customerStylesheets.reduce((sum, asset) => s
 const customerJavascriptGzipBytes = [...customerAssetNames].filter((asset) => asset.endsWith(".js"))
   .map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const initialStylesheets = new Set(readInitialHtmlAssets("css"));
+const initialCss = [...initialStylesheets].map(sizeAsset);
+const initialStylesheetRawBytes = initialCss.reduce((sum, asset) => sum + asset.rawBytes, 0);
+const initialStylesheetGzipBytes = initialCss.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const workspaceStylesheets = stylesheets.filter((asset) =>
+  readFileSync(join(nextRoot, asset.asset), "utf8").includes(".workspace-navigation"));
+assertBudget(workspaceStylesheets.length > 0, "authenticated workspace CSS must be present");
+for (const asset of workspaceStylesheets) {
+  assertBudget(!initialStylesheets.has(asset.asset), "workspace CSS must wait for the authenticated shell");
+}
+assertBudget(initialStylesheetRawBytes <= 32 * 1024, `initial CSS raw ${initialStylesheetRawBytes}B exceeds 32KiB`);
+assertBudget(initialStylesheetGzipBytes <= 8 * 1024, `initial CSS gzip ${initialStylesheetGzipBytes}B exceeds 8KiB`);
 const legacyDynamicAssets = new Set(dynamicEntries.filter((entry) => !customerEntries.includes(entry)).flatMap((entry) => entry.files));
 assertBudget(inventoryWorkspaceEntries.length === 2 && inventoryPhotoEntries.length === 1,
   "inventory must retain two staff/admin workspace entries and one deferred photo viewer");
@@ -458,6 +469,8 @@ const report = {
     initialRawBytes: 520 * 1024,
     initialGzipBytes: 160 * 1024,
     largestJavascriptGzipBytes: 90 * 1024,
+    initialStylesheetRawBytes: 32 * 1024,
+    initialStylesheetGzipBytes: 8 * 1024,
     legacyStylesheetRawBytes: 235 * 1024,
     legacyStylesheetGzipBytes: 44.5 * 1024,
     adminInterfaceRawBytes: 64 * 1024,
@@ -493,6 +506,8 @@ const report = {
     initialRawBytes,
     initialGzipBytes,
     largestJavascriptGzipBytes,
+    initialStylesheetRawBytes,
+    initialStylesheetGzipBytes,
     dynamicBoundaryCount: dynamicEntries.length,
     dynamicAssetCount: dynamicAssets.length,
     stylesheetRawBytes,

@@ -4,7 +4,7 @@ import { ShellHeader } from "../../../src/features/app-shell/app-shell-header";
 import { WelcomeGreeting } from "../../../src/features/app-shell/welcome-greeting";
 import { useHeaderMotionPreference } from "../../../src/features/app-shell/header-motion-preference";
 import type { WorkMode } from "../../../src/features/app-shell/shell-policy";
-import { LoadingIndicator as OnnuriLoader } from "../../../src/components/ui/loading-indicator";
+import { LoadingIndicator } from "../../../src/components/ui/loading-indicator";
 
 function HeaderMotionFixture() {
   const [mode, setMode] = useState<WorkMode>("customer");
@@ -50,11 +50,11 @@ function LoaderFixture() {
       <button type="button" style={{ minHeight: 44 }} onClick={() => setPaused(!paused)}>{paused ? "모션 재개" : "모션 일시정지"}</button>
     </div>
     <section aria-label="로더 표시" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 20, paddingBlock: 24 }}>
-      {(["small", "medium", "large"] as const).map((size) => <OnnuriLoader key={size} size={size} label={`${size} 정보 불러오는 중`} />)}
+      {(["small", "medium", "large"] as const).map((size) => <LoadingIndicator key={size} size={size} label={`${size} 정보 불러오는 중`} />)}
     </section>
     <section aria-label="명시적 로더 색상" style={{ display: "flex", flexWrap: "wrap", gap: 20, paddingBlock: 24 }}>
-      {(["delivery", "customer", "sales"] as const).map((tone) => <OnnuriLoader key={tone} tone={tone} decorative />)}
-      <button type="button" onClick={() => setClicks((value) => value + 1)} style={{ display: "inline-flex", gap: 12, alignItems: "center", minHeight: 44, color: "#315b65" }}><OnnuriLoader size="small" tone="inherit" decorative />저장 상태</button>
+      {(["delivery", "customer", "sales"] as const).map((tone) => <LoadingIndicator key={tone} tone={tone} decorative />)}
+      <button type="button" onClick={() => setClicks((value) => value + 1)} style={{ display: "inline-flex", gap: 12, alignItems: "center", minHeight: 44, color: "#315b65" }}><LoadingIndicator size="small" tone="inherit" decorative />저장 상태</button>
     </section>
     <output aria-label="검증용 버튼 입력 횟수">{clicks}</output>
   </main>;

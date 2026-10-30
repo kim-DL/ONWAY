@@ -1,4 +1,4 @@
-import { readStylesheet } from "../../../tests/helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../../../tests/helpers/read-stylesheet";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -53,7 +53,7 @@ describe("shell header", () => {
   });
 
   it("exports actual component markup and scoped styles for browser verification", () => {
-    const globalCss = readStylesheet(new URL("../../app/globals.css", import.meta.url));
+    const globalCss = readApplicationStylesheet();
     const scope = (css: string, names: Record<string, string>, keys: string[]) => {
       let scoped = css.replace(/:global\(([^)]+)\)/g, "$1");
       for (const name of keys) scoped = scoped.replace(new RegExp("\\." + name + "\\b", "g"), "." + names[name]);

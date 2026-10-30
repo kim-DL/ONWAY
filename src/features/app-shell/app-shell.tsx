@@ -1,5 +1,7 @@
 "use client";
 
+import "@/app/workspace.css";
+
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 

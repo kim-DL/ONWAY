@@ -203,11 +203,6 @@
 .detail-network-state strong { font-size: 0.74rem; }
 .detail-network-state small { font-size: 0.64rem; }
 
-.field-loading { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-
-
-
-
 .sales-deferred-loading { min-height: 8rem; display: grid; place-items: center; margin: 1rem 0; padding: 1.2rem; border: 1px solid var(--shell-line); border-radius: 20px; color: var(--shell-ink-soft); background: rgba(255,255,255,.72); font-size: .7rem; font-weight: 760; }
 
 .photo-uploader { display: grid; gap: 1rem; }
@@ -226,7 +221,6 @@
 .photo-privacy-note strong { font-size: .67rem; }
 .photo-privacy-note small { font-size: .59rem; line-height: 1.55; }
 .photo-uploader > .glass-button { width: 100%; min-height: 52px; }
-
 
 .field-editor { display: grid; gap: 1.2rem; }
 .field-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
@@ -469,18 +463,6 @@
 .toast .toast__action { width: auto; min-width: 64px; padding-inline: .65rem; color: #d9fff6; background: rgba(255,255,255,.12); font-size: .65rem; font-weight: 820; }
 @keyframes toast-in { from { transform: translateY(-0.5rem); opacity: 0; } }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .school-search-layer {
   position: fixed;
   z-index: 90;
@@ -673,7 +655,7 @@
   text-align: center;
 }
 
-.school-search-state > span:not([data-onnuri-loader]) { width: 3.4rem; aspect-ratio: 1; display: grid; place-items: center; margin-bottom: 1rem; border-radius: 17px; color: var(--shell-accent); background: var(--shell-accent-soft); }
+.school-search-state > span:not([data-loading-indicator]) { width: 3.4rem; aspect-ratio: 1; display: grid; place-items: center; margin-bottom: 1rem; border-radius: 17px; color: var(--shell-accent); background: var(--shell-accent-soft); }
 .school-search-state strong { font-size: 1rem; letter-spacing: -0.03em; }
 .school-search-state p { max-width: 30rem; margin: 0.6rem 0 1rem; color: var(--shell-ink-soft); font-size: 0.72rem; line-height: 1.65; word-break: keep-all; }
 .school-search-state--guide b { color: var(--shell-accent-deep); }
@@ -726,7 +708,6 @@
   .workspace-header .app-brand__wordmark small { display: none; }
   .workspace-header .app-brand__mark { width: 2.45rem; }
   .workspace-header__controls { gap: 0.5rem; }
-    .mode-label { min-height: 2.5rem; padding-inline: 0.7rem; }
 
   .workspace-navigation {
     inset: auto 0.75rem max(0.75rem, env(safe-area-inset-bottom));
@@ -766,13 +747,11 @@
   .sales-scope-control button { flex: 1; }
   .assignment-grid { grid-template-columns: 1fr; }
   .assignment-card { min-height: 18rem; }
-  .skeleton-card { min-height: 12.5rem; }
             .settings-grid { grid-template-columns: 1fr; }
   .profile-card { grid-row: auto; }
     .detail-hero { gap: 0.85rem; }
   .detail-hero h1 { font-size: clamp(2.35rem, 11vw, 4rem); }
   .detail-hero { padding-bottom: 2.5rem; }
-  .field-loading { grid-template-columns: 1fr; }
   .field-form-grid { grid-template-columns: 1fr; }
   .field-form-grid__wide { grid-column: auto; }
   .field-editor__actions .glass-button { width: 100%; }
@@ -808,7 +787,6 @@
 
 @media (max-width: 440px) {
   .workspace-header .app-brand__wordmark { display: none; }
-  .mode-label { font-size: 0.68rem; }
       .settings-list { padding-inline: 0.75rem; }
   .settings-list > div { grid-template-columns: auto 1fr; padding: 0.5rem 0; }
   .settings-list > div > .status-badge { grid-column: 2; }

@@ -1,11 +1,11 @@
-import { readStylesheet } from "../helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../helpers/read-stylesheet";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { build } from "esbuild";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
+const globals = readApplicationStylesheet();
 const storageKey = "onnuriway:header-motion-paused:v1";
 let script = "";
 let moduleCss = "";
@@ -220,6 +220,10 @@ test("pause and resume share the existing preference and a stopped choice surviv
   await expectMotion(page, "running");
   await page.getByRole("switch", { name: "인사 애니메이션" }).click();
   await expectMotion(page, "paused");
+  // CSS can report paused while the compositor is still settling its hold time.
+  await particles(page).evaluateAll(async elements => {
+    await Promise.all(elements.flatMap(element => element.getAnimations()).map(animation => animation.ready));
+  });
   const stoppedTransforms = await particles(page).evaluateAll(elements => elements.map(element => getComputedStyle(element).transform));
   await page.waitForTimeout(350);
   expect(await particles(page).evaluateAll(elements => elements.map(element => getComputedStyle(element).transform))).toEqual(stoppedTransforms);

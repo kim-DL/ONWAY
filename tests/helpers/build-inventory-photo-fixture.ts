@@ -1,6 +1,6 @@
 import { build, type Plugin } from "esbuild";
 import { fileURLToPath } from "node:url";
-import { readStylesheet } from "./read-stylesheet";
+import { readApplicationStylesheet } from "./read-stylesheet";
 
 export async function buildInventoryPhotoFixture(entryPoint = "tests/e2e/fixtures/inventory-photo-pan-zoom.tsx", plugins: Plugin[] = []) {
   const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -12,5 +12,5 @@ export async function buildInventoryPhotoFixture(entryPoint = "tests/e2e/fixture
     } }],
   });
   return { script: result.outputFiles.find((file) => file.path.endsWith(".js"))!.text,
-    css: readStylesheet(new URL("../../src/app/globals.css", import.meta.url)) + result.outputFiles.find((file) => file.path.endsWith(".css"))!.text };
+    css: readApplicationStylesheet() + result.outputFiles.find((file) => file.path.endsWith(".css"))!.text };
 }

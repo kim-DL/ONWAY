@@ -2,13 +2,13 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { OnnuriLoader } from "./onnuri-loader";
+import { LoadingIndicator } from "./loading-indicator";
 import { LoadingStatus } from "./loading-status";
 import { LoadingSkeleton } from "./loading-skeleton";
 
 describe("Onnuri loading indicator", () => {
   it("announces the operation immediately without flashing an animation before hydration", () => {
-    const markup = renderToStaticMarkup(createElement(OnnuriLoader, { label: "학교 정보를 여는 중" }));
+    const markup = renderToStaticMarkup(createElement(LoadingIndicator, { label: "학교 정보를 여는 중" }));
     expect(markup).toContain('role="status"');
     expect(markup).toContain('aria-label="학교 정보를 여는 중"');
     expect(markup).toContain('data-motion="paused"');
@@ -19,7 +19,7 @@ describe("Onnuri loading indicator", () => {
   });
 
   it("does not repeat a surrounding status announcement", () => {
-    const markup = renderToStaticMarkup(createElement(OnnuriLoader, { decorative: true, size: "small", tone: "inherit" }));
+    const markup = renderToStaticMarkup(createElement(LoadingIndicator, { decorative: true, size: "small", tone: "inherit" }));
     expect(markup).not.toContain('role="status"');
     expect(markup).not.toContain("aria-label=");
     expect(markup).toContain('aria-hidden="true"');

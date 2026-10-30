@@ -1,4 +1,4 @@
-import { readStylesheet } from "../helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../helpers/read-stylesheet";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -20,7 +20,7 @@ test.beforeAll(async () => {
 });
 
 async function liveMotionFixture(page: Page, kind = "header", modeCount = 4) {
-  const globals = readStylesheet(new URL("../../src/app/globals.css", import.meta.url));
+  const globals = readApplicationStylesheet();
   await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({ contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)) }));
   await page.setContent(`<!doctype html><html lang="ko" data-fixture="${kind}" data-mode-count="${modeCount}"><head><base href="http://header.fixture/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>헤더 모션 검증</title><style>${globals}</style><style>${motionCss}</style></head><body><div id="root"></div></body></html>`);
   await page.addScriptTag({ content: motionScript });
@@ -244,7 +244,7 @@ test("loading indicators preserve status, compact geometry and a consistent acce
   expect(dimensions[1]).toBeLessThan(dimensions[2]!);
   const explicit = page.getByRole("region", { name: "명시적 로더 색상", exact: true });
   await expect(explicit.getByRole("status")).toHaveCount(0);
-  for (const loader of await explicit.locator("[data-onnuri-loader]").all()) await expect(loader).toHaveAttribute("aria-hidden", "true");
+  for (const loader of await explicit.locator("[data-loading-indicator]").all()) await expect(loader).toHaveAttribute("aria-hidden", "true");
   const colors: string[] = [];
   for (const mode of ["customer", "delivery", "sales"]) {
     await page.getByRole("group", { name: "검증용 업무 모드" }).locator(`[data-mode="${mode}"]`).click();

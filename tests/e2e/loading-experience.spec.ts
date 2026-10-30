@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { readStylesheet } from "../helpers/read-stylesheet";
+import { readApplicationStylesheet } from "../helpers/read-stylesheet";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 let script = "";
@@ -16,7 +16,7 @@ test.beforeAll(async () => {
     builder.onLoad({ filter: /.*/, namespace: "loading-fixture" }, ({ path }) => ({ loader: "js", resolveDir: root, contents: path === "auth" ? `import {useState,useEffect} from 'react';export function useAuth(){const [state,setState]=useState({status:'unauthenticated'});useEffect(()=>{const update=e=>setState(e.detail);window.addEventListener('fixture-auth-state',update);return()=>window.removeEventListener('fixture-auth-state',update)},[]);return {state,login:()=>new Promise((_,reject)=>window.addEventListener('fixture-login-fail',()=>reject(new Error('연결을 확인한 뒤 다시 시도해주세요.')),{once:true})),loginWithGoogle:()=>new Promise(()=>{})}}` : path === "dynamic" ? "import {createElement} from 'react';export default function dynamic(){return ()=>createElement('main',null,'인증된 업무 화면')}" : "export const AppShell=()=>null" }));
   } }] });
   script = result.outputFiles.find(file => file.path.endsWith(".js"))!.text;
-  css = readStylesheet(new URL("../../src/app/globals.css", import.meta.url)) + result.outputFiles.find(file => file.path.endsWith(".css"))!.text;
+  css = readApplicationStylesheet() + result.outputFiles.find(file => file.path.endsWith(".css"))!.text;
 });
 
 async function fixture(page: Page, view = "launch", clock = true) {
