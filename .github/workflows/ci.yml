@@ -4,11 +4,34 @@ on:
     branches:
       - main
   pull_request: null
+  workflow_dispatch: {}
 permissions:
   contents: read
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      profile: ${{ steps.scope.outputs.profile }}
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - name: Checkout complete change range
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Verify scope classifier
+        run: node --test scripts/ci-scope.test.mjs
+      - name: Select required checks
+        id: scope
+        run: node scripts/ci-scope.mjs
   # Independent jobs keep successful checks reusable when a failed job is rerun.
   audit:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'audit') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -19,6 +42,8 @@ jobs:
       - name: Dependency audit (high and critical)
         run: npm run audit
   lint:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'lint') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -29,6 +54,8 @@ jobs:
       - name: Lint
         run: npm run lint
   typecheck:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'typecheck') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -39,6 +66,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
   unit:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'unit') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -49,6 +78,8 @@ jobs:
       - name: Unit tests
         run: npm test
   search-performance:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'search-performance') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -59,6 +90,8 @@ jobs:
       - name: Search and cache performance
         run: npm run test:performance
   functions-build:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'functions-build') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -69,6 +102,8 @@ jobs:
       - name: Functions build
         run: npm run functions:build
   production-build:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'production-build') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -88,6 +123,8 @@ jobs:
       - name: JavaScript and CSS budget gate
         run: npm run verify:performance:build
   browser:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'browser') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -103,6 +140,8 @@ jobs:
       - name: Safe configuration browser tests
         run: npm run test:e2e
   deferred-tools:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'deferred-tools') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -119,6 +158,8 @@ jobs:
           ONNURIWAY_E2E_UX_SUITE: optimization
           ONNURIWAY_E2E_GREP: loads on first open
   phase17:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'phase17') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -132,6 +173,8 @@ jobs:
       - name: Phase 17 emulator and production journey
         run: npm run test:acceptance:emulator
   inventory-photos:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'inventory-photos') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -148,6 +191,8 @@ jobs:
           INVENTORY_E2E_STATIC: "true"
           INVENTORY_E2E_GREP: HEIC product capture|PIN user registers a photographed product
   delivery-photos:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'delivery-photos') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -160,10 +205,28 @@ jobs:
           chromium: "true"
       - name: Delivery photo field and durable queue regression
         run: node scripts/firebase-emulators.mjs delivery-photo-frontend-e2e
+  presentation:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'presentation') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          chromium: "true"
+      - name: Prepare header browser fixtures
+        run: npx vitest run src/features/app-shell/app-shell-header.test.ts
+      - name: Header, login and loading presentation regression
+        run: npx playwright test tests/e2e/header-layout.spec.ts tests/e2e/loading-experience.spec.ts
   verify:
-    # Preserve the existing required check; failure, cancellation and skips must fail it.
+    # Required jobs must succeed; only exclusions recorded by a successful plan may skip.
     if: ${{ always() }}
     needs:
+      - plan
+      - presentation
       - audit
       - lint
       - typecheck
@@ -185,7 +248,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - name: Require every check to succeed
+      - name: Require every selected check to succeed
         run: node scripts/verify-ci-results.mjs
         env:
           CI_RESULTS: ${{ toJSON(needs) }}

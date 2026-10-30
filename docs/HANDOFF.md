@@ -5,6 +5,13 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-31 변경 범위별 릴리스 검사 — 규칙·CI 개선
+
+- 사용자 요청으로 문서/허용된 표현 변경/전체 검증을 나눴다. AGENTS.md와 [범위별 검증 규칙](scoped-verification-20261031.md)이 기존 항상 전체 검사 관행을 대체한다. 작은 UI 변경은 관련 로컬 검사부터 실행하고 같은 커밋·빌드의 통과 결과를 반복하지 않는다.
+- CI는 전체 Git diff를 분류한다. docs는 plan/verify만, presentation은 lint·typecheck·unit·운영 build/PWA/성능·헤더/로그인/로딩 UI, 기능/보안/설정/미분류는 기존 full 12개다. 필수 job skip/실패/취소/누락과 분류 실패는 거부하며 계획된 제외만 인정한다. 수동 실행은 full이다.
+- 분류 회귀 7·최종 판정 회귀 30·관련 lint/typecheck·actionlint PASS. 새 presentation 명령의 기존 모바일/데스크톱 78개가 로컬에서 1.5분에 PASS했다. 기존 Android 테마 수정의 실제 diff가 presentation으로 분류됨을 확인했다. CI 규칙 자체 변경의 full 실행과 문서 후속 커밋의 docs 경로는 확정 후 기록한다.
+- 앱 runtime 소스·의존성·기능·Hosting 후보는 변경하지 않는다. 운영은 아래 Android 테마 릴리스를 유지하며 CI 규칙 변경으로 Hosting을 재배포하지 않는다.
+
 ### 2026-10-31 Android 설치형 PWA 하단 시스템 버튼 대비 — main·Hosting 반영, 실기기 미검증
 
 - 사용자 확인상 Chrome 일반 탭은 정상, 설치형만 흰 배경/흰 아이콘이다. 밝은 화면과 어두운 theme-color/manifest 불일치를 확인해 #f8fafc로 통일하고 meta/CSS 밝은 색상 체계를 명시했다. 네이티브 시스템 아이콘을 직접 제어하거나 실기기 해결을 확인한 것은 아니다.
