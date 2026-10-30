@@ -21,7 +21,9 @@
 - 로딩 전체 검사 27 PASS / 1 FAIL 뒤 320px·글자 200% 넘침을 수정했다. 최종 해당 검사 1 PASS, 반응형·새 배치 검사 10 PASS다. 나머지 시간·PIN·실패·연결 복구 검사는 변경 후 기존 조건 그대로 통과했다.
 - 320·390·768·840·1280px, 844×390 가로 화면, 글자 200%, 동작 줄이기·고대비·axe와 요소 경계 확인을 포함한다. 화면 중앙, 1초/3초 전환 시 위치 유지, PIN/관리자 버튼 접근을 확인했다.
 - 앱·Functions typecheck, 전체 lint PASS. 운영 형식 정적 결과의 390/1280px에서도 중앙 그룹의 x/y 중심 오차 1px 미만, 가로 넘침 0, PIN 입력 가능, pageerror 0, 로고 HTTP 응답과 파일 내용 일치를 확인했다.
-- 최종 build·PWA·성능·Hosting gate PASS, 로컬 정적 HTTP 26개 검사 PASS다. initial JS gzip 143,643B, 학교/공통 CSS gzip 47,194B, 납품사진 JS gzip 10,223B, 사진 이력 CSS raw 5,620B로 기존 모든 한도를 유지했다. 최종 사진 CSS 정리 후 사진 브라우저 12 PASS/기존 2 SKIP, 이력 unit 6 PASS다.
+- 최종 build·PWA·성능·Hosting gate PASS, 로컬 정적 HTTP 26개 검사 PASS다. initial JS gzip 143,643B, 학교/공통 CSS gzip 47,198B, 납품사진 JS gzip 10,223B, 사진 이력 CSS raw 5,620B로 기존 모든 한도를 유지했다. 최종 사진 CSS 정리 후 사진 브라우저 12 PASS/기존 2 SKIP, 이력 unit 6 PASS다.
+
+첫 main 커밋 `91040ee`의 [CI 41024711214](https://github.com/kim-DL/ONWAY/actions/runs/41024711214)에서 관리자 스타일 보존 unit 한 개가 `.auth-shell .auth-brand__mark` 범위를 요구해 실패했다(unit 1,826 PASS/1 FAIL/기존 15 SKIP). 로고와 고대비 규칙의 인증 범위를 복원했고 기존 assertion을 유지한 관련 unit 13 PASS, 중앙 배치·확대·고대비 browser 4 PASS와 운영 build/PWA/성능/Hosting을 다시 확인했다. 수정 커밋은 별도의 전체 CI로 검증한다.
 
 후속 예산 검사에서 사진 이력 CSS raw 6,019B가 5,632B를 초과한 것은 중복 focus/media/선택자를 합쳐 5,620B로 줄였다. 새 공개 로고가 Hosting 검증기의 별도 allowlist에도 필요해 정확한 파일만 추가하고, 경량 WebP 형식·검토 자산과의 일치·원격 MIME/해시 검사를 보강했다. 기존 공개 HTTP 25개 조건에 로고 GET 검사를 더해 26개가 됐다.
 

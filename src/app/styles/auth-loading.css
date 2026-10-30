@@ -12,7 +12,7 @@
 }
 .auth-brand { display: flex; align-items: center; gap: .75rem; width: fit-content; max-width: 100%; }
 .auth-brand > span:last-child { display: grid; gap: .05rem; min-width: 0; }
-.auth-brand__mark {
+.auth-shell .auth-brand__mark {
   width: min(4.5rem, 22vw);
   aspect-ratio: 1200 / 446;
   flex-shrink: 0;
@@ -152,7 +152,7 @@
   .auth-header { padding-inline: .75rem; }
 }
 @media (forced-colors: active) {
-  .auth-brand__mark { filter: none; }
+  .auth-shell .auth-brand__mark { filter: none; }
   .pin-form button,
   .admin-google-login { border: 1px solid ButtonText; }
   .pin-form button:disabled { color: GrayText; }
