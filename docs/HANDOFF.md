@@ -5,6 +5,11 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-31 Android 설치형 PWA 하단 시스템 버튼 대비 — 로컬 수정, 실기기 미검증
+
+- 사용자 확인상 Chrome 일반 탭은 정상, 설치형만 흰 배경/흰 아이콘이다. 밝은 화면과 어두운 theme-color/manifest 불일치를 확인해 #f8fafc로 통일하고 meta/CSS 밝은 색상 체계를 명시했다. 네이티브 시스템 아이콘을 직접 제어하거나 실기기 해결을 확인한 것은 아니다.
+- `codex/android-system-bar-20261031`에 로컬 수정. 관련 unit 18·typecheck·lint·운영 build/PWA/성능/Hosting·로컬 HTTP 28 PASS. Aside 360px와 다크 선호 에뮬레이션에서 설정/화면 확인. 연결된 Android가 없고 사용자가 연결이 어렵다고 답해 실제 일반 탭/PWA 시스템 바 비교는 남아 있다. 전체 CI·main 병합·운영 배포는 하지 않았다. [조사·변경·검증 경계](android-system-bar-20261031.md)를 참고한다.
+
 ### 2026-10-30 시작 경로·검색·코드 정리 — main 병합·Hosting 운영 배포 완료
 
 - `codex/app-optimization-20261030`, 기준 `24c462ad1d6797afdf832d64de60febfec1459d6`, 최종 제품 source **`64cfdaddbd777dcf87892d11204c8434dbff7aa3`**를 main에 fast-forward 병합하고 Hosting만 배포했다. 승인된 유리 버튼·로그인·권한/저장 계약을 유지한다.

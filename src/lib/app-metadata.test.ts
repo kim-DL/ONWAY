@@ -15,6 +15,7 @@ describe("APP_METADATA", () => {
   it("uses the same background for the PWA launch and web entry surface", () => {
     const css = readFileSync(new URL("../app/styles/auth-loading.css", import.meta.url), "utf8");
     expect(APP_METADATA.backgroundColor).toBe("#f8fafc");
+    expect(APP_METADATA.themeColor).toBe(APP_METADATA.backgroundColor);
     expect(css).toContain(`background: ${APP_METADATA.backgroundColor};`);
   });
 });
