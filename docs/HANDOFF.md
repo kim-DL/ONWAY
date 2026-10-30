@@ -5,12 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-30 업무 모드 프리즘 유리 버튼 — 구현·로컬 검증, 릴리스 준비
+### 2026-10-30 업무 모드 프리즘 유리 버튼 — main 병합·Hosting 운영 배포 완료
 
 - 사용자 최종 선택은 작은 radius의 낮은 직사각형·맑은 유리와 일부 모서리 프리즘광·아이콘 없는 실제 텍스트다. `거래처 · 학교 · 영업 · 재고`를 로고 오른쪽 한 줄에 상시 표시한다. 권한 수에 따라 폭을 나누며 3개/4개용 빈 소재 두 개(합계 85,590B)를 사용한다. 에셋에 문자를 포함한 시안은 제외했다.
 - S26 기준 360×780 / DPR 3, 모바일 13px·44px 누름 영역·34px 유리 표면으로 마감했다. 기존 선택창·회전 테두리·공통 배경판·외부 광번짐과 중복 CSS 테두리를 제거했다. 기존 권한/탐색/저장·본문 업무색·인사 모션·로딩·API/서버 데이터 계약은 유지한다.
 - 최종 전체 unit 1,825 PASS/기존 15 SKIP, 헤더 Chromium 50 PASS, typecheck·lint·공개 소재 크기/투명도·audit high/critical 0을 확인했다. 실제 정적 앱의 합성 브랜드/로그인 검사 1 PASS다. 최초 로컬 Functions 10초 발견 실패는 기존 복구 설정 60초로 에뮬레이터만 재실행해 해결했으며 테스트·CI timeout을 바꾸지 않았다. 기존 unit의 제목/모드 버튼 색상 결합 1개는 본문 팔레트 검사를 보존하고 최종 중립색 버튼 결정에 맞췄다.
-- 현재 브랜치 `codex/glass-mode-navigation-20261030`. 운영 빌드·전체 CI·main 병합·Hosting 배포는 이어서 수행한다. [최종 결정·전후 화면·검증 범위](glass-mode-navigation-20261030.md), ignored `output/glass-mode-navigation-20261030/`와 로컬 Aside 미리보기 `http://127.0.0.1:4319/`를 참고한다. 실제 S26/설치 PWA 인수와 브라우저 에뮬레이션을 구분한다.
+- 제품 source `6a703f26d737ce331d469875e4730feec18cac7f`를 main에 fast-forward 병합했다. [Quality Gate 41052348949](https://github.com/kim-DL/ONWAY/actions/runs/41052348949) attempt 1 검사 12개+verify **13개 전체 SUCCESS**다. unit 1,825 PASS/기존 15 SKIP, 일반 browser 348 PASS/기존 8 SKIP, Phase 17 83 PASS/기존 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다. 실패·내부 flaky·수동 job 재실행은 0이다.
+- 운영 build/PWA/성능/Hosting과 로컬 HTTP 28개 검사 PASS. JS initial gzip 143,643B는 기존과 같고 공통 CSS gzip은 47,198→44,387B다. 후보 116파일·precache 103개와 비공개 env가 배포 전후 동일하다. 기존 검사·성능 예산을 유지했다.
+- 승인 범위인 `--project onnuriway --only hosting:onnuriway` 배포 완료. live version **4b292455d646836f**, release **1793362470563000**, **2026-10-30 21:14:30.563 KST**, 직전 복구 version **faa34f2e24e98461**다. 양쪽 origin 공개 검사 각 28 PASS, www301, S26 규격 Chromium의 PIN·worker activated·새 소재 2개 offline cache·pageerror 0을 확인했다. 공개 worker SHA-256 `f0a0c98c9de46fe2765694c518e274e76bcf9489565dddae15d67fbc577b2f29`가 후보와 같다.
+- Functions 72개 metadata와 MCP 전용 Hosting이 전후 동일하며 Functions/Rules/Auth 배포·운영 업무 데이터 쓰기는 없다. [최종 결정·전후 화면·검증 범위](glass-mode-navigation-20261030.md), [릴리스 기록](releases/2026-10-30-glass-mode-navigation.md), ignored `output/glass-mode-navigation-20261030/`·`output/glass-mode-release-20261030/`와 로컬 Aside 미리보기 `http://127.0.0.1:4319/`를 참고한다. 실제 S26/설치 PWA 인수와 브라우저 에뮬레이션을 구분한다.
 
 ### 2026-10-30 모바일 중앙 로딩·온누리 로고 보강 — main 병합·Hosting 배포 완료
 

@@ -42,4 +42,12 @@
 - UI 조정 중 선택창·회전 효과·옛 색상/gradient를 기대하던 검사를 최종 동작에 맞췄다. 재질의 외부 그림자 영역이 너비 측정에 포함되던 문제는 소재를 버튼 내부에 clip해 해결했다. 문구 변경 도중의 로컬 브라우저 실행 1회는 중단하고 최종 문구로 50개를 다시 통과했다.
 - 의존성 audit는 high/critical **0**, 기존 moderate **14**다. 의존성과 보안 기준은 변경하지 않았다.
 
-전체 CI·운영 빌드 gate·Hosting 배포 결과는 릴리스 확정 후 별도 기록으로 갱신한다. 최종 운영 배포 전 상태이며 실제 직원 기기 인수는 수행하지 않았다.
+## main·운영 반영
+
+제품 source `6a703f26d737ce331d469875e4730feec18cac7f`를 main에 fast-forward 병합했다. [Quality Gate 41052348949](https://github.com/kim-DL/ONWAY/actions/runs/41052348949) attempt 1의 검사 12개와 최종 verify가 전부 SUCCESS다. 일반 browser 348 PASS/기존 8 SKIP, Phase 17 83 PASS/기존 18 SKIP이며 실패·내부 flaky·수동 job 재실행은 없다. 전체 unit 1,825 PASS/기존 15 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS도 확인했다.
+
+운영 build·PWA·성능·Hosting gate와 로컬 HTTP 28개 검사를 통과한 동일한 116파일을 project `onnuriway` / `hosting:onnuriway`에만 배포했다. **2026-10-30 21:14:30.563 KST**, live version **`4b292455d646836f`**다. 양쪽 공개 origin의 검사 각 28 PASS, www301, 새 worker·소재와 후보 파일의 일치 및 소재 2개의 오프라인 캐시를 확인했다. 비공개 env·Functions 72개 metadata·MCP 전용 Hosting은 전후 동일하다.
+
+initial JS gzip 143,643B는 기존과 같고 공통 CSS gzip은 47,198→44,387B다. 이는 산출물 비교이며 실제 업무 조작 시간의 개선을 주장하는 측정이 아니다. 새 유리 소재는 합계 85,590B다. 기존 번들·PWA 예산을 유지하며 인위적 대기를 추가하지 않았다.
+
+[릴리스·복구 기준과 검증 증거](releases/2026-10-30-glass-mode-navigation.md)를 함께 참고한다. 실제 직원 PIN을 사용하는 운영 업무와 실제 S26·설치 PWA 인수는 수행하지 않았다. 공개 페이지 확인·합성 데이터·브라우저 에뮬레이션을 실기 검증과 구분한다.
