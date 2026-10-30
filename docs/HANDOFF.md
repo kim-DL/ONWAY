@@ -5,10 +5,12 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-31 Android 설치형 PWA 하단 시스템 버튼 대비 — 로컬 수정, 실기기 미검증
+### 2026-10-31 Android 설치형 PWA 하단 시스템 버튼 대비 — main·Hosting 반영, 실기기 미검증
 
 - 사용자 확인상 Chrome 일반 탭은 정상, 설치형만 흰 배경/흰 아이콘이다. 밝은 화면과 어두운 theme-color/manifest 불일치를 확인해 #f8fafc로 통일하고 meta/CSS 밝은 색상 체계를 명시했다. 네이티브 시스템 아이콘을 직접 제어하거나 실기기 해결을 확인한 것은 아니다.
-- `codex/android-system-bar-20261031`에 로컬 수정. 관련 unit 18·typecheck·lint·운영 build/PWA/성능/Hosting·로컬 HTTP 28 PASS. Aside 360px와 다크 선호 에뮬레이션에서 설정/화면 확인. 연결된 Android가 없고 사용자가 연결이 어렵다고 답해 실제 일반 탭/PWA 시스템 바 비교는 남아 있다. 전체 CI·main 병합·운영 배포는 하지 않았다. [조사·변경·검증 경계](android-system-bar-20261031.md)를 참고한다.
+- source `4ab5b0acb6a267068b3684a4faba42ee078adf6e`를 main에 fast-forward 병합했다. 관련 unit 18·typecheck·lint·운영 build/PWA/성능/Hosting·로컬 HTTP 28 PASS. [Quality Gate 41145106830](https://github.com/kim-DL/ONWAY/actions/runs/41145106830) attempt 1 검사 12개+verify 모두 SUCCESS, 실패·재실행·내부 flaky 0이다.
+- Hosting version `df13547e1d3815c7`, release `1793403783636000`, **2026-10-31 08:43:03.636 KST** 배포 완료. 두 운영 주소 HTTP 각 28 PASS, 모바일 Chromium PIN·worker activated·pageerror 0, Aside 운영 업무 화면의 밝은 theme/meta/CSS 반영을 확인했다. Functions 72개 metadata·MCP Hosting·비공개 env는 동일하다. [릴리스 기록](releases/2026-10-31-android-system-bar.md)을 참고한다.
+- 연결된 Android가 없고 사용자가 연결이 어렵다고 답해 실제 일반 탭/PWA 시스템 바 비교는 남아 있다. 설치 WebAPK의 manifest 갱신은 웹 콘텐츠와 시점이 다를 수 있다. [조사·변경·검증 경계](android-system-bar-20261031.md)를 참고한다.
 
 ### 2026-10-30 시작 경로·검색·코드 정리 — main 병합·Hosting 운영 배포 완료
 
