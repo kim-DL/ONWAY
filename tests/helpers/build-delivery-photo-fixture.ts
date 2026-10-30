@@ -8,6 +8,6 @@ export function buildDeliveryPhotoFixture() {
     builder.onLoad({ filter: /.*/, namespace: "delivery-fixture" }, ({ path }) => ({ loader: "js", contents:
       path.endsWith("delivery-photo-delete-action") ? "export const DeliveryPhotoDeleteAction=()=>null;"
         : path.endsWith("private-client-state") ? `export const registerPrivateBlobUrl=url=>url;export function forgetPrivateBlobUrl(url){window.__revokedPhotos.push(url);URL.revokeObjectURL(url);}`
-          : `export const deliveryPhotoHistoryRepository={async load(id){window.__evidenceLoads.push(id);if(window.__rejectEvidence)throw Error('fixture unavailable');return new Blob([window.__fixtureImages[id]],{type:'image/svg+xml'});}};export const deliveryPhotoHistoryErrorMessage=()=> '사진을 불러오지 못했어요.';` }));
+          : `export const deliveryPhotoHistoryRepository={async load(id){window.__evidenceLoads.push(id);if(window.__delayEvidence)await new Promise(resolve=>window.addEventListener('fixture:release-evidence',resolve,{once:true}));if(window.__rejectEvidence)throw Error('fixture unavailable');return new Blob([window.__fixtureImages[id]],{type:'image/svg+xml'});}};export const deliveryPhotoHistoryErrorMessage=()=> '사진을 불러오지 못했어요.';` }));
   } }]);
 }

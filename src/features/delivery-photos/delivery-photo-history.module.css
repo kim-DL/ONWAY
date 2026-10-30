@@ -5,37 +5,37 @@
 .item{display:grid;align-content:start;gap:.35rem;min-width:0}
 .card,.retry,.error button{min-width:44px;min-height:44px;border:1px solid #cbd6e9;border-radius:11px;background:#f7f9ff;color:var(--shell-ink);font:inherit;cursor:pointer}
 .card{display:grid;align-content:start;min-width:0;padding:.35rem;text-align:left}
-.card:focus-visible,.retry:focus-visible,.error button:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
+.card:focus-visible,.retry:focus-visible,.error button:focus-visible,.actions button:focus-visible,.failure button:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
 .frame{display:grid;place-items:center;width:100%;min-height:96px;overflow:hidden;border-radius:9px;background:#e0e8f5;color:#536582}
 .frame img{display:block;width:100%;height:100%;object-fit:cover}
 .placeholder{display:grid;place-items:center;gap:.3rem;padding:.6rem;text-align:center;font-size:.76rem;line-height:1.35}
 .cardMeta{display:grid;gap:.15rem;min-width:0;padding:.55rem .35rem .35rem;line-height:1.4}
-.cardMeta strong,.cardMeta span{overflow-wrap:anywhere}
+.cardMeta>*{overflow-wrap:anywhere}
 .cardMeta strong{font-size:.84rem}
 .cardMeta span{color:var(--shell-ink-soft);font-size:.78rem}
 .retry{width:100%;padding:.4rem .55rem;border-style:dashed;border-radius:10px;background:white;font-size:.78rem}
 .error{display:grid;gap:.6rem;padding:.8rem;border-radius:12px;background:#fff1ee;color:#7b3328}
 .error p{margin:0;line-height:1.5}
 .error button{justify-self:start;padding:.45rem .75rem;background:white;color:#7b3328;font-weight:750}
-@media(max-width:340px){.frame{min-height:128px}}
-@media(prefers-reduced-motion:reduce){.card,.retry{transition:none}}
-@media(forced-colors:active){.card,.retry,.error button{border-color:CanvasText}}
 .stage{--delivery-photo-viewer-ui:1;position:relative;display:grid;place-items:center;height:min(60dvh,620px);min-height:180px;overflow:hidden;overscroll-behavior:contain;border:1px solid #263d68;border-radius:14px;background:#111e38;touch-action:none}
 .stage>img{display:block;width:100%;height:100%;object-fit:contain;user-select:none}
 .loading,.failure{margin:0;padding:1rem;color:#e8f1ed;text-align:center;line-height:1.5}
+.loading[data-loading-status]{align-items:center;max-width:100%;color:#e8f1ed}
+.loading>span{color:inherit}
+.loading [data-loading-indicator]{color:#c3dbea}
+.loading [data-loading-track]{background:#40516b}
 .failure{display:grid;justify-items:center;gap:.65rem}
 .failure button,.actions button{min-width:44px;min-height:44px;border:1px solid #cbd6e9;border-radius:10px;background:#fff;box-shadow:0 2px #d5dfef;color:#263c68;font:inherit;font-weight:750;cursor:pointer}
 .failure button{padding:.5rem .8rem}
 .metadata{display:grid;gap:.15rem;margin-top:.7rem;color:var(--shell-ink);line-height:1.45}
 .metadata strong{font-size:.9rem}
 .metadata span{color:var(--shell-ink-soft);font-size:.82rem;overflow-wrap:anywhere}
-.actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.45rem}
+.actions,.confirmActions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:.45rem}
+.actions{align-items:center}
 .actions button{display:flex;align-items:center;justify-content:center;gap:.3rem;padding:.45rem .65rem}
 .actions button:disabled{opacity:.45;cursor:default}
-.actions button:focus-visible,.failure button:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
 .actions .danger{color:white;border-color:#a33e36;background:#b84c43}
-.confirmActions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:.45rem}
 .position{margin-right:auto;min-width:3.5rem;color:var(--shell-ink-soft);font-size:.84rem;font-variant-numeric:tabular-nums}
-@media(max-width:340px){.stage{height:min(52dvh,460px)}.actions button{flex:1 1 44px}.position{flex:1 0 100%}}
-@media(prefers-reduced-motion:reduce){.stage,.actions button{transition:none}}
-@media(forced-colors:active){.stage,.failure button,.actions button{border-color:CanvasText}}
+@media(max-width:340px){.frame{min-height:128px}.stage{height:min(52dvh,460px)}.actions button{flex:1 1 44px}.position{flex:1 0 100%}}
+@media(prefers-reduced-motion:reduce){.card,.retry,.stage,.actions button{transition:none}}
+@media(forced-colors:active){.card,.retry,.error button,.stage,.failure button,.actions button{border-color:CanvasText}}

@@ -2,7 +2,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  width: 80px;
+  width: var(--loading-line-width, 80px);
   height: 16px;
   color: #0b5a84;
   vertical-align: middle;
@@ -20,8 +20,8 @@
 .indicator[data-motion="running"] .segment,
 .indicator[data-motion="running"][data-variant="circular"] .track { animation-play-state: running; }
 .status { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 8px; color: #191f28; }
-.label { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
-.detail { max-width: 36ch; color: #526171; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.label { font-size: var(--loading-label-size, 14px); line-height: 1.5; overflow-wrap: anywhere; }
+.detail { max-width: 36ch; color: #526171; font-size: var(--loading-detail-size, 13px); line-height: 1.6; overflow-wrap: anywhere; }
 .skeleton { display: flex; gap: 12px; width: 100%; min-width: 0; }
 .placeholderMark, .placeholderCopy i { display: block; flex-shrink: 0; border-radius: 4px; background: #e8edf2; }
 .placeholderMark { width: 32px; height: 32px; }

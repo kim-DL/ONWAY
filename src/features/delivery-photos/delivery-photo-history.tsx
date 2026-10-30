@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
@@ -51,7 +52,7 @@ export function DeliveryPhotoHistory({ customer, session, onClose, sync, initial
 
   return <BottomSheet open title={`${customer.name} 납품사진`} onClose={onClose}>
     <section className={styles.history} aria-label={`${customer.name} 최근 납품사진`}>
-      {state.status === "loading" ? <p className={styles.status} role="status">최근 납품사진 불러오는 중</p> : null}
+      {state.status === "loading" ? <LoadingStatus className={styles.status} label="최근 납품사진 불러오는 중" detail="등록된 사진과 최근 납품 기록을 확인하고 있습니다." /> : null}
       {state.status === "error" ? <div className={styles.error} role="alert"><p>{state.message}</p><button type="button" onClick={() => setAttempt((value) => value + 1)}>다시 시도</button></div> : null}
       {state.status === "ready" ? <DeliveryPhotoHistoryDates customerName={customer.name} session={session}
         photos={state.photos} fromDateKey={state.fromDateKey} onDeleted={(photoId, update) => {

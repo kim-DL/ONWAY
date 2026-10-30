@@ -14,6 +14,7 @@ const PUBLIC_ASSET_PATHS = new Set([
   "/icons/onnuriway-company-icon-maskable-512-v4.png",
   "/icons/onnuriway-company-apple-touch-icon-v4.png",
   "/brand/onnuri-food-logo.png",
+  "/brand/onnuri-food-logo-auth.webp",
 ]);
 
 export function isAppShellPath(pathname: string) {

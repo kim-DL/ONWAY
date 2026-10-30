@@ -26,6 +26,13 @@ const brandMark = await sharp(sourceLogoPath)
 
 await writeFile(join(brandDirectory, "onnuri-food-logo.png"), brandMark);
 
+// The 144px launch mark also stays crisp at 200% text size on a 2x display.
+// Re-encode the same transparent artwork, without the install icon's background.
+await sharp(brandMark)
+  .resize({ width: 576, withoutEnlargement: true })
+  .webp({ quality: 90, alphaQuality: 100, effort: 6 })
+  .toFile(join(brandDirectory, "onnuri-food-logo-auth.webp"));
+
 function iconBackground(size) {
   return Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">

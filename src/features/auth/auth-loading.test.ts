@@ -10,6 +10,9 @@ describe("privacy-safe application entry", () => {
     const markup = renderToStaticMarkup(createElement(LaunchTimingProvider, null,
       createElement(AuthLoadingScreen, { stage })));
     expect(markup).toContain(header);
+    expect(markup).toContain('class="auth-launch-group"');
+    expect(markup).toContain('href="/brand/onnuri-food-logo-auth.webp"');
+    expect(markup).not.toContain("/icons/");
     expect(markup.match(/role="status"/g)).toHaveLength(1);
     expect(markup).toContain(`data-auth-stage="${stage}"`);
     expect(markup).not.toContain("workspace-navigation");

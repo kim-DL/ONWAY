@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { searchInputProps } from "@/components/ui/search-input-props";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { searchCustomers } from "@/features/customers/customer-search";
@@ -96,13 +97,13 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       if (data.error) data.refresh();
       if (catalog.status === "error") catalog.retry();
     }}>다시 시도</button></div> : null}
-    {data.loading && snapshot ? <p className={styles.freshness}>최신 목록 확인 중</p> : null}
+    {data.loading && snapshot ? <LoadingStatus className={styles.freshness} label="최신 목록 확인 중" detail="오늘 납품 기록을 확인하고 있습니다." /> : null}
     {snapshot?.today.truncated ? <p className={styles.notice}>오늘 사진이 많아 기록완료 수가 정확하지 않을 수 있습니다. 관리자에게 확인하세요.</p> : null}
     <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
     {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
       {searchResults.length ? <ul className={styles.list}>{searchResults.filter((customer) => customer.customerId !== captureId).map((customer) => renderRow(customer.customerId, true))}</ul>
         : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
-    {!snapshot && data.loading ? <p className={styles.empty} role="status">오늘 납품처 불러오는 중</p> : null}
+    {!snapshot && data.loading ? <LoadingStatus className={styles.empty} label="오늘 납품처 불러오는 중" detail="오늘 납품 기록을 확인하고 있습니다." /> : null}
     {captureId && byId.has(captureId) ? <section className={styles.section} aria-label="추가 촬영 납품처">
         <h2>촬영 중인 납품처</h2><ul className={styles.list}>{renderRow(captureId)}</ul>
         <button type="button" onClick={() => setCaptureId(null)}>촬영 영역 닫기</button>

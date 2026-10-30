@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import { usePhotoMorph } from "@/components/ui/photo-morph";
 import morphStyles from "@/components/ui/photo-morph.module.css";
 import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
@@ -20,7 +21,7 @@ import styles from "./delivery-photo-history.module.css";
 
 const DeliveryPhotoDeleteAction = dynamic(() => import("./delivery-photo-delete-action").then((module) => module.DeliveryPhotoDeleteAction), { ssr: false });
 const PhotoPanZoom = dynamic(() => import("@/components/ui/photo-pan-zoom").then((module) => module.PhotoPanZoom), { ssr: false,
-  loading: () => <p role="status">사진 확대 준비 중</p> });
+  loading: () => <LoadingStatus label="사진 확대 준비 중" detail="확대·이동 기능을 준비하고 있습니다." /> });
 
 export function DeliveryPhotoViewer({ customerName, session, photos, initialIndex, origin, onClose, onDeleted }: {
   customerName: string;
@@ -66,7 +67,7 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
       role="region" aria-label={`${customerName} 납품사진 크게 보기`} tabIndex={0} data-zoomed={zoomed}>
       {image.status === "ready" ? <img src={image.url} alt={`${customerName} 납품사진, 등록자 ${photo.createdByName}`} decoding="async" draggable={false} onError={image.fail} />
         : image.status === "error" ? <div className={styles.failure} role="alert"><p>{image.message}</p><button type="button" onClick={image.retry}>사진 다시 불러오기</button></div>
-          : <p className={styles.loading} role="status">원본 사진 불러오는 중</p>}
+          : <LoadingStatus key={photo.photoId} className={styles.loading} label="원본 사진 불러오는 중" detail="선택한 사진의 원본을 확인하고 있습니다." />}
     </div>
     {image.status === "ready" ? <PhotoPanZoom key={image.url} stageRef={stageRef} origin={null} onZoomedChange={setZoomed} onSwipe={navigate} /> : null}
     <div className={styles.metadata}><strong>{deliveryPhotoRegisteredAt(photo.createdAt, true)}</strong><span>등록자 {photo.createdByName}</span></div>

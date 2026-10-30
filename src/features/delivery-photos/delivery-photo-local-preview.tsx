@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import { useRef } from "react";
 import { createPortal } from "react-dom";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { LoadingStatus } from "@/components/ui/loading-status";
 import styles from "./delivery-photo-local-preview.module.css";
 
 const PhotoPanZoom = dynamic(() => import("@/components/ui/photo-pan-zoom").then((module) => module.PhotoPanZoom), { ssr: false,
-  loading: () => <p role="status">사진 확대 준비 중</p> });
+  loading: () => <LoadingStatus label="사진 확대 준비 중" detail="확대·이동 기능을 준비하고 있습니다." /> });
 const retainZoom = () => {};
 
 export function DeliveryPhotoLocalPreview({ url, origin, onClose }: { url: string; origin: HTMLElement; onClose: () => void }) {

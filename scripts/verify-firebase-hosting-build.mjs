@@ -16,7 +16,8 @@ const expectedIcons = new Map([
   ["/brand/onnuri-food-logo.png", [1200, 446]],
   ["/icon.png", [64, 64]],
 ]);
-const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", ...expectedIcons.keys()]);
+const launchLogo = "/brand/onnuri-food-logo-auth.webp";
+const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...expectedIcons.keys()]);
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -139,7 +140,7 @@ async function verifyLocal() {
     check(pathname.startsWith("/_next/static/") || publicFiles.has(pathname), `Unexpected precached response: ${pathname}.`);
     check((await stat(outputFile(pathname))).isFile(), `Precached asset is missing from out: ${pathname}.`);
   }
-  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", ...manifest.icons.map((icon) => icon.src)])
+  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...manifest.icons.map((icon) => icon.src)])
     check(precached.includes(pathname), `PWA installation asset is not precached: ${pathname}.`);
   check(!precached.some((pathname) => pathname.startsWith("/api/") || pathname.startsWith("/__/")), "Connectivity and private/server responses must never be precached.");
 
@@ -150,6 +151,9 @@ async function verifyLocal() {
   }
   const favicon = await readFile(outputFile("/favicon.ico"));
   check(favicon.subarray(0, 6).toString("hex") === "000001000100", "Exported favicon.ico is invalid.");
+  const logo = await readFile(outputFile(launchLogo));
+  check(logo.length <= 32 * 1024 && logo.subarray(0, 4).toString() === "RIFF" && logo.subarray(8, 12).toString() === "WEBP", "Launch logo must be a lightweight WebP.");
+  check(sha256(logo) === sha256(await readFile(join(root, "public", launchLogo))), "Exported launch logo differs from the reviewed asset.");
   const initialAssets = [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+\.(?:js|css))(?:\?[^" ]*)?"/gu)].map((match) => match[1]))];
   check(initialAssets.some((asset) => asset.endsWith(".js")) && initialAssets.some((asset) => asset.endsWith(".css")), "Initial JavaScript/CSS assets were not found in the exported HTML.");
   for (const asset of initialAssets) {
@@ -184,6 +188,9 @@ async function verifyRemote(base, local) {
     if (method === "GET") check((await probe.text()).trim() === "online", "Connectivity returned HTML or another unexpected response.");
   }
   for (const pathname of expectedIcons.keys()) assertMime((await request(pathname)).headers, /^image\/png\b/i, pathname);
+  const logo = await request(launchLogo, "GET");
+  assertMime(logo.headers, /^image\/webp\b/i, launchLogo);
+  check(sha256(Buffer.from(await logo.arrayBuffer())) === sha256(await readFile(outputFile(launchLogo))), "Remote launch logo differs from this build.");
   for (const pathname of local.initialAssets) {
     const asset = await request(pathname);
     assertMime(asset.headers, pathname.endsWith(".css") ? /^text\/css\b/i : /^(?:application|text)\/javascript\b/i, pathname);

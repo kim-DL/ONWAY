@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
@@ -33,6 +34,21 @@ async function inspectMark(filename: string, directory = join(process.cwd(), "pu
 }
 
 describe("production company icons", () => {
+  it("keeps the transparent launch artwork lightweight and available offline", async () => {
+    const asset = "/brand/onnuri-food-logo-auth.webp";
+    expect(isPublicAssetPath(asset)).toBe(true);
+    const bytes = await readFile(join(process.cwd(), "public", asset));
+    const metadata = await sharp(bytes).metadata();
+    expect(metadata.width).toBe(576);
+    expect(metadata.height).toBe(214);
+    expect(metadata.hasAlpha).toBe(true);
+    expect(metadata.size).toBeLessThan(32 * 1024);
+    const alpha = await sharp(bytes).extractChannel("alpha").raw().toBuffer();
+    const originalAlpha = await sharp(join(process.cwd(), "public/brand/onnuri-food-logo.png"))
+      .resize({ width: 576, withoutEnlargement: true }).extractChannel("alpha").raw().toBuffer();
+    expect(alpha.equals(originalAlpha)).toBe(true);
+  });
+
   it("publishes versioned, correctly sized, opaque icons in the offline allowlist", async () => {
     for (const icon of manifest().icons ?? []) {
       expect(icon.src).toContain("-v4.png");

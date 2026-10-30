@@ -33,7 +33,7 @@ export const useLaunchTiming = () => useContext(LaunchTimingContext);
 export function AuthBrand() {
   return (
     <div className="auth-brand" aria-label="급식길">
-      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark /></span>
+      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark variant="auth" /></span>
       <span><strong>급식길</strong><small>온누리종합식품</small></span>
     </div>
   );
@@ -63,16 +63,18 @@ export function AuthLoadingScreen({ stage, message, waitingForConnection = false
   const { startedAt } = useLaunchTiming();
   return (
     <main className="auth-shell auth-shell--launch" data-auth-stage={waitingForConnection ? "connection" : stage}>
-      <AuthHeader />
-      <section className="auth-launch-content" aria-label="급식길 준비">
-        <h1 className="sr-only">급식길</h1>
-        <LoadingStatus
-          label={message ?? launchLabels[stage]}
-          detail={message ? undefined : launchDetails[stage]}
-          startedAt={startedAt}
-          indicator={!waitingForConnection}
-        />
-      </section>
+      <div className="auth-launch-group">
+        <AuthHeader />
+        <section className="auth-launch-content" aria-label="급식길 준비">
+          <h1 className="sr-only">급식길</h1>
+          <LoadingStatus
+            label={message ?? launchLabels[stage]}
+            detail={message ? undefined : launchDetails[stage]}
+            startedAt={startedAt}
+            indicator={!waitingForConnection}
+          />
+        </section>
+      </div>
     </main>
   );
 }

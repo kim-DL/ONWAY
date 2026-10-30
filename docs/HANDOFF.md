@@ -5,6 +5,12 @@
 
 ## 1. 먼저 알아야 할 상태
 
+### 2026-10-30 모바일 중앙 로딩·온누리 로고 보강 — 로컬 검증 완료, 릴리스 준비
+
+- 사용자 후속 요청으로 시작 로딩을 중앙 배치하고 투명 온누리 로고 144px·안내 17px·진행선 160px로 확대했다. 기존 선형 모션·1초/3초 기준·PIN 기능은 유지하며 고정 그림자로 로고 윤곽에 깊이를 더한다. 원본 그림을 유지한 29KB WebP를 생성하고 해당 공개 파일만 PWA allowlist/precache에 추가했다.
+- 납품사진 목록·갱신·이력·원본 조회·확대 준비에 공용 로딩을 확장했다. 인증·Callable·서버 확인 후 완료·사진 보관 정책은 변경하지 않았다. 320px/글자 200% grid 넘침을 수정했고 반응형 최종 10 PASS, 사진 12 PASS/기존 2 SKIP, 관련 단위·앱/Functions typecheck·lint를 확인했다. 최종 운영 build/PWA/성능/Hosting과 로컬 정적 HTTP 26개 검사 PASS, CSS/JS 기존 상한을 유지했다.
+- 사용자는 작업 완료 후 main 병합과 Hosting 운영 배포를 승인했다. 최종 로컬 운영 build/PWA/성능/Hosting 통과 후 최종 커밋을 main에 fast-forward 병합하고 동일 커밋의 전체 CI를 확인한 다음 `hosting:onnuriway`만 배포한다. [설계·전후 화면·검증](mobile-loading-20261030.md), ignored `output/mobile-loading-20261030/` 및 `output/mobile-loading-release-20261030/`를 참고한다.
+
 ### 2026-10-30 로딩·로그인 개선 — PR #6 main 병합·Hosting 운영 배포 완료
 
 - 사용자 승인으로 [PR #6](https://github.com/kim-DL/ONWAY/pull/6)을 main에 병합했다. 배포 소스 `72b243b2fe98faf9d69396225c1fdd5d40b40d32`는 PR head와 전체 tree가 동일하다. 해당 커밋의 [Quality Gate 40928837270](https://github.com/kim-DL/ONWAY/actions/runs/40928837270) attempt 1은 검사 12개+verify 전부 SUCCESS다. unit 1,826 PASS/기존 15 SKIP, 일반 browser 334 PASS/2 내부 flaky/기존 8 SKIP, 정적 인증 83 PASS/기존 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다. 모션 정지 직후 transform 비교 2개의 자동 재시도 통과를 릴리스 기록에 구분했다.
