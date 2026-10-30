@@ -5,11 +5,13 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-30 모바일 중앙 로딩·온누리 로고 보강 — 로컬 검증 완료, 릴리스 준비
+### 2026-10-30 모바일 중앙 로딩·온누리 로고 보강 — main 병합·Hosting 배포 완료
 
 - 사용자 후속 요청으로 시작 로딩을 중앙 배치하고 투명 온누리 로고 144px·안내 17px·진행선 160px로 확대했다. 기존 선형 모션·1초/3초 기준·PIN 기능은 유지하며 고정 그림자로 로고 윤곽에 깊이를 더한다. 원본 그림을 유지한 29KB WebP를 생성하고 해당 공개 파일만 PWA allowlist/precache에 추가했다.
 - 납품사진 목록·갱신·이력·원본 조회·확대 준비에 공용 로딩을 확장했다. 인증·Callable·서버 확인 후 완료·사진 보관 정책은 변경하지 않았다. 320px/글자 200% grid 넘침을 수정했고 반응형 최종 10 PASS, 사진 12 PASS/기존 2 SKIP, 관련 단위·앱/Functions typecheck·lint를 확인했다. 최종 운영 build/PWA/성능/Hosting과 로컬 정적 HTTP 26개 검사 PASS, CSS/JS 기존 상한을 유지했다.
-- 사용자는 작업 완료 후 main 병합과 Hosting 운영 배포를 승인했다. 최종 로컬 운영 build/PWA/성능/Hosting 통과 후 최종 커밋을 main에 fast-forward 병합하고 동일 커밋의 전체 CI를 확인한 다음 `hosting:onnuriway`만 배포한다. [설계·전후 화면·검증](mobile-loading-20261030.md), ignored `output/mobile-loading-20261030/` 및 `output/mobile-loading-release-20261030/`를 참고한다.
+- 사용자 승인으로 최종 소스 `9b8fc14daa97897ae4c9a2d763e93606a32cb36d`를 main에 fast-forward 병합했다. [Quality Gate 41025259604](https://github.com/kim-DL/ONWAY/actions/runs/41025259604) attempt 1 검사 12개+verify 모두 SUCCESS다. unit 1,827 PASS/기존 15 SKIP, browser 340 PASS/2 내부 flaky/기존 8 SKIP, 인증 83 PASS/기존 18 SKIP, 재고사진 4·transaction 12·납품사진 16 PASS다. 첫 CI의 관리자 스타일 범위 unit 실패는 범위를 복원한 새 커밋으로 해결했고, 최종 기존 환영 모션 정지 2개의 자동 재시도 이력은 릴리스 기록에 구분한다.
+- `--project onnuriway --only hosting:onnuriway` 운영 배포 완료. version **faa34f2e24e98461**, release **1793348791948000**, **2026-10-30 17:26:31.948 KST**, 직전 복구 version **0daafb880d5e16f4**. 양쪽 origin 공개 검사 각 26 PASS, www301, 로그인·worker activated·pageerror 0, 운영 390/1280px 중앙 배치 확인 PASS다. worker SHA-256 `38fcf60fa93c8cb03cae7c054906beae715bc0b4685d63299ac8af3f1ecbcded`가 후보와 같다.
+- 후보 114파일·비공개 env와 Functions 72개 metadata·MCP 전용 Hosting이 전후 동일하다. Functions/Rules/Auth 배포·운영 업무 데이터 쓰기는 없다. [릴리스 기록](releases/2026-10-30-mobile-loading.md), [설계·전후 화면·검증](mobile-loading-20261030.md), ignored `output/mobile-loading-20261030/` 및 `output/mobile-loading-release-20261030/`를 참고한다. 실제 직원 기기·설치 PWA 인수는 별도다.
 
 ### 2026-10-30 로딩·로그인 개선 — PR #6 main 병합·Hosting 운영 배포 완료
 
