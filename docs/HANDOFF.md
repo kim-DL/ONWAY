@@ -5,13 +5,15 @@
 
 ## 1. 먼저 알아야 할 상태
 
-### 2026-10-30 시작 경로·검색·코드 정리 — 로컬 검증 완료, CI/Hosting 준비
+### 2026-10-30 시작 경로·검색·코드 정리 — main 병합·Hosting 운영 배포 완료
 
-- `codex/app-optimization-20261030`, 기준 `24c462ad1d6797afdf832d64de60febfec1459d6`. 사용자 요청으로 최적화가 만족스럽게 끝나면 main 병합과 Hosting만 배포한다. 승인된 유리 버튼·로그인·권한/저장 계약을 유지한다.
+- `codex/app-optimization-20261030`, 기준 `24c462ad1d6797afdf832d64de60febfec1459d6`, 최종 제품 source **`64cfdaddbd777dcf87892d11204c8434dbff7aa3`**를 main에 fast-forward 병합하고 Hosting만 배포했다. 승인된 유리 버튼·로그인·권한/저장 계약을 유지한다.
 - 인증 후 업무 CSS를 AppShell 지연 청크로 옮겨 최초 CSS gzip **37,102→6,436B(-82.7%)**, 초기 JS **143,643→143,657B(+14B)**다. 옛 미사용 로더 별칭·스켈레톤·썸네일·CSS와 중복 선언을 정리하고 Tailwind 탐색을 src로 제한했다. 바깥 배경은 시작/PWA와 같은 오프화이트로 통일했다.
 - 동일 정적 합성 앱·CPU 4배·지연 120ms·각 5회의 첫 브랜드 위치 안정 중앙값 **1,325→685ms**, PIN **3,814→3,746ms**, 저장 세션의 재고 실제 입력 **3,953→3,963ms**다. 초기 표시가 개선됐고 업무 준비 시간은 사실상 동일하다. 5,000개 학교 155개 검색 표본의 결과/점수/순서는 같으며 중앙값 **18.64→15.41ms**, p95 **24.70→21.27ms**다. 실제 S26/운영 p75 수치는 아니다.
 - unit **1,817 PASS/기존 15 SKIP**, 관련 후속 16 PASS, 정적 인증·업무 30 PASS, typecheck/lint·audit high/critical 0·운영 build/PWA/성능/Hosting·로컬 HTTP 28 PASS다. 최초 일반 browser 350 PASS/플랫폼 4 SKIP/표시 타이밍 2 FAIL 후 원본 재현 12 PASS, 검사 동기화 보강 후 12 PASS. 판정값·timeout·skip·CI retry를 유지했다. 세부 내역은 [최적화·측정·검증 문서](app-optimization-20261030.md)에 있다.
-- 최종 소스 확정 후 전체 CI→동일 후보 Hosting 배포→공개 확인→문서/저장소 동기화 순서로 마무리한다. `output/app-optimization-20261030/`의 비교용/demo 빌드는 운영 후보가 아니다.
+- 위 source의 [Quality Gate 41068028807](https://github.com/kim-DL/ONWAY/actions/runs/41068028807), attempt 1 검사 12개+verify **13개 전체 SUCCESS**다. 일반 browser **348 PASS/기존 8 SKIP**, Phase 17 browser **83 PASS/기존 18 SKIP**, 재고사진 4·transaction 12·납품사진 16 PASS, 실패·내부 flaky·수동 재실행 0이다.
+- `--project onnuriway --only hosting:onnuriway` 배포 완료. live version **9799c6d06a6314cc**, release **1793369645430000**, **2026-10-30 23:14:05.430 KST**, 복구 version **4b292455d646836f**다. 양쪽 공개 HTTP 각28 PASS, www301, S26 규격 Chromium의 PIN·worker activated·CSS 19개와 유리 소재 offline cache·업무 CSS 지연 적용·pageerror 0을 확인했다. worker SHA-256 `e12d7a0be7611eb1c68ac09f7c94ff2775ef53c5db87d3f2e952919b9e6494c3`가 후보와 같다.
+- 후보 117파일·비공개 env·Functions 72개 metadata·MCP 전용 Hosting이 전후 동일하다. Functions/Rules/Auth 배포와 운영 업무 데이터 쓰기는 없다. [릴리스 기록](releases/2026-10-30-app-optimization.md), ignored `output/app-optimization-20261030/`·`output/app-optimization-release-20261030/`를 참고한다. 비교용/demo 빌드는 운영 후보가 아니다. 결과 문서만 후속 `[skip ci]` 커밋으로 저장한다.
 
 ### 2026-10-30 업무 모드 프리즘 유리 버튼 — main 병합·Hosting 운영 배포 완료
 

@@ -48,4 +48,4 @@ ignored `output/app-optimization-20261030/`에 import/CSS 감사, 전후 빌드 
 - 독립 검색/캐시 gate: 5,000개 목록, index 119.04ms, 검색 p95 1.41ms, 타이핑 중 네트워크 요청 0 PASS. 이는 위의 오타 포함 155개 비교와 질의 집합이 다른 기존 gate 수치다.
 - 의존성 audit high/critical 0, 기존 moderate 14다. 패키지·lock·CI 구성은 변경하지 않았다.
 
-위 코드와 로컬 검증을 확정한 뒤 전체 CI를 실행한다. 운영 릴리스 결과는 완료 후 별도로 기록한다.
+위 코드와 로컬 검증을 확정한 source `64cfdaddbd777dcf87892d11204c8434dbff7aa3`의 전체 CI 13개가 attempt 1에서 모두 성공했다. main 병합과 Hosting 배포, 양쪽 공개 주소의 검증도 완료했다. [릴리스 기록](releases/2026-10-30-app-optimization.md)에 CI 수치·배포 식별자·검증 경계와 증거 위치를 정리했다.
