@@ -8,6 +8,10 @@ import { LoadingIndicator as OnnuriLoader } from "../../../src/components/ui/loa
 
 function HeaderMotionFixture() {
   const [mode, setMode] = useState<WorkMode>("customer");
+  const requestedCount = Number(document.documentElement.dataset.modeCount || new URLSearchParams(location.search).get("modes")) || 4;
+  const availableModes = requestedCount === 3
+    ? ["customer", new URLSearchParams(location.search).get("scope") === "sales" ? "sales" : "delivery", "inventory"] as const
+    : (["customer", "delivery", "sales", "inventory"] as const).slice(0, Math.max(1, Math.min(4, requestedCount)));
   const [activity, setActivity] = useState(false);
   const { paused, setPaused } = useHeaderMotionPreference();
   useEffect(() => {
@@ -25,9 +29,9 @@ function HeaderMotionFixture() {
   };
   return <main className="workspace-shell" data-mode={mode}>
     <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
-    <ShellHeader mode={mode} availableModes={["customer", "delivery", "sales", "inventory"]} onModeChange={changeMode} />
+    <ShellHeader mode={mode} availableModes={availableModes} onModeChange={changeMode} />
     <section className="shell-page"><div className="shell-hero">
-      <WelcomeGreeting key={`${mode}:${activity}`} className="shell-greeting" titleId="motion-title" title={mode === "customer" ? "거래처 정보를" : mode === "delivery" ? "어느 학교로" : "다음 방문을"} accent={mode === "customer" ? "한눈에." : mode === "delivery" ? "갈까요?" : "준비해요."}>김대인 부장님, 반가워요.</WelcomeGreeting>
+      <WelcomeGreeting key={`${mode}:${activity}`} className="shell-greeting" titleId="motion-title" title={mode === "customer" ? "거래처 정보를" : mode === "delivery" ? "어느 학교로" : "다음 방문을"} accent={mode === "customer" ? "한눈에." : mode === "delivery" ? "갈까요?" : "준비해요."}>테스트 담당자님, 반가워요.</WelcomeGreeting>
     </div><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       <button type="button" style={{ minHeight: 44 }} onClick={() => setActivity((current) => !current)}>활동 탭</button>
       <button type="button" style={{ minHeight: 44 }} onClick={() => setPaused(!paused)}>{paused ? "모션 재개" : "모션 일시정지"}</button>

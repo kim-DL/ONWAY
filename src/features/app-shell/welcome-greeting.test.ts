@@ -37,13 +37,11 @@ describe("welcome quantum artwork", () => {
     expect(renderToString(createElement(QuantumCloudLoader, { paused: false }))).toContain('data-motion="running"');
   });
 
-  it("shares headline text tokens with the selected mode buttons", () => {
+  it("preserves the work-mode headline palettes independently of the glass navigation", () => {
     const globals = readStylesheet(new URL("../../app/globals.css", import.meta.url));
-    const header = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
     const greeting = readFileSync(new URL("./welcome-greeting.module.css", import.meta.url), "utf8");
     for (const [mode, color] of [["delivery", "#1b64da"], ["customer", "#274a94"], ["sales", "#FA6F42"]]) {
       expect(globals).toContain(`--mode-${mode}-text: ${color}`);
-      expect(header).toContain(`color: var(--mode-${mode}-text)`);
       expect(greeting).toContain(`color: var(--mode-${mode}-text)`);
     }
     expect(greeting).toMatch(/@media \(forced-colors: active\)[\s\S]*color: CanvasText/);

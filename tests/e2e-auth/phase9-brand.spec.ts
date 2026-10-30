@@ -126,21 +126,18 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(cloud.locator("[data-quantum-particle]")).toHaveCount(4);
   await expectHeadlineMascotPlacement(page);
   await expect(header.locator(".employee-avatar")).toHaveCount(0);
-  const modeTrigger = header.getByRole("button", { name: /^업무 모드 변경, 현재 / });
-  await expect(modeTrigger).toBeVisible();
-  await modeTrigger.click();
-  const modePicker = page.getByRole("dialog", { name: "업무 모드 선택", exact: true });
-  await expect(modePicker.locator('button[data-mode="delivery"]')).toContainText("학교납품");
-  await expect(modePicker.locator('button[data-mode="sales"]')).toContainText("영업/홍보");
-  await modePicker.locator('button[data-mode="sales"]').click();
-  await expect(modePicker).toHaveCount(0);
+  const modes = header.getByRole("group", { name: "업무 모드" });
+  await expect(modes.locator('button[data-mode="delivery"]')).toBeVisible();
+  await expect(modes.locator('button[data-mode="sales"]')).toBeVisible();
+  await modes.locator('button[data-mode="sales"]').click();
+  await expect(page.getByRole("dialog", { name: "업무 모드 선택" })).toHaveCount(0);
   await expect(page.locator("#sales-cycle-title")).toBeVisible({ timeout: 30_000 });
   const signature = header.locator(".app-brand--signature");
   await expect(signature.getByText("온누리종합식품", { exact: true })).toBeVisible();
   await expect(signature.locator("image")).toHaveAttribute("href", "/brand/onnuri-food-logo.png");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "none");
   const salesButton = header.locator('[data-mode-switcher]:visible button[data-mode="sales"]');
-  await expect(salesButton).toHaveCSS("color", "rgb(250, 111, 66)");
+  await expect(salesButton).toHaveCSS("color", "rgb(11, 79, 118)");
 
   for (const width of [320, 360, 390, 430, 768, 1280]) {
     await page.setViewportSize({ width, height: width > 760 ? 900 : 844 });
@@ -152,8 +149,8 @@ test("company signature stays visible without crowding mobile mode controls and 
       const symbol = element.querySelector(".app-brand__mark > svg")!.getBoundingClientRect();
       return { brandRight: brand.right, controlsLeft: controls.left, controlsRight: controls.right, viewport: innerWidth, markWidth: mark.width, symbolWidth: symbol.width };
     });
-    expect(geometry.markWidth).toBeGreaterThanOrEqual(76);
-    expect(geometry.symbolWidth / geometry.markWidth).toBeCloseTo(.85, 1);
+    expect(geometry.markWidth).toBeGreaterThanOrEqual(72);
+    expect(geometry.symbolWidth / geometry.markWidth).toBeCloseTo(1, 1);
     expect(geometry.brandRight + 4).toBeLessThanOrEqual(geometry.controlsLeft);
     expect(geometry.controlsRight).toBeLessThanOrEqual(geometry.viewport);
     await expect(signature.getByText("온누리종합식품", { exact: true })).toBeVisible();
@@ -195,9 +192,9 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(motionToggle).toHaveAttribute("aria-checked", "true");
   await motionToggle.click();
   await expect(motionToggle).toHaveAttribute("aria-checked", "false");
-  await expect(header.locator('[data-mode-switcher]:visible')).toHaveAttribute("data-motion", "paused");
+  await expect(header.locator('[data-mode-switcher]:visible')).toHaveAttribute("data-motion", "static");
   await page.reload();
-  await expect(header.locator('[data-mode-switcher]:visible')).toHaveAttribute("data-motion", "paused");
+  await expect(header.locator('[data-mode-switcher]:visible')).toHaveAttribute("data-motion", "static");
   await navigation.getByRole("button", { name: "학교", exact: true }).click();
   await expect(cloud).toHaveAttribute("data-motion", "paused");
   await expect(greetingVisual).toHaveAttribute("data-typing", "complete");

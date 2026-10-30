@@ -5,105 +5,77 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ShellHeader } from "./app-shell-header";
+import type { WorkMode } from "./shell-policy";
 import styles from "./app-shell-header.module.css";
 import brandStyles from "./app-brand.module.css";
 
+const ALL_MODES: readonly WorkMode[] = ["customer", "delivery", "sales", "inventory"];
+const renderHeader = (availableModes: readonly WorkMode[], mode: WorkMode = availableModes[0]!, detail = false) =>
+  renderToStaticMarkup(createElement(ShellHeader, { mode, availableModes, onModeChange: () => undefined,
+    ...(detail ? { onDetailBack: () => undefined } : {}) }));
+
 describe("shell header", () => {
-  it("keeps four desktop choices and a discoverable compact picker beside the brand", () => {
-    const html = renderToStaticMarkup(createElement(ShellHeader, { mode: "inventory", availableModes: ["customer", "delivery", "sales", "inventory"], onModeChange: () => undefined }));
+  it("keeps one persistent set of named mode buttons beside the company identity", () => {
+    const html = renderHeader(ALL_MODES, "inventory");
     expect(html).toContain('data-mode-count="4"');
+    expect(html).toContain('data-mode-switcher="glass" data-motion="static"');
     expect(html).toContain('data-mode="inventory" aria-pressed="true"');
-    expect(html).toContain("grid-template-columns:repeat(4, minmax(0, 1fr))");
-    expect(html.indexOf(">영업/홍보</button>")).toBeLessThan(html.indexOf(">재고</button>"));
-    const css = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
-    expect(css).toContain('.header[data-mode-count="4"] .controls');
-    expect(css).not.toContain("flex: 1 0 100%");
-    expect(css).not.toContain("flex-wrap: wrap");
-    expect(css).toContain("@media (max-width: 900px)");
-    expect(css).toContain(".segmentedFrame { display: none; }");
-    expect(html).toContain('aria-label="업무 모드 변경, 현재 재고"');
-    expect(html).toContain('aria-haspopup="dialog" aria-expanded="false"');
-    expect(html).toContain("모드 전환");
-    expect(html).not.toContain('class="bottom-sheet-layer"');
-  });
-  it("presents customer, school delivery, sales in that order with three equal columns", () => {
-    const html = renderToStaticMarkup(createElement(ShellHeader, {
-      mode: "customer", availableModes: ["customer", "delivery", "sales"], onModeChange: () => undefined,
-    }));
-    expect(html).toContain('data-mode="customer" aria-pressed="true"');
-    expect(html.indexOf(">거래처</button>")).toBeLessThan(html.indexOf(">학교납품</button>"));
-    expect(html.indexOf(">학교납품</button>")).toBeLessThan(html.indexOf(">영업/홍보</button>"));
-    expect(html).toContain("grid-template-columns:repeat(3, minmax(0, 1fr))");
-  });
-  it("keeps both named native mode buttons and the company name, without a profile avatar", () => {
-    const html = renderToStaticMarkup(createElement(ShellHeader, {
-      mode: "sales", availableModes: ["delivery", "sales"], onModeChange: () => undefined,
-    }));
+    expect(html.match(/data-mode="/g)).toHaveLength(4);
     expect(html.replace(/<[^>]+>/g, "")).toContain("온누리종합식품");
-    expect(html).toContain('aria-label="업무 모드"');
-    expect(html).toContain('data-mode="sales" aria-pressed="true"');
+    expect(html.indexOf('app-brand')).toBeLessThan(html.indexOf('aria-label="업무 모드"'));
+    expect(html).not.toContain('aria-haspopup');
+    expect(html).not.toContain('role="dialog"');
     expect(html).not.toContain("employee-avatar");
-    expect(html).toContain('data-motion="paused"');
+    expect(html.slice(html.indexOf('aria-label="업무 모드"'))).not.toContain("<svg");
+    expect(html).toContain('aria-label="영업"');
+    expect(html).not.toContain("영업/홍보");
   });
 
-  it("shows only the authorized mode and preserves the detail back action", () => {
-    const html = renderToStaticMarkup(createElement(ShellHeader, {
-      mode: "delivery", availableModes: ["delivery"], onModeChange: () => undefined,
-      onDetailBack: () => undefined,
-    }));
+  it("filters every permission combination without exposing unauthorized modes", () => {
+    for (let mask = 1; mask < 16; mask++) {
+      const allowed = ALL_MODES.filter((_, index) => mask & (1 << index));
+      const html = renderHeader(allowed);
+      expect(html.match(/data-mode="/g)).toHaveLength(allowed.length);
+      expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+      for (const mode of ALL_MODES) expect(html.includes('data-mode="' + mode + '"')).toBe(allowed.includes(mode));
+      expect(allowed.map(mode => html.indexOf('data-mode="' + mode + '"'))).toEqual(
+        allowed.map(mode => html.indexOf('data-mode="' + mode + '"')).toSorted((a, b) => a - b));
+    }
+  });
+
+  it("preserves the detail back action and a consistent single authorized choice", () => {
+    const html = renderHeader(["delivery"], "delivery", true);
     expect(html).toContain("학교 목록");
-    expect(html).toContain("학교납품 모드");
-    expect(html).not.toContain('aria-label="업무 모드"');
-    expect(html).not.toContain("영업");
-    expect(html).not.toContain('aria-haspopup="dialog"');
-  });
-
-  it("never exposes an unauthorized mode through either control", () => {
-    const html = renderToStaticMarkup(createElement(ShellHeader, {
-      mode: "delivery", availableModes: ["customer", "delivery"], onModeChange: () => undefined,
-    }));
-    expect(html).toContain('aria-label="업무 모드 변경, 현재 학교납품"');
+    expect(html).toContain("학교");
+    expect(html).toContain('data-mode-count="1"');
+    expect(html).toContain('aria-label="업무 모드"');
     expect(html).not.toContain('data-mode="sales"');
-    expect(html).not.toContain('data-mode="inventory"');
   });
 
-  it("provides explicit selected markers and keeps arrival motion optional", () => {
-    const source = readFileSync(new URL("./app-shell-header.tsx", import.meta.url), "utf8");
-    const css = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
-    expect(source).toContain('title="업무 모드 선택"');
-    expect(source).toContain("<span>현재</span>");
-    expect(source).toContain("queueMicrotask(() => onModeChange(nextMode))");
-    expect(source).toContain("useBottomSheetClose()");
-    expect(source).not.toContain("window.history.back()");
-    expect(css).toContain("min-height: 52px");
-    expect(css).toContain("min-height: 78px");
-    expect(css.indexOf(".pickerOption { animation:")).toBeGreaterThan(css.indexOf("@media (prefers-reduced-motion: no-preference)"));
-    expect(css).toContain("@media (forced-colors: active)");
-  });
-
-  it("exports actual component markup and scoped styles for serverless browser layout verification", () => {
+  it("exports actual component markup and scoped styles for browser verification", () => {
     const globalCss = readStylesheet(new URL("../../app/globals.css", import.meta.url));
-    const rawCss = readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8");
-    const scopedCss = rawCss.replace(/:global\(([^)]+)\)/g, "$1")
-      .replace(/\.(header|controls|modeFrame|modeControl|modeButton|singleMode|segmentedFrame|compactFrame|modeTrigger|pickerOption|triggerIcon|triggerChevron|triggerCopy|currentLabel|pickerList|optionIcon|optionCopy|currentMarker|optionChevron)\b/g, (_, name: string) => `.${styles[name]}`);
-    const brandCss = readFileSync(new URL("./app-brand.module.css", import.meta.url), "utf8")
-      .replace(/\.(companyName|nameLead|nameDescriptor)\b/g, (_, name: string) => `.${brandStyles[name]}`);
+    const scope = (css: string, names: Record<string, string>, keys: string[]) => {
+      let scoped = css.replace(/:global\(([^)]+)\)/g, "$1");
+      for (const name of keys) scoped = scoped.replace(new RegExp("\\." + name + "\\b", "g"), "." + names[name]);
+      return scoped;
+    };
+    const scopedCss = scope(readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8"), styles,
+      ["header", "controls", "modeControl", "modeButton", "glassSurface", "glassMaterial", "modeLabel"]);
+    const brandCss = scope(readFileSync(new URL("./app-brand.module.css", import.meta.url), "utf8"), brandStyles,
+      ["companyName", "nameLead", "nameDescriptor"]);
     const directory = new URL("../../../output/playwright/header-layout/", import.meta.url);
     mkdirSync(directory, { recursive: true });
+    const write = (name: string, mode: WorkMode, availableModes: readonly WorkMode[], detail = false) =>
+      writeFileSync(new URL(name + ".html", directory), '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>' + globalCss + '</style><style>' + scopedCss + '</style><style>' + brandCss + '</style></head><body><main class="workspace-shell" data-mode="' + mode + '"><div class="aurora-background" aria-hidden="true"><i></i><i></i><i></i></div>' + renderHeader(availableModes, mode, detail) + '</main></body></html>');
     for (const mode of ["customer", "delivery", "sales"] as const) {
       for (const state of ["dual", "single", "detail", "triple", "triple-detail"] as const) {
-        const html = renderToStaticMarkup(createElement(ShellHeader, {
-          mode, availableModes: state === "single" ? [mode] : state.startsWith("triple") ? ["customer", "delivery", "sales"] : ["delivery", "sales"],
-          onModeChange: () => undefined,
-          ...(state.endsWith("detail") ? { onDetailBack: () => undefined } : {}),
-        }));
-        // Files are generated verification artifacts, never production assets.
-        writeFileSync(new URL(`${mode}-${state}.html`, directory), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${globalCss}</style><style>${scopedCss}</style><style>${brandCss}</style></head><body><main class="workspace-shell" data-mode="${mode}"><div class="aurora-background" aria-hidden="true"><i></i><i></i><i></i></div>${html}</main></body></html>`);
+        write(mode + "-" + state, mode, state === "single" ? [mode] : state.startsWith("triple") ? ALL_MODES.slice(0, 3) : ["delivery", "sales"], state.endsWith("detail"));
       }
     }
+    write("inventory-four", "inventory", ALL_MODES);
+    write("delivery-inventory", "delivery", ["customer", "delivery", "inventory"]);
+    write("sales-inventory", "sales", ["customer", "sales", "inventory"]);
     expect(scopedCss).not.toContain(":global(");
-    expect(scopedCss).toContain(`.${styles.compactFrame} { display: none; }`);
-    const inventoryHtml = renderToStaticMarkup(createElement(ShellHeader, { mode: "inventory", availableModes: ["customer", "delivery", "sales", "inventory"], onModeChange: () => undefined }));
-    writeFileSync(new URL("inventory-four.html", directory), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${globalCss}</style><style>${scopedCss}</style><style>${brandCss}</style></head><body><main class="workspace-shell" data-mode="inventory">${inventoryHtml}</main></body></html>`);
+    expect(scopedCss).toContain("." + styles.modeControl);
   });
 });

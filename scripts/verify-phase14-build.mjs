@@ -15,6 +15,8 @@ for (const required of [
   "onnuriway-company-icon-maskable-512-v4.png",
   "onnuri-food-logo.png",
   "onnuri-food-logo-auth.webp",
+  "mode-glass-three-v2.webp",
+  "mode-glass-four-v2.webp",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {

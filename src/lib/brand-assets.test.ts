@@ -74,3 +74,21 @@ describe("production company icons", () => {
     }
   });
 });
+
+describe("public mode glass materials", () => {
+  it("keeps the three- and four-permission materials small, clear and available offline", async () => {
+    for (const count of ["three", "four"]) {
+      const asset = `/ui/mode-glass-${count}-v2.webp`;
+      expect(isPublicAssetPath(asset)).toBe(true);
+      const bytes = await readFile(join(process.cwd(), "public", asset));
+      const metadata = await sharp(bytes).metadata();
+      expect(bytes.length).toBeLessThanOrEqual(80 * 1024);
+      expect(metadata.hasAlpha).toBe(true);
+      const { channels } = await sharp(bytes).extract({
+        left: Math.floor(metadata.width! * .4), top: Math.floor(metadata.height! * .4),
+        width: Math.floor(metadata.width! * .2), height: Math.floor(metadata.height! * .2),
+      }).extractChannel("alpha").stats();
+      expect(channels[0]!.mean).toBeLessThan(64);
+    }
+  });
+});

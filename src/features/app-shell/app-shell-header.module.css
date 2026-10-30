@@ -1,326 +1,169 @@
-.header {
-  column-gap: 12px;
+.header.header {
+  display: grid;
+  grid-template-columns: clamp(72px, 20.5vw, 104px) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  padding-block: 16px 18px;
 }
+
+.header.header :global(.app-brand--signature) {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
+  text-align: center;
+}
+
+.header.header :global(.app-brand--signature .app-brand__mark) {
+  width: 100%;
+  max-width: 92px;
+  height: 34px;
+  filter: drop-shadow(0 1px 1px rgb(255 255 255 / 80%)) drop-shadow(0 2px 2px rgb(37 78 98 / 10%));
+}
+
+.header :global(.app-brand--signature .app-brand__mark > svg) { width: 100%; height: 100%; }
+
+.header.header :global(.app-brand--signature .app-brand__wordmark) {
+  display: grid;
+  min-width: 0;
+  white-space: normal;
+}
+
+.header.header :global(.app-brand--signature .app-brand__wordmark strong) {
+  font-size: .6875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.header.header :global(.app-brand--signature .app-brand__wordmark small) { display: none; }
+.header :global([data-company-wordmark]) { white-space: normal; }
 
 .header :global(.workspace-header__back) {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.header :global(.app-brand--signature .app-brand__mark > svg) {
-  width: 85%;
-  height: 85%;
-}
-
-.header .controls {
-  flex: 1 1 280px;
   min-width: 0;
-  max-width: 320px;
-  justify-content: flex-end;
-  margin-left: auto;
+  padding-inline: 6px;
+  font-size: .75rem;
+  line-height: 1.4;
 }
 
-.header[data-mode-count="4"] .controls { max-width: 380px; }
+.header :global(.workspace-header__back > svg) { flex: none; width: 16px; }
 
-.modeFrame {
-  position: relative;
-  isolation: isolate;
-  width: 100%;
-  padding: 1.5px;
-  overflow: hidden;
-  border: 1px solid rgb(49 130 246 / 18%);
-  border-radius: 17px;
-  background: #edf1f4;
-  box-shadow: 0 2px 10px rgb(49 130 246 / 6%);
-}
-
-.modeFrame::before,
-.modeFrame::after {
-  position: absolute;
-  z-index: -1;
-  content: "";
-  pointer-events: none;
-}
-
-.modeFrame::before {
-  inset: -240%;
-  /* Blue and jade meet through aqua on both sides of the closed orbit.
-     Matching endpoints avoid a seam as the highlight completes each turn. */
-  background: conic-gradient(
-    from 18deg,
-    #83b5ee 0deg,
-    #4d93e5 48deg,
-    #67b3d5 96deg,
-    #86c7c5 140deg,
-    #66bca6 184deg,
-    #49a48c 225deg,
-    #8fcdb9 268deg,
-    #c6e6e3 306deg,
-    #a1cdea 338deg,
-    #83b5ee 360deg
-  );
-}
-
-.modeFrame::after {
-  inset: 2px;
-  border-radius: 14px;
-  background: #f2f4f6;
-}
+.header .controls { display: block; min-width: 0; width: 100%; }
 
 .modeControl {
-  position: relative;
   display: grid;
-  gap: 3px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
   width: 100%;
-  padding: 3px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
-  box-shadow: none;
 }
 
 .modeButton {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
   min-width: 44px;
   min-height: 44px;
-  padding: 9px 6px;
+  padding: 4px 2px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 4px;
   background: transparent;
-  color: #525d6b;
-  font-size: 14px;
-  font-weight: 750;
-  line-height: 1.4;
-  white-space: nowrap;
-  box-shadow: none;
+  color: #243348;
+  font: inherit;
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+  text-align: center;
   cursor: pointer;
-  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep the rendered reflection in the button; broad light pools and cast
+   shadows outside it would exaggerate the shallow glass edge. */
+.glassSurface {
+  position: absolute;
+  z-index: 0;
+  inset: 5px 0;
+  overflow: clip;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.glassMaterial {
+  position: absolute;
+  inset: -10px -6px -10px;
+  border: 0 solid transparent;
+  border-image-source: var(--glass-three);
+  border-image-slice: 57 34 66 35 fill;
+  border-image-width: 12px 8px 12px;
+  border-image-repeat: stretch;
+  pointer-events: none;
+}
+
+.header[data-mode-count="4"] .glassMaterial {
+  inset: -10px -6px -10px;
+  border-image-source: var(--glass-four);
+  border-image-slice: 82 39 98 40 fill;
+  border-image-width: 12px 8px 12px;
+}
+
+.modeLabel {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .modeButton[aria-pressed="true"] {
-  background: #fff;
-  color: var(--mode-delivery-text);
-  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #3182f6;
+  color: #0b4f76;
+  font-weight: 760;
 }
 
-.modeButton[data-mode="customer"][aria-pressed="true"] {
-  color: var(--mode-customer-text);
-  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #3868ce;
+.modeButton[aria-pressed="true"] .glassSurface { background: rgb(166 204 228 / 8%); }
+
+.modeButton:focus-visible { outline: 2px solid #0b5a84; outline-offset: 3px; }
+
+@media (min-width: 761px) {
+  .header.header { grid-template-columns: auto minmax(0, 1fr); column-gap: 20px; padding-block: 24px; }
+  .header.header :global(.app-brand--signature) { display: flex; width: auto; gap: 12px; text-align: left; }
+  .header.header :global(.app-brand--signature .app-brand__mark) { width: 88px; height: 40px; }
+  .header.header :global(.app-brand--signature .app-brand__wordmark strong) { font-size: .9375rem; }
+  .header.header :global(.app-brand--signature .app-brand__wordmark small) { display: block; }
+  .modeControl { gap: 10px; }
+  .modeButton { min-height: 48px; padding-inline: 12px; font-size: .875rem; border-radius: 4px; }
 }
 
-.modeButton[data-mode="sales"][aria-pressed="true"] {
-  color: var(--mode-sales-text);
-  box-shadow: 0 2px 7px rgb(25 31 40 / 6%), inset 0 -3px 0 #FAAA9D;
-}
-
-.header .singleMode {
-  min-height: 44px;
-  padding: 8px 14px;
-  color: #525d6b;
-  border: 1px solid #dce3e9;
-  border-radius: 13px;
-  background: #fff;
-}
-
-.header .singleMode i { background: #3182f6; }
-.header .singleMode[data-mode="customer"] i { background: #3868ce; }
-.header .singleMode[data-mode="sales"] i { background: #FAAA9D; }
-
-.compactFrame { display: none; }
-
-.modeTrigger,
-.pickerOption {
-  --option-ink: var(--mode-delivery-text);
-  --option-tint: #edf4fd;
-  --option-line: #3182f6;
-}
-
-.modeTrigger[data-mode="customer"],
-.pickerOption[data-mode="customer"] {
-  --option-ink: var(--mode-customer-text);
-  --option-tint: #edf2ff;
-  --option-line: #3868ce;
-}
-
-.modeTrigger[data-mode="sales"],
-.pickerOption[data-mode="sales"] {
-  --option-ink: var(--mode-sales-text);
-  --option-tint: #fff2ed;
-  --option-line: #faaa9d;
-}
-
-.header .modeTrigger {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 52px;
-  padding: 6px 11px 7px 8px;
-  border: 0;
-  border-radius: 14px;
-  background: #fff;
-  color: var(--option-ink);
-  font-size: 14px;
-  font-weight: 750;
-  line-height: 1.4;
-  white-space: nowrap;
-  box-shadow: inset 0 -2px 0 var(--option-line);
-  cursor: pointer;
-  transition: background-color 160ms ease;
-}
-
-.triggerIcon {
-  display: grid;
-  place-items: center;
-  width: 29px;
-  height: 29px;
-  flex: none;
-  border-radius: 9px;
-  background: var(--option-tint);
-}
-
-.triggerChevron { flex: none; transform: rotate(90deg); color: #687583; }
-.modeTrigger[aria-expanded="true"] .triggerChevron { transform: rotate(-90deg); }
-.triggerCopy { display: grid; gap: 1px; text-align: left; }
-.triggerCopy small { color: #687583; font-size: 10px; font-weight: 650; line-height: 1.35; }
-.currentLabel { display: block; }
-
-.modeButton:focus-visible,
-.header .modeTrigger:focus-visible,
-.pickerOption:focus-visible {
-  outline: 2px solid #1b64da;
-  outline-offset: -3px;
-}
-
-.pickerList { display: grid; gap: 9px; }
-
-.pickerList .pickerOption {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  width: 100%;
-  min-height: 78px;
-  padding: 13px 15px;
-  border: 1px solid #e1e7ed;
-  border-radius: 13px;
-  background: #fff;
-  color: #263342;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease;
-}
-
-.pickerList .pickerOption[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--option-line) 55%, #e1e7ed);
-  background: color-mix(in srgb, var(--option-tint) 62%, white);
-  box-shadow: inset 3px 0 0 var(--option-line);
-}
-
-.optionIcon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 41px;
-  height: 41px;
-  border: 1px solid color-mix(in srgb, var(--option-line) 12%, transparent);
-  border-radius: 12px;
-  background: var(--option-tint);
-  color: var(--option-ink);
-}
-
-.optionCopy { display: grid; flex: 1; min-width: 0; gap: 4px; }
-.optionCopy strong { color: #263342; font-size: 16px; font-weight: 750; line-height: 1.35; }
-.optionCopy > span { color: #626f7c; font-size: 12px; line-height: 1.4; }
-.currentMarker { display: inline-flex; align-items: center; gap: 3px; flex: none; color: #426457; font-size: 11px; font-weight: 700; }
-.optionChevron { flex: none; color: #7b8895; }
-.pickerOption:disabled { cursor: wait; }
-
-/* Keep the brand and the current mode on one line. The complete, comfortably
-   sized choice list is disclosed instead of shrinking four labels to fit. */
-@media (max-width: 900px) {
-  .header .controls,
-  .header[data-mode-count="4"] .controls { flex: 0 1 auto; width: auto; max-width: 200px; }
-  .segmentedFrame { display: none; }
-  .compactFrame { display: block; }
-}
-
-@media (max-width: 760px) {
-  .header:has(:global(.app-brand--signature)) .controls { flex-shrink: 1; }
-  .header { column-gap: 8px; }
-}
-
-@media (max-width: 359px) {
-  .header :global(.workspace-header__back) { padding-inline: 8px; gap: 4px; font-size: 12px; }
-  .header :global(.workspace-header__back) svg { width: 16px; height: 16px; }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .modeFrame::before { animation: mode-border-orbit 8s linear infinite; }
-  .triggerChevron { transition: transform 220ms cubic-bezier(.2, .8, .2, 1); }
-  .header .modeTrigger { transition: transform 160ms ease, background-color 160ms ease; }
-  .header .modeTrigger:active { transform: scale(.98); }
-  .currentLabel { animation: current-mode-arrive 200ms ease-out; }
-  .pickerOption { animation: mode-option-arrive 280ms cubic-bezier(.2, .8, .2, 1) both; }
-  .pickerOption:nth-child(2) { animation-delay: 35ms; }
-  .pickerOption:nth-child(3) { animation-delay: 70ms; }
-  .pickerOption:nth-child(4) { animation-delay: 105ms; }
-  .pickerList .pickerOption:active { transform: scale(.99); }
-  /* Focus remains on a mode button after a tap. Only an explicit preference or
-     hidden page pauses this decoration; focus/hover must not freeze the loop. */
-  .modeFrame[data-motion="paused"]::before { animation-play-state: paused; }
+@media (min-width: 761px) and (max-width: 1023px) {
+  .header.header { grid-template-columns: 108px minmax(0, 1fr); column-gap: 16px; }
+  .header.header :global(.app-brand--signature) { display: grid; width: 108px; text-align: center; }
+  .header.header :global(.app-brand--signature .app-brand__wordmark small) { display: none; }
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .modeButton[aria-pressed="false"]:hover { background: #e7ecf1; }
-  .header .modeTrigger:hover,
-  .pickerList .pickerOption:hover { background: var(--option-tint); }
+  .modeButton { transition: transform 140ms ease; }
+  .modeButton:hover { transform: translateY(-1px); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .modeFrame::before { animation: none; }
-  .modeButton,
-  .header .modeTrigger,
-  .pickerList .pickerOption { transition: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .modeButton:active { transform: translateY(1px); }
+}
+
+@media (prefers-contrast: more) {
+  .modeButton { border: 1px solid #657d90; background: #f6f9fc; }
+  .modeButton[aria-pressed="true"] { background: #e7f2fa; border-color: #0b5a84; }
+  .glassSurface { display: none; }
 }
 
 @media (forced-colors: active) {
-  .modeFrame { border: 1px solid ButtonText; }
-  .modeFrame::before,
-  .modeFrame::after { display: none; animation: none; }
-  .modeButton { color: ButtonText; }
-  .modeButton[aria-pressed="true"],
-  .modeButton[data-mode="customer"][aria-pressed="true"],
-  .modeButton[data-mode="sales"][aria-pressed="true"] {
-    color: HighlightText;
-    background: Highlight;
-    forced-color-adjust: none;
-    box-shadow: none;
-  }
-  .modeButton:focus-visible { outline-color: ButtonText; }
-  .header .modeTrigger,
-  .pickerList .pickerOption { color: ButtonText; background: ButtonFace; border: 1px solid ButtonText; box-shadow: none; }
-  .pickerList .pickerOption[aria-pressed="true"] { border: 2px solid Highlight; box-shadow: none; }
-  .triggerIcon,
-  .optionIcon,
-  .currentMarker,
-  .optionCopy strong,
-  .optionCopy > span,
-  .triggerCopy small,
-  .triggerChevron,
-  .optionChevron { color: ButtonText; }
-}
-
-@keyframes mode-border-orbit {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes current-mode-arrive {
-  from { opacity: .35; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes mode-option-arrive {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: translateY(0); }
+  .header :global(.app-brand__mark) { filter: none; }
+  .modeButton { color: ButtonText; background: ButtonFace; border: 1px solid ButtonText; box-shadow: none; }
+  .glassSurface { display: none; }
+  .modeButton[aria-pressed="true"] { color: HighlightText; background: Highlight; border-color: Highlight; forced-color-adjust: none; }
+  .modeLabel { text-shadow: none; }
+  .modeButton:focus-visible { outline-color: Highlight; }
 }
