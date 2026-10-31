@@ -141,6 +141,10 @@ test("company signature stays visible without crowding mobile mode controls and 
 
   for (const width of [320, 360, 390, 430, 768, 1280]) {
     await page.setViewportSize({ width, height: width > 760 ? 900 : 844 });
+    // Viewport resize can resolve before the responsive layout has painted.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
     await expectHeadlineMascotPlacement(page);
     const geometry = await header.evaluate((element) => {
       const brand = element.querySelector(".app-brand--signature")!.getBoundingClientRect();
