@@ -46,6 +46,6 @@ workflow-level paths-ignore로 실행 자체를 없애지 않는다. plan/verify
 
 - 로컬: 분류기 7·최종 판정 30·UI 78 PASS, typecheck/lint/actionlint PASS. 초기 테스트 helper의 빈 배열 추론 오류는 명시적 타입으로 수정한 뒤 통과했다. 실제 테마 diff는 presentation이다.
 - source `fed0c42`의 [전체 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41146903811)은 attempt 1 SUCCESS. 기존 full 12개와 plan/verify 성공, presentation은 계획대로 제외됐다. 기존 테스트 조건과 실패 차단을 유지했다. 일반 browser 348 PASS/8 SKIP, Phase17 83 PASS/18 SKIP, unit 1,821 PASS/15 SKIP이다. 내부 flaky·job 재실행 없음.
-- 문서 경로는 이 결과와 축약 AGENTS.md를 기록하는 후속 커밋에서 실제 확인한다. 제품 코드가 같으므로 Hosting은 다시 배포하지 않는다. UI 경로는 로컬 명령·분류 회귀로 검증했으며 실제 GitHub의 UI 전용 실행 시간은 아직 측정하지 않았다.
+- 문서 경로는 후속 `41148064803`에서 plan/verify만 실행해 35초에 성공했다. 실제 이미지 교체 `62a1245`의 [presentation CI](https://github.com/kim-DL/ONWAY/actions/runs/41192590796)는 attempt 1 SUCCESS, 선택된 7개 job 성공·8개 계획 제외, UI 78 PASS다. 생성→완료 5분 28초, UI 테스트 자체 3.2분이었다. 당시 측정이며 향후 실행 시간 보장은 아니다.
 
 참고: [GitHub workflow trigger](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow), [job 조건·needs·outputs 문법](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
