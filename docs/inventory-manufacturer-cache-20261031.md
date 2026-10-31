@@ -37,4 +37,4 @@ IndexedDB·localStorage·sessionStorage·Service Worker 업무 캐시는 추가�
 
 - 메모리가 없는 앱 최초 실행·새로고침 뒤 첫 목록은 네트워크 응답이 필요하다. 미리 읽기가 끝나기 전에 버튼을 누르면 최초 로딩이 표시될 수 있다.
 - 실기기·설치 PWA·현장망에서의 절대 지연 시간과 실제 App Check 토큰 검증은 이번 로컬 결과에 포함하지 않는다.
-- 이 문서는 로컬 개선 단계의 결과다. 이후 사용자가 커밋·Hosting 배포를 승인했다. 캐시 기능 변경이므로 릴리스 자동 CI 범위는 `full`이며, CI·운영 build·Hosting 결과는 별도 릴리스 기록과 HANDOFF에 남긴다.
+- 이 문서는 로컬 개선 단계의 결과다. 이후 사용자 승인에 따라 커밋·전체 CI·운영 build·Hosting 배포를 완료했다. [릴리스·운영 검증 기록](releases/2026-10-31-manufacturer-cache.md)을 참고한다.
