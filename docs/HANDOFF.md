@@ -5,14 +5,14 @@
 ## 현재 상태
 
 - 프런트엔드: Next.js 정적 내보내기 → Firebase Hosting. 운영 주소는 [onnuriway.com](https://onnuriway.com), [onnuriway.web.app](https://onnuriway.web.app)이다.
-- 마지막 확인된 운영 배포: **2026-10-31 08:43 KST**, 제품 소스 `4ab5b0a`, Hosting version `df13547e1d3815c7`. 두 주소의 공개 검사·모바일 브라우저·Aside 반영 확인 완료. [배포·복구 기록](releases/2026-10-31-android-system-bar.md)
-- 이후 main에는 검사 범위 자동 선택과 AGENTS.md 정리가 반영됐다. 앱 기능 변경이나 추가 Hosting 배포는 없다. Git의 최신 HEAD는 명령으로 확인한다.
+- 마지막 확인된 운영 배포: **2026-10-31 10:11 KST**, 제품 소스 `0fd7db3`, Hosting version `93a62db89377f0f1`. 유리 소재·면 반사·얕은 그림자 반영, 두 주소 공개 검사·새 모바일 브라우저/PWA 캐시 확인 완료. [배포·복구 기록](releases/2026-10-31-glass-surface.md)
+- main에 범위별 검사 규칙과 문서 정리, 유리 버튼 개선이 반영됐다. 제품 source와 후속 결과 문서 커밋은 구분한다. Git의 최신 HEAD는 명령으로 확인한다.
 - 로딩·로그인·유리 모드 버튼과 시작 경로 최적화는 운영 반영됐다. 모드 표기는 `거래처 · 학교 · 영업 · 재고`, 버튼은 권한에 따라 표시한다. [UI 결정](glass-mode-navigation-20261030.md) · [최적화 결과](app-optimization-20261030.md)
 - Android 설치형 PWA의 밝은 화면과 짙은 테마 설정 불일치를 수정했다. **실제 시스템 버튼의 대비 개선은 아직 미확인**이다. [조사와 검증 경계](android-system-bar-20261031.md)
 
 ## 로컬 작업
 
-- 유리 버튼 소재 보강 후보: `codex/glass-material-depth-20261031`. 에셋 2개와 정적 면 반사·얕은 그림자 적용, 기존 크기·텍스트 유지. 관련 단위 9개·브라우저 3개 통과, 운영 미반영. [변경과 미리보기](glass-material-depth-20261031.md)
+- 유리 버튼 최종안은 운영 반영됐다. [소재 연구·선택](glass-material-depth-20261031.md). 해당 작업의 미커밋 제품 변경은 없다.
 
 ## 남은 작업
 
