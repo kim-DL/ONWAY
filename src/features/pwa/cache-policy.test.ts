@@ -24,6 +24,9 @@ describe("Phase 14 PWA cache allowlist", () => {
     expect(isPublicAssetPath("/brand/onnuri-food-logo-auth.webp")).toBe(true);
     expect(isPublicAssetPath("/ui/mode-glass-three-v2.webp")).toBe(true);
     expect(isPublicAssetPath("/ui/mode-glass-four-v2.webp")).toBe(true);
+    for (const name of ["search", "directory", "camera", "register"]) {
+      expect(isPublicAssetPath(`/ui/customer-ceramic-${name}-v1.webp`)).toBe(true);
+    }
     expect(isPublicAssetPath("/ui/unlisted-private.webp")).toBe(false);
     expect(isPublicAssetPath("/brand/unlisted-animation.webp")).toBe(false);
     expect(isPublicAssetPath("/brand/unlisted-still.png")).toBe(false);

@@ -171,7 +171,7 @@ function DeliveryHome({
   );
 }
 
-function SettingsPage({ session, onBack }: { session: AuthenticatedSession; onBack?: () => void }) {
+function SettingsPage({ session, onBack, backLabel = "재고로 돌아가기" }: { session: AuthenticatedSession; onBack?: () => void; backLabel?: string }) {
   const pageRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const scroller = pageRef.current?.closest(".workspace-content");
@@ -230,7 +230,7 @@ function SettingsPage({ session, onBack }: { session: AuthenticatedSession; onBa
 
   return (
     <section ref={pageRef} className="shell-page settings-page" aria-labelledby="settings-title">
-      {onBack ? <GlassButton compact variant="quiet" onClick={onBack}><Icon name="arrow-left" />재고로 돌아가기</GlassButton> : null}
+      {onBack ? <GlassButton compact variant="quiet" onClick={onBack}><Icon name="arrow-left" />{backLabel}</GlassButton> : null}
       <div className="shell-page-heading">
         <p className="shell-kicker">ACCOUNT · DEVICE</p>
         <h1 id="settings-title">설정</h1>
@@ -305,6 +305,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const selectedSchoolId = selectedSchool?.schoolId;
 
   useEffect(() => {
@@ -312,8 +313,25 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [selectedSchoolId]);
 
+  useEffect(() => {
+    const scroller = contentRef.current;
+    if (mode !== "customer" || !scroller) return;
+    let hideTimer: ReturnType<typeof setTimeout> | undefined;
+    const showScrollbar = () => {
+      scroller.dataset.scrolling = "";
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { delete scroller.dataset.scrolling; }, 700);
+    };
+    scroller.addEventListener("scroll", showScrollbar, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", showScrollbar);
+      clearTimeout(hideTimer);
+      delete scroller.dataset.scrolling;
+    };
+  }, [mode]);
+
   const writeHistory = useCallback((
-    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean },
+    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean; customerHomeReturn?: boolean },
     replace = false,
   ) => {
     const state = {
@@ -418,6 +436,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     setCustomerDetailRequest(null);
     writeHistory({ mode, view: nextView, school: null, searchOpen: false,
       ...(mode === "inventory" && nextView === "settings" ? { inventorySettingsReturn: true } : {}),
+      ...(mode === "customer" && view === "schools" && nextView !== "schools" ? { customerHomeReturn: true } : {}),
     });
   };
 
@@ -437,16 +456,28 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false });
   };
 
+  const closeCustomerPage = () => {
+    if (window.history.state?.onnuriwayShell?.customerHomeReturn === true) {
+      window.history.back();
+    } else {
+      // A restored subpage still needs a way home without a prior history entry.
+      setView("schools");
+      setCustomerDetailRequest(null);
+      writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false }, true);
+    }
+  };
+
   let content;
   if (selectedSchool && isSchoolWorkMode(mode)) {
     content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} />;
   } else if (view === "settings") {
-    content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : {})} />;
+    content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : mode === "customer" ? { onBack: closeCustomerPage, backLabel: "거래처로 돌아가기" } : {})} />;
   } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
-    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} />;
+    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} onBack={closeCustomerPage} />;
   } else if (mode === "customer") {
     content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session}
-      requestedCustomerId={customerDetailRequest} />;
+      requestedCustomerId={customerDetailRequest}
+      onOpenDeliveryPhotos={DELIVERY_PHOTOS_ENABLED ? () => navigate("activity") : undefined} />;
   } else if (mode === "inventory") {
     content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenAppSettings={() => navigate("settings")} />;
   } else if (view === "activity" && mode === "sales") {
@@ -466,8 +497,8 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         onModeChange={changeMode}
         onDetailBack={selectedSchool ? closeSchool : undefined}
       />
-      {mode !== "inventory" ? <ShellNavigation mode={mode} view={view} onNavigate={navigate} /> : null}
-      <div className="workspace-content"><InitialWorkspaceTiming startedAt={startedAt}
+      {mode !== "inventory" && mode !== "customer" ? <ShellNavigation mode={mode} view={view} onNavigate={navigate} /> : null}
+      <div ref={contentRef} className="workspace-content"><InitialWorkspaceTiming startedAt={startedAt}
         navigationKey={JSON.stringify([mode, view, selectedSchoolId ?? null, searchOpen])}>
         {content}
       </InitialWorkspaceTiming></div>

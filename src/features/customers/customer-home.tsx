@@ -2,7 +2,6 @@
 
 import type { ReactNode, Ref } from "react";
 
-import { Icon } from "@/components/ui/icon";
 import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
 
 import styles from "./customer-home.module.css";
@@ -12,13 +11,19 @@ export interface CustomerHomeProps {
   onOpenSearch: () => void;
   onRegister?: () => void;
   onOpenDirectory?: () => void;
+  onOpenDeliveryPhotos?: (() => void) | undefined;
   registerDisabled?: boolean;
   searchContent?: ReactNode;
   searchTriggerRef?: Ref<HTMLButtonElement>;
 }
 
+function CeramicIcon({ name }: { name: "search" | "directory" | "register" | "camera" }) {
+  return <span className={styles.ceramicIcon} data-icon={name} aria-hidden="true"
+    style={{ backgroundImage: `url('/ui/customer-ceramic-${name}-v1.webp')` }} />;
+}
+
 /** A compact field-work entry point that leaves the recent list in view. */
-export function CustomerHome({ greeting, onOpenSearch, onRegister, onOpenDirectory, registerDisabled = false, searchContent, searchTriggerRef }: CustomerHomeProps) {
+export function CustomerHome({ greeting, onOpenSearch, onRegister, onOpenDirectory, onOpenDeliveryPhotos, registerDisabled = false, searchContent, searchTriggerRef }: CustomerHomeProps) {
   if (searchContent) return <header className={styles.searchHeader} data-customer-home data-customer-search-header>
     <h1 id="customer-heading" className={styles.srOnly}>거래처 검색</h1>
     {searchContent}
@@ -30,19 +35,19 @@ export function CustomerHome({ greeting, onOpenSearch, onRegister, onOpenDirecto
         {greeting}
       </WelcomeGreeting>
     </div>
-    <div className={styles.actions}>
-      <button ref={searchTriggerRef} className={styles.searchTrigger} type="button" onClick={onOpenSearch}>
-        <Icon name="search" size={20} /><span><strong>거래처 이름으로 찾기</strong><small>거래처명 · 초성</small></span>
-        <Icon name="chevron-right" size={18} />
+    <div className={styles.actions} role="group" aria-label="거래처 빠른 메뉴">
+      <button ref={searchTriggerRef} className={styles.action} type="button" onClick={onOpenSearch}>
+        <CeramicIcon name="search" /><span>거래처 이름으로 찾기</span>
       </button>
-      <div className={styles.secondaryActions}>
-        {onOpenDirectory ? <button className={styles.browse} type="button" onClick={onOpenDirectory} disabled={registerDisabled}>
-          <Icon name="location" size={18} /><span>거래처 전체보기</span><Icon name="chevron-right" size={15} />
-        </button> : null}
-        {onRegister ? <button className={styles.register} type="button" onClick={onRegister} disabled={registerDisabled}>
-          <Icon name="plus" size={18} /><span>거래처 등록</span>
-        </button> : null}
-      </div>
+      {onOpenDirectory ? <button className={styles.action} type="button" onClick={onOpenDirectory} disabled={registerDisabled}>
+        <CeramicIcon name="directory" /><span>거래처 전체보기</span>
+      </button> : null}
+      {onOpenDeliveryPhotos ? <button className={styles.action} type="button" onClick={onOpenDeliveryPhotos}>
+        <CeramicIcon name="camera" /><span>납품사진</span>
+      </button> : null}
+      {onRegister ? <button className={styles.action} type="button" onClick={onRegister} disabled={registerDisabled}>
+        <CeramicIcon name="register" /><span>거래처 등록</span>
+      </button> : null}
     </div>
   </header>;
 }

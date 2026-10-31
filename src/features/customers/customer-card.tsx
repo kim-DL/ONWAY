@@ -99,7 +99,7 @@ export function CustomerCard({ customer, onSelect, compact = false }: { customer
   </article>;
 }
 
-/** Photo requests are intentionally limited to these five recent rows, not search results. */
+/** Photo requests are intentionally limited to these ten recent rows, not search results. */
 export function RecentCustomerCard({ customer, onSelect }: { customer: Customer; onSelect: () => void }) {
   return <button type="button" className={`${fieldList.row} ${styles.recentItem}`} onClick={onSelect} aria-label={`${customer.name} 다시 열기`} aria-describedby={`customer-recent-address-${customer.customerId} customer-recent-password-${customer.customerId}`} data-customer-recent-card>
     <CustomerOverviewPhoto customer={customer} variant="thumbnail" />

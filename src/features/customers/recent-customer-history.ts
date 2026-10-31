@@ -1,5 +1,5 @@
 export const MAX_RECENT_CUSTOMERS = 20;
-export const MAX_CUSTOMER_HOME_RECENTS = 5;
+export const MAX_CUSTOMER_HOME_RECENTS = 10;
 
 const customerIdPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const maximumStoredLength = 4096;

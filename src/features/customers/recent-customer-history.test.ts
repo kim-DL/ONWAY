@@ -78,9 +78,9 @@ describe("ID-only recent customer history", () => {
     cleanup();
   });
 
-  it("keeps the customer home presentation at five cards while history exposes twenty", () => {
+  it("keeps the customer home presentation at ten cards while history exposes twenty", () => {
     const customers = Array.from({ length: 20 }, (_, index) => ({ customerId: `customer_${index + 1}` }));
-    expect(customerHomeRecents(customers).map((customer) => customer.customerId)).toEqual(customers.slice(0, 5).map((customer) => customer.customerId));
+    expect(customerHomeRecents(customers).map((customer) => customer.customerId)).toEqual(customers.slice(0, 10).map((customer) => customer.customerId));
   });
 
   it("resolves only current authorized objects and does not erase IDs during an empty loading catalog", () => {

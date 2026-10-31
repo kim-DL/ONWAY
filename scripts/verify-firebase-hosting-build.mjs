@@ -18,7 +18,9 @@ const expectedIcons = new Map([
 ]);
 const launchLogo = "/brand/onnuri-food-logo-auth.webp";
 const glassAssets = ["/ui/mode-glass-three-v2.webp", "/ui/mode-glass-four-v2.webp"];
-const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...glassAssets, ...expectedIcons.keys()]);
+const ceramicAssets = ["search", "directory", "camera", "register"].map((name) => `/ui/customer-ceramic-${name}-v1.webp`);
+const panelAssets = [...glassAssets, ...ceramicAssets];
+const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...panelAssets, ...expectedIcons.keys()]);
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -141,7 +143,7 @@ async function verifyLocal() {
     check(pathname.startsWith("/_next/static/") || publicFiles.has(pathname), `Unexpected precached response: ${pathname}.`);
     check((await stat(outputFile(pathname))).isFile(), `Precached asset is missing from out: ${pathname}.`);
   }
-  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...glassAssets, ...manifest.icons.map((icon) => icon.src)])
+  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...panelAssets, ...manifest.icons.map((icon) => icon.src)])
     check(precached.includes(pathname), `PWA installation asset is not precached: ${pathname}.`);
   check(!precached.some((pathname) => pathname.startsWith("/api/") || pathname.startsWith("/__/")), "Connectivity and private/server responses must never be precached.");
 
@@ -155,10 +157,10 @@ async function verifyLocal() {
   const logo = await readFile(outputFile(launchLogo));
   check(logo.length <= 32 * 1024 && logo.subarray(0, 4).toString() === "RIFF" && logo.subarray(8, 12).toString() === "WEBP", "Launch logo must be a lightweight WebP.");
   check(sha256(logo) === sha256(await readFile(join(root, "public", launchLogo))), "Exported launch logo differs from the reviewed asset.");
-  for (const pathname of glassAssets) {
+  for (const pathname of panelAssets) {
     const bytes = await readFile(outputFile(pathname));
     check(bytes.length <= 80 * 1024 && bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP", `${pathname} must be a lightweight WebP.`);
-    check(sha256(bytes) === sha256(await readFile(join(root, "public", pathname))), `Exported glass material differs from the reviewed asset: ${pathname}.`);
+    check(sha256(bytes) === sha256(await readFile(join(root, "public", pathname))), `Exported panel asset differs from the reviewed asset: ${pathname}.`);
   }
   const initialAssets = [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+\.(?:js|css))(?:\?[^" ]*)?"/gu)].map((match) => match[1]))];
   check(initialAssets.some((asset) => asset.endsWith(".js")) && initialAssets.some((asset) => asset.endsWith(".css")), "Initial JavaScript/CSS assets were not found in the exported HTML.");
@@ -197,10 +199,10 @@ async function verifyRemote(base, local) {
   const logo = await request(launchLogo, "GET");
   assertMime(logo.headers, /^image\/webp\b/i, launchLogo);
   check(sha256(Buffer.from(await logo.arrayBuffer())) === sha256(await readFile(outputFile(launchLogo))), "Remote launch logo differs from this build.");
-  for (const pathname of glassAssets) {
+  for (const pathname of panelAssets) {
     const material = await request(pathname, "GET");
     assertMime(material.headers, /^image\/webp\b/i, pathname);
-    check(sha256(Buffer.from(await material.arrayBuffer())) === sha256(await readFile(outputFile(pathname))), `Remote glass material differs from this build: ${pathname}.`);
+    check(sha256(Buffer.from(await material.arrayBuffer())) === sha256(await readFile(outputFile(pathname))), `Remote panel asset differs from this build: ${pathname}.`);
   }
   for (const pathname of local.initialAssets) {
     const asset = await request(pathname);

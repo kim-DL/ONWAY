@@ -202,7 +202,7 @@ test("mobile network handoff preserves the current customer and explicit logout 
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith("onnuriway:private:")).length)).toBe(0);
 });
 
-test("recent customers keep five selected results, deduplicate, survive return and clear safely", async ({ page }, testInfo) => {
+test("recent customers keep selected results within the ten-row limit, deduplicate, survive return and clear safely", async ({ page }, testInfo) => {
   await login(page, true, false);
   await expect(page.locator("[data-customer-workspace] [data-freshness]")).toHaveCount(0);
   await expect(page.locator("[data-customer-card]")).toHaveCount(0);
@@ -221,35 +221,37 @@ test("recent customers keep five selected results, deduplicate, survive return a
   await search.fill("");
   const recents = page.locator("[data-customer-recents]");
   const rows = recents.getByRole("button", { name: /다시 열기/ });
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(6);
   await expect(rows.first()).toHaveAccessibleName("푸른식품 다시 열기");
   await expect(rows.first()).toHaveAccessibleDescription("주소 미등록 출입비번 0012*");
-  await expect(recents).not.toContainText("강은유통");
+  await expect(recents).toContainText("강은유통");
   await expect(recents).toContainText("한빛상회 공식 주소");
   await expect(recents).toContainText("주소 미등록");
   await recents.getByRole("button", { name: "한빛상회 다시 열기" }).click();
   await expect(page.getByRole("dialog", { name: "한빛상회" })).toBeVisible();
   await page.goBack();
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(6);
   await expect(rows.first()).toHaveAccessibleName("한빛상회 다시 열기");
   await expect(rows.first()).toHaveAccessibleDescription("한빛상회 공식 주소 출입비번 0012*");
   await page.reload();
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(6);
   await expect(rows.first()).toHaveAccessibleName("한빛상회 다시 열기");
-  await page.getByRole("button", { name: "설정", exact: true }).click();
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "거래처", exact: true }).click();
-  await expect(rows).toHaveCount(5);
+  await chooseMode(page, "delivery");
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "설정", exact: true }).click();
+  await chooseMode(page, "customer");
+  await page.getByRole("button", { name: "거래처로 돌아가기", exact: true }).click();
+  await expect(rows).toHaveCount(6);
   for (const width of [320, 390, 768]) {
     await page.setViewportSize({ width, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).include("[data-customer-workspace]").analyze()).violations).toEqual([]);
-    await page.screenshot({ path: testInfo.outputPath(`customer-home-five-${width}.png`), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath(`customer-home-recents-${width}.png`), fullPage: true });
   }
   const saved = await page.evaluate(() => JSON.stringify({ ...localStorage }));
   expect(saved).not.toMatch(/푸른식품|한빛상회|0012\*|010-0000|36\.35|탄방동/);
   page.once("dialog", (dialog) => void dialog.dismiss());
   await recents.getByRole("button", { name: "기록 지우기" }).click();
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(6);
   page.once("dialog", (dialog) => void dialog.accept());
   await recents.getByRole("button", { name: "기록 지우기" }).click();
   await expect(rows).toHaveCount(0);

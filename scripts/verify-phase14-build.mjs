@@ -17,6 +17,10 @@ for (const required of [
   "onnuri-food-logo-auth.webp",
   "mode-glass-three-v2.webp",
   "mode-glass-four-v2.webp",
+  "customer-ceramic-search-v1.webp",
+  "customer-ceramic-directory-v1.webp",
+  "customer-ceramic-camera-v1.webp",
+  "customer-ceramic-register-v1.webp",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {

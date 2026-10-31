@@ -198,13 +198,25 @@
   scrollbar-gutter: stable;
 }
 
-/* Inventory has one primary screen; app settings live in its options sheet. */
-.workspace-shell[data-mode="inventory"] { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
-.workspace-shell[data-mode="inventory"] > .workspace-header { flex: none; }
-.workspace-shell[data-mode="inventory"] > .workspace-header,
-.workspace-shell[data-mode="inventory"] > .workspace-content { margin-left: 0; }
-.workspace-shell[data-mode="inventory"] > .workspace-content { flex: 1; min-height: 0; height: auto; scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
-.workspace-shell[data-mode="inventory"] .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+/* Customer and inventory expose actions and settings without a navigation rail. */
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-header { flex: none; }
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-header,
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { margin-left: 0; }
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { flex: 1; min-height: 0; height: auto; scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+
+@media (max-width: 739px) {
+  .workspace-shell[data-mode="customer"] > .workspace-header { padding-bottom: 8px; }
+  /* Keep native scroll affordance and balance classic scrollbar space on both sides. */
+  .workspace-shell[data-mode="customer"] > .workspace-content { scrollbar-gutter: stable both-edges; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .workspace-shell[data-mode="customer"] > .workspace-content[data-scrolling] { scrollbar-color: #90969e transparent; }
+  .workspace-shell[data-mode="customer"] [data-customer-workspace] { padding-top: 4px; padding-inline: max(8px, env(safe-area-inset-left), env(safe-area-inset-right)); }
+}
+
+@media (max-width: 739px) and (forced-colors: active) {
+  .workspace-shell[data-mode="customer"] > .workspace-content { scrollbar-color: auto; }
+}
 
 .shell-page {
   width: min(100%, 86rem);

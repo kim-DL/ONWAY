@@ -63,6 +63,15 @@ test.beforeAll(async () => {
   await batch.commit();
 });
 
+async function openPhotoWorkspace(page: Page) {
+  const heading = page.getByRole("heading", { name: "납품사진", exact: true });
+  const entry = page.getByRole("button", { name: "납품사진", exact: true });
+  // Reload can restore the photo page; entering from home uses the action panel.
+  await expect(heading.or(entry)).toBeVisible();
+  if (!await heading.isVisible()) await entry.click();
+  await expect(heading).toBeVisible();
+}
+
 async function login(page: Page) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
@@ -77,7 +86,7 @@ async function login(page: Page) {
   } else {
     await page.getByRole("group", { name: "업무 모드" }).locator('button[data-mode="customer"]').click();
   }
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+  await openPhotoWorkspace(page);
   await expect(page.getByRole("heading", { name: "납품사진" })).toBeVisible();
 }
 
@@ -346,7 +355,7 @@ test("camera and album uploads stay non-blocking and merge only server-confirmed
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", regular, "additional.jpg");
     await expect(page.getByRole("region", { name: "추가 촬영 납품처" }).getByText("사진 2장")).toBeVisible({ timeout: 30_000 });
     await page.reload();
-    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+    await openPhotoWorkspace(page);
     await expect(page.getByRole("heading", { name: "납품사진" })).toBeVisible();
     await expect(page.getByText("남음 0곳 · 기록완료 3곳")).toBeVisible();
     await page.locator("details").getByText("기록완료 3곳").click();
@@ -438,7 +447,7 @@ test("P0: a reload recovers the same photo and request without waiting for the c
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer);
     await expect.poll(() => requests.length).toBe(1);
     await page.reload();
-    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+    await openPhotoWorkspace(page);
     await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible({ timeout: 30_000 });
     expect(requests[1]).toEqual(requests[0]);
     const photos = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get();
@@ -476,9 +485,9 @@ test("P0: switching workspace during native file copying preserves the photo", a
   const buffer = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#82a4b2" } }).jpeg().toBuffer();
   try {
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer, "slow-copy.jpg");
-    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "거래처", exact: true }).click();
+    await page.getByRole("button", { name: "거래처로 돌아가기", exact: true }).click();
     await expect.poll(async () => (await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get()).size, { timeout: 30_000 }).toBe(1);
-    await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진", exact: true }).click();
+    await openPhotoWorkspace(page);
     await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible();
   } finally { await removePilotPhotos([ids[1]!]); }
 });
@@ -876,7 +885,7 @@ test("another employee photo has no delete action in the viewer DOM", async ({ p
     const snapshots = await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[2]).get();
     expect(snapshots.size).toBe(1);
     await snapshots.docs[0]!.ref.update({ createdByUid: "uid-other-delivery", createdByEmployeeId: "EMP-OTHER-DELIVERY", createdByName: "다른 직원" });
-    await page.reload(); await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+    await page.reload(); await openPhotoWorkspace(page);
     await page.locator("details").getByText(/기록완료/u).click();
     await page.getByRole("button", { name: `${names[2]} 사진 기록` }).click();
     const history = page.getByRole("dialog", { name: `${names[2]} 납품사진`, exact: true });
@@ -950,8 +959,8 @@ test("field route, completion, search, today override and reorder survive re-ent
   await page.keyboard.press("Enter");
   await reorder.getByRole("button", { name: "저장", exact: true }).click();
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "거래처", exact: true }).click();
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+  await page.getByRole("button", { name: "거래처로 돌아가기", exact: true }).click();
+  await openPhotoWorkspace(page);
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
   await expect(page.getByRole("region", { name: "오늘 남은 납품처" }).getByText("대전식품")).toHaveCount(0);
   await page.getByRole("button", { name: "내 납품처 편집" }).click();
@@ -964,7 +973,7 @@ test("field route, completion, search, today override and reorder survive re-ent
     localStorage.setItem("onnuriway:private:recent-customers:v1:uid-delivery:1:1", JSON.stringify(recentIds));
   }, ids);
   await page.reload();
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "납품사진" }).click();
+  await openPhotoWorkspace(page);
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
   await page.getByRole("button", { name: "내 납품처 편집" }).click();
   const recentEditor = page.getByRole("dialog", { name: "내 납품처 편집" });

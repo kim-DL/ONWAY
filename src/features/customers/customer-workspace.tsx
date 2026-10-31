@@ -31,8 +31,9 @@ const CustomerEditor = dynamic(() => import("./customer-editor"), {
   loading: () => <BottomSheet open title="거래처 정보" onClose={() => undefined} dismissible={false}><LoadingStatus label="입력 화면 여는 중" /></BottomSheet>,
 });
 
-export function CustomerWorkspace({ session, requestedCustomerId }: {
+export function CustomerWorkspace({ session, requestedCustomerId, onOpenDeliveryPhotos }: {
   session: AuthenticatedSession; requestedCustomerId: string | null;
+  onOpenDeliveryPhotos?: (() => void) | undefined;
 }) {
   const sessionKey = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`;
   const initialSnapshot = readCustomerWorkspaceSnapshot(sessionKey);
@@ -86,6 +87,7 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
   };
   return <section ref={workspaceRef} className={`shell-page ${styles.workspace}`} aria-labelledby="customer-heading" data-customer-workspace data-search-open={searchOpen || undefined}>
     <CustomerHome greeting={`${session.displayName}님, ${greeting}.`} searchTriggerRef={searchTriggerRef} onOpenSearch={() => setSearchOpen(true)} onOpenDirectory={() => setDirectoryOpen(true)} onRegister={() => setEditing("new")} registerDisabled={catalog.status !== "ready"}
+      onOpenDeliveryPhotos={onOpenDeliveryPhotos}
       searchContent={searchOpen ? <div className={styles.searchPanel}>
         <label className={styles.search}><Icon name="search" size={22} /><input {...searchInputProps} name="customer-query" ref={searchRef} value={query} onChange={(event) => changeQuery(event.target.value)} onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
@@ -102,7 +104,7 @@ export function CustomerWorkspace({ session, requestedCustomerId }: {
             <RecentCustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} />
           </li>)}</ul> : <button type="button" className={styles.recentEmpty} onClick={() => { setSearchOpen(true); searchRef.current?.focus(); }}>
             <span className={styles.recentIcon} aria-hidden="true"><Icon name="clock" size={23} /></span>
-            <span><strong>자주 찾는 거래처로 더 빠르게</strong><span>검색 후 선택한 거래처 5곳이 여기에 모여요.</span></span>
+            <span><strong>자주 찾는 거래처로 더 빠르게</strong><span>검색 후 선택한 거래처 10곳이 여기에 모여요.</span></span>
             <Icon name="chevron-right" size={17} />
           </button>}
         </section>

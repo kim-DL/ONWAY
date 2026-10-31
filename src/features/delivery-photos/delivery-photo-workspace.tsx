@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { searchInputProps } from "@/components/ui/search-input-props";
+import { GlassButton } from "@/components/ui/glass-button";
+import { Icon } from "@/components/ui/icon";
 import { LoadingStatus } from "@/components/ui/loading-status";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
@@ -25,7 +27,7 @@ const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { s
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
 const DeliveryPhotoUploadPanel = dynamic(() => import("./delivery-photo-upload-panel"), { ssr: false });
 
-export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { session: AuthenticatedSession; onOpenCustomerDetail?: (customerId: string) => void }) {
+export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, onBack }: { session: AuthenticatedSession; onOpenCustomerDetail?: (customerId: string) => void; onBack?: () => void }) {
   const data = useDeliveryPhotoData(session);
   const snapshot = data.snapshot;
   const catalog = useDeliveryPhotoCatalog(session, data.clear);
@@ -88,6 +90,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
   };
 
   return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
+    {onBack ? <GlassButton compact variant="quiet" onClick={onBack}><Icon name="arrow-left" />거래처로 돌아가기</GlassButton> : null}
     <header className={styles.header}><h1 id="delivery-photo-heading">납품사진</h1>
       <div className={styles.summary}><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong>
         {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
