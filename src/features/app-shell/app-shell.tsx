@@ -473,7 +473,8 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   } else if (view === "settings") {
     content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : mode === "customer" ? { onBack: closeCustomerPage, backLabel: "거래처로 돌아가기" } : {})} />;
   } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
-    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} onBack={closeCustomerPage} />;
+    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto}
+      backAction={<GlassButton compact variant="quiet" onClick={closeCustomerPage}><Icon name="arrow-left" />거래처로 돌아가기</GlassButton>} />;
   } else if (mode === "customer") {
     content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session}
       requestedCustomerId={customerDetailRequest}

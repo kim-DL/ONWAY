@@ -46,8 +46,8 @@ test("four centered actions fit mobile and desktop without a navigation rail or 
       expect(Math.abs(ib.x + ib.width / 2 - box.x - box.width / 2)).toBeLessThan(1);
       await expect(button).toHaveCSS("text-align", "center");
       expect(await icon.evaluate(async el => {
-        const src = getComputedStyle(el).backgroundImage.slice(5, -2);
-        const image = new Image(); image.src = src; await image.decode(); return image.naturalWidth;
+        const image = el as HTMLImageElement;
+        await image.decode(); return image.naturalWidth;
       })).toBe(192);
     }
     await page.screenshot({ path: `output/customer-ceramic-20261101/${width}-${info.project.name}.png` });
