@@ -2,7 +2,7 @@
 
 import "@/app/workspace.css";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -171,7 +171,12 @@ function DeliveryHome({
   );
 }
 
-function SettingsPage({ session }: { session: AuthenticatedSession }) {
+function SettingsPage({ session, onBack }: { session: AuthenticatedSession; onBack?: () => void }) {
+  const pageRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const scroller = pageRef.current?.closest(".workspace-content");
+    if (scroller) scroller.scrollTop = 0;
+  }, []);
   const { logout } = useAuth();
   const { install, installState, isOnline } = usePwa();
   const { showToast } = useToast();
@@ -224,7 +229,8 @@ function SettingsPage({ session }: { session: AuthenticatedSession }) {
   };
 
   return (
-    <section className="shell-page settings-page" aria-labelledby="settings-title">
+    <section ref={pageRef} className="shell-page settings-page" aria-labelledby="settings-title">
+      {onBack ? <GlassButton compact variant="quiet" onClick={onBack}><Icon name="arrow-left" />재고로 돌아가기</GlassButton> : null}
       <div className="shell-page-heading">
         <p className="shell-kicker">ACCOUNT · DEVICE</p>
         <h1 id="settings-title">설정</h1>
@@ -307,7 +313,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   }, [selectedSchoolId]);
 
   const writeHistory = useCallback((
-    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean },
+    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean },
     replace = false,
   ) => {
     const state = {
@@ -410,7 +416,19 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     setView(nextView);
     setSearchOpen(false);
     setCustomerDetailRequest(null);
-    writeHistory({ mode, view: nextView, school: null, searchOpen: false });
+    writeHistory({ mode, view: nextView, school: null, searchOpen: false,
+      ...(mode === "inventory" && nextView === "settings" ? { inventorySettingsReturn: true } : {}),
+    });
+  };
+
+  const closeInventorySettings = () => {
+    // A restored settings screen may have no preceding inventory history entry.
+    if (window.history.state?.onnuriwayShell?.inventorySettingsReturn === true) {
+      window.history.back();
+    } else {
+      setView("schools");
+      writeHistory({ mode, view: "schools", school: null, searchOpen: false }, true);
+    }
   };
 
   const openCustomerDetailFromPhoto = (customerId: string) => {
@@ -423,14 +441,14 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   if (selectedSchool && isSchoolWorkMode(mode)) {
     content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} />;
   } else if (view === "settings") {
-    content = <SettingsPage session={session} />;
+    content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : {})} />;
   } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
     content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} />;
   } else if (mode === "customer") {
     content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session}
       requestedCustomerId={customerDetailRequest} />;
   } else if (mode === "inventory") {
-    content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} />;
+    content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenAppSettings={() => navigate("settings")} />;
   } else if (view === "activity" && mode === "sales") {
     content = <SalesActivityWorkspace session={session} onSelectSchool={openSchool} onOpenSearch={openSearch} onOpenSchools={() => navigate("schools")} />;
   } else if (mode === "sales") {
@@ -448,7 +466,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         onModeChange={changeMode}
         onDetailBack={selectedSchool ? closeSchool : undefined}
       />
-      <ShellNavigation mode={mode} view={view} onNavigate={navigate} />
+      {mode !== "inventory" ? <ShellNavigation mode={mode} view={view} onNavigate={navigate} /> : null}
       <div className="workspace-content"><InitialWorkspaceTiming startedAt={startedAt}
         navigationKey={JSON.stringify([mode, view, selectedSchoolId ?? null, searchOpen])}>
         {content}

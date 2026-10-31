@@ -198,6 +198,14 @@
   scrollbar-gutter: stable;
 }
 
+/* Inventory has one primary screen; app settings live in its options sheet. */
+.workspace-shell[data-mode="inventory"] { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
+.workspace-shell[data-mode="inventory"] > .workspace-header { flex: none; }
+.workspace-shell[data-mode="inventory"] > .workspace-header,
+.workspace-shell[data-mode="inventory"] > .workspace-content { margin-left: 0; }
+.workspace-shell[data-mode="inventory"] > .workspace-content { flex: 1; min-height: 0; height: auto; scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.workspace-shell[data-mode="inventory"] .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+
 .shell-page {
   width: min(100%, 86rem);
   min-height: 100%;
