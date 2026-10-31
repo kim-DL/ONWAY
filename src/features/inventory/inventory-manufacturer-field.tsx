@@ -1,15 +1,17 @@
 "use client";
 
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import type { InventoryProduct, SaveInventoryProductInput } from "@/domain/inventory";
 import { useAuth } from "@/features/auth/auth-context";
+import { inventoryManufacturerRepository } from "./inventory-manufacturer-repository";
 import formStyles from "./inventory-form.module.css";
 
-const InventoryManufacturerPicker = lazy(() => import("./inventory-manufacturer-picker")
-  .then((module) => ({ default: module.InventoryManufacturerPicker })));
+const loadInventoryManufacturerPicker = () => import("./inventory-manufacturer-picker")
+  .then((module) => ({ default: module.InventoryManufacturerPicker }));
+const InventoryManufacturerPicker = lazy(loadInventoryManufacturerPicker);
 
 export function InventoryManufacturerField({ name, manufacturerId, productId, allowCreate, canAdmin = false, disabled, onSelect, onClear }: {
   name: string;
@@ -25,7 +27,12 @@ export function InventoryManufacturerField({ name, manufacturerId, productId, al
   const sessionNamespace = auth.state.status === "authenticated"
     ? `${auth.state.session.uid}:${auth.state.session.claims.sessionVersion}:${auth.state.session.claims.permissionsVersion}` : "signed-out";
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (sessionNamespace === "signed-out" || !navigator.onLine) return;
+    void loadInventoryManufacturerPicker().catch(() => undefined);
+    void inventoryManufacturerRepository.list(sessionNamespace).catch(() => undefined);
+  }, [sessionNamespace]);
   return <><GlassButton className={formStyles.select} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(true)}><span>{name || "제조사 선택하기"}</span><Icon name="chevron-right" size={16} /></GlassButton>
-    {open ? <Suspense fallback={<BottomSheet open title="제조사 선택" onClose={() => setOpen(false)}><p role="status">선택 목록 여는 중</p></BottomSheet>}><InventoryManufacturerPicker current={{ name, ...(manufacturerId ? { manufacturerId } : {}) }} {...(productId ? { productId } : {})} sessionNamespace={sessionNamespace} allowCreate={allowCreate} canAdmin={canAdmin} onSelect={(manufacturer, saveProduct) => { onSelect(manufacturer, saveProduct); setOpen(false); }} onClear={(saveProduct) => { onClear(saveProduct); setOpen(false); }} onClose={() => setOpen(false)} /></Suspense> : null}
+    {open ? <Suspense fallback={<BottomSheet open title="제조사 선택" onClose={() => setOpen(false)}><p role="status">선택 목록 여는 중</p></BottomSheet>}><InventoryManufacturerPicker key={sessionNamespace} current={{ name, ...(manufacturerId ? { manufacturerId } : {}) }} {...(productId ? { productId } : {})} sessionNamespace={sessionNamespace} allowCreate={allowCreate} canAdmin={canAdmin} onSelect={(manufacturer, saveProduct) => { onSelect(manufacturer, saveProduct); setOpen(false); }} onClear={(saveProduct) => { onClear(saveProduct); setOpen(false); }} onClose={() => setOpen(false)} /></Suspense> : null}
   </>;
 }

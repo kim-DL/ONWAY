@@ -486,6 +486,69 @@ test("360px list options keep readable row toggles and a persistent count-mode s
   expect(consoleIssues).toEqual([]);
 });
 
+test("manufacturer picker preloads once and keeps cached choices usable during slow and failed refreshes", async ({ page }, info) => {
+  // Install before the coordinator captures Date.now, then advance only wall time.
+  await page.clock.setFixedTime(new Date());
+  const token = await login(page, PHASE3_TEST_PINS.delivery);
+  const name = `캐시 검증 제조사 ${randomUUID().slice(0, 8)}`;
+  expect((await call("createInventoryManufacturer", token, { requestId: randomUUID(), name })).status).toBe(200);
+  let listRequests = 0;
+  page.on("request", (request) => { if (new URL(request.url()).pathname.endsWith("/listInventoryManufacturers")) listRequests += 1; });
+  const preloaded = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/listInventoryManufacturers"));
+  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
+  expect((await preloaded).ok()).toBe(true);
+  await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
+  await expect(picker.getByRole("option", { name, exact: true })).toBeVisible();
+  await picker.getByRole("button", { name: "닫기", exact: true }).click();
+  await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
+  await expect(picker.getByRole("option", { name, exact: true })).toBeVisible();
+  expect(listRequests).toBe(1);
+  await picker.getByRole("button", { name: "닫기", exact: true }).click();
+
+  await page.clock.setFixedTime(new Date(Date.now() + 61_000));
+  let releaseRefresh!: () => void;
+  const refreshGate = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+  let refreshPending = false;
+  await page.route("**/listInventoryManufacturers", async (route) => {
+    if (route.request().method() !== "POST") { await route.continue(); return; }
+    refreshPending = true;
+    await refreshGate;
+    await route.continue();
+  });
+  const refreshed = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/listInventoryManufacturers"));
+  try {
+    await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
+    await expect.poll(() => refreshPending).toBe(true);
+    await expect(picker.getByRole("status").filter({ hasText: "최신 제조사 목록 확인 중" })).toBeVisible();
+    await expect(picker.getByRole("option", { name, exact: true })).toBeVisible();
+    await capture(page, info, "manufacturer-cached-during-refresh");
+    await picker.getByRole("combobox", { name: "제조사 검색", exact: true }).fill(name);
+    await picker.getByRole("option", { name, exact: true }).click();
+    await expect(editor.getByRole("button", { name, exact: true })).toBeVisible();
+    expect(listRequests).toBe(2);
+  } finally { releaseRefresh(); }
+  expect((await refreshed).ok()).toBe(true);
+  await page.unroute("**/listInventoryManufacturers");
+
+  await page.clock.setFixedTime(new Date(Date.now() + 122_000));
+  await page.route("**/listInventoryManufacturers", async (route) => {
+    if (route.request().method() !== "POST") { await route.continue(); return; }
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { status: "UNAVAILABLE", message: "Emulator-only cache refresh failure" } }) });
+  });
+  await editor.getByRole("button", { name, exact: true }).click();
+  await expect(picker.getByRole("alert")).toContainText("기존 목록을 표시");
+  await expect(picker.getByRole("option", { name, exact: true })).toBeVisible();
+  await capture(page, info, "manufacturer-cached-after-refresh-failure");
+  await page.unroute("**/listInventoryManufacturers");
+  await picker.getByRole("button", { name: "다시 시도", exact: true }).click();
+  await expect(picker.getByRole("alert")).toHaveCount(0);
+  await expect(picker.getByText("최신 제조사 목록 확인 중", { exact: true })).toHaveCount(0);
+  await expect(picker.getByRole("option", { name, exact: true })).toBeVisible();
+  expect(listRequests).toBe(4);
+});
+
 test("admin manages manufacturers through the real callable without changing the current draft", async ({ page }) => {
   const token = await loginAdmin(page);
   await page.setViewportSize({ width: 360, height: 800 });
@@ -656,11 +719,11 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   let listOptions = await openListOptions(page);
   await expect(listOptions.getByRole("switch", { name: "재고조사 모드", exact: true })).not.toBeChecked();
   await closeListOptions(listOptions);
+  let manufacturerListRequests = 0;
+  page.on("request", (request) => { if (new URL(request.url()).pathname.endsWith("/listInventoryManufacturers")) manufacturerListRequests += 1; });
   await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(productName);
-  let manufacturerListRequests = 0;
-  page.on("request", (request) => { if (new URL(request.url()).pathname.endsWith("/listInventoryManufacturers")) manufacturerListRequests += 1; });
   await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
   let manufacturerPicker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
   const manufacturerSearch = manufacturerPicker.getByRole("combobox", { name: "제조사 검색", exact: true });

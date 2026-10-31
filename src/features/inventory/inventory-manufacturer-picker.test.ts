@@ -5,7 +5,7 @@ import { readRecentInventoryManufacturers } from "./inventory-manufacturer-sessi
 
 const harness = vi.hoisted(() => ({
   states: [] as unknown[], refs: [] as Array<{ current: unknown }>, stateCursor: 0, refCursor: 0,
-  effects: [] as Array<() => void | (() => void)>, list: vi.fn(), reference: vi.fn(), create: vi.fn(), update: vi.fn(), saveProduct: vi.fn(), selected: vi.fn(), cleared: vi.fn(), closed: vi.fn(),
+  effects: [] as Array<() => void | (() => void)>, cached: vi.fn(), list: vi.fn(), reference: vi.fn(), create: vi.fn(), update: vi.fn(), saveProduct: vi.fn(), selected: vi.fn(), cleared: vi.fn(), closed: vi.fn(),
 }));
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(),
   useState: (initial: unknown) => { const index = harness.stateCursor++; if (!(index in harness.states)) harness.states[index] = typeof initial === "function" ? (initial as () => unknown)() : initial; return [harness.states[index], (next: unknown) => { harness.states[index] = typeof next === "function" ? (next as (old: unknown) => unknown)(harness.states[index]) : next; }]; },
@@ -13,7 +13,7 @@ vi.mock("react", async (original) => ({ ...await original<typeof import("react")
   useEffect: (effect: () => void | (() => void)) => { harness.effects.push(effect); }, useMemo: (factory: () => unknown) => factory(), useId: () => "manufacturer-picker-test",
 }));
 vi.mock("client-only", () => ({}));
-vi.mock("./inventory-manufacturer-repository", () => ({ inventoryManufacturerRepository: { list: harness.list, reference: harness.reference, create: harness.create, update: harness.update, saveProduct: harness.saveProduct } }));
+vi.mock("./inventory-manufacturer-repository", () => ({ inventoryManufacturerRepository: { cached: harness.cached, list: harness.list, reference: harness.reference, create: harness.create, update: harness.update, saveProduct: harness.saveProduct } }));
 import { InventoryManufacturerPicker, filterInventoryManufacturers, inventoryManufacturerCandidates } from "./inventory-manufacturer-picker";
 
 const manufacturers = [
@@ -56,6 +56,7 @@ function submitRename(tree: ReactNode) {
 }
 beforeEach(() => {
   harness.states = []; harness.refs = []; harness.effects = [];
+  harness.cached.mockReset().mockReturnValue(null);
   harness.list.mockReset().mockResolvedValue(manufacturers); harness.create.mockReset(); harness.update.mockReset();
   harness.reference.mockReset();
   harness.saveProduct.mockReset();
@@ -66,6 +67,46 @@ beforeEach(() => {
 afterEach(() => { clearInventoryWorkspaceSnapshot(); vi.unstubAllGlobals(); });
 
 describe("inventory manufacturer picker", () => {
+  it("shows cached active options on the first render while the refresh is still pending", async () => {
+    harness.cached.mockReturnValue(manufacturers);
+    harness.list.mockReturnValue(new Promise(() => undefined));
+    const tree = await load();
+    expect(findAll(tree, (_type, item) => item.role === "option").map(textOf)).toEqual(["제조사 없음", "사옹원", "CJ 제일제당"]);
+    expect(textOf(tree)).not.toContain("제조사 목록 불러오는 중");
+    expect(textOf(tree)).toContain("최신 제조사 목록 확인 중");
+    expect(harness.cached).toHaveBeenCalledWith("session-a");
+    expect(harness.list).toHaveBeenCalledWith("session-a", { force: false });
+    clickText(tree, "사옹원");
+    expect(harness.selected).toHaveBeenCalledWith(manufacturers[0], harness.saveProduct);
+  });
+
+  it("keeps cached choices and search usable after a refresh fails and offers a forced retry", async () => {
+    harness.cached.mockReturnValue(manufacturers);
+    harness.list.mockRejectedValueOnce(new Error("offline"));
+    let tree = await load();
+    expect(textOf(tree)).toContain("기존 목록");
+    expect(findAll(tree, (_type, item) => item.role === "option").map(textOf)).toContain("사옹원");
+    clickText(tree, "다시 시도"); tree = render();
+    harness.effects[0]!(); await settle();
+    expect(harness.list).toHaveBeenLastCalledWith("session-a", { force: true });
+  });
+
+  it("treats a cached empty list as ready and still offers explicit none during refresh", async () => {
+    harness.cached.mockReturnValue([]);
+    harness.list.mockReturnValue(new Promise(() => undefined));
+    const tree = await load();
+    expect(findAll(tree, (_type, item) => item.role === "option").map(textOf)).toEqual(["제조사 없음"]);
+    expect(textOf(tree)).toContain("새 제조사 추가");
+    expect(textOf(tree)).not.toContain("제조사 목록 불러오는 중");
+  });
+
+  it("does not hold back the list for a slow existing-product reference read", async () => {
+    harness.reference.mockReturnValue(new Promise(() => undefined));
+    const tree = await load({ productId: "product-1" });
+    expect(findAll(tree, (_type, item) => item.role === "option").map(textOf)).toContain("사옹원");
+    expect(textOf(tree)).not.toContain("제조사 목록 불러오는 중");
+  });
+
   it("filters the loaded active list locally without another network request or opening the keyboard", async () => {
     let tree = await load();
     expect(textOf(tree)).toContain("새 제조사 추가");

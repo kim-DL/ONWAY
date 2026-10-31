@@ -10,6 +10,7 @@ import {
 } from "@/domain/inventory-manufacturer";
 import { readRecentInventoryManufacturers, rememberInventoryManufacturer } from "./inventory-manufacturer-session";
 import { inventoryManufacturerRepository } from "./inventory-manufacturer-repository";
+import { isInventoryAccessFailure } from "./inventory-access-boundary";
 import type { InventoryProduct, SaveInventoryProductInput } from "@/domain/inventory";
 import styles from "./inventory-manufacturer-picker.module.css";
 
@@ -61,9 +62,11 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const request = useRef({ signature: "", id: "" });
   const updateRequest = useRef({ signature: "", id: "" });
-  const [manufacturers, setManufacturers] = useState<InventoryManufacturer[]>([]);
+  const [manufacturers, setManufacturers] = useState<InventoryManufacturer[]>(() => inventoryManufacturerRepository.cached(sessionNamespace)?.filter((item) => item.active) ?? []);
+  const [hasList, setHasList] = useState(() => inventoryManufacturerRepository.cached(sessionNamespace) !== null);
   const [resolvedCurrent, setResolvedCurrent] = useState(current);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasList);
+  const [checking, setChecking] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
@@ -79,16 +82,24 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
 
   useEffect(() => {
     let alive = true;
-    void Promise.all([inventoryManufacturerRepository.list(), productId ? inventoryManufacturerRepository.reference(productId) : Promise.resolve(null)]).then(([items, detail]) => {
+    void inventoryManufacturerRepository.list(sessionNamespace, { force: attempt > 0 }).then((items) => {
       if (alive) {
         setManufacturers(items.filter((item) => item.active));
-        if (detail) setResolvedCurrent({ name: detail.product.manufacturer,
-          ...(detail.product.manufacturerId ? { manufacturerId: detail.product.manufacturerId } : {}) });
+        setHasList(true);
       }
-    }).catch(() => { if (alive) setLoadError("제조사 목록을 불러오지 못했어요. 연결을 확인하고 다시 시도해주세요."); })
-      .finally(() => { if (alive) setLoading(false); });
+    }).catch((error: unknown) => {
+      if (!alive) return;
+      if (isInventoryAccessFailure(error)) { setManufacturers([]); setHasList(false); }
+      setLoadError(inventoryManufacturerRepository.cached(sessionNamespace) !== null
+        ? "최신 제조사 목록을 확인하지 못했어요. 기존 목록을 표시하고 있어요. 연결을 확인하고 다시 시도해주세요."
+        : "제조사 목록을 불러오지 못했어요. 연결을 확인하고 다시 시도해주세요.");
+    }).finally(() => { if (alive) { setLoading(false); setChecking(false); } });
+    if (productId) void inventoryManufacturerRepository.reference(productId).then((detail) => {
+      if (alive) setResolvedCurrent({ name: detail.product.manufacturer,
+        ...(detail.product.manufacturerId ? { manufacturerId: detail.product.manufacturerId } : {}) });
+    }).catch(() => { if (alive) setLoadError("현재 품목의 제조사 연결을 확인하지 못했어요. 연결을 확인하고 다시 시도해주세요."); });
     return () => { alive = false; };
-  }, [attempt, productId]);
+  }, [attempt, productId, sessionNamespace]);
 
   useEffect(() => {
     const target = mode === "add" ? addInput : management?.mode === "rename" ? renameInput : null;
@@ -122,7 +133,7 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
     setManagement(null); setManagementError("");
   }
   async function refreshActiveManufacturers() {
-    const items = (await inventoryManufacturerRepository.list()).filter((item) => item.active);
+    const items = (await inventoryManufacturerRepository.list(sessionNamespace, { force: true })).filter((item) => item.active);
     setManufacturers(items);
     return items;
   }
@@ -196,8 +207,9 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
       {mode === "select" ? <>
         {pickerFeedback ? <p className={pickerFeedback.tone === "error" ? styles.error : styles.success} role={pickerFeedback.tone === "error" ? "alert" : "status"}>{pickerFeedback.message}</p> : null}
         {loading ? <p className={styles.status} role="status">제조사 목록 불러오는 중</p> : null}
-        {loadError ? <div className={styles.section} role="alert"><p className={styles.error}>{loadError}</p><GlassButton onClick={() => { setLoading(true); setLoadError(""); setAttempt((value) => value + 1); }}>다시 시도</GlassButton></div> : null}
-        {!loading && !loadError ? <>
+        {!loading && checking ? <p className={styles.status} role="status">최신 제조사 목록 확인 중</p> : null}
+        {loadError ? <div className={styles.section} role="alert"><p className={styles.error}>{loadError}</p><GlassButton onClick={() => { setLoading(!hasList); setChecking(true); setLoadError(""); setAttempt((value) => value + 1); }}>다시 시도</GlassButton></div> : null}
+        {hasList ? <>
           {currentIsMissing ? <p className={styles.current}><strong>현재 제조사 · {resolvedCurrent.name || "이름 없음"}</strong>비활성 또는 현재 선택 목록에 없는 연결을 유지하고 있어요.</p> : null}
           {recent.length ? <section className={styles.section} aria-labelledby={`${listId}-recent`}><h3 id={`${listId}-recent`}>최근 사용</h3><div className={styles.recent}>{recent.map((item) => <button key={item.manufacturerId} type="button" aria-pressed={resolvedCurrent.manufacturerId === item.manufacturerId} onClick={() => choose(item)}>{item.name}</button>)}</div></section> : null}
           <label className={styles.field}>제조사 검색<input {...searchInputProps} value={query} role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls={listId} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); optionRefs.current[0]?.focus({ preventScroll: true }); } }} /></label>

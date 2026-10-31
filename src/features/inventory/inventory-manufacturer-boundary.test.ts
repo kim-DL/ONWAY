@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("inventory manufacturer lazy boundary", () => {
-  it("keeps the full picker behind an interaction-only dynamic import", () => {
+  it("keeps the picker deferred from the workspace while allowing preload from the open editor", () => {
     const formSource = readFileSync(new URL("./inventory-forms.tsx", import.meta.url), "utf8");
     const productSource = readFileSync(new URL("./inventory-product-editor.tsx", import.meta.url), "utf8");
     const fieldSource = readFileSync(new URL("./inventory-manufacturer-field.tsx", import.meta.url), "utf8");
@@ -11,8 +11,8 @@ describe("inventory manufacturer lazy boundary", () => {
     expect(loaderSource).toContain('import("./inventory-product-editor")');
     expect(formSource).not.toMatch(/import\s+\{[^}]*InventoryManufacturerPicker[^}]*\}\s+from/u);
     expect(productSource).toContain('lazy(() => import("./inventory-manufacturer-field")');
-    expect(fieldSource).toContain('lazy(() => import("./inventory-manufacturer-picker")');
-    expect(fieldSource.indexOf("setOpen(true)")).toBeGreaterThan(fieldSource.indexOf("lazy(() => import"));
+    expect(fieldSource).toContain('() => import("./inventory-manufacturer-picker")');
+    expect(fieldSource).toContain("lazy(loadInventoryManufacturerPicker)");
   });
 
   it("keeps manufacturer controls touch-safe and width-bounded on a 360px sheet", () => {
