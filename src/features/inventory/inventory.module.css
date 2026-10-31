@@ -69,7 +69,7 @@
 .loadMore { justify-self: center; scroll-margin-block-end: calc(var(--inventory-action-inset) + 90px); }
 .productButton { composes: row from "../../components/ui/field-list.module.css?inventory"; display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 8px 4px; font: inherit; text-align: left; cursor: pointer; }
 .sheet { color: #191f28; display: grid; gap: 12px; padding: 2px 0 6px; }
-.appSettings { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 14px 4px; margin-top: 4px; border: 0; border-top: 1px solid #d8e1e8; background: transparent; color: #243348; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.appSettings { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 14px 4px; border: 0; border-top: 1px solid #d8e1e8; background: transparent; color: #243348; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .appSettings > svg:last-child { margin-left: auto; }
 .sheet :global(.glass-button) { min-height: 44px; }
 .sheet :global(.glass-button--glass) { background: #e8eef5; border-color: #cbd8e5; color: #304d6b; }
