@@ -194,7 +194,8 @@ test("mobile network handoff preserves the current customer and explicit logout 
   await context.setOffline(false);
   await expect(page.getByRole("dialog", { name: "강은유통" })).toBeVisible();
   await page.goBack();
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await chooseMode(page, "delivery");
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "설정", exact: true }).click();
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await page.getByRole("dialog", { name: "로그아웃할까요?" }).getByRole("button", { name: "로그아웃", exact: true }).click();
   await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
