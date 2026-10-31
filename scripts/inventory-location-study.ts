@@ -1,6 +1,7 @@
 // Local design study only. These styles are never imported by the application.
 const group = 'html[data-location-style] [role="group"][aria-label="보관 장소"]';
 export const inventoryLocationStudyCss = `
+${group} > span, ${group} button i{display:none}
 ${group}{padding:0;border:0;border-radius:0;background:transparent;gap:4px}
 ${group} button{position:relative;isolation:isolate;min-height:48px;padding:8px 1px;border:0;border-radius:8px;background:transparent;color:#59636f;box-shadow:none;transition:color 140ms ease}
 ${group} button:active{transform:none;box-shadow:none}
@@ -16,7 +17,7 @@ html[data-location-style^="motion-"] [aria-label="보관 장소"]:has(button:nth
 html[data-location-style^="motion-"] [aria-label="보관 장소"]:has(button:nth-child(4)[aria-pressed="true"]){--selected:3}
 html[data-location-style^="motion-"] [aria-label="보관 장소"]:has(button:nth-child(5)[aria-pressed="true"]){--selected:4}
 html[data-location-style^="motion-"] [aria-label="보관 장소"]::after{content:"";position:absolute;bottom:4px;left:calc(var(--selected) * (100% + 4px) / 5 + (100% - 16px) / 10 - 15px);width:30px;height:2px;border-radius:2px;background:#3d586f;pointer-events:none;transition:left 200ms cubic-bezier(.2,.8,.2,1)}
-html[data-location-style="motion-all"] [aria-label="보관 장소"] button:not(:last-child)::after,
+html[data-location-style="motion-all"] [aria-label="보관 장소"] button:not(:nth-child(5))::after,
 html[data-location-style="motion-first"] [aria-label="보관 장소"] button:first-child::after{content:"";position:absolute;right:-2.5px;top:18px;width:1px;height:12px;background:#65717d2b;pointer-events:none}
 @media(prefers-reduced-motion:reduce){html[data-location-style^="motion-"] [aria-label="보관 장소"]::after{transition:none}${group} button{transition:none}}
 `;

@@ -44,7 +44,7 @@ test("location underline follows the final selection and respects reduced motion
   const locations = page.getByRole("group", { name: "보관 장소" });
   const indicator = () => locations.evaluate(el => {
     const selected = el.querySelector('[aria-pressed="true"]')!.getBoundingClientRect();
-    const line = getComputedStyle(el, "::after");
+    const line = getComputedStyle(el.querySelector("span")!);
     return { center: el.getBoundingClientRect().left + parseFloat(line.left) + 15,
       selectedCenter: selected.left + selected.width / 2, transition: line.transitionProperty };
   });

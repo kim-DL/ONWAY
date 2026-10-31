@@ -4,17 +4,9 @@
 .workspace[data-admin] { --inventory-action-inset: 100px; }
 .row, .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .muted { color: var(--shell-soft-ink, #4e5968); font-size: 13px; line-height: 1.65; margin: 4px 0 0; }
-.locations { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; --selected: 0; }
-.locations button { position: relative; min-width: 0; min-height: 48px; padding: 8px 1px; border: 0; border-radius: 8px; background: transparent; color: #59636f; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: color 140ms ease; }
-.locations button[aria-pressed="true"] { color: #25364a; font-weight: 700; }
-.locations button:not(:last-child)::after { content: ""; position: absolute; right: -2.5px; top: 18px; width: 1px; height: 12px; background: #65717d2b; pointer-events: none; }
-.locations:has(button:nth-child(2)[aria-pressed="true"]) { --selected: 1; }
-.locations:has(button:nth-child(3)[aria-pressed="true"]) { --selected: 2; }
-.locations:has(button:nth-child(4)[aria-pressed="true"]) { --selected: 3; }
-.locations:has(button:nth-child(5)[aria-pressed="true"]) { --selected: 4; }
-.locations::after { content: ""; position: absolute; bottom: 4px; left: calc(var(--selected) * (100% + 4px) / 5 + (100% - 16px) / 10 - 15px); width: 30px; height: 2px; border-radius: 2px; background: #3d586f; pointer-events: none; transition: left 200ms cubic-bezier(.2,.8,.2,1); }
-@media (prefers-reduced-motion: reduce) { .locations::after { transition: none; } }
-@media (forced-colors: active) { .locations button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -3px; } .locations::after { background: Highlight; } }
+.indicator { background: #3d586f; transition: left 200ms cubic-bezier(.2,.8,.2,1); }
+
+
 :is(.workspace, .sheet) :is(button, input, select, textarea):focus-visible { outline: 3px solid #3182f6; outline-offset: 3px; }
 .progressCard { display: grid; gap: 6px; padding: 9px 11px; border: 1px solid #e9cf9d; border-radius: 7px; background: #fffaf0; }
 .progressCard > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
@@ -183,5 +175,5 @@
 @media (max-width: 480px) { .sheet .row { flex-wrap: wrap; } }
 @media (min-width: 900px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 359px) { .productButton { gap: 6px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 18px; } .filters { gap: 6px; } }
-@media (prefers-reduced-motion: reduce) { .locations button, .optionToggle, .countToggleControl > span { transition: none; } }
-@media (forced-colors: active) { .countIndicator { border-color: CanvasText; } .countIndicator[data-state="done"], .countIndicator[data-state="changed"] { border-color: Highlight; color: HighlightText; background: Highlight; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }
+@media (prefers-reduced-motion: reduce) { .indicator, .optionToggle, .countToggleControl > span { transition: none; } }
+@media (forced-colors: active) { .tabs [aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -3px; } .indicator { background: Highlight; } .countIndicator { border-color: CanvasText; } .countIndicator[data-state="done"], .countIndicator[data-state="changed"] { border-color: Highlight; color: HighlightText; background: Highlight; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }
