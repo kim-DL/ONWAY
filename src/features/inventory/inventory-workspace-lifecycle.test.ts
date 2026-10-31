@@ -81,14 +81,14 @@ describe("inventory in-memory draft lifecycle", () => {
     const editor = find(render(), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
     (editor.onSaved as (product: InventoryProduct) => void)(product);
     expect(find(render(), (type) => typeof type === "function" && type.name === "InventoryDetail")).not.toBeNull();
-    (find(render(), (type, props) => type === "button" && props.children === "냉동1")!.onClick as () => void)();
+    (find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")!.onClick as () => void)();
     (searchField().onChange as (event: { target: { value: string } }) => void)({ target: { value: "private query" } });
     (find(render(), (_type, props) => props["aria-label"] === "새 품목 등록")!.onClick as () => void)();
     reportInventoryAccessFailure(cause, session.uid);
     expect(hasEditor(render())).toBe(false);
     expectNoPrivateSurfaces();
     expect(searchField().value).toBe("");
-    expect(find(render(), (type, props) => type === "button" && props.children === "전체")?.["aria-pressed"]).toBe(true);
+    expect(find(render(), (type, props) => type === "button" && textContent(props.children) === "전체")?.["aria-pressed"]).toBe(true);
     windowEvents.get("focus")!(); await settle(); expect(harness.list).toHaveBeenCalledOnce();
     cleanup();
   });
@@ -296,7 +296,7 @@ describe("inventory in-memory draft lifecycle", () => {
     render();
     expect(catalog()?.products).toEqual([saved]);
     expect(searchField().value).toBe("최신");
-    expect(find(render(), (type, props) => type === "button" && props.children === "냉동1")?.["aria-pressed"]).toBe(true);
+    expect(find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")?.["aria-pressed"]).toBe(true);
     for (const label of ["임박 상품만 보기", "비활성 품목 보기"]) {
       const option = find(render(), (type, props) => type === "label" && textContent(props.children).includes(label))!;
       expect(find(option.children, (type) => type === "input")?.checked).toBe(true);
@@ -345,14 +345,14 @@ describe("inventory in-memory draft lifecycle", () => {
     harness.list.mockResolvedValue([product]);
     const catalogCleanup = await openEditor();
     (searchField().onChange as (event: { target: { value: string } }) => void)({ target: { value: "calendar draft" } });
-    (find(render(), (type, props) => type === "button" && props.children === "냉동1")!.onClick as () => void)();
+    (find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")!.onClick as () => void)();
     expect(card(product.productId)?.product).toEqual(product);
     render(); const calendarCleanup = harness.effects[1]!() as () => void;
     harness.context.mockRejectedValueOnce({ code: "functions/permission-denied" });
     await vi.advanceTimersByTimeAsync(1_250);
     expectNoPrivateSurfaces();
     expect(searchField().value).toBe("calendar draft");
-    expect(find(render(), (type, props) => type === "button" && props.children === "냉동1")?.["aria-pressed"]).toBe(true);
+    expect(find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")?.["aria-pressed"]).toBe(true);
     expect(find(render(), (_type, props) => props.role === "alert")).not.toBeNull();
     expect(harness.list).toHaveBeenCalledOnce();
     calendarCleanup(); catalogCleanup(); expect(vi.getTimerCount()).toBe(0);
