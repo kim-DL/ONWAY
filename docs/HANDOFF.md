@@ -5,14 +5,14 @@
 ## 현재 상태
 
 - 프런트엔드: Next.js 정적 내보내기 → Firebase Hosting. 운영 주소는 [onnuriway.com](https://onnuriway.com), [onnuriway.web.app](https://onnuriway.web.app)이다.
-- 마지막 확인된 운영 배포: **2026-10-31 19:30 KST**, 제품 소스 `62a1245`, Hosting version `9c55e93a21e26f39`. 모바일 유리 버튼의 좌하단 모서리·반사 개선 반영. presentation CI·두 주소 공개 검사·로그인 운영 화면의 업데이트 및 새 에셋 캐시 확인 완료. [배포·복구 기록](releases/2026-10-31-glass-mobile-corners.md)
+- 마지막 확인된 운영 배포: **2026-10-31 21:20 KST**, 제품 소스 `e28adca`, Hosting version `10ce0ed273e639ad`. 재고 하단 탐색 제거·목록 옵션의 앱 설정·조회 전용 접근 반영. 사용자 요청으로 전체 CI는 생략하고 관련 로컬 검사와 운영 build/PWA/성능/Hosting 검사, 두 주소·로그인 운영 동선을 확인했다. [배포·복구 기록](releases/2026-10-31-inventory-settings.md)
 - main에 범위별 검사 규칙과 문서 정리, 유리 버튼 개선이 반영됐다. 제품 source와 후속 결과 문서 커밋은 구분한다. Git의 최신 HEAD는 명령으로 확인한다.
 - 로딩·로그인·유리 모드 버튼과 시작 경로 최적화는 운영 반영됐다. 모드 표기는 `거래처 · 학교 · 영업 · 재고`, 버튼은 권한에 따라 표시한다. [UI 결정](glass-mode-navigation-20261030.md) · [최적화 결과](app-optimization-20261030.md)
 - Android 설치형 PWA의 밝은 화면과 짙은 테마 설정 불일치를 수정했다. **실제 시스템 버튼의 대비 개선은 아직 미확인**이다. [조사와 검증 경계](android-system-bar-20261031.md)
 
 ## 로컬 작업
 
-- `codex/inventory-settings-menu`: 재고 하단 탐색을 제거하고 목록 옵션에 앱 설정을 연결했다. 조회 전용 접근·설정 복귀·모바일 화면 관련 검증 완료, main 병합·운영 배포 전. 현재 운영 유리 버튼을 유지하며 추가 소재 실험은 채택하지 않는다. [변경·검증](inventory-settings-navigation-20261031.md)
+- 재고 탐색 개선은 main 병합·운영 반영 완료. 현재 운영 유리 버튼을 유지하며 추가 소재 실험은 채택하지 않았다. [변경·검증](inventory-settings-navigation-20261031.md)
 - 유리 버튼 소재·표면 반사와 추가 모바일 모서리 개선이 운영 반영됐다. 해당 작업의 미커밋 제품 변경은 없다. [소재 연구·선택](glass-material-depth-20261031.md) · [모서리 변경·검증 경계](glass-mobile-corners-20261031.md)
 - 재고 제조사 선택창의 사전 준비·인증 세션 메모리 캐시·60초 재조회 생략이 운영 반영됐다. 실제 운영 탭에서 연속 두 번 열어 목록 조회 총 1회, 저장 요청 0회를 확인했다. 해당 작업의 미커밋 제품 변경은 없다. [원인·캐시 계약·검증 경계](inventory-manufacturer-cache-20261031.md)
 

@@ -1,6 +1,6 @@
 # 재고 목록 옵션과 앱 설정
 
-2026-10-31 · 로컬 구현 완료 · 브랜치 `codex/inventory-settings-menu`
+2026-10-31 · 운영 반영 완료 · 제품 소스 `e28adca`
 
 ## 변경
 
@@ -24,4 +24,4 @@
 
 - 로컬 데모: `http://127.0.0.1:4336/` (실행 중인 이 PC에서만 접근, 직원 권한과 화면 폭 선택).
 - 로컬 화면: `output/inventory-settings-20261031/`의 writer/readonly list·options·settings PNG.
-- 운영 데이터·API·인증 정책 변경 없음. main 병합·CI·운영 빌드·Hosting 배포는 하지 않았다. 릴리스 시 범위별 검사 규칙과 누적 기준 검증을 적용한다.
+- 운영 데이터·API·인증 정책 변경 없음. main 병합·Hosting 배포 완료. 사용자 요청에 따라 이번 전체 CI를 생략했으며, 기존 관련 검사와 운영 빌드 검사를 사용했다. [릴리스 기록](releases/2026-10-31-inventory-settings.md)
