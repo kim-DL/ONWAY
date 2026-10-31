@@ -31,15 +31,17 @@ test("four centered actions fit mobile and desktop without a navigation rail or 
     const buttons = page.getByRole("group", { name: "거래처 빠른 메뉴" }).getByRole("button");
     if (width < 740) {
       const panel = (await page.getByRole("group", { name: "거래처 빠른 메뉴" }).boundingBox())!;
-      expect(panel.x).toBeGreaterThanOrEqual(8);
-      expect(panel.x).toBeLessThanOrEqual(18);
-      expect(width - panel.x - panel.width).toBeCloseTo(panel.x, 1);
+      expect(panel.x).toBeGreaterThan(12);
+      expect(panel.width).toBeLessThanOrEqual(288);
+      const gutter = await page.locator(".workspace-content").evaluate(el => el.getBoundingClientRect().width - el.clientWidth);
+      expect(width - panel.x - panel.width - gutter).toBeCloseTo(panel.x, 1);
     }
     await expect(buttons).toHaveCount(4);
-    await expect(buttons).toHaveText(["거래처 이름으로 찾기", "거래처 전체보기", "납품사진", "거래처 등록"]);
+    await expect(buttons).toHaveText(["이름으로 찾기", "전체보기", "납품사진", "거래처 등록"]);
     for (const button of await buttons.all()) {
       const box = (await button.boundingBox())!;
-      expect(box.height).toBeGreaterThanOrEqual(120);
+      expect(box.height).toBeGreaterThanOrEqual(112);
+      expect(box.height).toBeLessThanOrEqual(114);
       const icon = button.locator("[data-icon]");
       const ib = (await icon.boundingBox())!;
       expect(ib.width).toBe(await icon.getAttribute("data-icon") === "camera" ? 56 : 48);
@@ -58,13 +60,13 @@ test("four centered actions fit mobile and desktop without a navigation rail or 
 
 test("search, directory and registration still open their real UI", async ({ page }) => {
   await open(page);
-  const search = page.getByRole("button", { name: "거래처 이름으로 찾기", exact: true });
+  const search = page.getByRole("button", { name: "이름으로 찾기", exact: true });
   await search.focus(); await page.keyboard.press("Enter");
   const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색" });
   await expect(input).toBeFocused(); await input.fill("예시");
   await expect(page.locator("[data-customer-card]")).toHaveCount(12);
   await page.getByRole("button", { name: "검색 닫기" }).click(); await expect(search).toBeFocused();
-  await page.getByRole("button", { name: "거래처 전체보기", exact: true }).click();
+  await page.getByRole("button", { name: "전체보기", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "거래처 전체보기", exact: true })).toBeVisible();
   await expect(page.locator("[data-customer-directory] [data-customer-card]")).toHaveCount(12);
   await page.keyboard.press("Escape");
@@ -100,7 +102,7 @@ test("scrollbar hides at rest without changing the panel width or reserved gutte
   const after = (await panel.boundingBox())!;
   expect(after.width).toBe(before.width);
   expect(after.x).toBe(before.x);
-  await expect(scroller).toHaveCSS("scrollbar-gutter", "stable both-edges");
+  await expect(scroller).toHaveCSS("scrollbar-gutter", "stable");
 });
 
 for (const target of ["납품사진"]) {
@@ -140,7 +142,7 @@ test("loading and failed catalogs do not block photos; disabled feature stays hi
   for (const query of ["?loading", "?error"]) {
     await open(page, query);
     await expect(page.getByRole("button", { name: "거래처 등록", exact: true })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "거래처 전체보기", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "전체보기", exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "납품사진", exact: true })).toBeEnabled();
   }
   await open(page, "", false);

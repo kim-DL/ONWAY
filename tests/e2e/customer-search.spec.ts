@@ -47,7 +47,7 @@ test("large search keeps full matching and ordering with incremental results acr
       return { ...seed, customerId: `SEARCH-${index}`, name, normalizedName: name.replaceAll(" ", ""), choseongName: `ㄱㅅㄱㅈ${String(index + 1).padStart(4, "0")}` };
     });
   });
-  await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  await page.getByRole("button", { name: /이름으로 찾기/ }).click();
   const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true });
   const cards = page.locator("[data-customer-card]");
   await input.fill("0");
@@ -92,13 +92,13 @@ for (const width of [320, 390]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await fixture(page, width);
-    const trigger = page.getByRole("button", { name: /거래처 이름으로 찾기/ });
+    const trigger = page.getByRole("button", { name: /이름으로 찾기/ });
     await trigger.click();
     const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true });
     await expect(input).toBeFocused();
     await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "거래처 등록", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /거래처 전체보기/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /전체보기/ })).toHaveCount(0);
     await expect(input).toHaveAttribute("autocomplete", "off");
     await input.fill("온누리");
     const cards = page.locator("[data-customer-card]");
@@ -136,7 +136,7 @@ for (const width of [320, 390]) {
     await expect(trigger).toBeFocused();
     await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "거래처 등록", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /거래처 전체보기/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /전체보기/ })).toBeVisible();
     await trigger.click();
     await expect(input).toHaveValue("");
     await expect(input).toBeFocused();
@@ -146,7 +146,7 @@ for (const width of [320, 390]) {
 
 test("Korean composition preserves focus; completed Enter dismisses keyboard and Escape restores home", async ({ page }) => {
   await fixture(page, 390);
-  await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  await page.getByRole("button", { name: /이름으로 찾기/ }).click();
   const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true });
   await input.fill("ㅇㄴㄹ");
   await expect(page.locator("[data-customer-card]")).toHaveCount(3);
@@ -162,12 +162,12 @@ test("Korean composition preserves focus; completed Enter dismisses keyboard and
   await input.focus();
   await input.press("Escape");
   await expect(input).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /거래처 이름으로 찾기/ })).toBeFocused();
+  await expect(page.getByRole("button", { name: /이름으로 찾기/ })).toBeFocused();
 });
 
 test("200% text keeps search actions reachable without horizontal overflow", async ({ page }) => {
   await fixture(page, 320);
-  await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  await page.getByRole("button", { name: /이름으로 찾기/ }).click();
   await page.addStyleTag({ content: "html{font-size:200%}" });
   const input = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색", exact: true });
   await input.fill("온누리");
@@ -186,7 +186,7 @@ for (const width of [320, 360, 390, 412, 768, 1280]) {
     const output = "output/playwright/ui-renewal/after";
     mkdirSync(output, { recursive: true });
     await fixture(page, width);
-    const trigger = page.getByRole("button", { name: /거래처 이름으로 찾기/ });
+    const trigger = page.getByRole("button", { name: /이름으로 찾기/ });
     const recent = page.locator("[data-customer-recent-card]");
     await expect(recent).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

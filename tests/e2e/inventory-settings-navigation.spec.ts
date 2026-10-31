@@ -38,6 +38,29 @@ test("read-only staff can reach settings without gaining write controls", async 
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("location underline follows the final selection and respects reduced motion", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await open(page, "?readonly");
+  const locations = page.getByRole("group", { name: "보관 장소" });
+  const indicator = () => locations.evaluate(el => {
+    const selected = el.querySelector('[aria-pressed="true"]')!.getBoundingClientRect();
+    const line = getComputedStyle(el, "::after");
+    return { center: el.getBoundingClientRect().left + parseFloat(line.left) + 15,
+      selectedCenter: selected.left + selected.width / 2, transition: line.transitionProperty };
+  });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await locations.getByRole("button", { name: "냉동1", exact: true }).click();
+  await locations.getByRole("button", { name: "샘플", exact: true }).click();
+  await expect(locations.getByRole("button", { name: "샘플", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => { const line = await indicator(); return Math.abs(line.center - line.selectedCenter); }).toBeLessThan(1);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await locations.getByRole("button", { name: "전체", exact: true }).click();
+  const line = await indicator();
+  expect(Math.abs(line.center - line.selectedCenter)).toBeLessThan(1);
+  expect(line.transition).toBe("none");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("settings return preserves inventory filters, search and scroll without a retired sheet entry", async ({ page }) => {
   await open(page);
   await page.getByRole("button", { name: "냉동1", exact: true }).click();

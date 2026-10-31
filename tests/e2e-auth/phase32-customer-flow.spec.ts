@@ -68,7 +68,7 @@ async function login(page: Page, mockMap = true, openSearch = true) {
   await chooseMode(page, "customer");
   await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "최근 검색 거래처" })).toBeVisible();
-  if (openSearch) await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  if (openSearch) await page.getByRole("button", { name: /이름으로 찾기/ }).click();
 }
 
 async function chooseMode(page: Page, mode: "customer" | "delivery") {
@@ -139,7 +139,7 @@ test("name-only search shows all field information, map controls and private sel
   await page.reload();
   await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();
   await expect(search).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /거래처 이름으로 찾기/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /이름으로 찾기/ })).toBeVisible();
   await chooseMode(page, "delivery");
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
   expect(errors).toEqual([]);
@@ -209,7 +209,7 @@ test("recent customers keep selected results within the ten-row limit, deduplica
   await expect(page.locator("[data-customer-card]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /자주 찾는 거래처/ })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("customer-home-empty.png"), fullPage: true });
-  await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  await page.getByRole("button", { name: /이름으로 찾기/ }).click();
   const search = page.getByRole("searchbox", { name: "거래처명 또는 초성 검색" });
   const names = ["강은유통", "가온유통", "폐업유통", "위치없는유통", "한빛상회", "푸른식품"];
   for (const name of names) {
@@ -256,7 +256,7 @@ test("recent customers keep selected results within the ten-row limit, deduplica
   page.once("dialog", (dialog) => void dialog.accept());
   await recents.getByRole("button", { name: "기록 지우기" }).click();
   await expect(rows).toHaveCount(0);
-  await page.getByRole("button", { name: /거래처 이름으로 찾기/ }).click();
+  await page.getByRole("button", { name: /이름으로 찾기/ }).click();
   await search.fill("강은유통");
   await expect(page.locator("[data-customer-card]")).toHaveCount(1);
 });

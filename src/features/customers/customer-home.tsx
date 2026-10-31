@@ -32,8 +32,8 @@ export function CustomerHome({ greeting, onOpenSearch, onRegister, onOpenDirecto
     </div>
     <div className={styles.actions} role="group" aria-label="거래처 빠른 메뉴">
       {([
-        ["search", "거래처 이름으로 찾기", onOpenSearch],
-        ["directory", "거래처 전체보기", onOpenDirectory],
+        ["search", "이름으로 찾기", onOpenSearch],
+        ["directory", "전체보기", onOpenDirectory],
         ["camera", "납품사진", onOpenDeliveryPhotos],
         ["register", "거래처 등록", onRegister],
       ] as const).map(([name, label, onClick]) => onClick ? <button key={name}

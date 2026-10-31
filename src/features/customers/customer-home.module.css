@@ -20,8 +20,8 @@
 .hero [data-finish] > :nth-child(4) { animation-duration: 10.8s; }
 .searchHeader { min-width: 0; padding-top: 4px; }
 /* One continuous opaque surface; the buttons share its light and fine seams. */
-.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #c1c5ca; border-radius: 10px; background: linear-gradient(135deg, #fafafa, #f0f1f2 55%, #e7e9eb); box-shadow: 0 1px 0 #c3c7cc, 0 3px 4px #33383e18, 0 7px 14px #33383e0b; }
-.action { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 132px; padding: 17px 14px; border: 0; border-radius: 0; background: linear-gradient(160deg, #ffffff8c, #ffffff05 48%, #73798009); box-shadow: inset 1px 0 1px #ffffffb3, inset -1px -1px 0 #a6acb330, inset 0 -3px 5px #7f858c0a; color: #223d63; font: inherit; text-align: center; cursor: pointer; transition: background-color 120ms ease, box-shadow 120ms ease; }
+.actions { width: min(92%, 18rem); justify-self: center; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #c1c5ca; border-radius: 10px; background: linear-gradient(135deg, #fafafa, #f0f1f2 55%, #e7e9eb); box-shadow: 0 1px 0 #c3c7cc, 0 3px 4px #33383e18, 0 7px 14px #33383e0b; }
+.action { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 112px; padding: 8px 6px; border: 0; border-radius: 0; background: linear-gradient(160deg, #ffffff8c, #ffffff05 48%, #73798009); box-shadow: inset 1px 0 1px #ffffffb3, inset -1px -1px 0 #a6acb330, inset 0 -3px 5px #7f858c0a; color: #223d63; font: inherit; text-align: center; cursor: pointer; transition: background-color 120ms ease, box-shadow 120ms ease; }
 /* A rounded top shoulder catches light across a face, rather than a thick outline. */
 .action::before { content: ""; position: absolute; inset: 0 0 auto; height: 11px; pointer-events: none; background: linear-gradient(180deg, #c2c6cb33 0, #ffffff 1px, #ffffffbd 3px, #bfc4cb17 7px, transparent 11px); }
 /* A shadow and its adjacent highlight read as a shallow groove. */
@@ -29,7 +29,7 @@
 .action:nth-child(even) { border-left: 1px solid #ffffff; }
 .action:nth-child(n+3) { border-top: 1px solid #858b9452; }
 .action:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: 0; }
-.action > span:last-child { display: grid; place-content: center; min-height: 2.7em; max-width: 100%; font-size: .9375rem; font-weight: 650; line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
+.action > span:last-child { max-width: 100%; font-size: .9375rem; font-weight: 650; line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
 .ceramicIcon { display: block; flex: none; width: 48px; height: 48px; object-fit: contain; }
 /* The camera has a wide silhouette: match perceived size without shifting label baselines. */
 .ceramicIcon[data-icon="camera"] { width: 56px; object-fit: cover; }

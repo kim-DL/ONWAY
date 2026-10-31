@@ -14,7 +14,7 @@ describe("customer home", () => {
     expect(html).toContain("거래처 정보를");
     expect(html).toContain("한눈에.");
     expect(html).toContain("김대인 부장님, 좋은 아침이에요.");
-    expect(html).toContain("거래처 이름으로 찾기");
+    expect(html).toContain("이름으로 찾기");
     expect(html).not.toContain("납품 정보,");
     expect(html).not.toContain("주소</small>");
     expect(html).not.toContain("거래처 등록");
@@ -47,8 +47,8 @@ describe("customer home", () => {
     expect(html).not.toContain("거래처 정보를");
     expect(html).not.toContain("반가워요.");
     expect(html).not.toContain("거래처 등록");
-    expect(html).not.toContain("거래처 전체보기");
-    expect(html).not.toContain("거래처 이름으로 찾기");
+    expect(html).not.toContain("전체보기");
+    expect(html).not.toContain("이름으로 찾기");
     expect(html).not.toContain("data-quantum-cloud");
   });
 });
