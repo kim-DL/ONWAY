@@ -9,7 +9,9 @@
 
 - 사용자 요청으로 문서/허용된 표현 변경/전체 검증을 나눴다. AGENTS.md와 [범위별 검증 규칙](scoped-verification-20261031.md)이 기존 항상 전체 검사 관행을 대체한다. 작은 UI 변경은 관련 로컬 검사부터 실행하고 같은 커밋·빌드의 통과 결과를 반복하지 않는다.
 - CI는 전체 Git diff를 분류한다. docs는 plan/verify만, presentation은 lint·typecheck·unit·운영 build/PWA/성능·헤더/로그인/로딩 UI, 기능/보안/설정/미분류는 기존 full 12개다. 필수 job skip/실패/취소/누락과 분류 실패는 거부하며 계획된 제외만 인정한다. 수동 실행은 full이다.
-- 분류 회귀 7·최종 판정 회귀 30·관련 lint/typecheck·actionlint PASS. 새 presentation 명령의 기존 모바일/데스크톱 78개가 로컬에서 1.5분에 PASS했다. 기존 Android 테마 수정의 실제 diff가 presentation으로 분류됨을 확인했다. CI 규칙 자체 변경의 full 실행과 문서 후속 커밋의 docs 경로는 확정 후 기록한다.
+- 분류 회귀 7·최종 판정 회귀 30·관련 lint/typecheck·actionlint PASS. 새 presentation 명령의 기존 모바일/데스크톱 78개가 로컬에서 1.5분에 PASS했다. 기존 Android 테마 수정의 실제 diff가 presentation으로 분류됨을 확인했다. 이는 로컬 측정이며 향후 CI 시간 보장이 아니다.
+- main source `fed0c42aebbd24c3e1e333f24cb814ecd5e6dd80`의 [Quality Gate 41146903811](https://github.com/kim-DL/ONWAY/actions/runs/41146903811) attempt 1 SUCCESS. full 12개+plan+verify 성공, 중복 presentation만 계획된 SKIP이다. unit 1,821 PASS/기존 15 SKIP, browser 348 PASS/기존 8 SKIP, Phase17 83 PASS/기존 18 SKIP, 재고사진4·transaction12·납품사진16 PASS. 실패·내부 flaky·재실행 0이다.
+- 사용자 후속 요청으로 AGENTS.md를 Next.js 필수 블록 포함 25줄로 축약했다. 오래된 고정 dirty 상태·긴 문서 목록을 제거하고 핵심 계약·최소 검증·결과 재사용·배포 기준만 남겼다. 이 문서 후속 커밋은 `[skip ci]` 없이 docs 경로로 검증한다. 결과는 해당 커밋의 Quality Gate와 ignored `output/scoped-verification-20261031/`에 남긴다.
 - 앱 runtime 소스·의존성·기능·Hosting 후보는 변경하지 않는다. 운영은 아래 Android 테마 릴리스를 유지하며 CI 규칙 변경으로 Hosting을 재배포하지 않는다.
 
 ### 2026-10-31 Android 설치형 PWA 하단 시스템 버튼 대비 — main·Hosting 반영, 실기기 미검증

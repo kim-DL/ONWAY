@@ -8,6 +8,8 @@
 
 운영 Hosting 배포에는 운영 형식 build와 PWA·성능·Hosting gate, 배포 후 공개 HTTP·관련 화면 smoke 확인이 필요하다. 같은 소스·설정·파일 해시로 이미 통과한 빌드와 검사 결과는 재사용한다. 문서 후속 커밋 때문에 제품을 재빌드/재배포하지 않는다. 코드나 환경이 달라졌으면 재사용하지 않는다.
 
+축소 CI는 그 변경 범위의 검증이다. 릴리스 시에는 기준 제품 코드의 성공한 검증 이력도 확인한다. 앞선 제품 커밋이 실패·취소·미검증 상태라면 이후 docs/presentation 성공으로 덮어 배포하지 않는다. 미검증 누적 변경을 포함하는 관련 검사 또는 수동 full을 완료한다. 문서 전용 CI는 제품 릴리스 검증의 대체 증거가 아니다.
+
 ## 자동 CI 범위
 
 | 프로필 | 변경 범위 | 실행 |
@@ -41,5 +43,9 @@ workflow-level paths-ignore로 실행 자체를 없애지 않는다. plan/verify
 ## 검증 기록
 
 분류기 fixture와 실제 임시 Git 저장소 회귀, 최종 판정 실패 차단 회귀, actionlint와 관련 lint/typecheck, 새 presentation 명령의 실제 실행을 검증한다. 이번 Android 테마 수정의 실제 diff를 재분류해 presentation 선택 여부를 확인한다. CI 자체 변경인 최초 적용은 full을 한 번 실행하고, 이후 문서 후속 커밋으로 docs 경로를 확인한다. 실행 결과와 시간은 HANDOFF에 기록하며, 측정하지 않은 미래 단축 시간을 보장하지 않는다.
+
+- 로컬: 분류기 7·최종 판정 30·UI 78 PASS, typecheck/lint/actionlint PASS. 초기 테스트 helper의 빈 배열 추론 오류는 명시적 타입으로 수정한 뒤 통과했다. 실제 테마 diff는 presentation이다.
+- source `fed0c42`의 [전체 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41146903811)은 attempt 1 SUCCESS. 기존 full 12개와 plan/verify 성공, presentation은 계획대로 제외됐다. 기존 테스트 조건과 실패 차단을 유지했다. 일반 browser 348 PASS/8 SKIP, Phase17 83 PASS/18 SKIP, unit 1,821 PASS/15 SKIP이다. 내부 flaky·job 재실행 없음.
+- 문서 경로는 이 결과와 축약 AGENTS.md를 기록하는 후속 커밋에서 실제 확인한다. 제품 코드가 같으므로 Hosting은 다시 배포하지 않는다. UI 경로는 로컬 명령·분류 회귀로 검증했으며 실제 GitHub의 UI 전용 실행 시간은 아직 측정하지 않았다.
 
 참고: [GitHub workflow trigger](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow), [job 조건·needs·outputs 문법](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
