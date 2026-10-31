@@ -733,6 +733,10 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await expect.poll(() => manufacturerListRequests).toBe(1);
   await manufacturerSearch.fill("테스트 제조사");
   await expect.poll(() => manufacturerListRequests).toBe(1);
+  // Measure the settled touch target, not a fractional translated animation frame.
+  await manufacturerPicker.locator(".bottom-sheet").evaluate(async (sheet) => {
+    await Promise.all(sheet.getAnimations().map((animation) => animation.finished));
+  });
   const pickerGeometry = await manufacturerPicker.evaluate((dialog) => ({ scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth,
     targets: Array.from(dialog.querySelectorAll("button, input"), (element) => element.getBoundingClientRect().height) }));
   expect(pickerGeometry.scrollWidth).toBeLessThanOrEqual(pickerGeometry.clientWidth);
