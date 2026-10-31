@@ -9,7 +9,7 @@ import { InventoryListChunks } from "./inventory-list-chunks";
 import { InventoryGreeting } from "./inventory-greeting";
 import { restoreInventoryProductFocus } from "./inventory-focus";
 import { GlassButton } from "@/components/ui/glass-button";
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { BottomSheet, useBottomSheetClose } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
 import { searchInputProps } from "@/components/ui/search-input-props";
 import { inventoryCountEligible, inventoryScopeCountState, inventoryScopeIsUrgent, inventoryLocationsFor, inventoryOpeningLocation, inventoryNextCountTarget, inventoryCountState, inventorySearchText, inventorySearchMatcher, type InventoryLocationFilter } from "./inventory-model";
@@ -34,7 +34,12 @@ import styles from "./inventory.module.css";
 
 function preferenceStorage() { try { return window.sessionStorage; } catch { return undefined; } }
 
-export function InventoryWorkspace({ session, admin = false }: { session: AuthenticatedSession; admin?: boolean }) {
+function AppSettingsOption({ onRequest }: { onRequest: () => void }) {
+  const close = useBottomSheetClose();
+  return <button type="button" className={styles.appSettings} onClick={() => { onRequest(); close?.(); }}><Icon name="settings" /><span>앱 설정</span><Icon name="chevron-right" /></button>;
+}
+
+export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }: { session: AuthenticatedSession; admin?: boolean; onOpenAppSettings?: () => void }) {
   const online = useInventoryConnection();
   const sessionKey = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`;
   const workspaceSession = getInventoryWorkspaceSession(sessionKey);
@@ -63,6 +68,7 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
     ? { status: initialCatalog.freshness, lastSuccessAt: initialCatalog.lastSuccessAt }
     : { status: "idle", lastSuccessAt: null });
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const appSettingsRequested = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const calendarWatcher = useRef<ReturnType<typeof watchInventoryCalendar> | null>(null);
   const catalogReady = useRef(Boolean(initialCatalog));
@@ -296,16 +302,22 @@ export function InventoryWorkspace({ session, admin = false }: { session: Authen
     {context && online && !calendarReady ? <div className={styles.notice} role={calendarError ? "alert" : "status"}><p>{calendarRefreshing ? "날짜가 바뀌어 유통기한·실사 기준을 확인하고 있어요." : "날짜 기준을 갱신하지 못했어요. 기준을 다시 확인한 뒤 실사를 저장해주세요."}</p><p className={styles.muted}>기준 확인 전에는 유통기한·실사 필터를 잠시 멈추고 전체 품목을 보여드려요.</p>{calendarError ? <><p className={styles.muted}>{calendarError}</p><GlassButton disabled={calendarRefreshing} onClick={() => calendarWatcher.current?.refresh()}>날짜 기준 다시 확인</GlassButton></> : null}</div> : null}
     <div className={styles.locations} data-catalog role="group" aria-label="보관 장소">{(["all", ...INVENTORY_LOCATIONS] as const).map((item) => <button key={item} type="button" aria-pressed={location === item} onClick={() => { setLocation(item); setLimit(60); }}>{item === "all" ? "전체" : INVENTORY_LOCATION_LABELS[item]}</button>)}</div>
     {context && countControlsReady && countRows.length > 0 && (context.today === context.cycle.startDate || countMode) ? <div className={styles.progressCard} data-count-day><div><span><Icon name="clipboard" size={15} />{context.today === context.cycle.startDate ? "오늘은 재고조사일" : "재고조사 진행 중"}</span><strong>{completed}<small> / {countRows.length}개 확인</small></strong></div><progress value={completed} max={countRows.length} aria-label={`${locationLabel} 실사 ${countRows.length}개 중 ${completed}개 완료`} /></div> : null}
-    <div className={styles.filters}><label className={styles.search}><Icon name="search" size={18} /><input {...searchInputProps} aria-label="품목 검색" placeholder="상품명 · 제조사" value={query} onChange={(event) => { setQuery(event.target.value); setLimit(60); }} /></label>{context?.canWrite ? <button type="button" className={styles.optionsTrigger} aria-label="목록 옵션" aria-haspopup="dialog" aria-expanded={optionsOpen} data-active={optionsActive || undefined} onClick={() => setOptionsOpen(true)}><Icon name="sliders" size={20} /><span aria-hidden="true" /></button> : null}</div>
+    <div className={styles.filters}><label className={styles.search}><Icon name="search" size={18} /><input {...searchInputProps} aria-label="품목 검색" placeholder="상품명 · 제조사" value={query} onChange={(event) => { setQuery(event.target.value); setLimit(60); }} /></label>{context?.canWrite || onOpenAppSettings ? <button type="button" className={styles.optionsTrigger} aria-label="목록 옵션" aria-haspopup="dialog" aria-expanded={optionsOpen} data-active={optionsActive || undefined} onClick={() => setOptionsOpen(true)}><Icon name="sliders" size={20} /><span aria-hidden="true" /></button> : null}</div>
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}
     {loading ? <LoadingStatus className={styles.message} label="재고 불러오는 중" detail="등록된 품목과 현재 재고를 확인하고 있습니다." startedAt={loadingStartedAt} /> : <><div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div>{productList}{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
     {context?.canWrite ? <div className={styles.stickyActions}><GlassButton variant="primary" aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}><Icon name="plus" />새 품목</GlassButton></div> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => { setSelected(null); restoreInventoryProductFocus(selectedId); }} onSaved={saved} onCountSaved={countSaved} /> : null}
     {context?.canWrite && editorOpen ? <InventoryProductEditor product={null} location={location === "all" ? "refrigerated" : location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setEditorOpen(false)} onSaved={(product, detail) => { saved(product); setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) }); }} /> : null}
     {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}
-    {context?.canWrite ? <BottomSheet open={optionsOpen} title="목록 옵션" onClose={() => setOptionsOpen(false)}><div className={styles.sheet}>
-      <section className={styles.lotCard} aria-labelledby="inventory-display-options"><div className={styles.sectionHeading}><h3 id="inventory-display-options">표시 옵션</h3></div><label className={styles.optionToggle}><input type="checkbox" checked={showInactive} onChange={(event) => { setShowInactive(event.target.checked); setLimit(60); }} /><span>비활성 품목 보기</span></label><label className={styles.optionToggle} title={context ? `유통기한 D-${context.settings.urgentDays}일 이내, 기한 지난 상품 포함` : undefined}><input type="checkbox" disabled={inactiveView || !calendarReady || !context} checked={urgentOnly} onChange={(event) => { setUrgentOnly(event.target.checked); setLimit(60); }} /><span>임박 상품만 보기<small>{context ? `D-${context.settings.urgentDays}일` : "기준 확인 중"}</small></span></label></section>
+    {context?.canWrite || onOpenAppSettings ? <BottomSheet open={optionsOpen} title="목록 옵션" onClose={() => {
+      setOptionsOpen(false);
+      // Finish the sheet's history Back before creating the settings entry.
+      if (appSettingsRequested.current) { appSettingsRequested.current = false; onOpenAppSettings?.(); }
+    }}><div className={styles.sheet}>
+      {context?.canWrite ? <><section className={styles.lotCard} aria-labelledby="inventory-display-options"><div className={styles.sectionHeading}><h3 id="inventory-display-options">표시 옵션</h3></div><label className={styles.optionToggle}><input type="checkbox" checked={showInactive} onChange={(event) => { setShowInactive(event.target.checked); setLimit(60); }} /><span>비활성 품목 보기</span></label><label className={styles.optionToggle} title={context ? `유통기한 D-${context.settings.urgentDays}일 이내, 기한 지난 상품 포함` : undefined}><input type="checkbox" disabled={inactiveView || !calendarReady || !context} checked={urgentOnly} onChange={(event) => { setUrgentOnly(event.target.checked); setLimit(60); }} /><span>임박 상품만 보기<small>{context ? `D-${context.settings.urgentDays}일` : "기준 확인 중"}</small></span></label></section>
       <section className={styles.lotCard} aria-labelledby="inventory-work-mode"><div className={styles.sectionHeading}><h3 id="inventory-work-mode">작업 모드</h3></div><label className={styles.countToggle} data-active={countMode || undefined}><input type="checkbox" role="switch" aria-label="재고조사 모드" checked={countMode} disabled={!calendarReady} onChange={(event) => changeCountMode(event.target.checked)} /><span className={styles.countToggleLabel}>재고조사</span><span className={styles.countToggleControl} aria-hidden="true"><span>OFF</span><span>ON</span></span></label></section>
+      </> : null}
+      {onOpenAppSettings ? <AppSettingsOption onRequest={() => { appSettingsRequested.current = true; }} /> : null}
     </div></BottomSheet> : null}
   </section>;
 }
