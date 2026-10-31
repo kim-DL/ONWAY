@@ -1,7 +1,7 @@
 # 거래처 세라믹 패널 · 로컬 검토
 
 2026-11-01, 작업 저장소 `C:\Users\HOME\Desktop\onnuriway`, 기준 `3614f4d`, 브랜치 `codex/customer-ceramic-panel`.
-운영 배포·운영 데이터 변경 없음. 기존 loading-baseline worktree를 사용하지 않았다.
+초기 로컬 검토 기록이며, 이후 사용자 승인으로 2026-11-01 07:24 KST main 병합·Hosting 배포를 완료했다. [최종 릴리스·검증 기록](releases/2026-11-01-customer-ceramic.md). 운영 데이터 변경 없음. 기존 loading-baseline worktree를 사용하지 않았다.
 
 ## 사용자 선택과 구현
 
@@ -52,9 +52,9 @@
 
 - 관련 단위 18개 PASS (customer-home, customer-workspace-snapshot, shell-policy, shell-resume, app-shell-scroll).
 - 거래처 탐색/모바일 배치/접근성 브라우저 회귀 10개, 기존 거래처 검색 22개, 기존 재고 설정 탐색 10개 PASS. 최종 소재·카메라 크기 및 미리보기 PostCSS 변경 후 거래처 탐색 10개 재확인 PASS (23.5초). 로컬 미리보기 콘솔 오류/경고 없음.
-- 프런트 TypeScript와 변경 TS/TSX ESLint 확인. 실제 기기 확인·운영 build/Hosting gate·CI·배포는 수행하지 않았다.
+- 프런트 TypeScript와 변경 TS/TSX ESLint 확인. 아래는 로컬 검토 단계의 결과이며 후속 운영 build/Hosting gate·CI·배포 결과는 릴리스 기록을 참고한다. 실제 기기는 미확인이다.
 - 채도·홈·좌우 여백·최근 10개 후속 변경: 관련 단위 30개, 거래처 브라우저 회귀 12개 PASS (25.5초), TypeScript/변경 파일 ESLint PASS. 320/390/430px 좌우 대칭 및 가로 넘침 없음, 10번째 최근 항목까지 내부 스크롤 확인.
-- 기존 인증 에뮬레이터 테스트의 하단 탐색 선택자를 새 진입/복귀 동선으로 갱신했다. 이 에뮬레이터 스위트는 아직 실행하지 않았다.
+- 기존 인증 에뮬레이터 테스트의 하단 탐색 선택자를 새 진입/복귀 동선으로 갱신했다. 후속 전체 CI에서 인증 에뮬레이터와 사용자 흐름 검증까지 완료했다.
 - 캡처: `output/customer-ceramic-20261101/` (최종 로컬 미리보기 `local-preview-final.png`). 합성 데이터 브라우저 증거이며 운영/실기기 증거가 아니다.
 
 - 좌우 폭 후속 조정 및 스크롤바 자동 숨김: 브라우저 회귀 14개 PASS (28.1초), 기존 shell 스크롤 단위 3개 PASS, 타입·변경 파일 lint·diff 검사 PASS. 스크롤바 표시 전후 패널 폭·위치 불변 확인. 강제 색상 모드에서는 시스템 스크롤바를 유지한다.
