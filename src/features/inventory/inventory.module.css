@@ -1,5 +1,7 @@
 .workspace { color: var(--shell-ink, #191f28); display: grid; align-content: start; gap: 8px; padding-bottom: 16px; --inventory-action-inset: 16px; }
-.workspace > [data-welcome-greeting] { margin-bottom: -4px; }
+.toolbar { display: grid; gap: 8px; min-width: 0; align-self: start; }
+.toolbar > [data-welcome-greeting] { margin-bottom: -8px; }
+.toolbar[data-sticky] { position: sticky; top: 0; z-index: 2; padding-bottom: 4px; }
 /* A fixed, compact action stays reachable; the last row can scroll fully above it. */
 .workspace[data-write-actions] { padding-bottom: calc(var(--inventory-action-inset) + 64px + env(safe-area-inset-bottom)); }
 .workspace[data-admin] { --inventory-action-inset: 100px; }

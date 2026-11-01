@@ -139,3 +139,39 @@ test("inventory scrollbar appears during scrolling without shifting content", as
   await page.emulateMedia({ forcedColors: "active" });
   await expect(page.locator(".workspace-content")).toHaveCSS("scrollbar-color", "auto");
 });
+
+test("inventory controls and freshness stay above the scrolling product list", async ({ page }) => {
+  await open(page);
+  const toolbar = page.locator("[data-inventory-toolbar]");
+  const scroller = page.locator(".workspace-content");
+  for (const width of [320, 502, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await scroller.evaluate(el => { el.scrollTop = 0; });
+    await expect(toolbar.locator("[data-freshness]")).toBeVisible();
+    const copy = (await toolbar.locator("[data-welcome-greeting]").boundingBox())!;
+    const locations = (await page.getByRole("group", { name: "보관 장소" }).boundingBox())!;
+    expect(locations.y - copy.y - copy.height).toBeCloseTo(0, 1);
+    for (const button of await page.getByRole("group", { name: "보관 장소" }).getByRole("button").all()) {
+      expect((await button.boundingBox())!.height).toBe(48);
+    }
+    await scroller.evaluate(el => { el.scrollTop = 500; });
+    await expect.poll(async () => (await toolbar.boundingBox())!.y).toBeCloseTo((await scroller.boundingBox())!.y, 0);
+    await expect(page.getByRole("searchbox", { name: "품목 검색" })).toBeVisible();
+    const header = (await toolbar.boundingBox())!;
+    await expect(toolbar).toHaveCSS("background-image", "none");
+    await expect(toolbar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    expect(await toolbar.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return document.elementsFromPoint(box.x + 5, box.y + 5).some(node => node.closest("[data-inventory-results]"));
+    })).toBe(false);
+    const padding = await scroller.evaluate(el => parseFloat(getComputedStyle(el).scrollPaddingTop));
+    expect(padding).toBeGreaterThan(header.height);
+    const product = page.getByRole("list").getByRole("button").nth(25);
+    await product.focus();
+    expect((await product.boundingBox())!.y).toBeGreaterThanOrEqual(header.y + header.height);
+    await page.screenshot({path:`output/inventory-sticky/${width}.png`});
+  }
+  await page.getByRole("searchbox", { name: "품목 검색" }).fill("없는테스트상품");
+  await expect(toolbar).toContainText("0개 품목");
+  await expect(page.getByText("조건에 맞는 품목이 없어요.", {exact:true})).toBeVisible();
+});

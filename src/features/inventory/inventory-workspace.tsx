@@ -253,6 +253,27 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     if (!loading && context?.canWrite) return scheduleInventoryProductEditorPreload();
   }, [loading, context?.canWrite]);
   useLayoutEffect(() => {
+    const toolbar = workspaceRef.current?.querySelector<HTMLElement>("[data-sticky]");
+    const results = workspaceRef.current?.querySelector<HTMLElement>("[data-inventory-results]");
+    const scroller = workspaceRef.current?.closest(".workspace-content") as HTMLElement | null;
+    if (!toolbar || !results || !scroller) return;
+    const previous = scroller.style.scrollPaddingTop;
+    const update = () => {
+      scroller.style.scrollPaddingTop = `${toolbar.offsetHeight + 8}px`;
+      const covered = Math.max(0, toolbar.getBoundingClientRect().bottom - results.getBoundingClientRect().top);
+      results.style.clipPath = `inset(${covered}px 0 0)`;
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(toolbar);
+    observer.observe(results);
+    scroller.addEventListener("scroll", update, { passive: true });
+    return () => {
+      observer.disconnect(); scroller.removeEventListener("scroll", update);
+      scroller.style.scrollPaddingTop = previous; results.style.clipPath = "";
+    };
+  }, [admin]);
+  useLayoutEffect(() => {
     const scroller = workspaceRef.current?.closest(".workspace-content") as HTMLElement | null;
     if (!scroller) return;
     return rememberWorkspaceScroll(scroller, getInventoryWorkspaceSession(sessionKey).snapshot.ui.scrollTop,
@@ -297,14 +318,19 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   const optionsActive = showInactive || urgentOnly || countMode;
   return <section ref={workspaceRef} className={admin ? styles.workspace : `shell-page ${styles.workspace}`} data-admin={admin || undefined} data-write-actions={context?.canWrite || undefined} aria-label="재고 관리">
     <h1 className={styles.hiddenInput}>재고 관리</h1>
+    <div className={styles.toolbar} data-inventory-toolbar data-sticky={!admin || undefined}>
     {!admin ? <InventoryGreeting displayName={session.displayName} /> : null}
     {notice.message ? <p role="status" className={styles.success}>{notice.message}</p> : null}
     {context && online && !calendarReady ? <div className={styles.notice} role={calendarError ? "alert" : "status"}><p>{calendarRefreshing ? "날짜가 바뀌어 유통기한·실사 기준을 확인하고 있어요." : "날짜 기준을 갱신하지 못했어요. 기준을 다시 확인한 뒤 실사를 저장해주세요."}</p><p className={styles.muted}>기준 확인 전에는 유통기한·실사 필터를 잠시 멈추고 전체 품목을 보여드려요.</p>{calendarError ? <><p className={styles.muted}>{calendarError}</p><GlassButton disabled={calendarRefreshing} onClick={() => calendarWatcher.current?.refresh()}>날짜 기준 다시 확인</GlassButton></> : null}</div> : null}
     <div className={styles.tabs} style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 4, "--i": location === "all" ? 0 : INVENTORY_LOCATIONS.indexOf(location) + 1 } as CSSProperties} data-catalog role="group" aria-label="보관 장소">{(["all", ...INVENTORY_LOCATIONS] as const).map((item) => <button key={item} type="button" aria-pressed={location === item} style={{ position: "relative", minWidth: 0, minHeight: 48, padding: "8px 1px", border: 0, borderRadius: 8, background: "transparent", color: location === item ? "#25364a" : "#59636f", font: "inherit", fontSize: 13, fontWeight: location === item ? 700 : 600, cursor: "pointer" }} onClick={() => { setLocation(item); setLimit(60); }}>{item === "all" ? "전체" : INVENTORY_LOCATION_LABELS[item]}{item !== "all" ? <i aria-hidden="true" style={{ position: "absolute", left: -2.5, top: 18, width: 1, height: 12, background: "#65717d2b", pointerEvents: "none" }} /> : null}</button>)}<span aria-hidden="true" className={styles.indicator} style={{ position: "absolute", bottom: 4, left: "calc((var(--i) + .5) * (100% + 4px) / 5 - 17px)", width: 30, height: 2, borderRadius: 2, pointerEvents: "none" }} /></div>
     {context && countControlsReady && countRows.length > 0 && (context.today === context.cycle.startDate || countMode) ? <div className={styles.progressCard} data-count-day><div><span><Icon name="clipboard" size={15} />{context.today === context.cycle.startDate ? "오늘은 재고조사일" : "재고조사 진행 중"}</span><strong>{completed}<small> / {countRows.length}개 확인</small></strong></div><progress value={completed} max={countRows.length} aria-label={`${locationLabel} 실사 ${countRows.length}개 중 ${completed}개 완료`} /></div> : null}
     <div className={styles.filters}><label className={styles.search}><Icon name="search" size={18} /><input {...searchInputProps} aria-label="품목 검색" placeholder="상품명 · 제조사" value={query} onChange={(event) => { setQuery(event.target.value); setLimit(60); }} /></label>{context?.canWrite || onOpenAppSettings ? <button type="button" className={styles.optionsTrigger} aria-label="목록 옵션" aria-haspopup="dialog" aria-expanded={optionsOpen} data-active={optionsActive || undefined} onClick={() => setOptionsOpen(true)}><Icon name="sliders" size={20} /><span aria-hidden="true" /></button> : null}</div>
+    {!loading ? <div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div> : null}
+    </div>
+    <div data-inventory-results style={{ display: "grid", gap: 8, minWidth: 0 }}>
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}
-    {loading ? <LoadingStatus className={styles.message} label="재고 불러오는 중" detail="등록된 품목과 현재 재고를 확인하고 있습니다." startedAt={loadingStartedAt} /> : <><div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div>{productList}{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
+    {loading ? <LoadingStatus className={styles.message} label="재고 불러오는 중" detail="등록된 품목과 현재 재고를 확인하고 있습니다." startedAt={loadingStartedAt} /> : <>{productList}{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
+    </div>
     {context?.canWrite ? <div className={styles.stickyActions}><GlassButton variant="primary" aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}><Icon name="plus" />새 품목</GlassButton></div> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => { setSelected(null); restoreInventoryProductFocus(selectedId); }} onSaved={saved} onCountSaved={countSaved} /> : null}
     {context?.canWrite && editorOpen ? <InventoryProductEditor product={null} location={location === "all" ? "refrigerated" : location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setEditorOpen(false)} onSaved={(product, detail) => { saved(product); setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) }); }} /> : null}
