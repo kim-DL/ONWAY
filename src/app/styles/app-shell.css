@@ -207,6 +207,7 @@
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 
 @media (max-width: 739px) {
+  [data-welcome-variant="customer"] { margin-inline: 12px; }
   .workspace-shell:is([data-mode="customer"], [data-mode="inventory"]) > .workspace-header { padding-bottom: 8px; }
   /* Reserve the native scrollbar gutter, as in the other workspaces. */
   .workspace-shell[data-mode="customer"] > .workspace-content { scrollbar-width: thin; scrollbar-color: transparent transparent; }
