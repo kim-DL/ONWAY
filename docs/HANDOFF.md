@@ -4,7 +4,9 @@
 
 ## 현재 상태
 
-- 마지막 확인된 운영 배포: **2026-11-01 10:29 KST**, 소스 `6396bd2`, Hosting version `fea8a4a2901e1c22` (복구 기준 `7d7ff8e55056af01`). 재고 웰컴 간격 추가 4px 축소 및 품목 수/마지막 확인까지 상단 고정. 별도 배경색 없이 가려진 목록만 clip 처리한다. 관련 브라우저 20개·후속 2개/단위 30개·타입/lint, 운영 build/PWA/성능/Hosting gate·두 운영 주소 공개 검증 통과. 최종 121개 파일 해시 일치. 사용자 로컬 확인·배포 승인 후 로컬 검증을 기준으로 배포했으며 [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41261307262)는 별도 진행 중이다. 최초 CSS gzip 45B 초과는 고정 배치 스타일을 인라인으로 옮겨 해결했고 교체된 CI 41261182870은 취소했다. 실제 기기는 미확인. 증거: `output/inventory-sticky-release/`.
+- 마지막 확인된 운영 배포: **2026-11-01 10:45 KST**, 소스 `d307af6`, Hosting version `0effeb5eff17031e` (복구 기준 `fea8a4a2901e1c22`). 납품사진의 첫 화면/오늘 납품처/최신 목록 확인 로딩 문구·진행선·지연 안내를 가로 중앙 정렬했다. 다른 화면은 기본 정렬 유지. 관련 브라우저 2개(320/390/1280px)·단위 27개/lint, 운영 build/PWA/성능/Hosting gate·두 운영 주소 공개 검증 통과. 산출물 121개 해시 일치. 로컬 검증을 기준으로 배포했고 [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41262355323)는 별도 진행 중이다. CSS/JS 용량 초과는 중복 스타일을 정리해 해결했으며 교체된 CI 41261954510/41262253534는 취소했다. 실제 기기/로그인 운영 화면 재검증은 하지 않았다. 증거: `output/delivery-photo-loading-release/`.
+
+- 직전 운영 배포: **2026-11-01 10:29 KST**, 소스 `6396bd2`, Hosting version `fea8a4a2901e1c22` (복구 기준 `7d7ff8e55056af01`). 재고 웰컴 간격 추가 4px 축소 및 품목 수/마지막 확인까지 상단 고정. 별도 배경색 없이 가려진 목록만 clip 처리한다. 관련 브라우저 20개·후속 2개/단위 30개·타입/lint, 운영 build/PWA/성능/Hosting gate·두 운영 주소 공개 검증 통과. 최종 121개 파일 해시 일치. 사용자 로컬 확인·배포 승인 후 로컬 검증을 기준으로 배포했으며 [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41261307262)는 별도 진행 중이다. 최초 CSS gzip 45B 초과는 고정 배치 스타일을 인라인으로 옮겨 해결했고 교체된 CI 41261182870은 취소했다. 실제 기기는 미확인. 증거: `output/inventory-sticky-release/`.
 
 - 직전 운영 배포: **2026-11-01 10:13 KST**, 소스 `59fc991`, Hosting version `7d7ff8e55056af01` (복구 기준 `3e25d714ea2457f3`). 재고 웰컴 아래 간격 4px 축소 및 유휴 스크롤바 숨김(700ms), 너비 고정·고대비 대응 반영. 관련 브라우저 6개/lint 및 운영 build/PWA/성능/Hosting gate·두 운영 주소 검증 통과, 산출물 121개 해시 일치. 작은 수정에 맞춘 로컬 검증을 기준으로 배포했고 [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41260074082)는 배포 시점 진행 중이다. 실제 기기 첫 로딩은 미확인. 증거: `output/inventory-spacing-scrollbar-release/`.
 
