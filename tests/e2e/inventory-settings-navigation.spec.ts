@@ -118,3 +118,24 @@ test("inventory has no empty nav space and other modes retain navigation", async
   await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await expect(page.locator(".workspace-navigation")).toBeVisible();
 });
+
+test("inventory scrollbar appears during scrolling without shifting content", async ({ page }) => {
+  await open(page);
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    const scroller = page.locator(".workspace-content");
+    const locations = page.getByRole("group", { name: "보관 장소" });
+    await scroller.evaluate(el => { el.scrollTop = 0; });
+    await expect(scroller).toHaveCSS("scrollbar-color", "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)");
+    const before = (await locations.boundingBox())!;
+    await scroller.evaluate(el => { el.scrollTop = 100; });
+    await expect(scroller).toHaveCSS("scrollbar-color", "rgb(144, 150, 158) rgba(0, 0, 0, 0)");
+    await expect(scroller).toHaveCSS("scrollbar-color", "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)");
+    const after = (await locations.boundingBox())!;
+    expect(after.width).toBe(before.width);
+    expect(after.x).toBe(before.x);
+    await expect(scroller).toHaveCSS("scrollbar-gutter", "stable");
+  }
+  await page.emulateMedia({ forcedColors: "active" });
+  await expect(page.locator(".workspace-content")).toHaveCSS("scrollbar-color", "auto");
+});

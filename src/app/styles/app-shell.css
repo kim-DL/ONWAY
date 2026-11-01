@@ -205,19 +205,18 @@
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { margin-left: 0; }
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { flex: 1; min-height: 0; height: auto; scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+:is([data-mode="customer"], [data-mode="inventory"]) > .workspace-content { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+:is([data-mode="customer"], [data-mode="inventory"]) > .workspace-content[data-scrolling] { scrollbar-color: #90969e transparent; }
 
 @media (max-width: 739px) {
   [data-welcome-variant="customer"] { margin-inline: 12px; }
   .workspace-shell:is([data-mode="customer"], [data-mode="inventory"]) > .workspace-header { padding-bottom: 8px; }
-  /* Reserve the native scrollbar gutter, as in the other workspaces. */
-  .workspace-shell[data-mode="customer"] > .workspace-content { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-  .workspace-shell[data-mode="customer"] > .workspace-content[data-scrolling] { scrollbar-color: #90969e transparent; }
   .workspace-shell[data-mode="customer"] [data-customer-workspace] { padding-top: 4px; padding-inline: max(12px, env(safe-area-inset-left), env(safe-area-inset-right)); }
   .workspace-shell[data-mode="inventory"] .shell-page { padding-top: 4px; }
 }
 
-@media (max-width: 739px) and (forced-colors: active) {
-  .workspace-shell[data-mode="customer"] > .workspace-content { scrollbar-color: auto; }
+@media (forced-colors: active) {
+  :is([data-mode="customer"], [data-mode="inventory"]) > .workspace-content { scrollbar-color: auto; }
 }
 
 .shell-page {

@@ -315,7 +315,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 
   useEffect(() => {
     const scroller = contentRef.current;
-    if (mode !== "customer" || !scroller) return;
+    if ((mode !== "customer" && mode !== "inventory") || !scroller) return;
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     const showScrollbar = () => {
       scroller.dataset.scrolling = "";
