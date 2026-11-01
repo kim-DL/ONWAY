@@ -23,4 +23,12 @@
 
 ## 배포
 
-배포 결과는 완료 후 기록. 복구 기준 Hosting version 0effeb5eff17031e.
+- 배포 시각: 2026-11-01 16:45 KST.
+- main 소스: `12a15648202a033369dfde43f12a81fd1a325c29`.
+- Firebase Hosting version: `5379c539c51de5aa`, 122개 산출물 배포 전후 해시 일치.
+- `onnuriway.com`과 `onnuriway.web.app` 공개 Hosting 검증 통과.
+- Hosting만 배포했으며 Functions/Rules/인증 설정/운영 데이터 변경 없음.
+- 복구 기준 Hosting version: `0effeb5eff17031e`.
+- [자동 CI 41285983636](https://github.com/kim-DL/ONWAY/actions/runs/41285983636)는 별도 실행 중. 로컬 검증 기반 배포이며 CI 통과로 보고하지 않음.
+- 운영 도메인에서 390px 브라우저 모바일 화면 확인. 새 버전 안내 확인 후 검증 탭에서만 나중에를 선택했으며 사용자 작업 탭을 새로고침하지 않음. 실제 휴대폰 검증과 구분.
+- 증거: `output/login-landing-release/`.
