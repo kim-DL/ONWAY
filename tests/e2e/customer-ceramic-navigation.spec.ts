@@ -19,6 +19,19 @@ async function open(page: Page, query = "", photos = true) {
   await expect(page.getByRole("group", { name: "거래처 빠른 메뉴" })).toBeVisible();
 }
 
+test("customer icons retain display dimensions before styles arrive", async ({ page }) => {
+  await open(page);
+  await page.locator("[data-customer-home] img").evaluateAll(async images => {
+    await Promise.all(images.map(image => (image as HTMLImageElement).decode()));
+    for (const sheet of Array.from(document.styleSheets)) sheet.disabled = true;
+  });
+  for (const icon of await page.locator("[data-customer-home] img").all()) {
+    const size = (await icon.boundingBox())!;
+    expect(size.width).toBe(await icon.getAttribute("data-icon") === "camera" ? 56 : 48);
+    expect(size.height).toBe(48);
+  }
+});
+
 test("four centered actions fit mobile and desktop without a navigation rail or reserved gap", async ({ page }, info) => {
   const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
   await open(page);

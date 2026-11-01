@@ -41,7 +41,9 @@ export function CustomerHome({ greeting, onOpenSearch, onRegister, onOpenDirecto
         disabled={registerDisabled && (name === "directory" || name === "register")}>
         {/* These tiny, pre-sized static WebPs need no image transformation service. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={styles.ceramicIcon} data-icon={name} alt="" src={`/ui/customer-ceramic-${name}-v1.webp`} /><span>{label}</span>
+        <img className={styles.ceramicIcon} data-icon={name} alt="" width={name === "camera" ? 56 : 48} height={48}
+          style={{ width: name === "camera" ? 56 : 48, height: 48, objectFit: name === "camera" ? "cover" : "contain" }}
+          src={`/ui/customer-ceramic-${name}-v1.webp`} /><span>{label}</span>
       </button> : null)}
     </div>
   </header>;
