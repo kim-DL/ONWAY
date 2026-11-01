@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-- **납품사진 버튼 복구(2026-11-01):** 16:45 로그인 릴리스의 운영 빌드에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` 주입이 누락되어 납품사진 버튼이 숨겨지고 등록 버튼이 하단 전체를 차지했다. 플래그를 활성화하여 복구하며, 새 표준 빌드 명령은 `npm run build:hosting`이다. 실제 운영 프로젝트에서 사진/재고 플래그가 누락되면 Next 빌드를 중단한다. 모바일 390px 합성 화면에서 4버튼과 사진 진입, 관련 단위 10개/lint·운영 build 및 PWA/성능/Hosting gate 통과. [복구 기록](releases/2026-11-01-delivery-photo-flag-restore.md). 배포 결과는 아래 기록에서 갱신한다.
+- **납품사진 버튼 복구 완료(2026-11-01 16:56 KST):** 16:45 로그인 릴리스의 운영 빌드에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` 주입이 누락되어 납품사진 버튼이 숨겨지고 등록 버튼이 하단 전체를 차지했다. 플래그를 활성화하여 복구하며, 새 표준 빌드 명령은 `npm run build:hosting`이다. 실제 운영 프로젝트에서 사진/재고 플래그가 누락되면 Next 빌드를 중단한다. 모바일 390px 합성 화면에서 4버튼과 사진 진입, 관련 단위 10개/lint·운영 build 및 PWA/성능/Hosting gate 통과. [복구 기록](releases/2026-11-01-delivery-photo-flag-restore.md). 소스 `6478f87`, Hosting `9c2e4115d58151ae`. 두 운영 주소 공개 검사와 AppShell 자산 해시 일치 확인. 자동 CI 41286720134는 진행 중, 실제 휴대폰은 미확인.
 
 - **로그인 랜딩 운영 반영 완료 (2026-11-01 16:45 KST)**: 급식길 블루 단일 배경, 로고 위/회사명 아래 중앙 정렬, 부드러운 글자 그림자, SVG/CSS 세라믹 3D 패널, 6칸 PIN. 작은 소개·재생 컨트롤·환영 문구·모션/PIN 사이 구분선은 제거. 자동 전환 4.2초/이동 1.1초, 모션 감소·탭 비활성 정지 유지. 기존 PIN/Google 인증·제출 잠금·오류 복구 유지. 로그인 CSS는 auth application과 함께 지연 로드하여 초기 CSS 23,045B/6,504B gzip 유지. 전용 CSS 12,303B/3,390B gzip은 별도 16KiB/4KiB 한도로 관리하며 기존 한도는 유지. 인증 단위 55개·관련 lint·운영 build/타입·PWA/성능/Hosting gate 통과. 실제 운영 빌드 데스크톱과 기존 320/390px 시안 확인. 실제 기기·운영 로그인 제출은 미검증. [릴리스 기록](releases/2026-11-01-login-landing.md). 소스 `12a1564`, Hosting `5379c539c51de5aa`, 122개 산출물 해시 일치. 두 운영 주소 공개 검증 통과. [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41285983636)는 별도 진행 중이며 통과로 보고하지 않음.
 
@@ -56,6 +56,7 @@
 - [범위별 검증 규칙](scoped-verification-20261031.md): 문서는 `docs`, 등록된 화면의 정적 JSX/CSS는 `ui`, 공용 표현은 `presentation`, CI 정책은 `policy`, 기능·보안·미분류 변경은 `full`. 관련 로컬 검사부터 실행하고 동일 결과를 반복하지 않는다.
 - CI 구성의 [전체 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41146903811)은 통과했다. [문서 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41148064803)은 plan/verify만 실행해 35초에 완료됐다. 이는 당시 측정이며 향후 시간 보장이 아니다.
 - 개발은 `npm run dev`. 단위 검사는 관련 파일을 지정하고 필요한 `npm run typecheck`와 lint를 실행한다. 전체 검사·운영 빌드는 변경 범위와 릴리스 조건에 맞춰 선택한다.
+- 운영 빌드는 `npm run build:hosting`으로 기존 납품사진/재고 플래그를 명시한다. 일반 `npm run build`는 운영 필수 플래그 누락 시 실패한다.
 - Hosting 배포는 별도 승인 범위와 검증된 후보만 사용한다. 상세 보안·데이터·배포 계약은 AGENTS.md를 따른다. 문서 정리 때문에 앱을 재빌드·재배포하지 않는다.
 
 ## 필요한 문서
