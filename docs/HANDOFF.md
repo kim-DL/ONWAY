@@ -4,7 +4,9 @@
 
 ## 현재 상태
 
-- 마지막 확인된 운영 배포: **2026-11-01 09:18 KST**, 소스 `1b603cf`, Hosting version `faf62df372bf411c` (복구 기준 `2c632f78ce31c7b2`). 모바일 거래처 웰컴/제목 영역만 좌우 12px 추가 여백(기본 시작점 약 24px)을 적용했다. CSS 한 줄 변경. 관련 레이아웃 2개(320/390/430/1280px)·화면 캡처 검토, 운영 build/PWA/성능/Hosting gate, [presentation CI](https://github.com/kim-DL/ONWAY/actions/runs/41255678608) 첫 실행 및 두 운영 주소 공개 검증 통과. 배포 전후 121개 산출물 해시 일치. 실제 기기/로그인 운영 화면은 이번 수정에서 재검증하지 않았다. 증거: `output/customer-heading-inset/`.
+- 마지막 확인된 운영 배포: **2026-11-01 09:51 KST**, 소스 `768992a`, Hosting version `3e25d714ea2457f3`. 첫 로딩 거래처 아이콘 확대 방지(width/height 48) 반영. 최종 CI 필수 14개 성공, build/PWA/성능/Hosting gate 및 두 주소 공개 검증 통과. [릴리스·검사 지연 기록](releases/2026-11-01-customer-icon-size.md). 실제 기기 첫 로딩은 미확인이다.
+
+- 직전 운영 배포: **2026-11-01 09:18 KST**, 소스 `1b603cf`, Hosting version `faf62df372bf411c` (복구 기준 `2c632f78ce31c7b2`). 모바일 거래처 웰컴/제목 영역만 좌우 12px 추가 여백(기본 시작점 약 24px)을 적용했다. CSS 한 줄 변경. 관련 레이아웃 2개(320/390/430/1280px)·화면 캡처 검토, 운영 build/PWA/성능/Hosting gate, [presentation CI](https://github.com/kim-DL/ONWAY/actions/runs/41255678608) 첫 실행 및 두 운영 주소 공개 검증 통과. 배포 전후 121개 산출물 해시 일치. 실제 기기/로그인 운영 화면은 이번 수정에서 재검증하지 않았다. 증거: `output/customer-heading-inset/`.
 
 - 프런트엔드: Next.js 정적 내보내기 → Firebase Hosting. 운영 주소는 [onnuriway.com](https://onnuriway.com), [onnuriway.web.app](https://onnuriway.web.app)이다.
 - 직전 주요 운영 배포: **2026-11-01 08:46 KST**, 검증 소스 `89a0a82`, Hosting version `2c632f78ce31c7b2`. 거래처 패널 크기·문구·좌우 여백과 재고 헤더 간격, 위치 필터 A안(짧은 구분선·밑줄 이동)을 반영했다. 최종 CI 필수 14개 job 및 운영 build/PWA/성능/Hosting gate, 두 운영 주소와 로그인 화면 검증이 통과했다. [배포·검증 기록](releases/2026-11-01-compact-customer-inventory.md)
@@ -14,7 +16,7 @@
 
 ## 로컬 작업
 
-- **첫 로딩 아이콘 크기 수정(로컬·미배포):** 거래처 세라믹 이미지의 크기가 지연 로딩 CSS에만 의존했다. 실제 컴포넌트의 스타일을 비활성화한 브라우저 검사에서 48px 대신 원본 192px 표시를 재현했다. 이미지 width/height 속성을 지정해 스타일 적용 전에는 모두 48×48px로 제한하고, 적용 후 카메라는 기존 56×48px을 유지한다. 재현/기존 레이아웃 브라우저 4개 및 CustomerHome 단위 3개 통과. 운영 첫 로딩에서 CSS 지연이 발생하는 정확한 타이밍은 별도 미확인이다.
+- **첫 로딩 아이콘 크기 수정(운영 반영 완료):** 거래처 세라믹 이미지의 크기가 지연 로딩 CSS에만 의존했다. 실제 컴포넌트의 스타일을 비활성화한 브라우저 검사에서 48px 대신 원본 192px 표시를 재현했다. 이미지 width/height 속성을 지정해 스타일 적용 전에는 모두 48×48px로 제한하고, 적용 후 카메라는 기존 56×48px을 유지한다. 재현/기존 레이아웃 브라우저 4개 및 CustomerHome 단위 3개 통과. 운영 첫 로딩에서 CSS 지연이 발생하는 정확한 타이밍은 별도 미확인이다.
 
 - **거래처·재고 후속 수정 운영 반영 완료:** 거래처 본문 좌우 12px, 패널 중앙·최대 18rem, 버튼 최소 높이 112px와 안쪽 여백 축소, 새 문구 4개를 적용했다. 재고 모바일 헤더/본문 간격 축소와 A안 필터를 반영했다. 실제 기기 확인은 남아 있다. [릴리스 기록](releases/2026-11-01-compact-customer-inventory.md)
 
