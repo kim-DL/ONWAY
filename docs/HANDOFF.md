@@ -4,8 +4,10 @@
 
 ## 현재 상태
 
+- 마지막 확인된 운영 배포: **2026-11-01 09:18 KST**, 소스 `1b603cf`, Hosting version `faf62df372bf411c` (복구 기준 `2c632f78ce31c7b2`). 모바일 거래처 웰컴/제목 영역만 좌우 12px 추가 여백(기본 시작점 약 24px)을 적용했다. CSS 한 줄 변경. 관련 레이아웃 2개(320/390/430/1280px)·화면 캡처 검토, 운영 build/PWA/성능/Hosting gate, [presentation CI](https://github.com/kim-DL/ONWAY/actions/runs/41255678608) 첫 실행 및 두 운영 주소 공개 검증 통과. 배포 전후 121개 산출물 해시 일치. 실제 기기/로그인 운영 화면은 이번 수정에서 재검증하지 않았다. 증거: `output/customer-heading-inset/`.
+
 - 프런트엔드: Next.js 정적 내보내기 → Firebase Hosting. 운영 주소는 [onnuriway.com](https://onnuriway.com), [onnuriway.web.app](https://onnuriway.web.app)이다.
-- 마지막 확인된 운영 배포: **2026-11-01 08:46 KST**, 검증 소스 `89a0a82`, Hosting version `2c632f78ce31c7b2`. 거래처 패널 크기·문구·좌우 여백과 재고 헤더 간격, 위치 필터 A안(짧은 구분선·밑줄 이동)을 반영했다. 최종 CI 필수 14개 job 및 운영 build/PWA/성능/Hosting gate, 두 운영 주소와 로그인 화면 검증이 통과했다. [배포·검증 기록](releases/2026-11-01-compact-customer-inventory.md)
+- 직전 주요 운영 배포: **2026-11-01 08:46 KST**, 검증 소스 `89a0a82`, Hosting version `2c632f78ce31c7b2`. 거래처 패널 크기·문구·좌우 여백과 재고 헤더 간격, 위치 필터 A안(짧은 구분선·밑줄 이동)을 반영했다. 최종 CI 필수 14개 job 및 운영 build/PWA/성능/Hosting gate, 두 운영 주소와 로그인 화면 검증이 통과했다. [배포·검증 기록](releases/2026-11-01-compact-customer-inventory.md)
 - main에 범위별 검사 규칙과 문서 정리, 유리 버튼 개선이 반영됐다. 제품 source와 후속 결과 문서 커밋은 구분한다. Git의 최신 HEAD는 명령으로 확인한다.
 - 로딩·로그인·유리 모드 버튼과 시작 경로 최적화는 운영 반영됐다. 모드 표기는 `거래처 · 학교 · 영업 · 재고`, 버튼은 권한에 따라 표시한다. [UI 결정](glass-mode-navigation-20261030.md) · [최적화 결과](app-optimization-20261030.md)
 - Android 설치형 PWA의 밝은 화면과 짙은 테마 설정 불일치를 수정했다. **실제 시스템 버튼의 대비 개선은 아직 미확인**이다. [조사와 검증 경계](android-system-bar-20261031.md)
