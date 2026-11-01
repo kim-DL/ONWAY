@@ -7,7 +7,7 @@ test("delivery photo loading copy, progress and delayed detail are centered", as
   await page.route("http://photo-loading.test/**", route => route.fulfill({contentType:"text/html", body:
     `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}*{box-sizing:border-box}${fixture.css}</style><div id="root"></div><script>${fixture.script.replaceAll("</script>","<\\/script>")}</script></html>`}));
   await page.goto("http://photo-loading.test/");
-  await expect(page.getByRole("status")).toHaveCount(2);
+  await expect(page.getByRole("status")).toHaveCount(3);
   await page.clock.fastForward(10000);
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({width,height:844});

@@ -14,12 +14,13 @@ interface LoadingStatusProps {
   indicator?: boolean;
   className?: string | undefined;
   startedAt?: number | undefined;
+  centered?: boolean;
 }
 
-export function LoadingStatus({ as: Element = "div", label, detail, indicator = true, className, startedAt }: LoadingStatusProps) {
+export function LoadingStatus({ as: Element = "div", label, detail, indicator = true, className, startedAt, centered }: LoadingStatusProps) {
   const stage = useLoadingStage(startedAt);
   return (
-    <Element className={cn(styles.status, className)} role="status" aria-live="polite" data-loading-status>
+    <Element className={cn(styles.status, className)} style={centered ? { alignItems: "center", textAlign: "center" } : undefined} role="status" aria-live="polite" data-loading-status>
       <span className={styles.label}>{label}</span>
       {indicator ? <LoadingIndicator decorative startedAt={startedAt} /> : null}
       {detail && stage === 2 ? <span className={styles.detail}>{detail}</span> : null}

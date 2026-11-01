@@ -32,6 +32,6 @@ export function WorkspaceFeatureLoading({ mode, label = labels[mode] }: { mode: 
         <div className={styles.copy}><LoadingSkeleton kind="text" /><LoadingSkeleton kind="text" /></div>
         {mode === "inventory" ? <LoadingSkeleton kind="text" className={styles.quantity} /> : null}
       </div>)}</div>}
-    <LoadingStatus label={label} detail="필요한 화면을 불러오고 있습니다." startedAt={startedAt} />
+    <LoadingStatus centered={mode === "delivery"} label={label} detail="필요한 화면을 불러오고 있습니다." startedAt={startedAt} />
   </section>;
 }
