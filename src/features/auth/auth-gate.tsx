@@ -8,6 +8,9 @@ import { LoadingStatus } from "@/components/ui/loading-status";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import { useAuth } from "./auth-context";
 import { AuthBrand, AuthHeader, AuthLoadingScreen, useLaunchTiming } from "./auth-loading";
+import { LoginMotion } from "./login-motion";
+import "@/app/styles/login-landing.css";
+import "@/app/styles/login-motion.css";
 
 function AppShellFallback() {
   return <AuthLoadingScreen stage="workspace" />;
@@ -26,7 +29,7 @@ function PinIndicator({ length }: { length: number }) {
   return (
     <div className="pin-indicator" aria-hidden="true">
       {Array.from({ length: 6 }, (_, index) => (
-        <span key={index} data-filled={index < length} />
+        <span key={index} data-filled={index < length} data-current={index === length} />
       ))}
     </div>
   );
@@ -84,19 +87,16 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
 
   return (
     <main className="auth-shell auth-shell--login">
-      <AuthHeader />
+      <AuthHeader company />
       <section className="login-story" aria-label="급식길 소개">
         <div className="login-story__copy">
-          <p className="auth-eyebrow">온누리종합식품 현장 업무</p>
-          <h1>오늘의 업무를<br /><em>시작합니다.</em></h1>
-          <p>납품부터 재고까지, 필요한 업무를 한곳에서.</p>
+          <h1>좋은 하루의 시작,<br /><em>급식길에서.</em></h1>
         </div>
+        <LoginMotion />
       </section>
 
-      <section className="login-panel" aria-labelledby="pin-title">
+      <section className="login-panel" aria-label="직원 PIN 로그인">
         <div className="login-card">
-          <h2 id="pin-title">6자리 PIN을<br />입력해주세요.</h2>
-
           <form onSubmit={submit} className="pin-form">
             <label htmlFor="employee-pin">직원 PIN</label>
             <div className="pin-field" onClick={() => inputRef.current?.focus()}>
@@ -110,7 +110,6 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
                 pattern="[0-9]*"
                 maxLength={6}
                 autoComplete="off"
-                autoFocus
                 data-1p-ignore
                 disabled={submitting || adminSubmitting}
                 value={pin}
@@ -129,7 +128,7 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
               {submitting ? <LoadingIndicator size="small" tone="inherit" decorative startedAt={startedAt} /> : <span aria-hidden="true">→</span>}
             </button>
           </form>
-          <div className="admin-login-separator"><span>또는</span></div>
+          <div className="admin-login-separator" aria-hidden="true" />
           <button
             className="admin-google-login"
             type="button"
@@ -151,7 +150,7 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
             ) : null}
           </div>
         </div>
-        <p className="login-support">PIN을 잊으셨나요? 운영 관리자에게 문의해주세요.</p>
+        <details className="login-support"><summary>PIN을 잊으셨나요?</summary><p>운영 관리자에게 문의해주세요.</p></details>
       </section>
     </main>
   );

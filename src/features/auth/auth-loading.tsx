@@ -30,17 +30,17 @@ export function LaunchTimingProvider({ children }: { children: ReactNode }) {
 
 export const useLaunchTiming = () => useContext(LaunchTimingContext);
 
-export function AuthBrand() {
+export function AuthBrand({ company = false }: { company?: boolean } = {}) {
   return (
-    <div className="auth-brand" aria-label="급식길">
+    <div className="auth-brand" aria-label={company ? "온누리종합식품" : "급식길"}>
       <span className="auth-brand__mark" aria-hidden="true"><AppIconMark variant="auth" /></span>
-      <span><strong>급식길</strong><small>온누리종합식품</small></span>
+      <span><strong>{company ? "온누리종합식품" : "급식길"}</strong>{company ? null : <small>온누리종합식품</small>}</span>
     </div>
   );
 }
 
-export function AuthHeader() {
-  return <header className="auth-header"><AuthBrand /></header>;
+export function AuthHeader({ company = false }: { company?: boolean } = {}) {
+  return <header className="auth-header"><AuthBrand company={company} /></header>;
 }
 
 const launchLabels = {

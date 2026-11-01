@@ -1,0 +1,58 @@
+/* A CSS 3D stage with original SVG objects. No video, image asset or WebGL runtime. */
+.login-motion { width: 100%; margin: 24px auto 0; position: relative; isolation: isolate; }
+.login-motion__stage { --pointer-x: 0deg; --pointer-y: 0deg; height: 360px; width: min(100%, 640px); margin: auto; perspective: 1050px; }
+.login-motion__rig { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateX(var(--pointer-y)) rotateY(var(--pointer-x)); transition: transform 550ms cubic-bezier(.2,.7,.2,1); }
+.login-motion__floor { position: absolute; left: 50%; bottom: -40px; width: 410px; height: 180px; transform: translateX(-50%) rotateX(65deg); border-radius: 50%; background: radial-gradient(ellipse, #7aa49525, #a1c7b90a 45%, transparent 72%); filter: blur(10px); pointer-events: none; }
+.motion-panel { width: 224px; height: 270px; position: absolute; top: 42px; left: calc(50% - 112px); transform-style: preserve-3d; transition: transform 1100ms cubic-bezier(.22,.8,.18,1), filter 1000ms ease; will-change: transform; }
+.motion-panel::before { content: ""; position: absolute; inset: 0; border-radius: 23px; background: linear-gradient(140deg, #e6e8dc, #99afa4 58%, #d5deca); transform: translate3d(3px, 7px, -6px); box-shadow: 0 22px 30px #4c655b29, 0 5px 8px #52655420; }
+.motion-panel[data-position="0"] { transform: translate3d(0, 0, 80px) rotateX(7deg) rotateY(-10deg) rotateZ(-3deg); z-index: 3; filter: brightness(1); }
+.motion-panel[data-position="1"] { transform: translate3d(160px, -10px, -150px) rotateX(9deg) rotateY(-24deg) rotateZ(11deg); z-index: 2; filter: brightness(.96) saturate(.85); }
+.motion-panel[data-position="2"] { transform: translate3d(-160px, -27px, -150px) rotateX(9deg) rotateY(24deg) rotateZ(-12deg); z-index: 1; filter: brightness(.96) saturate(.85); }
+.motion-panel__face { position: absolute; inset: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 23px; padding: 21px 21px 20px; background: linear-gradient(145deg, #fffdf6 0%, #f1f2e9 48%, #e1e7dc 100%); border: 1px solid #fbfff7; box-shadow: inset 0 1px 1px #fff, inset -1px -2px 3px #59756b24; backface-visibility: hidden; }
+.motion-art { display: block; flex: 1; min-height: 0; width: calc(100% + 26px); margin: 8px -13px 0; overflow: visible; }
+.motion-panel__bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; color: #28483f; }
+.motion-panel__bottom strong { font-size: 21px; letter-spacing: -.055em; font-weight: 720; }
+.motion-panel__check { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; border: 1px solid #c2d4c3; background: #f6faf0; box-shadow: 0 2px 3px #4e785014; }
+.motion-panel__check svg { width: 15px; height: 15px; fill: none; stroke: #4d8e6b; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.motion-panel__check path { stroke-dasharray: 16; stroke-dashoffset: 16; transition: stroke-dashoffset 500ms ease 850ms; }
+.motion-panel[data-position="0"] .motion-panel__check path { stroke-dashoffset: 0; }
+.motion-panel__sheen { pointer-events: none; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 15%, #ffffff00 30%, #ffffff60 42%, #ffffff00 54%, transparent 80%); transform: translateX(-130%); }
+.motion-panel[data-position="0"] .motion-panel__sheen { animation: motion-sheen 1600ms ease 400ms both; }
+.motion-directory__row { transform-box: fill-box; transform-origin: center; }
+.motion-panel[data-position="0"] .motion-directory__row { animation: directory-assemble 900ms cubic-bezier(.2,.8,.2,1) calc(350ms + var(--row) * 140ms) both; }
+.motion-magnifier { transform-origin: 99px 106px; }
+.motion-panel[data-position="0"] .motion-magnifier { animation: directory-find 3600ms cubic-bezier(.4,0,.2,1) 600ms both; }
+.motion-panel[data-position="0"] .motion-camera__iris { transform-origin: 111px 100px; animation: camera-focus 3200ms cubic-bezier(.3,0,.2,1) 350ms both; }
+.motion-camera__flash { opacity: 0; }
+.motion-panel[data-position="0"] .motion-camera__flash { animation: camera-flash 2800ms ease 450ms both; }
+.motion-receipt { transform-origin: 165px 80px; }
+.motion-panel[data-position="0"] .motion-receipt { animation: receipt-arrive 1200ms cubic-bezier(.2,.8,.2,1) 1300ms both; }
+.motion-carton { transform-box: fill-box; transform-origin: center; }
+.motion-panel[data-position="0"] .motion-carton { animation: carton-stack 1100ms cubic-bezier(.2,.8,.2,1) calc(300ms + var(--carton) * 250ms) both; }
+.login-motion[data-running="false"] *, .login-motion[data-running="false"] *::after { animation: none !important; }
+@keyframes motion-sheen { from { transform: translateX(-130%); } to { transform: translateX(130%); } }
+@keyframes directory-assemble { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes directory-find { 0%,100% { transform: translate(0,0) rotate(0deg); } 38% { transform: translate(18px,-11px) rotate(7deg); } 70% { transform: translate(13px,8px) rotate(-4deg); } }
+@keyframes camera-focus { 0%,100% { rotate: 0deg; scale: 1; } 40% { rotate: 35deg; scale: .76; } 55% { rotate: 35deg; scale: .76; } 72% { rotate: 0deg; scale: 1; } }
+@keyframes camera-flash { 0%,42%,58%,100% { opacity: 0; } 48%,50% { opacity: .95; } }
+@keyframes receipt-arrive { from { opacity: 0; transform: translateY(28px) rotate(-8deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
+@keyframes carton-stack { from { opacity: 0; transform: translateY(-22px); } to { opacity: 1; transform: translateY(0); } }
+@media (min-width: 841px) and (max-height: 850px) {
+  .auth-shell--login .auth-header { min-height: 88px; padding-block: 20px; }
+  .auth-shell--login .login-story { padding-top: 12px; }
+  .login-motion { margin-top: 8px; }
+  .login-motion__stage { height: 310px; }
+  .login-motion__rig { scale: .88; transform-origin: center 45%; }
+}
+@media (max-width: 840px) {
+  .login-motion { margin: 12px auto 20px; }
+  .login-motion__stage { width: 100%; height: 208px; }
+  .login-motion__rig { scale: .61; transform-origin: center 0; }
+  .motion-panel { top: 30px; }
+  .login-motion__floor { width: 280px; bottom: -20px; height: 120px; }
+}
+@media (max-width: 359px) { .login-motion__rig { scale: .55; } .login-motion__stage { height: 207px; } }
+@media (prefers-reduced-motion: reduce) {
+  .login-motion *, .login-motion *::after { animation: none !important; transition: none !important; }
+  .login-motion__rig { transform: none; }
+}
