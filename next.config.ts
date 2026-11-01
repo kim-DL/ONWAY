@@ -3,6 +3,15 @@ import { randomUUID } from "node:crypto";
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 
+// Production already exposes both modes. Never silently compile them away.
+if (process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === "onnuriway") {
+  for (const flag of ["NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS", "NEXT_PUBLIC_ENABLE_INVENTORY"]) {
+    if (process.env[flag] !== "true") {
+      throw new Error(`Production requires ${flag}=true. Use npm run build:hosting.`);
+    }
+  }
+}
+
 const pwaBuildRevision =
   process.env.VERCEL_GIT_COMMIT_SHA ??
   process.env.GITHUB_SHA ??

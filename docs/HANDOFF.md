@@ -4,6 +4,8 @@
 
 ## 현재 상태
 
+- **납품사진 버튼 복구(2026-11-01):** 16:45 로그인 릴리스의 운영 빌드에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` 주입이 누락되어 납품사진 버튼이 숨겨지고 등록 버튼이 하단 전체를 차지했다. 플래그를 활성화하여 복구하며, 새 표준 빌드 명령은 `npm run build:hosting`이다. 실제 운영 프로젝트에서 사진/재고 플래그가 누락되면 Next 빌드를 중단한다. 모바일 390px 합성 화면에서 4버튼과 사진 진입, 관련 단위 10개/lint·운영 build 및 PWA/성능/Hosting gate 통과. [복구 기록](releases/2026-11-01-delivery-photo-flag-restore.md). 배포 결과는 아래 기록에서 갱신한다.
+
 - **로그인 랜딩 운영 반영 완료 (2026-11-01 16:45 KST)**: 급식길 블루 단일 배경, 로고 위/회사명 아래 중앙 정렬, 부드러운 글자 그림자, SVG/CSS 세라믹 3D 패널, 6칸 PIN. 작은 소개·재생 컨트롤·환영 문구·모션/PIN 사이 구분선은 제거. 자동 전환 4.2초/이동 1.1초, 모션 감소·탭 비활성 정지 유지. 기존 PIN/Google 인증·제출 잠금·오류 복구 유지. 로그인 CSS는 auth application과 함께 지연 로드하여 초기 CSS 23,045B/6,504B gzip 유지. 전용 CSS 12,303B/3,390B gzip은 별도 16KiB/4KiB 한도로 관리하며 기존 한도는 유지. 인증 단위 55개·관련 lint·운영 build/타입·PWA/성능/Hosting gate 통과. 실제 운영 빌드 데스크톱과 기존 320/390px 시안 확인. 실제 기기·운영 로그인 제출은 미검증. [릴리스 기록](releases/2026-11-01-login-landing.md). 소스 `12a1564`, Hosting `5379c539c51de5aa`, 122개 산출물 해시 일치. 두 운영 주소 공개 검증 통과. [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41285983636)는 별도 진행 중이며 통과로 보고하지 않음.
 
 - 마지막 확인된 운영 배포: **2026-11-01 10:45 KST**, 소스 `d307af6`, Hosting version `0effeb5eff17031e` (복구 기준 `fea8a4a2901e1c22`). 납품사진의 첫 화면/오늘 납품처/최신 목록 확인 로딩 문구·진행선·지연 안내를 가로 중앙 정렬했다. 다른 화면은 기본 정렬 유지. 관련 브라우저 2개(320/390/1280px)·단위 27개/lint, 운영 build/PWA/성능/Hosting gate·두 운영 주소 공개 검증 통과. 산출물 121개 해시 일치. 로컬 검증을 기준으로 배포했고 [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41262355323)는 별도 진행 중이다. CSS/JS 용량 초과는 중복 스타일을 정리해 해결했으며 교체된 CI 41261954510/41262253534는 취소했다. 실제 기기/로그인 운영 화면 재검증은 하지 않았다. 증거: `output/delivery-photo-loading-release/`.

@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
+    "build:hosting": "node scripts/build-hosting.mjs",
     "start": "node scripts/serve-hosting-local.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit && npm run typecheck --workspace functions",
