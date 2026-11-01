@@ -16,4 +16,8 @@ AuthProvider는 `fromCache`인 authz 스냅샷을 인증 근거로 사용하지 
 
 ## 배포
 
-운영 build와 필수 산출물 검사 후 Hosting 복구 결과를 기록한다.
+- 2026-11-01 17:05 KST, Hosting `f341f4ea489a61e7` 반영 완료. 소스 `2283a6c388b9bdca06ef52a6caf756e6b53115d1`.
+- `npm run build:hosting`/TypeScript 및 PWA·성능·Hosting gate 통과. 납품사진/재고 운영 플래그 유지.
+- 두 운영 주소 공개 검증과 인증 application 자산 총 12개 해시 일치 확인. 122개 로컬 산출물의 배포 전후 해시 일치.
+- [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41287320489)는 진행 중이며 통과로 보고하지 않음. 관련 로컬 검증과 실제 SDK 재현을 근거로 긴급 복구.
+- Hosting만 배포. Functions/Rules/인증 설정/운영 데이터는 변경하지 않음. 실제 휴대폰 재로그인은 사용자 확인이 남아 있음.

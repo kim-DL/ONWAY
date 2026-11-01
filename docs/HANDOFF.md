@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-- **PIN 재로그인 대기 복구(2026-11-01):** 로그아웃 후 같은 계정으로 로그인할 때 Firestore 캐시/서버 권한 데이터가 같으면 서버 확인 메타데이터 이벤트가 생략되어 resolving에 머물렀다. authz 구독에 `includeMetadataChanges: true`를 추가했고 서버 확인 전 접근 금지와 권한 취소/세대 보호를 유지했다. 관련 인증 58개·로컬 실제 SDK 에뮬레이터 재현 통과. [복구 기록](releases/2026-11-01-auth-relogin-metadata.md).
+- **PIN 재로그인 대기 복구 완료(2026-11-01 17:05 KST):** 로그아웃 후 같은 계정으로 로그인할 때 Firestore 캐시/서버 권한 데이터가 같으면 서버 확인 메타데이터 이벤트가 생략되어 resolving에 머물렀다. authz 구독에 `includeMetadataChanges: true`를 추가했고 서버 확인 전 접근 금지와 권한 취소/세대 보호를 유지했다. 관련 인증 58개·로컬 실제 SDK 에뮬레이터 재현 통과. [복구 기록](releases/2026-11-01-auth-relogin-metadata.md). 소스 `2283a6c`, Hosting `f341f4ea489a61e7`, 운영 build/PWA/성능/Hosting gate 및 두 주소 인증 자산 일치 확인. 자동 CI 41287320489는 진행 중, 실제 모바일 재로그인은 미확인.
 
 - **납품사진 버튼 복구 완료(2026-11-01 16:56 KST):** 16:45 로그인 릴리스의 운영 빌드에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` 주입이 누락되어 납품사진 버튼이 숨겨지고 등록 버튼이 하단 전체를 차지했다. 플래그를 활성화하여 복구하며, 새 표준 빌드 명령은 `npm run build:hosting`이다. 실제 운영 프로젝트에서 사진/재고 플래그가 누락되면 Next 빌드를 중단한다. 모바일 390px 합성 화면에서 4버튼과 사진 진입, 관련 단위 10개/lint·운영 build 및 PWA/성능/Hosting gate 통과. [복구 기록](releases/2026-11-01-delivery-photo-flag-restore.md). 소스 `6478f87`, Hosting `9c2e4115d58151ae`. 두 운영 주소 공개 검사와 AppShell 자산 해시 일치 확인. 자동 CI 41286720134는 진행 중, 실제 휴대폰은 미확인.
 
