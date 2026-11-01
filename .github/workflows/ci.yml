@@ -14,6 +14,7 @@ jobs:
     outputs:
       profile: ${{ steps.scope.outputs.profile }}
       required: ${{ steps.scope.outputs.required }}
+      areas: ${{ steps.scope.outputs.areas }}
     steps:
       - name: Checkout complete change range
         uses: actions/checkout@v7
@@ -24,9 +25,15 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Verify scope classifier
-        run: node --test scripts/ci-scope.test.mjs
+        env:
+          CI_TYPESCRIPT_PATH: ${{ runner.temp }}/ci-parser/node_modules/typescript
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ci-parser" --ignore-scripts --no-audit --no-fund --package-lock=false typescript@6.0.3
+          node --test scripts/ci-scope.test.mjs scripts/ci-policy.test.mjs
       - name: Select required checks
         id: scope
+        env:
+          CI_TYPESCRIPT_PATH: ${{ runner.temp }}/ci-parser/node_modules/typescript
         run: node scripts/ci-scope.mjs
   # Independent jobs keep successful checks reusable when a failed job is rerun.
   audit:
@@ -205,6 +212,45 @@ jobs:
           chromium: "true"
       - name: Delivery photo field and durable queue regression
         run: node scripts/firebase-emulators.mjs delivery-photo-frontend-e2e
+  ui:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'ui') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+        with:
+          chromium: "true"
+      - name: Test affected UI areas
+        run: node scripts/run-ui-checks.mjs
+        env:
+          UI_AREAS: ${{ needs.plan.outputs.areas }}
+  ci-policy:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.required), 'ci-policy') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up CI runtime
+        uses: ./.github/actions/setup-ci
+      - name: Scope and required-result regression
+        run: |
+          node --test scripts/ci-scope.test.mjs scripts/ci-policy.test.mjs
+          npx vitest run src/lib/ci-results.test.ts
+      - name: Check workflow syntax
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" -o "$RUNNER_TEMP/actionlint.tar.gz"
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -shellcheck="" .github/workflows/ci.yml
   presentation:
     needs: plan
     if: ${{ contains(fromJSON(needs.plan.outputs.required), 'presentation') }}
@@ -227,6 +273,8 @@ jobs:
     needs:
       - plan
       - presentation
+      - ui
+      - ci-policy
       - audit
       - lint
       - typecheck

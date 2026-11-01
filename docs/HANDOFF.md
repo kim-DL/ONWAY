@@ -37,7 +37,9 @@
 
 ## 작업·검증 방법
 
-- [범위별 검증 규칙](scoped-verification-20261031.md): 문서는 `docs`, 허용된 표현 변경은 `presentation`, 기능·보안·설정·불확실 변경은 `full`. 관련 로컬 검사부터 실행하고 동일 결과를 반복하지 않는다.
+- **CI 범위 개선(2026-11-01):** 사용자 요청으로 AGENTS.md 검사 강제 규칙 삭제. 정적 JSX/CSS 변경은 화면별 ui 경로(거래처·재고·헤더/웰컴·영업 카드/지역 필터), CI 정책만 변경하면 policy 경로로 검사한다. 실제 아이콘 수정 범위가 ui로 분류되는 것을 확인했다. 이벤트·동적 코드·권한·저장·미분류 변경은 full 유지. [현재 자동 CI 동작](scoped-verification-20261031.md). 앱 소스/Hosting 변경은 없다.
+
+- [범위별 검증 규칙](scoped-verification-20261031.md): 문서는 `docs`, 등록된 화면의 정적 JSX/CSS는 `ui`, 공용 표현은 `presentation`, CI 정책은 `policy`, 기능·보안·미분류 변경은 `full`. 관련 로컬 검사부터 실행하고 동일 결과를 반복하지 않는다.
 - CI 구성의 [전체 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41146903811)은 통과했다. [문서 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41148064803)은 plan/verify만 실행해 35초에 완료됐다. 이는 당시 측정이며 향후 시간 보장이 아니다.
 - 개발은 `npm run dev`. 단위 검사는 관련 파일을 지정하고 필요한 `npm run typecheck`와 lint를 실행한다. 전체 검사·운영 빌드는 변경 범위와 릴리스 조건에 맞춰 선택한다.
 - Hosting 배포는 별도 승인 범위와 검증된 후보만 사용한다. 상세 보안·데이터·배포 계약은 AGENTS.md를 따른다. 문서 정리 때문에 앱을 재빌드·재배포하지 않는다.

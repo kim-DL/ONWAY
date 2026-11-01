@@ -1,51 +1,33 @@
-# 변경 범위에 맞는 검증과 릴리스
+# 변경 범위에 따른 GitHub Actions
 
-2026-10-31 사용자가 작은 수정마다 전체 검사로 시간·토큰이 낭비되는 문제를 지적하고 릴리스 규칙 수정을 요청했다. 이 문서와 AGENTS.md가 이전의 항상 전체 검사를 요구하던 운영 방식을 대체한다.
+2026-11-01: 작은 UI 변경에 전체 회귀가 실행되는 문제를 줄였다. AGENTS.md의 검사 강제 규칙은 사용자 요청으로 삭제했다. 이 문서는 자동 CI의 현재 구현을 설명한다.
 
-## 기본 원칙
-
-검증 강도는 변경 영향에 비례한다. 로컬에서는 변경 동작과 직접 관련된 검사부터 실행하고, 실제 실패·영향 불확실성·인증/데이터/보안/공유 기반 변경에만 확대한다. 전체 CI와 같은 회귀를 로컬에서 한 번 더 돌리지 않는다. 최종 코드를 확정하기 전에 전체 CI를 먼저 실행하지 않는다.
-
-운영 Hosting 배포에는 운영 형식 build와 PWA·성능·Hosting gate, 배포 후 공개 HTTP·관련 화면 smoke 확인이 필요하다. 같은 소스·설정·파일 해시로 이미 통과한 빌드와 검사 결과는 재사용한다. 문서 후속 커밋 때문에 제품을 재빌드/재배포하지 않는다. 코드나 환경이 달라졌으면 재사용하지 않는다.
-
-축소 CI는 그 변경 범위의 검증이다. 릴리스 시에는 기준 제품 코드의 성공한 검증 이력도 확인한다. 앞선 제품 커밋이 실패·취소·미검증 상태라면 이후 docs/presentation 성공으로 덮어 배포하지 않는다. 미검증 누적 변경을 포함하는 관련 검사 또는 수동 full을 완료한다. 문서 전용 CI는 제품 릴리스 검증의 대체 증거가 아니다.
-
-## 자동 CI 범위
-
-| 프로필 | 변경 범위 | 실행 |
+| 프로필 | 변경 | 실행 |
 | --- | --- | --- |
-| docs | docs 아래 Markdown 및 저장소 루트 Markdown만 | 의존성 설치 없이 plan 자체 회귀 + 최종 verify |
-| presentation | 기존 허용 스타일/이미지, 제한된 테마 선언만 | lint·typecheck·unit·운영 build/PWA/성능 + 모바일/데스크톱 헤더·로그인·로딩 UI 회귀 |
-| full | 기능 로직·인증·권한·저장·사진·캐시·서버·Rules·의존성·빌드/CI 설정, 미분류/불확실 변경 | 기존 독립 검사 12개와 최종 verify 유지 |
+| docs | Markdown만 | 분류기 회귀와 최종 판정. 앱 의존성 설치·빌드 없음 |
+| ui | 등록된 화면의 정적인 JSX 표현 또는 CSS, 함께 바뀐 관련 테스트 | lint·typecheck·운영 build/PWA/성능·해당 화면의 단위/브라우저 검사 |
+| presentation | 기존 공용 스타일·래스터 에셋·제한된 테마 선언 | lint·typecheck·unit·운영 build/PWA/성능·공용 헤더/로그인/로딩 검사 |
+| policy | 등록된 CI 워크플로·분류/판정/실행 스크립트와 관련 테스트만 | 분류기·최종 판정 회귀·actionlint. 앱 빌드/브라우저/에뮬레이터 없음 |
+| full | 로직·권한·저장·인증·의존성·기타 설정·미분류·불확실 변경 | 기존 전체 검사 |
 
-- presentation 허용 스타일은 auth-loading.css, brand-motion.css, app-shell.css다. 기존 public/brand·ui·icons의 PNG/WebP/JPEG/ICO 교체도 포함한다. 새로운 파일·삭제·이동은 full이다. SVG/JS는 포함하지 않는다.
-- layout.tsx는 literal themeColor/colorScheme 선언, app-metadata.ts는 literal themeColor/backgroundColor와 주석, base.css는 color-scheme 선언만 제거했을 때 변경 전후 전체 파일이 같아야 한다. 공용 파일의 다른 코드·앱 식별자·권한 변경을 테마 변경으로 오분류하지 않는다. 관련 app-metadata.test.ts 수정은 허용한다.
-- 비문서 파일 12개 초과 또는 문서를 포함한 diff 500줄 초과는 full이다. Markdown만 바뀐 큰 문서 정리는 docs다.
-- 일반 기능 변경의 로컬 검사는 관련 기능만 우선한다. 자동 CI에서 기능별 축소는 아직 하지 않는다. 의존관계가 입증되지 않은 경로를 추정으로 면제하지 않고 full을 유지한다. 추후 실제 비용과 영향 범위를 확인한 기능만 별도 allowlist로 추가한다.
-- presentation에도 빠른 전체 unit은 유지한다. 시간이 큰 인증·사진 에뮬레이터와 전체 브라우저는 생략한다. UI job은 기존 header-layout/loading-experience 전체 파일을 두 Chromium 프로젝트로 실행하며 assertion·timeout·retry를 변경하지 않는다. Next dev/Java/Firebase emulator를 시작하지 않는다.
+## 작은 UI 변경 판별
 
-## diff와 최종 판정
+- `scripts/ui-change-scope.mjs`의 화면별 목록에 소스와 관련 단위·브라우저 테스트를 명시한다. 현재 거래처 홈, 재고 화면, 헤더/웰컴, 영업 카드/지역 필터를 지원한다.
+- TypeScript 구문 트리로 전체 변경 전후 소스를 비교한다. intrinsic JSX의 정적인 className/style/width/height 및 문구만 제외했을 때 나머지 소스가 같아야 한다. 문자열·주석에 숨은 코드나 이벤트/함수/동적 표현식/커스텀 컴포넌트 prop 변경은 면제하지 않는다.
+- 해당 화면의 CSS와 짝지어진 테스트를 함께 수정할 수 있다. 여러 화면 변경은 관련 검사 목록의 합집합을 실행한다. 테스트 실행기는 등록된 화면 이름만 받는다.
+- `ui`는 전체 unit·전체 browser·사진·서버·에뮬레이터 검사를 실행하지 않는다. 예를 들어 거래처 아이콘 width/height만 변경하면 CustomerHome 단위 및 customer-ceramic-navigation 두 브라우저 프로젝트를 실행한다.
+- 공용 CSS/이미지는 영향이 여러 화면에 걸치므로 기존 presentation 검사를 유지한다. 매핑되지 않은 화면은 추정으로 축소하지 않는다.
 
-`scripts/ci-scope.mjs`가 push의 before→검사 HEAD, PR base→검사 merge HEAD 전체를 비교한다. 마지막 커밋만 보는 방식으로 앞선 기능 변경을 놓치지 않는다. checkout은 전체 history를 가져오고 rename 감지를 끄며 NUL로 경로를 분리해 이름에 공백이 있어도 양쪽 경로를 보존한다. base 부재·초기 push·비조상 관계·git 오류는 full이다. 수동 workflow_dispatch는 항상 full로 확대한다.
+## 변경 범위와 최종 판정
 
-workflow-level paths-ignore로 실행 자체를 없애지 않는다. plan/verify를 항상 남겨 required check가 영원히 pending이 되는 일을 피한다. 최종 `verify-ci-results.mjs`는 성공한 plan의 프로필과 canonical job 목록을 다시 대조한다. 선택된 job은 success, 제외한 job은 skipped여야 한다. 필수 job skip·실패·취소·누락·알 수 없는 프로필·위조/불완전한 목록은 실패한다. 분류기와 최종 판정 코드를 바꾸면 full로 검증한다.
-
-기존 job은 plan 이후 병렬로 실행하며 실패 작업만 재실행한다. 성공 job의 무조건 반복과 실패를 통과 처리하는 우회는 금지한다. workflow·환경·검사 기준이 바뀌었으면 새 커밋을 검증한다. PR 검사 후 main 검사 생략을 단순 SHA 추정으로 구현하지 않는다. 필요한 최종 main 판정을 유지하며 검증을 위해 불필요한 PR을 추가 생성하지 않는다.
-
-## 로컬 작업과 보고 비용
-
-1. diff와 영향 경계를 확인하고 필요한 검사 목록을 정한다.
-2. 작은 UI 작업은 관련 단위·브라우저 검사와 필요한 lint/typecheck만 실행한다. 단순 문구 수정에 의미 없는 새 테스트를 만들지 않는다.
-3. 실패하면 해당 원인을 조사하고 영향이 드러난 범위만 확대한다. 이후 동일 커밋의 통과 검사를 습관적으로 반복하지 않는다.
-4. 릴리스는 source·환경·빌드 해시를 고정하고 필요한 CI와 Hosting 검증을 연결한다. 앱 코드가 그대로인 CI 규칙 수정만으로 Hosting을 다시 배포하지 않는다.
-5. CI 대기 중에는 상태·실패 요약만 조회한다. 전체 로그 반복 출력, 동일 결과를 확인하는 중복 도구 호출, 변화 없는 반복 방송을 피한다.
+- push의 before→HEAD, PR의 base→검사 merge HEAD 전체를 비교한다. 마지막 커밋만 보고 앞선 기능 변경을 누락하지 않는다.
+- 런타임 추가/삭제/이동, 12개 초과 파일, 500줄 초과 diff, 기준 커밋 누락·비조상·읽기 실패는 full이다. 등록된 CI 정책 파일의 추가는 policy에서 허용한다. CI 정책과 제품 변경이 섞이면 full이다.
+- 수동 workflow_dispatch는 full을 명시적으로 실행한다.
+- 모든 경로는 plan/verify를 실행한다. 선택된 검사의 실패·취소·skip·누락은 실패다. 제외한 검사만 skipped여야 하며 canonical job/프로필 목록을 최종 판정에서 재검증한다.
+- plan은 TSX를 파싱하기 위해 버전이 고정된 TypeScript 파서만 임시 경로에 설치한다. docs 경로에서도 앱 전체 의존성을 설치하지 않는다.
+- CI 정책 변경은 정책 회귀와 workflow 문법을 검사한다. CI만 변경한 커밋 때문에 Hosting을 재배포하지 않는다.
 
 ## 검증 기록
 
-분류기 fixture와 실제 임시 Git 저장소 회귀, 최종 판정 실패 차단 회귀, actionlint와 관련 lint/typecheck, 새 presentation 명령의 실제 실행을 검증한다. 이번 Android 테마 수정의 실제 diff를 재분류해 presentation 선택 여부를 확인한다. CI 자체 변경인 최초 적용은 full을 한 번 실행하고, 이후 문서 후속 커밋으로 docs 경로를 확인한다. 실행 결과와 시간은 HANDOFF에 기록하며, 측정하지 않은 미래 단축 시간을 보장하지 않는다.
-
-- 로컬: 분류기 7·최종 판정 30·UI 78 PASS, typecheck/lint/actionlint PASS. 초기 테스트 helper의 빈 배열 추론 오류는 명시적 타입으로 수정한 뒤 통과했다. 실제 테마 diff는 presentation이다.
-- source `fed0c42`의 [전체 경로 검증](https://github.com/kim-DL/ONWAY/actions/runs/41146903811)은 attempt 1 SUCCESS. 기존 full 12개와 plan/verify 성공, presentation은 계획대로 제외됐다. 기존 테스트 조건과 실패 차단을 유지했다. 일반 browser 348 PASS/8 SKIP, Phase17 83 PASS/18 SKIP, unit 1,821 PASS/15 SKIP이다. 내부 flaky·job 재실행 없음.
-- 문서 경로는 후속 `41148064803`에서 plan/verify만 실행해 35초에 성공했다. 실제 이미지 교체 `62a1245`의 [presentation CI](https://github.com/kim-DL/ONWAY/actions/runs/41192590796)는 attempt 1 SUCCESS, 선택된 7개 job 성공·8개 계획 제외, UI 78 PASS다. 생성→완료 5분 28초, UI 테스트 자체 3.2분이었다. 당시 측정이며 향후 실행 시간 보장은 아니다.
-
-참고: [GitHub workflow trigger](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow), [job 조건·needs·outputs 문법](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
+- 이전 구현/측정 기록: 2026-10-31 presentation CI는 약 5분 28초였다. 2026-11-01 아이콘 속성 변경은 full로 분류되어 CI에 13분 54초가 소요됐다. 이 수치는 새 ui 경로의 시간 보장이 아니다.
+- 새 분류기는 실제 아이콘 변경 사례 및 이벤트·동적 표현식·권한·함께 섞인 서버 변경의 전체 검사 유지 여부를 검증한다. 실제 workflow 실행 결과는 GitHub Actions와 HANDOFF에 기록한다.

@@ -1,15 +1,18 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { presentationOnly, uiAreas } from "./ui-change-scope.mjs";
 
 export const fullChecks = [
   "audit", "lint", "typecheck", "unit", "search-performance", "functions-build",
   "production-build", "browser", "deferred-tools", "phase17", "inventory-photos", "delivery-photos",
 ];
-export const allChecks = [...fullChecks, "presentation"];
+export const allChecks = [...fullChecks, "presentation", "ui", "ci-policy"];
 export const profiles = {
   docs: [],
   presentation: ["lint", "typecheck", "unit", "production-build", "presentation"],
+  ui: ["lint", "typecheck", "production-build", "ui"],
+  policy: ["ci-policy"],
   full: fullChecks,
 };
 
@@ -19,6 +22,12 @@ const styles = new Set([
   "src/app/styles/auth-loading.css", "src/app/styles/brand-motion.css", "src/app/styles/app-shell.css",
 ]);
 const testFiles = new Set(["src/lib/app-metadata.test.ts"]);
+const policyFiles = new Set([
+  ".github/workflows/ci.yml", "scripts/ci-scope.mjs", "scripts/ci-scope.test.mjs",
+  "scripts/verify-ci-results.mjs", "scripts/ci-policy.test.mjs",
+  "scripts/ui-change-scope.mjs", "scripts/run-ui-checks.mjs",
+  "src/lib/ci-results.test.ts",
+]);
 const stripped = (text, pattern) => text.replaceAll("\r\n", "\n").split("\n")
   .filter((line) => !pattern.test(line)).join("\n");
 
@@ -44,9 +53,18 @@ export function classifyChanges(changes, { forceFull = false } = {}) {
   }
   if (changes.every((c) => isDoc(c.path))) return makePlan("docs", "Documentation only; no runtime files changed.");
   const runtime = changes.filter((c) => !isDoc(c.path));
+  if (runtime.every(c => policyFiles.has(c.path) && ["A", "M"].includes(c.status))) {
+    return makePlan("policy", "CI policy only; test classifier, result enforcement and workflow syntax.");
+  }
   if (runtime.length > 12 || runtime.some((c) => c.status !== "M")) {
     return makePlan("full", "Broad change, addition, deletion or rename needs full verification.");
   }
+  const areas = Object.keys(uiAreas).filter(area => runtime.some(c => uiAreas[area].sources.includes(c.path)));
+  if (areas.length && runtime.every(c => areas.some(area => {
+    const scope = uiAreas[area];
+    return scope.unit.includes(c.path) || scope.browser.includes(c.path) ||
+      (scope.sources.includes(c.path) && (c.path.endsWith(".css") || presentationOnly(c.before, c.after)));
+  }))) return { ...makePlan("ui", "Presentation syntax only; run tests for the affected UI areas."), areas };
   const uiOnly = runtime.every((c) => styles.has(c.path) || testFiles.has(c.path) ||
     /^public\/(?:brand|ui|icons)\/[^/]+\.(?:png|webp|jpe?g|ico)$/.test(c.path) || themeOnly(c));
   return uiOnly
@@ -76,7 +94,7 @@ export function planRange(base, head, options = {}) {
     for (let index = 0; index < parts.length; index += 2) {
       const status = parts[index], path = parts[index + 1];
       const change = { status, path };
-      if (["src/lib/app-metadata.ts", "src/app/layout.tsx", "src/app/styles/base.css"].includes(path) && status === "M") {
+      if ((path.endsWith(".tsx") || ["src/lib/app-metadata.ts", "src/app/styles/base.css"].includes(path)) && status === "M") {
         change.before = git("show", `${base}:${path}`);
         change.after = git("show", `${head}:${path}`);
       }
@@ -100,7 +118,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const plan = planRange(base, head, { forceFull: process.env.GITHUB_EVENT_NAME === "workflow_dispatch" });
   console.log(JSON.stringify({ ...plan, base, head }, null, 2));
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `profile=${plan.profile}\nrequired=${JSON.stringify(plan.required)}\n`);
+    appendFileSync(process.env.GITHUB_OUTPUT, `profile=${plan.profile}\nrequired=${JSON.stringify(plan.required)}\nareas=${JSON.stringify(plan.areas || [])}\n`);
   }
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY,

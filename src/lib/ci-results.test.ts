@@ -5,14 +5,16 @@ const checks = [
   "audit", "lint", "typecheck", "unit", "search-performance", "functions-build",
   "production-build", "browser", "deferred-tools", "phase17", "inventory-photos", "delivery-photos",
 ];
-const profiles: Record<"full" | "presentation" | "docs", string[]> = {
+const profiles: Record<"full" | "presentation" | "docs" | "ui" | "policy", string[]> = {
   full: checks,
   presentation: ["lint", "typecheck", "unit", "production-build", "presentation"],
   docs: [],
+  ui: ["lint", "typecheck", "production-build", "ui"],
+  policy: ["ci-policy"],
 };
 const successfulResults = (profile: keyof typeof profiles = "full"): Record<string, { result: string; outputs?: { profile: string; required: string } }> => ({
   plan: { result: "success", outputs: { profile, required: JSON.stringify(profiles[profile]) } },
-  ...Object.fromEntries([...checks, "presentation"].map((id) => [id, {
+  ...Object.fromEntries([...checks, "presentation", "ui", "ci-policy"].map((id) => [id, {
     result: profiles[profile].includes(id) ? "success" : "skipped",
   }])),
 });
@@ -60,7 +62,7 @@ describe("CI final required check", () => {
     },
   );
 
-  it.each(["docs", "presentation"] as const)("allows only the planned skips for %s", (profile) => {
+  it.each(["docs", "presentation", "ui", "policy"] as const)("allows only the planned skips for %s", (profile) => {
     expect(run(successfulResults(profile)).status).toBe(0);
     expect(run({ ...successfulResults(profile), phase17: { result: "failure" } }).status).toBe(1);
     expect(run({ ...successfulResults(profile), plan: { result: "failure" } }).status).toBe(1);
@@ -68,6 +70,13 @@ describe("CI final required check", () => {
 
   it("rejects a skipped selected UI check", () => {
     expect(run({ ...successfulResults("presentation"), presentation: { result: "skipped" } }).status).toBe(1);
+  });
+
+  it.each(["ui", "policy"] as const)("rejects unsuccessful selected checks for %s", (profile) => {
+    const id = profile === "ui" ? "ui" : "ci-policy";
+    for (const result of ["skipped", "failure", "cancelled"]) {
+      expect(run({ ...successfulResults(profile), [id]: { result } }).status).toBe(1);
+    }
   });
 
   it("rejects missing or tampered plans instead of accepting fewer checks", () => {
