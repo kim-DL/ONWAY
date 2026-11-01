@@ -4,6 +4,8 @@
 
 ## 현재 상태
 
+- **PIN 재로그인 대기 복구(2026-11-01):** 로그아웃 후 같은 계정으로 로그인할 때 Firestore 캐시/서버 권한 데이터가 같으면 서버 확인 메타데이터 이벤트가 생략되어 resolving에 머물렀다. authz 구독에 `includeMetadataChanges: true`를 추가했고 서버 확인 전 접근 금지와 권한 취소/세대 보호를 유지했다. 관련 인증 58개·로컬 실제 SDK 에뮬레이터 재현 통과. [복구 기록](releases/2026-11-01-auth-relogin-metadata.md).
+
 - **납품사진 버튼 복구 완료(2026-11-01 16:56 KST):** 16:45 로그인 릴리스의 운영 빌드에서 `NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS=true` 주입이 누락되어 납품사진 버튼이 숨겨지고 등록 버튼이 하단 전체를 차지했다. 플래그를 활성화하여 복구하며, 새 표준 빌드 명령은 `npm run build:hosting`이다. 실제 운영 프로젝트에서 사진/재고 플래그가 누락되면 Next 빌드를 중단한다. 모바일 390px 합성 화면에서 4버튼과 사진 진입, 관련 단위 10개/lint·운영 build 및 PWA/성능/Hosting gate 통과. [복구 기록](releases/2026-11-01-delivery-photo-flag-restore.md). 소스 `6478f87`, Hosting `9c2e4115d58151ae`. 두 운영 주소 공개 검사와 AppShell 자산 해시 일치 확인. 자동 CI 41286720134는 진행 중, 실제 휴대폰은 미확인.
 
 - **로그인 랜딩 운영 반영 완료 (2026-11-01 16:45 KST)**: 급식길 블루 단일 배경, 로고 위/회사명 아래 중앙 정렬, 부드러운 글자 그림자, SVG/CSS 세라믹 3D 패널, 6칸 PIN. 작은 소개·재생 컨트롤·환영 문구·모션/PIN 사이 구분선은 제거. 자동 전환 4.2초/이동 1.1초, 모션 감소·탭 비활성 정지 유지. 기존 PIN/Google 인증·제출 잠금·오류 복구 유지. 로그인 CSS는 auth application과 함께 지연 로드하여 초기 CSS 23,045B/6,504B gzip 유지. 전용 CSS 12,303B/3,390B gzip은 별도 16KiB/4KiB 한도로 관리하며 기존 한도는 유지. 인증 단위 55개·관련 lint·운영 build/타입·PWA/성능/Hosting gate 통과. 실제 운영 빌드 데스크톱과 기존 320/390px 시안 확인. 실제 기기·운영 로그인 제출은 미검증. [릴리스 기록](releases/2026-11-01-login-landing.md). 소스 `12a1564`, Hosting `5379c539c51de5aa`, 122개 산출물 해시 일치. 두 운영 주소 공개 검증 통과. [자동 CI](https://github.com/kim-DL/ONWAY/actions/runs/41285983636)는 별도 진행 중이며 통과로 보고하지 않음.

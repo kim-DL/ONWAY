@@ -157,7 +157,7 @@ describe("mobile session continuity", () => {
     network.resolve(true);
     await flushCallbacks();
     expect(harness.probeNetworkReachability).toHaveBeenCalledTimes(1);
-    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void;
     snapshotCallback({ ...authz("A"), metadata: { fromCache: true }, exists: () => false });
     expect(harness.signOut).not.toHaveBeenCalled();
     snapshotCallback(authz("A"));
@@ -186,7 +186,7 @@ describe("mobile session continuity", () => {
     expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
     harness.probeNetworkReachability.mockResolvedValue(true);
     harness.retry!(); await flushCallbacks();
-    (harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    (harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void)(authz("A"));
     expect(harness.currentState.status).toBe("authenticated");
     expect(harness.employeeLogin).not.toHaveBeenCalled();
     cleanup();
@@ -196,7 +196,7 @@ describe("mobile session continuity", () => {
     const cleanup = mountObserver(); await flushCallbacks();
     const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void;
     tokenCallback(user("A")); await flushCallbacks();
-    (harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    (harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void)(authz("A"));
     const previous = harness.currentState;
     const getIdTokenResult = vi.fn().mockRejectedValueOnce(new FirebaseError("auth/network-request-failed", "temporary"))
       .mockResolvedValue(await user("A").getIdTokenResult());
@@ -206,7 +206,7 @@ describe("mobile session continuity", () => {
     expect(harness.clearPrivateClientState).not.toHaveBeenCalled();
     harness.retry!(); await flushCallbacks();
     expect(getIdTokenResult).toHaveBeenLastCalledWith(true);
-    (harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    (harness.onSnapshot.mock.calls[1]![2] as (snapshot: FakeSnapshot) => void)(authz("A"));
     expect(harness.currentState.status).toBe("authenticated");
     cleanup();
   });
@@ -215,11 +215,11 @@ describe("mobile session continuity", () => {
     harness.readVerifiedOfflineSession.mockReturnValue(cachedSession);
     const cleanup = mountObserver(); await flushCallbacks();
     (harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser) => void)(user("A")); await flushCallbacks();
-    (harness.onSnapshot.mock.calls[0]![2] as (error: unknown) => void)({ code: "unavailable" });
+    (harness.onSnapshot.mock.calls[0]![3] as (error: unknown) => void)({ code: "unavailable" });
     expect(harness.currentState.status).toBe("authenticated");
     expect(harness.signOut).not.toHaveBeenCalled();
     harness.retry!(); await flushCallbacks();
-    (harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void)({ ...authz("A"), exists: () => false });
+    (harness.onSnapshot.mock.calls[1]![2] as (snapshot: FakeSnapshot) => void)({ ...authz("A"), exists: () => false });
     expect(harness.currentState.status).toBe("invalid");
     await flushCallbacks();
     expect(harness.signOut).toHaveBeenCalledTimes(1);
@@ -250,7 +250,7 @@ describe("private-screen session termination", () => {
     const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
     tokenCallback(user("A"));
     await flushCallbacks();
-    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void;
     snapshotCallback(authz("A"));
     harness.setState.mockClear();
     harness.writeVerifiedOfflineSession.mockClear();
@@ -297,7 +297,7 @@ describe("private-screen session termination", () => {
     const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
     tokenCallback(user("A"));
     await flushCallbacks();
-    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void;
     snapshotCallback({ metadata: { fromCache: false }, exists: () => false, data: () => undefined });
     context.dismissInvalidSession();
     expect(harness.setState).toHaveBeenLastCalledWith({ status: "resolving" });
@@ -314,7 +314,7 @@ describe("private-screen session termination", () => {
     await context.login("test-only-pin");
     tokenCallback(user("B"));
     await flushCallbacks();
-    const freshSnapshot = harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void;
+    const freshSnapshot = harness.onSnapshot.mock.calls[1]![2] as (snapshot: FakeSnapshot) => void;
     freshSnapshot(authz("B"));
     expect(harness.setState).toHaveBeenLastCalledWith(expect.objectContaining({
       status: "authenticated", session: expect.objectContaining({ uid: "B" }),
@@ -333,7 +333,7 @@ describe("private-screen session termination", () => {
     const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
     tokenCallback(user("A"));
     await flushCallbacks();
-    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void;
     snapshotCallback(authz("A"));
     harness.setState.mockClear();
     harness.writeVerifiedOfflineSession.mockClear();
@@ -397,6 +397,41 @@ describe("private-screen session termination", () => {
 });
 
 describe("PIN login failure recovery", () => {
+  it("finishes same-account relogin when only server metadata changes", async () => {
+    const context = renderProvider();
+    const cleanup = harness.effect?.();
+    await flushCallbacks();
+    const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
+    tokenCallback(user("A"));
+    await flushCallbacks();
+    (harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void)(authz("A"));
+    expect(harness.currentState.status).toBe("authenticated");
+    harness.writeVerifiedOfflineSession.mockClear();
+    // Match Firestore: unchanged cached data produces a server event only for
+    // listeners that opted into metadata updates.
+    let confirmServer!: () => void;
+    harness.onSnapshot.mockImplementation((_ref, optionsOrNext, maybeNext) => {
+      const next = typeof optionsOrNext === "function" ? optionsOrNext : maybeNext;
+      next({ ...authz("A"), metadata: { fromCache: true } });
+      confirmServer = () => {
+        if (optionsOrNext.includeMetadataChanges) next(authz("A"));
+      };
+      return vi.fn();
+    });
+    harness.signOut.mockImplementationOnce(async () => { tokenCallback(null); });
+    await context.logout();
+    expect(harness.currentState.status).toBe("unauthenticated");
+    harness.signInWithCustomToken.mockImplementationOnce(async () => { tokenCallback(user("A")); });
+    await context.login("test-only-pin");
+    await flushCallbacks();
+    expect(harness.currentState.status).toBe("resolving");
+    expect(harness.writeVerifiedOfflineSession).not.toHaveBeenCalled();
+    confirmServer();
+    expect(harness.currentState).toEqual(expect.objectContaining({ status: "authenticated" }));
+    expect(harness.writeVerifiedOfflineSession).toHaveBeenCalledTimes(1);
+    if (cleanup) cleanup();
+  });
+
   it("does not send a PIN request when App Check fails and permits a later retry", async () => {
     const context = renderProvider();
     harness.ensureFirebaseAppCheckReady.mockRejectedValueOnce(new FirebaseError("appCheck/recaptcha-error", "private provider detail"));
@@ -440,7 +475,7 @@ describe("PIN login failure recovery", () => {
     await context.login("test-only-pin");
     await flushCallbacks();
     expect(harness.setState).not.toHaveBeenCalledWith(expect.objectContaining({ status: "authenticated" }));
-    const snapshotCallback = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    const snapshotCallback = harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void;
     snapshotCallback(authz("RETRY"));
     expect(harness.setState).toHaveBeenLastCalledWith(expect.objectContaining({
       status: "authenticated", session: expect.objectContaining({ uid: "RETRY" }),
@@ -506,10 +541,10 @@ describe("auth observer effect lifecycle", () => {
     const tokenCallback = harness.onIdTokenChanged.mock.calls[0]![1] as (current: FakeUser | null) => void;
     tokenCallback(user("A"));
     await flushCallbacks();
-    const previousSnapshot = harness.onSnapshot.mock.calls[0]![1] as (snapshot: FakeSnapshot) => void;
+    const previousSnapshot = harness.onSnapshot.mock.calls[0]![2] as (snapshot: FakeSnapshot) => void;
     tokenCallback(user("B"));
     await flushCallbacks();
-    const currentSnapshot = harness.onSnapshot.mock.calls[1]![1] as (snapshot: FakeSnapshot) => void;
+    const currentSnapshot = harness.onSnapshot.mock.calls[1]![2] as (snapshot: FakeSnapshot) => void;
     harness.setState.mockClear();
 
     previousSnapshot(authz("A"));

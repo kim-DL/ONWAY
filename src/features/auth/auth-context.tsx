@@ -234,6 +234,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               authzUnsubscribe?.();
               authzUnsubscribe = onSnapshot(
                 doc(services.firestore, "authz", user.uid),
+                // A warm cache may differ only in fromCache after re-login.
+                // Receive that server confirmation without trusting cached authz.
+                { includeMetadataChanges: true },
                 (snapshot) => {
                   if (!active || generation !== authGenerationRef.current) return;
                   // Only server snapshots can confirm or revoke authorization.
