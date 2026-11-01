@@ -318,7 +318,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   const optionsActive = showInactive || urgentOnly || countMode;
   return <section ref={workspaceRef} className={admin ? styles.workspace : `shell-page ${styles.workspace}`} data-admin={admin || undefined} data-write-actions={context?.canWrite || undefined} aria-label="재고 관리">
     <h1 className={styles.hiddenInput}>재고 관리</h1>
-    <div className={styles.toolbar} data-inventory-toolbar data-sticky={!admin || undefined}>
+    <div style={{ display: "grid", gap: 8, minWidth: 0, alignSelf: "start", position: admin ? "static" : "sticky", top: 0, zIndex: 2, paddingBottom: admin ? 0 : 4 }} data-inventory-toolbar data-sticky={!admin || undefined}>
     {!admin ? <InventoryGreeting displayName={session.displayName} /> : null}
     {notice.message ? <p role="status" className={styles.success}>{notice.message}</p> : null}
     {context && online && !calendarReady ? <div className={styles.notice} role={calendarError ? "alert" : "status"}><p>{calendarRefreshing ? "날짜가 바뀌어 유통기한·실사 기준을 확인하고 있어요." : "날짜 기준을 갱신하지 못했어요. 기준을 다시 확인한 뒤 실사를 저장해주세요."}</p><p className={styles.muted}>기준 확인 전에는 유통기한·실사 필터를 잠시 멈추고 전체 품목을 보여드려요.</p>{calendarError ? <><p className={styles.muted}>{calendarError}</p><GlassButton disabled={calendarRefreshing} onClick={() => calendarWatcher.current?.refresh()}>날짜 기준 다시 확인</GlassButton></> : null}</div> : null}
