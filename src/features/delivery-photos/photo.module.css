@@ -1,4 +1,4 @@
-.workspace{max-width:48rem;margin:0 auto;padding:1rem;color:var(--shell-ink)}
+.workspace{min-width:0;max-width:48rem;margin:0 auto;padding:1rem}
 .header{display:grid;gap:.35rem;margin-bottom:.85rem}
 .header h1{margin:0;font-size:1.65rem;line-height:1.2}
 .summary{display:flex;align-items:center;justify-content:space-between;gap:.4rem;min-width:0}
