@@ -27,7 +27,7 @@ test("customer icons retain display dimensions before styles arrive", async ({ p
   });
   for (const icon of await page.locator("[data-customer-home] img").all()) {
     const size = (await icon.boundingBox())!;
-    expect(size.width).toBe(await icon.getAttribute("data-icon") === "camera" ? 56 : 48);
+    expect(size.width).toBe(48);
     expect(size.height).toBe(48);
   }
 });
