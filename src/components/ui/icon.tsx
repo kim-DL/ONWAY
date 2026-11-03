@@ -24,8 +24,10 @@ export type IconName =
   | "refresh"
   | "route"
   | "search"
+  | "search-refined"
   | "settings"
   | "sliders"
+  | "sliders-refined"
   | "sparkles"
   | "trash"
   | "upload"
@@ -63,8 +65,10 @@ const paths: Readonly<Record<IconName, React.ReactNode>> = {
   refresh: <><path d="M20 7v5h-5" /><path d="M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 8M4 16l2.3 1.6A7 7 0 0 0 17.9 15" /></>,
   route: <><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h2a3 3 0 0 0 3-3V8a3 3 0 0 1 3-3" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+  "search-refined": <><circle cx="10.5" cy="10.5" r="6.75" /><path d="M6.8 10.1a3.8 3.8 0 0 1 3.7-3.4" opacity=".5" /><path d="m15.5 15.5 1.3 1.3" /><path d="m17 17 3.5 3.5" strokeWidth="2.8" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></>,
   sliders: <><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5" /><circle cx="16" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="13" cy="18" r="2" /></>,
+  "sliders-refined": <><path d="M5 3.5v4M5 12.5v8M12 3.5v10M12 18.5v2M19 3.5v4M19 12.5v8" opacity=".65" /><rect x="2.75" y="7.5" width="4.5" height="5" rx="1.7" /><rect x="9.75" y="13.5" width="4.5" height="5" rx="1.7" /><rect x="16.75" y="7.5" width="4.5" height="5" rx="1.7" /><path d="M4.4 10h1.2M11.4 16h1.2M18.4 10h1.2" strokeWidth="1" opacity=".5" /></>,
   sparkles: <><path d="m12 3 1.2 3.2L16.5 7l-3.3 1.2L12 11.5l-1.2-3.3L7.5 7l3.3-.8L12 3Z" /><path d="m18.5 13 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2ZM5.5 12l1 2.5L9 15.5l-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1 1-2.5Z" /></>,
   trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" /></>,
   upload: <><path d="M12 16V4M7 9l5-5 5 5" /><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></>,

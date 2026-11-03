@@ -129,9 +129,9 @@ describe("inventory UI contracts", () => {
     }));
     const fixtureLocations = h("div", { className: styles.locations, "data-catalog": true },
       ...["전체", "냉장", "냉동1", "냉동2", "샘플"].map((label, index) => h("button", { key: label, "aria-pressed": index === 0 }, label)));
-    const fixtureSearch = h("div", { className: styles.filters },
-      h("label", { className: styles.search }, h(Icon, { name: "search", size: 18 }), h("input", { "aria-label": "품목 검색", placeholder: "상품명 · 제조사" })),
-      h("button", { className: styles.optionsTrigger, "aria-label": "목록 옵션", "data-active": true }, h(Icon, { name: "sliders", size: 20 }), h("span", { "aria-hidden": true })));
+    const fixtureSearch = h("div", { className: styles.filters, style: { display: "flex", alignItems: "stretch" } },
+      h("div", { className: styles.search, style: { position: "relative", display: "flex", flex: 1, minWidth: 0, alignItems: "center", gap: 9, padding: "0 10px", minHeight: 52, background: "linear-gradient(175deg, #fff, #f6fafd)", borderRadius: 11 } }, h("span", { style: { color: "#526e82", display: "grid", placeItems: "center", flex: "0 0 26px", height: 28 } }, h(Icon, { name: "search-refined", size: 22, strokeWidth: 1.5 })), h("input", { "aria-label": "품목 검색", placeholder: "상품명 · 제조사", style: { minWidth: 0, width: "100%", minHeight: 50, padding: 0, border: 0, background: "transparent", font: "inherit", fontSize: 16, color: "inherit", letterSpacing: "-.35px" } })),
+      h("button", { className: styles.optionsTrigger, style: { position: "relative", border: "1px solid #c8d8e3", color: "#376582", display: "grid", placeItems: "center", flex: "0 0 52px", minWidth: 52, minHeight: 52, padding: 0, borderRadius: 11, background: "linear-gradient(150deg, #f9fcff, #e7f0f7)", boxShadow: "inset 0 1px #fff, 0 3px 6px #294c6410" }, "aria-label": "목록 옵션", "data-active": true }, h(Icon, { name: "sliders-refined", size: 22, strokeWidth: 1.5 }), h("span", { "aria-hidden": true })));
     const fixtureList = h("ul", { className: styles.list },
       ...fixtureCards.map((card, index) => h("li", { key: index }, card)));
     const markup = renderToStaticMarkup(h("main", { className: "workspace-shell", "data-mode": "inventory" },
