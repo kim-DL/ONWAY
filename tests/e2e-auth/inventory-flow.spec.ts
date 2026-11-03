@@ -152,7 +152,7 @@ async function captureInventoryList(page: Page, info: TestInfo, name: string) {
   }
   if (geometry.writer) expect(geometry.paddingBottom, "sticky action must leave final rows reachable").toBeGreaterThanOrEqual(geometry.actionInset + 16);
   const controls = await workspace.evaluate((element) => {
-    const search = element.querySelector('input[aria-label="품목 검색"]')!.closest("label")!.getBoundingClientRect();
+    const search = element.querySelector('input[aria-label="품목 검색"]')!.parentElement!.getBoundingClientRect();
     const options = element.querySelector('button[aria-label="목록 옵션"]')!.getBoundingClientRect();
     return {
       search: search.toJSON(), options: options.toJSON(),
