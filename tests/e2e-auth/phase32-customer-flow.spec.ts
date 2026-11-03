@@ -190,7 +190,7 @@ test("mobile network handoff preserves the current customer and explicit logout 
   await context.setOffline(true);
   await expect(page.getByRole("dialog", { name: "강은유통" })).toBeVisible();
   await expect(page.getByRole("searchbox")).toHaveValue("강은");
-  await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toHaveCount(0);
   await context.setOffline(false);
   await expect(page.getByRole("dialog", { name: "강은유통" })).toBeVisible();
   await page.goBack();
@@ -198,7 +198,7 @@ test("mobile network handoff preserves the current customer and explicit logout 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "설정", exact: true }).click();
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await page.getByRole("dialog", { name: "로그아웃할까요?" }).getByRole("button", { name: "로그아웃", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
   await expect(page.locator("[data-customer-workspace]")).toHaveCount(0);
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith("onnuriway:private:")).length)).toBe(0);
 });

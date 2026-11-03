@@ -50,7 +50,7 @@ async function listAuditLogs(): Promise<AuditLogDocument[]> {
 
 test("valid PIN persists through reopen and explicit logout clears the session", async ({ page, context }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
   await submitPin(page, PHASE3_TEST_PINS.delivery);
 
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 15_000 });
@@ -59,7 +59,7 @@ test("valid PIN persists through reopen and explicit logout clears the session",
   const reopened = await context.newPage();
   await reopened.goto("/");
   await expect(reopened.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 15_000 });
-  await expect(reopened.getByRole("heading", { name: /6자리 PIN/ })).toHaveCount(0);
+  await expect(reopened.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toHaveCount(0);
 
   await reopened.evaluate(() => localStorage.setItem("onnuriway:private:e2e", "remove-me"));
   await reopened.getByRole("button", { name: "설정" }).click();
@@ -72,7 +72,7 @@ test("valid PIN persists through reopen and explicit logout clears the session",
       && document.fields?.actorUid?.stringValue === "uid-delivery")
     .map((document) => document.name));
   await logoutDialog.getByRole("button", { name: "로그아웃", exact: true }).click();
-  await expect(reopened.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
+  await expect(reopened.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
   await expect.poll(() => reopened.evaluate(() => localStorage.getItem("onnuriway:private:e2e"))).toBeNull();
 
   let auditDocuments: AuditLogDocument[] = [];
@@ -116,7 +116,7 @@ test("authz revocation invalidates an active session without waiting for token e
   try {
     await expect(page.getByRole("heading", { name: /다시 로그인이 필요합니다/ })).toBeVisible();
     await page.getByRole("button", { name: "PIN 로그인으로 돌아가기" }).click();
-    await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
   } finally {
     await setAuthzSessionVersion("uid-sales-a", 1);
   }
@@ -124,7 +124,7 @@ test("authz revocation invalidates an active session without waiting for token e
 
 test("PIN login screen has no automatically detectable accessibility violations", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
   const accessibilityScan = await new AxeBuilder({ page }).analyze();
   expect(accessibilityScan.violations).toEqual([]);
 });

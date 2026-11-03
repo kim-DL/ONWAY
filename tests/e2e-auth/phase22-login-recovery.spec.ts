@@ -44,7 +44,7 @@ test("failed custom-token exchange keeps the form and actionable error visible",
   try {
     await submitPin(page);
     await expect.poll(() => exchangeRequests, { timeout: 20_000 }).toBe(1);
-    await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
     await expect(page.getByLabel("직원 PIN", { exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "로그인 확인 중" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Google로 관리자 로그인" })).toBeDisabled();
