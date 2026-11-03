@@ -51,7 +51,7 @@ test.beforeAll(async () => {
 
 async function login(page: Page, pin: string) {
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(pin);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
 }
@@ -161,7 +161,7 @@ test("sales A updates persistent communication tags without mutating visit event
 
 test("delivery mode never loads or reveals the sales archive", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();

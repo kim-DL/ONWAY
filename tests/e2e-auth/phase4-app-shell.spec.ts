@@ -5,7 +5,7 @@ import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 
 async function login(page: Page, pin: string) {
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(pin);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
 }
 

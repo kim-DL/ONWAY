@@ -4,7 +4,7 @@ import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 async function login(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "설정", exact: true }).click();
@@ -45,7 +45,7 @@ test("mobile cold resume opens the last tab while connectivity verification is u
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as Window & { mobileResumeBlockedProbes?: number }).mobileResumeBlockedProbes ?? 0)).toBeGreaterThan(0);
-  await expect(page.getByLabel("직원 PIN")).toHaveCount(0);
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toHaveCount(0);
   expect(loginRequests).toBe(0);
   await testInfo.attach("emulator-stream-cancellation", { contentType: "application/json", body: JSON.stringify({ browserName, cancelledEmulatorStreams }) });
   expect(pageErrors).toEqual([]);
@@ -65,11 +65,11 @@ test("an expired display cache waits offline and recovers without PIN or logout"
   await page.addInitScript(() => Object.defineProperty(navigator, "onLine", { configurable: true, value: false }));
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByText("로그인은 유지되어 있어요. 연결이 돌아오면 자동으로 이어집니다.")).toBeVisible();
-  await expect(page.getByLabel("직원 PIN")).toHaveCount(0);
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toHaveCount(0);
   await page.evaluate(() => {
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     window.dispatchEvent(new Event("online"));
   });
   await expect(page.getByRole("heading", { name: "설정", exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByLabel("직원 PIN")).toHaveCount(0);
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toHaveCount(0);
 });

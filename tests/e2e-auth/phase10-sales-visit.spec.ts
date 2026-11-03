@@ -25,7 +25,7 @@ test.beforeAll(async () => {
 async function login(page: Page, pin: string) {
   await page.clock.setFixedTime(new Date("2026-08-24T05:30:00.000Z"));
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(pin);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
 }

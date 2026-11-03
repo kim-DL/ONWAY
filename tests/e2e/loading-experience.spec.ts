@@ -140,7 +140,7 @@ test("launch and PIN remain reachable on short landscape screens with doubled te
       const administrator = page.getByRole("button", { name: "Google로 관리자 로그인" });
       await administrator.scrollIntoViewIfNeeded();
       await expect(administrator).toBeInViewport();
-      const pin = page.getByLabel("직원 PIN");
+      const pin = page.getByLabel("직원 PIN", { exact: true });
       await pin.scrollIntoViewIfNeeded();
       await expect(pin).toBeEditable();
       await expect(pin).toBeInViewport();
@@ -197,9 +197,9 @@ for (const terminal of ["조회 완료", "조회 실패"]) {
 
 test("PIN keeps its form and locked controls then restores focus after failure", async ({ page }) => {
   await fixture(page, "pin");
-  await page.getByLabel("직원 PIN").fill("123456");
+  await page.getByLabel("직원 PIN", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "급식길 시작하기", exact: true }).click();
-  await expect(page.getByLabel("직원 PIN")).toBeDisabled();
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "로그인 확인 중", exact: true })).toBeDisabled();
   await expect(page.locator("[data-loading-indicator]")).toHaveAttribute("data-visible", "false");
   await page.clock.runFor(3100);
@@ -207,8 +207,8 @@ test("PIN keeps its form and locked controls then restores focus after failure",
   await expect(page.getByRole("status")).toHaveCount(1);
   await page.evaluate(() => window.dispatchEvent(new Event("fixture-login-fail")));
   await expect(page.getByRole("alert")).toContainText("연결을 확인");
-  await expect(page.getByLabel("직원 PIN")).toBeFocused();
-  await expect(page.getByLabel("직원 PIN")).toHaveValue("");
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toHaveValue("");
   await expect(page.getByRole("button", { name: "Google로 관리자 로그인" })).toBeEnabled();
 });
 
@@ -238,12 +238,12 @@ test("connection recovery keeps one static status instead of an indefinite loade
   await expect(page.getByRole("status")).toHaveText(message);
   await expect(page.locator("[data-loading-indicator]")).toHaveCount(0);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent("fixture-auth-state", { detail: { status: "unauthenticated" } })));
-  await expect(page.getByLabel("직원 PIN")).toBeEditable();
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toBeEditable();
 });
 
 test("a submitted PIN keeps its elapsed time when Firebase starts resolving", async ({ page }) => {
   await fixture(page, "pin");
-  await page.getByLabel("직원 PIN").fill("123456");
+  await page.getByLabel("직원 PIN", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "급식길 시작하기", exact: true }).click();
   await page.clock.runFor(1_200);
   await expect(page.locator("[data-loading-indicator]")).toHaveAttribute("data-visible", "true");

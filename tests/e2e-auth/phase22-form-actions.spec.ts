@@ -28,7 +28,7 @@ test.beforeAll(async () => {
 async function login(page: Page, mode: "delivery" | "sales") {
   await page.clock.setFixedTime(new Date("2026-08-24T05:30:00.000Z"));
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const pin = page.getByLabel("직원 PIN");
+  const pin = page.getByLabel("직원 PIN", { exact: true });
   await expect(pin).toBeVisible({ timeout: 15_000 });
   await pin.fill(mode === "delivery" ? PHASE3_TEST_PINS.delivery : PHASE3_TEST_PINS.salesA);
   const response = page.waitForResponse((candidate) =>

@@ -27,7 +27,7 @@ html:has(.auth-shell--login) { min-width: 0; }
   letter-spacing: -.025em;
   line-height: 1.4;
   white-space: nowrap;
-  color: #52758e;
+  color: #45677e;
   text-shadow: 0 2px 3px #3a587b26, 0 5px 9px #3a587b12;
 }
 .auth-shell--login .auth-brand small { font-size: 10px; letter-spacing: .025em; }
@@ -85,7 +85,7 @@ html:has(.auth-shell--login) { min-width: 0; }
 .auth-shell--login .admin-google-login:hover:not(:disabled) { border-color: #88a9c9; background: #f0f6ff; }
 .auth-shell--login .login-progress { min-height: 0; padding: 0; }
 .auth-shell--login .login-progress:not(:empty) { padding-top: 16px; }
-.auth-shell--login .login-support { width: min(100%, 360px); margin: 32px 0 0; color: #61778d; font-size: 11px; line-height: 1.7; word-break: keep-all; }
+.auth-shell--login .login-support { width: min(100%, 360px); margin: 32px 0 0; color: #526a80; font-size: 11px; line-height: 1.7; word-break: keep-all; }
 .auth-shell--login .login-support summary { width: fit-content; margin: auto; min-height: 32px; display: grid; place-items: center; list-style: none; cursor: pointer; }
 .auth-shell--login .login-support summary::-webkit-details-marker { display: none; }
 .auth-shell--login .login-support summary:focus-visible { outline: 2px solid #426e8b; outline-offset: 3px; border-radius: 3px; }

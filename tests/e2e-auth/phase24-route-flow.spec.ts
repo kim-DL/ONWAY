@@ -51,7 +51,7 @@ test("district filters preserve all forty schools for real callable routes from 
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.salesA);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.salesA);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(40);
   const districts = page.getByRole("radiogroup", { name: "행정구 필터" });

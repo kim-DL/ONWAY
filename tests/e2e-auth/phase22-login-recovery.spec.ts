@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 
 async function submitPin(page: Page) {
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
 }
 
@@ -18,8 +18,8 @@ test("service failure is not reported as a bad PIN and a retry succeeds", async 
   });
   await submitPin(page);
   await expect(page.locator("#pin-error")).toContainText("연결이 원활하지 않아요");
-  await expect(page.getByLabel("직원 PIN")).toBeFocused();
-  await expect(page.getByLabel("직원 PIN")).toHaveValue("");
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("직원 PIN", { exact: true })).toHaveValue("");
   await page.unroute("**/employeeLogin");
   await submitPin(page);
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 30_000 });
@@ -45,13 +45,13 @@ test("failed custom-token exchange keeps the form and actionable error visible",
     await submitPin(page);
     await expect.poll(() => exchangeRequests, { timeout: 20_000 }).toBe(1);
     await expect(page.getByRole("heading", { name: /6자리 PIN/ })).toBeVisible();
-    await expect(page.getByLabel("직원 PIN")).toBeDisabled();
+    await expect(page.getByLabel("직원 PIN", { exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "로그인 확인 중" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Google로 관리자 로그인" })).toBeDisabled();
     release();
     await expect(page.locator("#pin-error")).toContainText("로그인 연결을 완료하지 못했어요");
-    await expect(page.getByLabel("직원 PIN")).toBeEnabled();
-    await expect(page.getByLabel("직원 PIN")).toBeFocused();
+    await expect(page.getByLabel("직원 PIN", { exact: true })).toBeEnabled();
+    await expect(page.getByLabel("직원 PIN", { exact: true })).toBeFocused();
     await page.unroute("**/accounts:signInWithCustomToken*");
     await submitPin(page);
     await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 30_000 });

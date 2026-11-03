@@ -51,7 +51,7 @@ test.beforeAll(async () => {
 
 async function openCompleteSchool(page: Page) {
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();

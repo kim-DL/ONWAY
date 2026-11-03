@@ -75,7 +75,7 @@ async function openPhotoWorkspace(page: Page) {
 async function login(page: Page) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   const trigger = page.getByRole("button", { name: /^업무 모드 변경, 현재 / });
   await expect(trigger.or(page.getByRole("group", { name: "업무 모드" }))).toBeVisible({ timeout: 30_000 });

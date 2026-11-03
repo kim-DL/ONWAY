@@ -69,7 +69,7 @@ function expiryAfter(days: number) {
 async function login(page: Page, pin: string) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(pin);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   const contextResponse = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/getInventoryContext"));
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await waitForAuthenticatedBoundary(page);

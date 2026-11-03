@@ -63,7 +63,7 @@ async function login(page: Page, mockMap = true, openSearch = true) {
   if (mockMap) await page.addInitScript(installCustomerMapMock);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByLabel("직원 PIN").fill(PHASE3_TEST_PINS.delivery);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   await chooseMode(page, "customer");
   await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible();

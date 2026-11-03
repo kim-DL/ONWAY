@@ -98,7 +98,7 @@ test("company signature stays visible without crowding mobile mode controls and 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const pinInput = page.getByLabel("직원 PIN");
+  const pinInput = page.getByLabel("직원 PIN", { exact: true });
   await pinInput.waitFor({ state: "visible", timeout: 15_000 });
   await pinInput.fill(BRAND_PIN);
   const loginResponse = page.waitForResponse((response) => response.url().includes("employeeLogin")

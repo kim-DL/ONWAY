@@ -23,7 +23,7 @@ async function setAuthzSessionVersion(uid: string, sessionVersion: number) {
 }
 
 async function submitPin(page: Page, pin: string) {
-  await page.getByLabel("직원 PIN").fill(pin);
+  await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
 }
 

@@ -71,7 +71,7 @@ test.beforeAll(async () => {
 });
 
 async function login(page: Page, pin: string) {
-  const pinInput = page.getByLabel("직원 PIN");
+  const pinInput = page.getByLabel("직원 PIN", { exact: true });
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     try {
