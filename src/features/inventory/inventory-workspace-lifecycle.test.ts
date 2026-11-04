@@ -253,6 +253,84 @@ describe("inventory in-memory draft lifecycle", () => {
     cleanup();
   });
 
+  it.each(["context", "list"] as const)("ignores late sibling results after %s fails and a newer catalog starts", async (failedPart) => {
+    const staleProduct = { productId: "same-product", name: "재검증 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(1),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
+    const currentProduct = { ...staleProduct, revision: 2, stockRevision: 2, quantityByLocation: inventoryLocationMap(9) };
+    const currentContext = { ...context, settings: { ...context.settings, urgentDays: 3, revision: 2 } };
+    let completeLateSibling!: () => void;
+    let completeCurrentList!: () => void;
+
+    if (failedPart === "context") {
+      harness.context.mockRejectedValueOnce(new Error("context unavailable"));
+      harness.list.mockImplementationOnce((onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) =>
+        new Promise<InventoryProduct[]>((resolve) => {
+          completeLateSibling = () => { onProgress([staleProduct], { pageCount: 1, complete: true }); resolve([staleProduct]); };
+        }));
+    } else {
+      harness.context.mockImplementationOnce(() => new Promise<InventoryContext>((resolve) => { completeLateSibling = () => resolve(context); }));
+      harness.list.mockImplementationOnce(async (onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) => {
+        onProgress([staleProduct], { pageCount: 1, complete: false });
+        throw new Error("next page unavailable");
+      });
+    }
+    render(); const cleanup = harness.effects[0]!() as () => void; await settle();
+
+    harness.context.mockResolvedValueOnce(currentContext);
+    harness.list.mockImplementationOnce((onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) => {
+      onProgress([currentProduct], { pageCount: 1, complete: false });
+      return new Promise<InventoryProduct[]>((resolve) => { completeCurrentList = () => resolve([currentProduct]); });
+    });
+    windowEvents.get("focus")!(); await settle();
+    expect(card(currentProduct.productId)?.product).toEqual(currentProduct);
+    completeLateSibling(); await settle();
+    const productAfterLateSibling = card(currentProduct.productId)?.product;
+    const contextAfterLateSibling = card(currentProduct.productId)?.context;
+    completeCurrentList(); await settle(); cleanup();
+
+    expect(productAfterLateSibling).toEqual(currentProduct);
+    expect(contextAfterLateSibling).toEqual(currentContext);
+  });
+
+  it("keeps a newer catalog and its committed writes when an invalidated read settles after re-entry", async () => {
+    const original = { productId: "overlapping-product", name: "재진입 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
+      createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(1),
+      nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
+    const reloaded = { ...original, revision: 2, stockRevision: 2, quantityByLocation: inventoryLocationMap(2) };
+    const committed = { ...original, revision: 3, stockRevision: 3, quantityByLocation: inventoryLocationMap(9) };
+    let finishOld!: () => void;
+    let finishCurrent!: () => void;
+    harness.list.mockImplementationOnce((onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) => {
+      onProgress([original], { pageCount: 1, complete: false });
+      return new Promise<InventoryProduct[]>((resolve) => { finishOld = () => resolve([original]); });
+    });
+    render(); const firstCleanup = harness.effects[0]!() as () => void; await settle();
+    harness.online = false; Object.assign(navigator, { onLine: false }); windowEvents.get("offline")!();
+    firstCleanup(); resetMountedInstance();
+
+    harness.online = true; Object.assign(navigator, { onLine: true });
+    harness.list.mockImplementationOnce((onProgress: (products: InventoryProduct[], progress: { pageCount: number; complete: boolean }) => void) => {
+      onProgress([reloaded], { pageCount: 1, complete: false });
+      return new Promise<InventoryProduct[]>((resolve) => { finishCurrent = () => resolve([reloaded]); });
+    });
+    render(); const secondCleanup = harness.effects[0]!() as () => void; await settle();
+    expect(card(original.productId)?.product).toEqual(reloaded);
+    (find(render(), (_type, props) => props["aria-label"] === "새 품목 등록")!.onClick as () => void)();
+    const editor = find(render(), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
+    (editor.onSaved as (product: InventoryProduct) => void)(committed);
+    finishOld(); await settle();
+    expect(card(original.productId)?.product).toEqual(committed);
+    finishCurrent(); await settle();
+    const finalCatalog = catalog();
+    const finalProduct = card(original.productId)?.product;
+    secondCleanup();
+
+    expect(finalCatalog?.freshness).toBe("fresh");
+    expect(finalProduct).toEqual(committed);
+    expect(harness.list).toHaveBeenCalledTimes(2);
+  });
+
   it("shows a warm catalog immediately, skips reads inside TTL, then revalidates in background after TTL", async () => {
     const product = { productId: "warm-product", name: "복원 품목", unitLabel: "봉", status: "active", revision: 1, stockRevision: 1,
       createdAt: "2026-09-06T00:00:00Z", defaultLocationId: "refrigerated", quantityByLocation: inventoryLocationMap(0),

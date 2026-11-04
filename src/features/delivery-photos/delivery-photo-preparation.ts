@@ -1,6 +1,7 @@
 import { DELIVERY_PHOTO_MAX_BYTES } from "@/domain/delivery-photo";
+import { deliveryPhotoSelectionError } from "./delivery-photo-selection";
+export { DELIVERY_PHOTO_SOURCE_MAX_BYTES } from "./delivery-photo-selection";
 
-export const DELIVERY_PHOTO_SOURCE_MAX_BYTES = 30 * 1024 * 1024;
 export const DELIVERY_PHOTO_TRANSPORT_MAX_EDGE = 2_560;
 // Transport quality is provisional until the Galaxy S20+ field benchmark.
 // The server independently creates the final evidence at WebP quality 88.
@@ -26,12 +27,8 @@ function canonicalDeclaredType(type: string) {
 }
 
 export function validateDeliveryPhotoSelection(file: File): string | null {
-  if (file.size <= 0) return "사진 파일이 비어 있어요. 다시 촬영하거나 선택해주세요.";
-  if (file.size > DELIVERY_PHOTO_SOURCE_MAX_BYTES) return "원본 사진은 30MB 이하여야 해요.";
-  if (!["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif", "", "application/octet-stream"].includes(file.type)) {
-    return "JPEG, PNG, WebP 또는 HEIC 사진을 선택해주세요.";
-  }
-  return null;
+  const code = deliveryPhotoSelectionError(file);
+  return code ? deliveryPhotoPreparationMessage({ code }) : null;
 }
 
 function readWithBlob(file: File, signal?: AbortSignal): Promise<ArrayBuffer> {
@@ -112,16 +109,11 @@ export function detectDeliveryPhotoContentType(bytes: Uint8Array): "image/jpeg" 
   throw preparationError("delivery-photo/invalid-source");
 }
 
-/** Copy provider-owned bytes before the native input is reset or unmounted. */
+/** Read an independent, format-checked source from the captured or stored file. */
 export async function materializeDeliveryPhotoSource(file: File, signal?: AbortSignal): Promise<File> {
   if (signal?.aborted) throw preparationError("delivery-photo/cancelled");
-  const validation = validateDeliveryPhotoSelection(file);
-  if (validation) {
-    const code = file.size <= 0 ? "delivery-photo/empty-source"
-      : file.size > DELIVERY_PHOTO_SOURCE_MAX_BYTES ? "delivery-photo/source-too-large"
-        : "delivery-photo/unsupported-source";
-    throw preparationError(code);
-  }
+  const validation = deliveryPhotoSelectionError(file);
+  if (validation) throw preparationError(validation);
   let bytes: ArrayBuffer;
   try { bytes = exactBytes(await readWithBlob(file, signal), file.size); }
   catch (cause) {
@@ -185,6 +177,7 @@ async function canvasTransport(canvas: HTMLCanvasElement): Promise<{ blob: Blob;
 
 export async function prepareDeliveryPhoto(source: File, signal?: AbortSignal): Promise<PreparedDeliveryPhoto> {
   signal?.throwIfAborted();
+  source = await materializeDeliveryPhotoSource(source, signal);
   const decoded = await decodeDeliveryPhoto(source);
   const target = deliveryPhotoTargetDimensions(decoded);
   const canvas = document.createElement("canvas");

@@ -24,7 +24,7 @@ test.beforeAll(async () => {
       const rows=reversed?[...products].reverse():products;
       return <main className="workspace-shell" data-mode="inventory"><div className="workspace-content"><section className={styles.workspace}>
         <h1>재고 목록 검증</h1>
-        <InventoryListChunks>{rows.map(product=><li role="listitem" key={product.productId}><InventoryCard product={product} context={null} location="all" onOpen={select}/></li>)}</InventoryListChunks>
+        <InventoryListChunks>{rows.map(product=><li role="listitem" key={product.productId}><InventoryCard product={product} context={null} location="all" onOpen={item=>select(item.productId)}/></li>)}</InventoryListChunks>
         {selected!==null?<BottomSheet open title={products[Number(selected)].name} onClose={()=>{select(null);restoreInventoryProductFocus(selected);}}><p>상세 내용</p><button onClick={()=>reverse(value=>!value)}>목록 순서 변경</button></BottomSheet>:null}
       </section></div></main>;
     }

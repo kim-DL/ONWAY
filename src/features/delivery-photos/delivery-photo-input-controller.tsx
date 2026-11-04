@@ -78,10 +78,10 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
     if (!job) { input.value = ""; releasePicker(); return; }
     localJob.current = job.jobId; reading.current = true;
     try {
-      if (!await coordinator.acceptNativeSource(job.jobId, nativeFile)) coordinator.dismiss(job.jobId);
+      await coordinator.acceptNativeSource(job.jobId, nativeFile);
       localJob.current = null;
     } catch (error) {
-      const preparation = await import("./delivery-photo-preparation");
+      const preparation = await import(/* webpackChunkName: "delivery-photo-preparation" */ "./delivery-photo-preparation");
       coordinator.failPreparation(job.jobId, preparation.deliveryPhotoPreparationMessage(error));
       localJob.current = null;
     } finally {

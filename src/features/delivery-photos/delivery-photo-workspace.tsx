@@ -65,11 +65,10 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
       onView={setHistoryCustomer} onCapture={capture} onMore={setMoreCustomer} onRetry={retry} />;
   };
 
-  const saveEditor = async (ids: readonly string[]): Promise<"saved" | "conflict" | "error"> => {
+  const saveEditor = async (ids: readonly string[], expectedRevision: number | null): Promise<"saved" | "conflict" | "error"> => {
     if (!editor || !snapshot) return "error";
     try {
-      const input = { requestId: crypto.randomUUID(), expectedRevision: editor.mode === "route"
-        ? snapshot.route?.revision ?? null : snapshot.day.revision, customerIds: [...ids] };
+      const input = { requestId: crypto.randomUUID(), expectedRevision, customerIds: [...ids] };
       if (editor.mode === "route") {
         const route = await deliveryPhotoRepository.saveRoute(input);
         data.accept((current) => ({ ...current, route, day: current.day.isOverride ? current.day
@@ -125,6 +124,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
     </> : null}
     {editor && ready ? <DeliveryPhotoEditor key={`${editor.mode}:${editor.addId ?? ""}`} mode={editor.mode} session={session} customers={activeCustomers}
       initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}
+      revision={snapshot?.[editor.mode]?.revision}
       onSave={saveEditor} onClose={() => setEditor(null)} /> : null}
     {historyCustomer ? <DeliveryPhotoHistoryLoader key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${historyCustomer.customerId}`}
       customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} sync={data.accept} /> : null}

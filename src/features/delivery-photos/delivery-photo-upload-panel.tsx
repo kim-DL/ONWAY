@@ -25,7 +25,9 @@ export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
   return <section className={styles.panel} aria-label="촬영 사진과 저장 상태">
     <h2>촬영 사진 · 저장 상태</h2>
     <p>미리보기를 눌러 크게 확인하세요. 저장 중에도 거래처별 3장까지 촬영할 수 있어요.</p>
-    {pending ? <p>미전송 사진은 이 기기에 임시 보관되며, 로그아웃하면 삭제됩니다.</p> : null}
+    {pending ? <p>{jobs.some((job) => isActiveDeliveryPhotoUpload(job) && !job.durable)
+      ? "기기 보관이 끝나지 않은 사진이 있어요. 보관될 때까지 잠시 화면을 유지해주세요."
+      : "전송이 중단되면 앱을 다시 열 때 이어서 전송해요. 로그아웃하면 미전송 사진이 삭제됩니다."}</p> : null}
     <ul className={styles.list}>{shown.map((job, index) => {
       const image = coordinator.getPreview(job.jobId);
       const retryable = coordinator.canRetry(job.jobId);
@@ -36,7 +38,7 @@ export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
         <div className={styles.status}><strong>{names.get(job.customerId)?.name ?? "납품처"}</strong>
           <span role={job.status === "failed" ? "alert" : "status"}>{deliveryPhotoUploadStatusText(job)}</span>
           {job.status === "completed" && job.registeredDate ? <small>서버 등록일 {job.registeredDate}</small> : null}
-          {job.durable && job.status !== "completed" ? <small>사진은 이 기기에 보관 중이에요.</small> : null}
+          {job.durable && job.status !== "completed" ? <small>기기 보관 완료 · 서버 저장 대기</small> : null}
           {retryable ? <button type="button" onClick={() => { void coordinator.retry(job.jobId); }}>{job.status === "paused" ? "날짜 확인 후 전송" : job.errorCategory === "storage" ? "보관 다시 시도" : "다시 시도"}</button> : null}
           {job.status === "failed" || job.status === "paused" ? <button type="button" onClick={() => {
             if (window.confirm("이 기기에 보관된 대기 사진을 버릴까요? 이미 저장된 사진 기록은 유지됩니다.")) coordinator.dismiss(job.jobId);
