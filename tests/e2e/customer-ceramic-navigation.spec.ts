@@ -118,6 +118,35 @@ test("scrollbar hides at rest without changing the panel width or reserved gutte
   await expect(scroller).toHaveCSS("scrollbar-gutter", "stable");
 });
 
+test("delivery photo header keeps its return action aligned and compact", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("requestfailed", request => errors.push(request.url()));
+  for (const width of [320, 390, 430, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await open(page);
+    await page.getByRole("button", { name: "납품사진", exact: true }).click();
+    const workspace = page.locator("[data-delivery-photo-workspace]");
+    const header = workspace.locator(":scope > header");
+    const back = header.getByRole("button", { name: "거래처로 돌아가기", exact: true });
+    await expect(back).toBeVisible();
+    const title = (await header.getByRole("heading", { name: "납품사진", exact: true }).boundingBox())!;
+    const button = (await back.boundingBox())!;
+    expect(button.x).toBeGreaterThan(title.x + title.width);
+    expect(Math.abs(button.y + button.height / 2 - title.y - title.height / 2)).toBeLessThan(2);
+    expect(button.height).toBeGreaterThanOrEqual(44);
+    expect(await workspace.evaluate(el => Number.parseFloat(getComputedStyle(el).paddingTop))).toBeLessThanOrEqual(4);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await back.focus();
+    await expect(back).toBeFocused();
+    await page.screenshot({ path: `output/playwright/photo-header-${width}-${test.info().project.name}.png` });
+    if (width === 390) await page.screenshot({ path: `output/playwright/photo-header-detail-${test.info().project.name}.png`, scale: "css", clip: { x: 0, y: 0, width, height: 250 } });
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("group", { name: "거래처 빠른 메뉴" })).toBeVisible();
+  }
+  expect(errors).toEqual([]);
+});
+
 for (const target of ["납품사진"]) {
   test(`${target} supports return, browser back and restored subpage return`, async ({ page }) => {
     await open(page);

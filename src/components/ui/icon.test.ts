@@ -27,6 +27,7 @@ const iconNames = Object.keys({
   phone: true,
   plus: true,
   refresh: true,
+  "return-refined": true,
   route: true,
   search: true,
   "search-refined": true,

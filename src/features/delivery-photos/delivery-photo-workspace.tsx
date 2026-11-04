@@ -87,8 +87,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
   };
 
   return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
-    {backAction}
-    <header className={styles.header}><h1 id="delivery-photo-heading">납품사진</h1>
+    <header className={styles.header}>
+      <h1 id="delivery-photo-heading">납품사진</h1>{backAction}
       <div className={styles.summary}><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong>
         {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
     </header>

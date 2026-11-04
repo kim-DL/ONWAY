@@ -337,6 +337,11 @@
 .glass-button--quiet { box-shadow: none; background: rgba(255, 255, 255, 0.5); }
 .glass-button--danger { color: white; border-color: #a33e36; background: #b84c43; }
 
+.workspace-shell[data-mode="customer"] [data-delivery-photo-workspace] { padding-top: 4px; }
+[data-delivery-photo-workspace] > header { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: .75rem; }
+[data-delivery-photo-workspace] > header > div { grid-column: 1 / -1; }
+.workspace-shell [data-delivery-photo-workspace] > header > button { gap: .45rem; padding: .45rem .7rem; border: 1px solid #cbd6e9; border-radius: 11px; background: #fff; box-shadow: inset 0 1px #fff, 0 2px 4px #1c345414; font-size: .84rem; line-height: 1.2; white-space: nowrap; }
+
 .segmented-control {
   min-height: 2.75rem;
   display: flex;
