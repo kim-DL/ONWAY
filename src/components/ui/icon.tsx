@@ -22,6 +22,7 @@ export type IconName =
   | "phone"
   | "plus"
   | "refresh"
+  | "return-refined"
   | "route"
   | "search"
   | "search-refined"
@@ -63,6 +64,7 @@ const paths: Readonly<Record<IconName, React.ReactNode>> = {
   phone: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z" />,
   plus: <path d="M12 5v14M5 12h14" />,
   refresh: <><path d="M20 7v5h-5" /><path d="M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 8M4 16l2.3 1.6A7 7 0 0 0 17.9 15" /></>,
+  "return-refined": <><path d="M13.5 3.5H19A1.5 1.5 0 0 1 20.5 5v14a1.5 1.5 0 0 1-1.5 1.5h-5.5" opacity=".55" strokeWidth="1.7" /><path d="M14.5 12H3.5m4-4-4 4 4 4" strokeWidth="1.9" /></>,
   route: <><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h2a3 3 0 0 0 3-3V8a3 3 0 0 1 3-3" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
   "search-refined": <><circle cx="10.5" cy="10.5" r="6.75" /><path d="M6.8 10.1a3.8 3.8 0 0 1 3.7-3.4" opacity=".5" /><path d="m15.5 15.5 1.3 1.3" /><path d="m17 17 3.5 3.5" strokeWidth="2.8" /></>,
