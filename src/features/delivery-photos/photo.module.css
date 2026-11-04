@@ -15,7 +15,7 @@
 .list{display:grid;min-width:0;margin:0;padding:0;list-style:none;border-top:1px solid #dce6df}
 .row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.25rem;padding:.4rem .15rem;border-bottom:1px solid #dce6df;background:#fff}
 .photoMain{min-width:0}
-.workspace .rowText{display:grid;width:100%;gap:.1rem;align-content:center;justify-items:start;padding:.2rem .35rem;text-align:left;overflow-wrap:anywhere}
+.workspace .rowText{display:grid;width:100%;min-height:48px;gap:.1rem;align-content:center;justify-items:start;padding:.2rem .35rem;text-align:left;overflow-wrap:anywhere}
 .row strong{color:#334155;font-size:.98rem}
 .row small,.inToday{color:#526174;font-size:.8125rem;font-weight:500;line-height:1.35}
 .photoActions{display:flex;gap:.25rem}

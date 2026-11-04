@@ -62,6 +62,8 @@ test("photo card controls remain centered across full cards and fit every viewpo
     const measured = await geometry(page);
     await info.attach(`geometry-${width}`, { body: JSON.stringify(measured, null, 2), contentType: "application/json" });
     for (const row of measured.rows) {
+      expect(row.text.width, JSON.stringify(row)).toBeGreaterThanOrEqual(48);
+      expect(row.text.height, JSON.stringify(row)).toBeGreaterThanOrEqual(48);
       for (const control of [row.camera, row.more]) {
         expect(control.width, JSON.stringify(row)).toBeGreaterThanOrEqual(48);
         expect(control.height, JSON.stringify(row)).toBeGreaterThanOrEqual(48);
