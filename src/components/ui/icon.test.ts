@@ -13,6 +13,7 @@ const iconNames = Object.keys({
   building: true,
   calendar: true,
   camera: true,
+  "more-refined": true,
   check: true,
   "chevron-right": true,
   clipboard: true,

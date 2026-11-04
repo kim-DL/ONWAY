@@ -19,6 +19,7 @@ export type IconName =
   | "key"
   | "location"
   | "logout"
+  | "more-refined"
   | "phone"
   | "plus"
   | "refresh"
@@ -61,6 +62,7 @@ const paths: Readonly<Record<IconName, React.ReactNode>> = {
   key: <><circle cx="7.5" cy="7.5" r="4.5" /><path d="m11 11 9 9h2v-4h-3v-3h-3M6.5 6.5h.01" /></>,
   location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
   logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></>,
+  "more-refined": <><g fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></g><path d="M4.4 11.4h.2m6.4 0h.2m6.4 0h.2" stroke="white" strokeWidth=".8" opacity=".5" /></>,
   phone: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z" />,
   plus: <path d="M12 5v14M5 12h14" />,
   refresh: <><path d="M20 7v5h-5" /><path d="M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 8M4 16l2.3 1.6A7 7 0 0 0 17.9 15" /></>,
