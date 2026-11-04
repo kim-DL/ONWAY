@@ -118,6 +118,29 @@ test("scrollbar hides at rest without changing the panel width or reserved gutte
   await expect(scroller).toHaveCSS("scrollbar-gutter", "stable");
 });
 
+test("delivery photo search renders ceramic cards inside the real workspace", async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("requestfailed", request => errors.push(request.url()));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await page.getByRole("button", { name: "납품사진", exact: true }).click();
+  await page.getByRole("searchbox", { name: "납품사진 거래처 검색" }).fill("예시");
+  const results = page.getByRole("region", { name: "거래처 검색 결과" });
+  await expect(results.getByRole("listitem")).toHaveCount(12);
+  const first = results.getByRole("listitem").first();
+  await expect(first.getByRole("button", { name: /카메라 촬영$/ }).locator("img")).toHaveAttribute("src", "/ui/customer-ceramic-camera-v1.webp");
+  await page.getByRole("heading", { name: "검색 결과", exact: true }).click();
+  await page.screenshot({ path: `output/photo-cards-20261104/workspace-${info.project.name}.png`, scale: "css" });
+  await first.getByRole("button", { name: /더보기$/ }).click();
+  await expect(page.getByRole("dialog", { name: "예시 거래처 가 더보기", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "납품사진 거래처 검색" }).fill("일치하지않는이름");
+  await expect(results).toContainText("일치하는 거래처가 없습니다.");
+  expect(errors).toEqual([]);
+});
+
 test("delivery photo header keeps its return action aligned and compact", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));

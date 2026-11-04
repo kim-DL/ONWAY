@@ -222,8 +222,10 @@ test("field action layout audit and customer detail history use one customer sco
   const camera = page.getByRole("button", { name: `${name} 카메라 촬영` });
   const more = page.getByRole("button", { name: `${name} 더보기` });
   await expect(camera).toBeVisible();
+  await expect(camera.locator("img")).toHaveAttribute("src", "/ui/customer-ceramic-camera-v1.webp");
+  await camera.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   const cameraAlignment = await camera.evaluate((button) => {
-    const icon = button.querySelector("svg")!;
+    const icon = button.querySelector("img")!;
     const outer = button.getBoundingClientRect();
     const inner = icon.getBoundingClientRect();
     return { x: Math.abs(inner.left + inner.width / 2 - (outer.left + outer.width / 2)),

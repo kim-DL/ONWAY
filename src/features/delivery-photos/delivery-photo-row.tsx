@@ -25,14 +25,18 @@ export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob,
       {detail ? <small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{detail}</small> : null}
     </button>
     {retryJob ? <button type="button" onClick={() => onRetry(retryJob.jobId)} aria-label={`${customer.name} 사진 업로드 다시 시도`}>재시도</button> : null}
-    <button type="button" className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
-      onClick={() => onCapture(customer)}><Icon name="camera" size={24} /></button>
-    <button type="button" className={styles.photoMore} aria-label={`${customer.name} 더보기`} aria-haspopup="dialog"
-      onClick={() => onMore(customer)}>⋯</button>
-  </div>
-    {onAdd ? <div className={styles.searchSupplement}>
+    {onAdd ? <div>
       {inToday ? <span className={styles.inToday}>오늘 목록</span> : <button type="button" onClick={() => onAdd(customer.customerId)}>오늘 추가</button>}
     </div> : null}
+  </div><div className={styles.photoActions}>
+    <button type="button" className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
+      onClick={() => onCapture(customer)}>
+      {/* Reuse the pre-sized static WebP without an image transformation service. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/ui/customer-ceramic-camera-v1.webp" alt="" width={48} height={48} /></button>
+    <button type="button" aria-label={`${customer.name} 더보기`} aria-haspopup="dialog"
+      onClick={() => onMore(customer)}><Icon name="more-refined" size={24} /></button>
+  </div>
   </li>;
 }
 
