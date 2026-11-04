@@ -147,6 +147,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
       const requestIsCurrent = coordinator.guardCurrentGeneration();
       const run = coordinator.run(async () => {
         if (!reconciler.begin()) throw new Error("Inventory revalidation overlap");
+        let acceptingProgress = true;
         try {
           const baselineCatalog = workspaceSession.snapshot.catalog;
           const baselineProducts = baselineCatalog?.products ?? [];
@@ -154,7 +155,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
           let progressiveProducts: InventoryProduct[] | null = null;
           let progressiveComplete = false;
           const publishProgress = () => {
-            if (!progressiveProducts || !requestIsCurrent()) return;
+            if (!acceptingProgress || !progressiveProducts || !requestIsCurrent()) return;
             const mergedProducts = reconciler.reconcile(progressiveProducts, progressiveComplete ? [] : baselineProducts);
             if (!mergedProducts) return;
             commitInventoryCatalog(sessionKey, {
@@ -178,7 +179,8 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
           }
           return { nextContext, mergedProducts, observedDate, refreshedAt };
         } finally {
-          reconciler.finish();
+          acceptingProgress = false;
+          if (requestIsCurrent()) reconciler.finish();
         }
       }, { force, hasData: catalogReady.current });
       if (run.kind === "skipped") return;
@@ -303,10 +305,9 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   }, [searchableRows, query, urgentOnly, context, location, countControlsReady]);
   const selectedId = selected?.productId;
   const selectedProduct = products.find((product) => product.productId === selectedId);
-  const openProduct = useCallback((productId: string) => {
-    const product = products.find((item) => item.productId === productId);
-    if (product) setSelected({ productId, location: inventoryOpeningLocation(product, location) });
-  }, [products, location]);
+  const openProduct = useCallback((product: InventoryProduct) => {
+    setSelected({ productId: product.productId, location: inventoryOpeningLocation(product, location) });
+  }, [location]);
   const productList = useMemo(() => <InventoryListChunks>{filtered.slice(0, limit).map((product) => <li role="listitem" key={product.productId}><InventoryCard product={product} location={location} context={calendarReady ? context : null} countMode={countMode} onOpen={openProduct} /></li>)}</InventoryListChunks>, [filtered, limit, location, calendarReady, context, countMode, openProduct]);
   function countSaved(product: InventoryProduct, checkedLocation: InventoryLocation, detail: InventoryProductDetail) {
     if (!countMode || !countControlsReady || !context || product.status !== "active" || inventoryCountState(product, checkedLocation, context.cycle.cycleId) !== "done") return;

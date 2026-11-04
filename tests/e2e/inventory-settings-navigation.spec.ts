@@ -160,7 +160,7 @@ test("inventory controls and freshness stay above the scrolling product list", a
     const header = (await toolbar.boundingBox())!;
     await expect(toolbar).toHaveCSS("background-image", "none");
     await expect(toolbar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    expect(await toolbar.evaluate(el => {
+    await expect.poll(() => toolbar.evaluate(el => {
       const box = el.getBoundingClientRect();
       return document.elementsFromPoint(box.x + 5, box.y + 5).some(node => node.closest("[data-inventory-results]"));
     })).toBe(false);

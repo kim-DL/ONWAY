@@ -32,7 +32,7 @@ function worker(overrides: Partial<DeliveryPhotoUploadDependencies> = {}) {
   return coordinator;
 }
 async function until(check: () => void) { await vi.waitFor(check, { timeout: 2_000, interval: 10 }); }
-afterEach(async () => { await Promise.all(workers.splice(0).map((worker) => worker.clear())); await clearDeliveryPhotoOutbox(); });
+afterEach(async () => { await Promise.all(workers.splice(0).map((worker) => worker.clear())); await clearDeliveryPhotoOutbox(); vi.unstubAllGlobals(); });
 
 describe("durable unsent-photo outbox", () => {
   it("allows a fresh session coordinator even if clearing the old storage fails", async () => {
@@ -135,6 +135,46 @@ describe("durable unsent-photo outbox", () => {
     expect(coordinator.getSnapshot()[0]).toMatchObject({ status: "persisting", durable: false }); expect(create).not.toHaveBeenCalled();
     release(); await accepted; await until(() => expect(create).toHaveBeenCalledOnce());
   });
+  it("persists the native photo before reading its bytes for preparation", async () => {
+    const bytes = new Uint8Array([255, 216, 255, 224]);
+    const native = new File([bytes], "capture.jpg", { type: "image/jpeg" });
+    let release!: (value: ArrayBuffer) => void;
+    const read = vi.spyOn(native, "arrayBuffer").mockImplementation(() => new Promise<ArrayBuffer>((resolve) => { release = resolve; }));
+    const prepare = vi.fn<DeliveryPhotoUploadDependencies["prepare"]>(() => new Promise(() => undefined));
+    const coordinator = worker({ prepare }); await coordinator.ready;
+    const scope = await deliveryPhotoOutbox.activate(owner);
+    const job = coordinator.begin("customer", "camera")!;
+    const accepting = coordinator.acceptNativeSource(job.jobId, native);
+    try {
+      await until(async () => expect(await deliveryPhotoOutbox.list(scope)).toHaveLength(1));
+      const saved = (await deliveryPhotoOutbox.list(scope))[0]!;
+      expect(saved.source?.size).toBe(bytes.length);
+      expect(saved.job).toMatchObject({ jobId: job.jobId, requestId: job.requestId, durable: true });
+      expect(read).not.toHaveBeenCalled();
+    } finally {
+      release?.(bytes.buffer);
+      await accepting;
+    }
+  });
+  it("retains a source transaction committed after pagehide without starting an upload", async () => {
+    const page = new EventTarget(); vi.stubGlobal("window", page);
+    vi.stubGlobal("document", Object.assign(new EventTarget(), { visibilityState: "visible" }));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const add = vi.fn<PhotoOutboxStore["add"]>(async (...args) => { await gate; return deliveryPhotoOutbox.add(...args); });
+    const create = vi.fn(async () => metadata("customer"));
+    const coordinator = worker({ store: { ...deliveryPhotoOutbox, add }, create }); await coordinator.ready;
+    const scope = await deliveryPhotoOutbox.activate(owner);
+    const job = coordinator.begin("customer", "camera")!;
+    const native = new File([new Uint8Array([255, 216, 255, 224])], "capture.jpg", { type: "image/jpeg" });
+    const accepting = coordinator.acceptNativeSource(job.jobId, native);
+    await until(() => expect(add).toHaveBeenCalledOnce());
+    page.dispatchEvent(new Event("pagehide")); release(); await accepting;
+    const saved = (await deliveryPhotoOutbox.list(scope))[0]!;
+    expect(saved.source?.size).toBe(4);
+    expect(saved.job.requestId).toBe(job.requestId);
+    expect(create).not.toHaveBeenCalled();
+  });
   it("retains a failed source in memory for storage retry instead of silently falling back to upload", async () => {
     let fail = true;
     const store: PhotoOutboxStore = { ...deliveryPhotoOutbox, add: async (...args) => { if (fail) throw new Error("quota"); return deliveryPhotoOutbox.add(...args); } };
@@ -144,6 +184,46 @@ describe("durable unsent-photo outbox", () => {
     expect(coordinator.getSnapshot()[0]).toMatchObject({ status: "failed", durable: false, errorCategory: "storage" });
     expect(create).not.toHaveBeenCalled(); expect(coordinator.canBegin("other")).toBe(false);
     fail = false; await coordinator.retry(job.jobId); await until(() => expect(create).toHaveBeenCalledOnce());
+  });
+  it("copies an independent native source after storage fails and retries with the original request", async () => {
+    const bytes = new Uint8Array([255, 216, 255, 224]);
+    const native = new File([bytes], "capture.jpg", { type: "image/jpeg" });
+    const read = vi.spyOn(native, "arrayBuffer");
+    let fail = true;
+    const store: PhotoOutboxStore = { ...deliveryPhotoOutbox, add: async (...args) => { if (fail) throw new Error("quota"); return deliveryPhotoOutbox.add(...args); } };
+    const create = vi.fn<DeliveryPhotoUploadDependencies["create"]>(async (input) => metadata(input.customerId));
+    const coordinator = worker({ store, create }); await coordinator.ready;
+    const job = coordinator.begin("customer", "camera")!;
+    await coordinator.acceptNativeSource(job.jobId, native);
+    expect(read).toHaveBeenCalledOnce();
+    expect(coordinator.getSnapshot()[0]).toMatchObject({ status: "failed", errorCategory: "storage", durable: false });
+    expect(create).not.toHaveBeenCalled();
+    read.mockRejectedValue(new Error("native provider released"));
+    fail = false; await coordinator.retry(job.jobId);
+    await until(() => expect(coordinator.getSnapshot()[0]?.status).toBe("completed"));
+    expect(create).toHaveBeenCalledOnce();
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ requestId: job.requestId, fileBase64: Buffer.from(bytes).toString("base64") });
+  });
+  it("rejects an invalid native selection before storing or preparing it", async () => {
+    const add = vi.fn(deliveryPhotoOutbox.add);
+    const prepare = vi.fn<DeliveryPhotoUploadDependencies["prepare"]>(() => new Promise(() => undefined));
+    const coordinator = worker({ store: { ...deliveryPhotoOutbox, add }, prepare }); await coordinator.ready;
+    const job = coordinator.begin("customer", "camera")!;
+    await coordinator.acceptNativeSource(job.jobId, new File(["not a photo"], "invalid.txt", { type: "text/plain" }));
+    expect(coordinator.getSnapshot()[0]).toMatchObject({ status: "failed", errorCategory: "preparation", durable: false });
+    expect(add).not.toHaveBeenCalled(); expect(prepare).not.toHaveBeenCalled();
+    expect(coordinator.canRetry(job.jobId)).toBe(false);
+  });
+  it("validates persisted native bytes before preparing or sending a claimed photo", async () => {
+    const coordinator = new DeliveryPhotoUploadCoordinator(session); workers.push(coordinator); await coordinator.ready;
+    const scope = await deliveryPhotoOutbox.activate(owner);
+    const job = coordinator.begin("customer", "camera")!;
+    await coordinator.acceptNativeSource(job.jobId, new File(["invalid JPEG bytes"], "invalid.jpg", { type: "image/jpeg" }));
+    await until(() => expect(coordinator.getSnapshot()[0]).toMatchObject({ status: "failed", errorCategory: "preparation", durable: true,
+      message: "사진 파일 형식이 실제 내용과 맞지 않아요. 원본을 다시 선택해주세요." }));
+    const saved = (await deliveryPhotoOutbox.list(scope))[0]!;
+    expect(await saved.source?.text()).toBe("invalid JPEG bytes");
+    expect(saved.prepared).toBeNull(); expect(saved.confirmed).toBeNull();
   });
   it("uses identical persisted bytes and request ID after a lost response and retry", async () => {
     const scope = await deliveryPhotoOutbox.activate(owner); await deliveryPhotoOutbox.add(scope, record("retry"));
@@ -170,17 +250,35 @@ describe("durable unsent-photo outbox", () => {
     await new Promise((resolve) => setTimeout(resolve, 20)); expect(create).not.toHaveBeenCalled();
     expect(coordinator.getSnapshot()).toEqual([]);
   });
-  it("aborts a native provider read on logout before it can persist or upload", async () => {
+  it("aborts a fallback native provider read on logout before it can persist or upload", async () => {
     let finish!: (value: ArrayBuffer) => void;
     const native = new File([new Uint8Array([255, 216, 255, 224])], "pending.jpg", { type: "image/jpeg" });
     const read = vi.spyOn(native, "arrayBuffer").mockImplementation(() => new Promise<ArrayBuffer>((resolve) => { finish = resolve; }));
-    const create = vi.fn(async () => metadata("customer")); const coordinator = worker({ create }); await coordinator.ready;
+    const store: PhotoOutboxStore = { ...deliveryPhotoOutbox, add: async () => { throw new Error("quota"); } };
+    const create = vi.fn(async () => metadata("customer")); const coordinator = worker({ store, create }); await coordinator.ready;
     const job = coordinator.begin("customer", "camera")!; const accepting = coordinator.acceptNativeSource(job.jobId, native);
     await until(() => expect(read).toHaveBeenCalled());
     expect(coordinator.canBegin("another-customer")).toBe(false);
+    expect(coordinator.canRetry(job.jobId)).toBe(false);
+    expect(await coordinator.retry(job.jobId)).toBe(false);
     await coordinator.clear();
     finish(new Uint8Array([255, 216, 255, 224]).buffer); await accepting;
     expect(create).not.toHaveBeenCalled(); expect(coordinator.getSnapshot()).toEqual([]);
+  });
+  it("does not resurrect a native source when logout precedes its pending transaction", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const add = vi.fn<PhotoOutboxStore["add"]>(async (...args) => { await gate; return deliveryPhotoOutbox.add(...args); });
+    const create = vi.fn(async () => metadata("customer"));
+    const coordinator = worker({ store: { ...deliveryPhotoOutbox, add }, create }); await coordinator.ready;
+    const job = coordinator.begin("customer", "camera")!;
+    const native = new File([new Uint8Array([255, 216, 255, 224])], "capture.jpg", { type: "image/jpeg" });
+    const accepting = coordinator.acceptNativeSource(job.jobId, native);
+    await until(() => expect(add).toHaveBeenCalledOnce());
+    await coordinator.clear(); release(); await accepting;
+    const scope = await deliveryPhotoOutbox.activate(owner);
+    expect(await deliveryPhotoOutbox.list(scope)).toEqual([]);
+    expect(coordinator.getSnapshot()).toEqual([]); expect(create).not.toHaveBeenCalled();
   });
   it("releases confirmed previews on leaving the workspace while retaining pending files", async () => {
     const scope = await deliveryPhotoOutbox.activate(owner); await deliveryPhotoOutbox.add(scope, record("done"));

@@ -14,26 +14,28 @@ import styles from "./photo.module.css";
 
 export type DeliveryPhotoEditorMode = "route" | "day";
 
-export function DeliveryPhotoEditor({ mode, session, customers, initialIds, initialAddId,
+export function DeliveryPhotoEditor({ mode, session, customers, initialIds, initialAddId, revision = null,
   onSave, onClose }: {
   mode: DeliveryPhotoEditorMode;
   session: AuthenticatedSession;
   customers: readonly Customer[];
   initialIds: readonly string[];
   initialAddId?: string | undefined;
-  onSave: (ids: readonly string[]) => Promise<"saved" | "conflict" | "error">;
+  revision: number | null | undefined;
+  onSave: (ids: readonly string[], expectedRevision: number | null) => Promise<"saved" | "conflict" | "error">;
   onClose: () => void;
 }) {
   const { recentCustomers, rememberCustomer } = useDeliveryPhotoRecents(session, customers);
   useEffect(() => { if (initialAddId) rememberCustomer(initialAddId); }, [initialAddId, rememberCustomer]);
   const knownIds = useMemo(() => new Set(customers.map((customer) => customer.customerId)), [customers]);
   const byId = useMemo(() => new Map(customers.map((customer) => [customer.customerId, customer])), [customers]);
+  const [baseline] = useState(() => ({ ids: initialIds, revision }));
   const [ids, setIds] = useState(() => initialAddId
-    ? addDeliveryPhotoCustomer(initialIds, initialAddId, knownIds) : [...initialIds]);
+    ? addDeliveryPhotoCustomer(baseline.ids, initialAddId, knownIds) : [...baseline.ids]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"conflict" | "error" | "">("");
-  const dirty = ids.join("\0") !== initialIds.join("\0");
+  const dirty = ids.join("\0") !== baseline.ids.join("\0");
   const candidates = useMemo(() => (query.trim() ? searchCustomers(customers, query) : recentCustomers)
     .filter((customer) => customer.status === "active" && !ids.includes(customer.customerId)).slice(0, 20), [customers, ids, query, recentCustomers]);
   const title = mode === "route" ? "내 납품처 편집" : "오늘 순서 편집";
@@ -43,7 +45,7 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
     setBusy(true);
     setError("");
     try {
-      const result = await onSave(ids);
+      const result = await onSave(ids, baseline.revision);
       if (result === "saved") onClose();
       else setError(result);
     } catch {

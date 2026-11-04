@@ -12,11 +12,12 @@ import { MAX_PENDING_PHOTOS_PER_CUSTOMER, MAX_PENDING_PHOTOS_TOTAL, isActiveDeli
   type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import type { PhotoOutboxWorker } from "./delivery-photo-outbox-worker";
 import type { PreparedDeliveryPhoto } from "./delivery-photo-preparation";
+import { deliveryPhotoSelectionError } from "./delivery-photo-selection";
 import { recordPerformanceMetric } from "@/lib/performance/performance-monitor";
 
 export type DeliveryPhotoUploadDependencies = {
   prepare: (source: File, signal: AbortSignal) => Promise<PreparedDeliveryPhoto>;
-  preparationMessage: (error: unknown) => string;
+  preparationMessage: (error: unknown) => string | Promise<string>;
   create: (input: DeliveryPhotoCreateInput, session: AuthenticatedSession) => Promise<DeliveryPhotoCreateResult>;
   encode: (blob: Blob) => Promise<string>;
   uuid: () => string;
@@ -27,21 +28,21 @@ export type DeliveryPhotoUploadDependencies = {
 };
 function defaultDependencies(): DeliveryPhotoUploadDependencies {
   return {
-    prepare: async (source, signal) => (await import("./delivery-photo-preparation")).prepareDeliveryPhoto(source, signal),
-    preparationMessage: () => "사진 준비를 마치지 못했어요. 다시 시도해주세요.",
+    prepare: (source, signal) => import(/* webpackChunkName: "delivery-photo-preparation" */ "./delivery-photo-preparation").then((module) => module.prepareDeliveryPhoto(source, signal)),
+    preparationMessage: (error) => import(/* webpackChunkName: "delivery-photo-preparation" */ "./delivery-photo-preparation").then(
+      (module) => module.deliveryPhotoPreparationMessage(error), () => "사진 준비를 마치지 못했어요. 다시 시도해주세요."),
     create: async (input, session) => (await import("./delivery-photo-create-repository")).deliveryPhotoCreateRepository.create(input, session),
     encode: encodeDeliveryPhotoBlob,
     uuid: () => crypto.randomUUID(), now: () => Date.now(), maxConcurrentRelays: 2, store: lazyDeliveryPhotoOutbox,
   };
 }
 export async function encodeDeliveryPhotoBlob(blob: Blob): Promise<string> {
-  return (await import("./delivery-photo-preparation")).encodeDeliveryPhotoBlob(blob);
+  return (await import(/* webpackChunkName: "delivery-photo-preparation" */ "./delivery-photo-preparation")).encodeDeliveryPhotoBlob(blob);
 }
 export function deliveryPhotoUploadNamespace(session: AuthenticatedSession) {
   return JSON.stringify([session.uid, session.claims.employeeId, session.claims.sessionVersion, session.claims.permissionsVersion]);
 }
 type LocalPreview = { thumbnail: string; full: string };
-const RETRY_DELAYS = [2_000, 8_000, 30_000];
 const PREVIOUS_DAY = "이전 날짜 사진입니다. 서버 접수일로 기록됩니다. 날짜 확인 후 전송해주세요.";
 
 export class DeliveryPhotoUploadCoordinator {
@@ -81,9 +82,9 @@ export class DeliveryPhotoUploadCoordinator {
         const worker = new PhotoOutboxWorker(this.dependencies.store, this.worker);
         this.outboxWorker = worker;
         if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch))) return false;
-        this.scope = worker.scope; await this.restore();
+        this.scope = worker.scope; await this.wake(true);
         if (!this.live(epoch)) { worker.close(); return false; }
-        worker.start(() => { void this.wake(); }, () => {
+        worker.start((foreground) => { void this.wake(foreground); }, () => {
           this.epoch++; this.authorized = false;
           for (const controller of this.controllers.values()) controller.abort();
         }, () => !!this.sourceReads.size || this.snapshot.some((job) => !job.durable && this.records.get(job.jobId)?.source),
@@ -92,23 +93,14 @@ export class DeliveryPhotoUploadCoordinator {
       this.initialized = true; this.publish(); this.pumpPreparation(); this.pumpRelays(); return true;
     } catch { this.initialized = false; return false; }
   }
-  private async wake() {
-    if (!this.authorized) return;
-    await this.restore();
-    const now = this.dependencies.now();
+  private async wake(foreground = false) {
     let expired = false;
-    for (const [id, record] of this.records) {
-      if (record.job.status === "completed" && record.confirmed && Date.parse(record.confirmed.expiresAt) <= now) {
-        this.removeLocal(id); expired = true;
-        if (this.scope) await this.dependencies.store?.remove(this.scope, id).catch(() => undefined);
-      }
-    }
+    const restored = await this.outboxWorker?.wake(foreground, {
+      records: this.records, restore: () => this.restore(), live: () => this.authorized, now: this.dependencies.now,
+      expire: (id) => { this.removeLocal(id); expired = true; }, retry: (id) => this.retry(id, false),
+    });
     if (expired) this.publish();
-    for (const job of this.jobs.values()) {
-      if (job.status === "failed" && job.errorCategory === "retryable" && job.retryAt && job.retryAt <= now
-        && (typeof navigator === "undefined" || navigator.onLine !== false)) void this.retry(job.jobId, false);
-    }
-    this.pumpPreparation(); this.pumpRelays();
+    if (restored) { this.pumpPreparation(); this.pumpRelays(); }
   }
   private async restore() {
     if (!this.outboxWorker) return;
@@ -152,14 +144,26 @@ export class DeliveryPhotoUploadCoordinator {
     const epoch = this.epoch; const controller = new AbortController();
     this.controllers.set(jobId, controller); this.sourceReads.add(jobId);
     try {
-      const preparation = await import("./delivery-photo-preparation");
+      const validation = deliveryPhotoSelectionError(native);
+      if (validation) throw { code: validation };
+      if (this.dependencies.store) {
+        const accepted = await this.acceptSource(jobId, native);
+        if (!accepted || !this.live(epoch, jobId) || this.jobs.get(jobId)?.durable) return accepted;
+      }
+      const preparation = await import(/* webpackChunkName: "delivery-photo-preparation" */ "./delivery-photo-preparation");
       const source = await preparation.materializeDeliveryPhotoSource(native, controller.signal);
       if (!this.live(epoch, jobId)) return false;
+      if (this.dependencies.store) {
+        this.records.get(jobId)!.source = source;
+        return true;
+      }
       return await this.acceptSource(jobId, source);
     } catch (error) {
       if (!this.live(epoch, jobId)) return false;
-      const preparation = await import("./delivery-photo-preparation");
-      this.failPreparation(jobId, preparation.deliveryPhotoPreparationMessage(error));
+      const record = this.records.get(jobId);
+      if (record && !record.job.durable) record.source = null;
+      const message = await this.dependencies.preparationMessage(error);
+      if (this.live(epoch, jobId)) this.failPreparation(jobId, message);
       return true;
     } finally {
       this.sourceReads.delete(jobId);
@@ -169,7 +173,8 @@ export class DeliveryPhotoUploadCoordinator {
   }
   canRetry(jobId: string) {
     const job = this.jobs.get(jobId); const record = this.records.get(jobId);
-    return !!job && !!record && this.authorized && (job.status === "paused" || job.status === "failed" && job.errorCategory !== "auth")
+    return !!job && !!record && this.authorized && !this.sourceReads.has(jobId)
+      && ["paused", "failed"].includes(job.status) && job.errorCategory !== "auth"
       && !!(record.source || record.prepared);
   }
   async acceptSource(jobId: string, source: File) {
@@ -196,15 +201,12 @@ export class DeliveryPhotoUploadCoordinator {
     this.update(jobId, { status: "failed", errorCategory: "preparation", message });
   }
   async retry(jobId: string, manual = true) {
-    const record = this.records.get(jobId); const job = this.jobs.get(jobId);
-    if (!record || !job || !this.authorized || !["failed", "paused"].includes(job.status) || job.errorCategory === "auth") return false;
+    if (!this.canRetry(jobId)) return false;
+    const record = this.records.get(jobId)!; const job = this.jobs.get(jobId)!;
     if (!manual && record.approvedDay !== this.today()) { this.update(jobId, { status: "paused", message: PREVIOUS_DAY }); return false; }
     if (job.errorCategory === "storage" && !job.durable && record.source) return this.acceptSource(jobId, record.source);
-    if (!record.prepared && !record.source) return false;
-    try {
-      const claimed = await this.claim(jobId, record.prepared ? "upload" : "prepare");
-      if (!claimed) return false;
-    } catch { this.storageFailure(jobId); return false; }
+    const claimed = await this.claim(jobId, record.prepared ? "upload" : "prepare");
+    if (!claimed) return false;
     if (manual) record.approvedDay = this.today();
     this.update(jobId, { status: record.prepared ? "queued" : "preparing", errorCategory: null, message: "", retryAt: 0,
       ...(manual ? { attempts: 0 } : {}) });
@@ -295,7 +297,9 @@ export class DeliveryPhotoUploadCoordinator {
           recordPerformanceMetric("deliveryPhotoPreviewDuration", started, "runtime"); this.publish(); this.pumpRelays();
         } catch (error) {
           if (this.live(epoch, id)) {
-            this.failPreparation(id, this.dependencies.preparationMessage(error));
+            const message = await this.dependencies.preparationMessage(error);
+            if (!this.live(epoch, id)) return;
+            this.failPreparation(id, message);
             record.lease = null; await this.save(record, this.worker).catch(() => this.storageFailure(id));
           }
         } finally { this.controllers.delete(id); this.activePreparation = null; }
@@ -358,8 +362,8 @@ export class DeliveryPhotoUploadCoordinator {
       const attempt = record.job.attempts ?? 1;
       this.update(id, { status: "failed", errorCategory: category,
         message: category === "retryable" ? "전송을 마치지 못했어요. 사진은 보관 중이에요." : deliveryPhotoCreateErrorMessage(error),
-        retryAt: this.dependencies.store && category === "retryable" && attempt <= RETRY_DELAYS.length
-          ? this.dependencies.now() + (RETRY_DELAYS[attempt - 1] ?? 30_000) : 0 });
+        retryAt: this.outboxWorker && category === "retryable"
+          ? this.dependencies.now() + this.outboxWorker.retryDelay(attempt) : 0 });
       record.lease = null; await this.save(record, this.worker).catch(() => this.storageFailure(id));
     }
   }
