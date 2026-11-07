@@ -8,6 +8,7 @@ const deliveryPhotoFunctionNames = [
   "createDeliveryPhoto", "deleteDeliveryPhoto", "expireDeliveryPhotos", "getDeliveryPhoto",
   "getDeliveryPhotoDay", "getDeliveryPhotoRoute", "listDeliveryPhotos", "saveDeliveryPhotoDay", "saveDeliveryPhotoRoute",
 ];
+const deliveryPlanningFunctionNames = ["analyzeDeliveryInvoice", "confirmDeliveryInvoice", "getDeliveryPlanningContext", "saveDeliveryPlanningSettings", "recommendDeliveryRoute", "applyDeliveryRoute"];
 
 function endpoint(value: unknown) {
   return (value as { __endpoint: { serviceAccountEmail?: string; callableTrigger?: object; scheduleTrigger?: object } }).__endpoint;
@@ -56,7 +57,7 @@ describe("delivery-photo dedicated runtime identity", () => {
       .rejects.toThrow("DELIVERY_PHOTO_SERVICE_ACCOUNT");
   });
 
-  it("puts the dedicated identity on exactly the nine exported deployment specs", async () => {
+  it("keeps the dedicated identity limited to nine photo and six planning deployment specs", async () => {
     vi.stubEnv("FUNCTIONS_EMULATOR", "false");
     vi.stubEnv("GCLOUD_PROJECT", projectId);
     vi.stubEnv("GOOGLE_CLOUD_PROJECT", projectId);
@@ -64,8 +65,8 @@ describe("delivery-photo dedicated runtime identity", () => {
     const exports = await import("../src/index.js");
     const configured = Object.entries(exports).filter(([, value]) => value && typeof value === "function"
       && "__endpoint" in value && typeof endpoint(value).serviceAccountEmail === "string").map(([name]) => name).sort();
-    expect(configured).toEqual(deliveryPhotoFunctionNames.toSorted());
-    for (const name of deliveryPhotoFunctionNames) {
+    expect(configured).toEqual([...deliveryPhotoFunctionNames, ...deliveryPlanningFunctionNames].toSorted());
+    for (const name of [...deliveryPhotoFunctionNames, ...deliveryPlanningFunctionNames]) {
       expect(endpoint(exports[name as keyof typeof exports]).serviceAccountEmail).toBe(account);
     }
     expect(endpoint(exports.expireDeliveryPhotos).scheduleTrigger).toBeDefined();

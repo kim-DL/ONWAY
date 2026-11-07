@@ -147,6 +147,10 @@ const deliveryPhotoFieldLayers = [
   { name: "inspection", boundaries: ["delivery-photo-local-preview"], javascript: 2 * 1024, cssRaw: 1024, cssGzip: 512 },
   { name: "durability", boundaries: ["delivery-photo-outbox", "delivery-photo-outbox-lazy", "delivery-photo-outbox-worker"], javascript: 4 * 1024 - 128, cssRaw: 0, cssGzip: 0 },
   { name: "relay", boundaries: ["delivery-photo-create-repository"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
+  // Invoice preparation is independently loaded. Keep every existing envelope;
+  // measure this new feature explicitly instead of charging it to legacy CSS.
+  { name: "planning-entry", boundaries: ["planning-entry"], javascript: 1.5 * 1024, cssRaw: 1.5 * 1024, cssGzip: .75 * 1024 },
+  { name: "invoice-planning", boundaries: ["delivery-planning-sheet"], javascript: 8 * 1024, cssRaw: 9 * 1024, cssGzip: 2.5 * 1024 },
 ].map((layer) => {
   const assets = [...new Set(dynamicEntries.filter((entry) => layer.boundaries.some((name) => entry.boundary.endsWith(`/${name}`)))
     .flatMap((entry) => entry.files))];
@@ -442,10 +446,14 @@ assertBudget(customerStylesheetGzipBytes <= 9.75 * 1024, `customer CSS gzip ${cu
 // P2-B adds the memory-only revalidation coordinator and freshness state to the
 // existing customer boundary. Measured 36,705B gzip; add only 512B while the
 // initial, inventory, school/sales and stylesheet budgets remain unchanged.
-assertBudget(customerJavascriptGzipBytes <= 36 * 1024, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 36KiB`);
+// Invoice planning reuses the customer schema/search boundary. The new split
+// measures 36,939B (+75B over its previous envelope); allocate 128B here only.
+assertBudget(customerJavascriptGzipBytes <= 36 * 1024 + 128, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 36KiB + 128B`);
 assertBudget(deliveryPhotoStylesheetRawBytes <= 6 * 1024, `delivery photo CSS raw ${deliveryPhotoStylesheetRawBytes}B exceeds 6KiB`);
 assertBudget(deliveryPhotoStylesheetGzipBytes <= 2 * 1024, `delivery photo CSS gzip ${deliveryPhotoStylesheetGzipBytes}B exceeds 2KiB`);
-assertBudget(deliveryPhotoJavascriptGzipBytes <= 10 * 1024, `delivery photo JavaScript gzip ${deliveryPhotoJavascriptGzipBytes}B exceeds 10KiB`);
+// Only the planning entry and session/date-bound mount live in this workspace.
+// Its new measured 10,450B receives 256B; the planning UI has separate caps.
+assertBudget(deliveryPhotoJavascriptGzipBytes <= 10 * 1024 + 256, `delivery photo JavaScript gzip ${deliveryPhotoJavascriptGzipBytes}B exceeds 10KiB + 256B`);
 assertBudget(deliveryPhotoHistoryStylesheetRawBytes <= 5.5 * 1024, `delivery photo history/viewer CSS raw ${deliveryPhotoHistoryStylesheetRawBytes}B exceeds 5.5KiB`);
 assertBudget(deliveryPhotoHistoryStylesheetGzipBytes <= 1.75 * 1024, `delivery photo history/viewer CSS gzip ${deliveryPhotoHistoryStylesheetGzipBytes}B exceeds 1.75KiB`);
 assertBudget(deliveryPhotoHistoryJavascriptGzipBytes <= 3.5 * 1024, `delivery photo history JavaScript gzip ${deliveryPhotoHistoryJavascriptGzipBytes}B exceeds 3.5KiB`);
@@ -503,10 +511,10 @@ const report = {
     combinedSchoolStylesheetGzipBytes: (44.5 + 1.625) * 1024,
     customerStylesheetRawBytes: 48 * 1024,
     customerStylesheetGzipBytes: 9.75 * 1024,
-    customerJavascriptGzipBytes: 36 * 1024,
+    customerJavascriptGzipBytes: 36 * 1024 + 128,
     deliveryPhotoStylesheetRawBytes: 6 * 1024,
     deliveryPhotoStylesheetGzipBytes: 2 * 1024,
-    deliveryPhotoJavascriptGzipBytes: 10 * 1024,
+    deliveryPhotoJavascriptGzipBytes: 10 * 1024 + 256,
     deliveryPhotoHistoryStylesheetRawBytes: 5.5 * 1024,
     deliveryPhotoHistoryStylesheetGzipBytes: 1.75 * 1024,
     deliveryPhotoHistoryJavascriptGzipBytes: 3.5 * 1024,

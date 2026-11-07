@@ -24,6 +24,7 @@ const DeliveryPhotoRow = dynamic(() => import("./delivery-photo-row"), { ssr: fa
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { ssr: false });
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
 const DeliveryPhotoUploadPanel = dynamic(() => import("./delivery-photo-upload-panel"), { ssr: false });
+const PlanningEntry = dynamic(() => import("../delivery-planning/planning-entry"), { ssr: false });
 
 export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backAction }: { session: AuthenticatedSession; onOpenCustomerDetail?: (customerId: string) => void; backAction?: ReactNode }) {
   const data = useDeliveryPhotoData(session);
@@ -92,6 +93,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
       <div className={styles.summary}><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong>
         {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
     </header>
+    {ready && snapshot ? <PlanningEntry key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${snapshot.day.deliveryDateKey}`}
+      customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh} /> : null}
     {uploads.storageError ? <p className={styles.notice} role="alert">사진 보관을 준비하지 못했어요. 기기 저장 공간과 브라우저의 저장소 허용을 확인한 뒤 앱을 다시 열어주세요.</p> : null}
     {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
       if (data.error) data.refresh();
