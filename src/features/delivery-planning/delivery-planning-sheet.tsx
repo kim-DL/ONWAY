@@ -36,7 +36,10 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
 }) {
   const [context, setContext] = useState<PlanningContext | null>(null); const [configuring, setConfiguring] = useState(false);
   const [scans, setScans] = useState<Scan[]>([]); const files = useRef(new Map<string, File>());
-  const [busy, setBusy] = useState(false); const running = useRef(false); const alive = useRef(true);
+  const [actionBusy, setBusy] = useState(false); const running = useRef(false); const alive = useRef(true);
+  const [processing, setProcessing] = useState(false); const draining = useRef(false);
+  const pending = useRef<string[]>([]); const scanCount = useRef(0);
+  const busy = actionBusy || processing;
   const [error, setError] = useState(""); const [lastId, setLastId] = useState("");
   const [recommendation, setRecommendation] = useState<RouteRecommendation | null>(null); const [applied, setApplied] = useState(false);
   const applyRequest = useRef<{ recommendationId: string; requestId: string } | null>(null);
@@ -46,12 +49,20 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
   const reviews = scans.filter((s) => s.result?.status === "review").length;
   const saved = new Set(scans.flatMap((s) => s.result?.status === "saved" && s.result.customerId ? [s.result.customerId] : [])).size;
   const done = scans.filter((s) => s.state === "done" || s.state === "failed").length;
+  const waiting = scans.filter((s) => s.state === "waiting").length;
+  const failed = scans.filter((s) => s.state === "failed").length;
   const loadContext = async () => { try { const value = await repository.context(); if (alive.current) setContext(value); } catch (e) { if (alive.current) setError(planningError(e)); } };
   useEffect(() => {
-    alive.current = true; const pendingFiles = files.current;
+    alive.current = true; const pendingFiles = files.current; const pendingQueue = pending.current;
     void repository.context().then((value) => { if (alive.current) setContext(value); }).catch((e: unknown) => { if (alive.current) setError(planningError(e)); });
-    return () => { alive.current = false; pendingFiles.clear(); };
+    return () => { alive.current = false; pendingQueue.length = 0; pendingFiles.clear(); };
   }, [repository]);
+  useEffect(() => {
+    if (!processing && !failed && !reviews) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [processing, failed, reviews]);
   const patch = (id: string, value: Partial<Scan>) => { if (alive.current) setScans((old) => old.map((s) => s.id === id ? { ...s, ...value } : s)); };
   const accept = (id: string, result: InvoiceResult) => {
     if (!alive.current) return;
@@ -68,24 +79,35 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
       accept(id, await repository.analyze({ requestId: id, deliveryDateKey: day.deliveryDateKey, ...image }));
     } catch (e) { patch(id, { state: "failed", error: planningError(e) }); if (alive.current) onRefresh(); }
   };
-  const addFiles = async (selected: File[]) => {
-    if (running.current || !selected.length) return;
-    if (selected.length > 20 || scans.length + selected.length > 60) { setError("한 번에 20장, 이 화면에서 최대 60장까지 확인할 수 있어요."); return; }
-    if (selected.some((f) => f.size > 20 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/u.test(f.type))) { setError("20MB 이하의 JPEG·PNG·WebP 사진을 선택해주세요."); return; }
-    running.current = true; setBusy(true); setError(""); setRecommendation(null); setApplied(false);
-    const queue = selected.map((file) => { const id = crypto.randomUUID(); files.current.set(id, file); return { id, name: file.name, state: "waiting" as const }; });
-    setScans((old) => [...old, ...queue]);
-    try { for (const scan of queue) { if (!alive.current) break; await read(scan.id); } }
-    finally { running.current = false; if (alive.current) setBusy(false); }
+  const drain = async () => {
+    if (draining.current || !alive.current) return;
+    draining.current = true; setProcessing(true);
+    try {
+      // Capture can append while this worker awaits the server. Only one request runs at a time.
+      while (alive.current && pending.current.length) {
+        const id = pending.current.shift()!;
+        await read(id);
+      }
+    } finally { draining.current = false; if (alive.current) setProcessing(false); }
   };
-  const retry = async (scan: Scan) => {
-    if (running.current) return;
+  const addFiles = (selected: File[]) => {
+    if (running.current || !alive.current || !selected.length) return;
+    if (selected.length > 20 || scanCount.current + selected.length > 60) { setError("한 번에 20장, 이 화면에서 최대 60장까지 확인할 수 있어요."); return; }
+    if (selected.some((f) => f.size > 20 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/u.test(f.type))) { setError("20MB 이하의 JPEG·PNG·WebP 사진을 선택해주세요."); return; }
+    setError(""); setRecommendation(null); setApplied(false);
+    const queue = selected.map((file) => { const id = crypto.randomUUID(); files.current.set(id, file); return { id, name: file.name, state: "waiting" as const }; });
+    scanCount.current += queue.length;
+    pending.current.push(...queue.map((scan) => scan.id));
+    setScans((old) => [...old, ...queue]);
+    void drain();
+  };
+  const retry = (scan: Scan) => {
+    if (running.current || draining.current || !files.current.has(scan.id)) return;
     // Retry the same request ID first: a lost response must not create a second paid call.
-    running.current = true; setBusy(true); setError("");
-    try { await read(scan.id); } finally { running.current = false; if (alive.current) setBusy(false); }
+    setError(""); pending.current.push(scan.id); void drain();
   };
   const action = async (work: () => Promise<void>) => {
-    if (running.current) return;
+    if (running.current || draining.current) return;
     running.current = true; setBusy(true); setError("");
     try { await work(); } catch (e) { if (alive.current) { setError(planningError(e)); onRefresh(); } }
     finally { running.current = false; if (alive.current) setBusy(false); }
@@ -109,21 +131,22 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
         {mode === "invoice" && <section className={styles.captureCard} aria-label="명세서 사진 선택">
           <div className={styles.captureHeading}><svg viewBox="0 0 40 40" width="40" height="40" fill="none" aria-hidden="true"><rect x="9" y="5" width="23" height="30" rx="3" stroke="currentColor" strokeWidth="1.8"/><path d="M15 13h11M15 19h11M15 25h6M5 11v-5a4 4 0 0 1 4-4M26 38h5a4 4 0 0 0 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
             <div><h3>오늘 명세서</h3></div></div>
-          <div className={styles.captureActions}><button type="button" className={styles.primary} disabled={busy} onClick={() => camera.current?.click()}>명세서 촬영</button><button type="button" disabled={busy} onClick={() => gallery.current?.click()}>갤러리에서 선택</button></div>
+          <div className={styles.captureActions}><button type="button" className={styles.primary} disabled={actionBusy || scans.length >= 60} onClick={() => camera.current?.click()}>명세서 촬영</button><button type="button" disabled={actionBusy || scans.length >= 60} onClick={() => gallery.current?.click()}>갤러리에서 선택</button></div>
+          {processing && <p className={styles.hint}>분석 중에도 계속 촬영할 수 있어요.</p>}
           <p className={styles.privacy}>명세서 사진은 Firebase에 저장하지 않아요.</p>
           <details className={styles.privacyDetail}><summary>사진 처리</summary><p>OpenAI로 전송해 분석합니다. 급식길에는 연결 결과만 남으며, OpenAI의 보존 정책은 별도로 적용됩니다.</p></details>
         </section>}
         <input ref={camera} hidden type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="명세서 카메라" onChange={(e) => { const picked = Array.from(e.target.files ?? []); e.target.value = ""; void addFiles(picked); }} />
         <input ref={gallery} hidden type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="명세서 갤러리" onChange={(e) => { const picked = Array.from(e.target.files ?? []); e.target.value = ""; void addFiles(picked); }} />
         {scans.length > 0 && <section className={styles.scanSection} aria-label="명세서 처리 결과">
-          <div className={styles.sectionTitle}><h3>명세서 확인</h3><span role="status">{busy ? `${done}/${scans.length}장 처리` : `${saved}곳 저장${reviews ? ` · ${reviews}장 확인 필요` : " 완료"}`}</span></div>
-          {busy && <progress className={styles.progress} value={done} max={scans.length} aria-label="명세서 분석 진행률" />}
+          <div className={styles.sectionTitle}><h3>명세서 확인</h3><span role="status">{processing ? `${done}/${scans.length}장 처리 · 대기 ${waiting}장` : `${saved}곳 저장${reviews ? ` · ${reviews}장 확인 필요` : ""}${failed ? ` · ${failed}장 재확인` : reviews ? "" : " 완료"}`}</span></div>
+          {processing && <progress className={styles.progress} value={done} max={scans.length} aria-label="명세서 분석 진행률" />}
           <ul className={styles.scanList}>{scans.map((scan, index) => <li key={scan.id}>
             <div className={styles.scanRow}><span className={styles.scanNumber}>{String(index + 1).padStart(2, "0")}</span><div><strong>{scan.result?.fields.recipientName || `명세서 ${index + 1}`}</strong>
               <small>{scan.result?.fields.recipientAddress || (scan.state === "reading" ? "상호와 주소를 읽고 있어요…" : scan.state === "waiting" ? "순서대로 확인할게요" : "")}</small></div>
-              <span className={scan.result?.status === "saved" ? styles.savedBadge : styles.reviewBadge}>{scan.result?.status === "saved" ? "저장됨" : scan.result ? "확인 필요" : scan.state === "failed" ? "재확인" : "분석 중"}</span></div>
+              <span className={scan.result?.status === "saved" ? styles.savedBadge : styles.reviewBadge}>{scan.result?.status === "saved" ? "저장됨" : scan.result ? "확인 필요" : scan.state === "failed" ? "재확인" : scan.state === "waiting" ? "대기" : "분석 중"}</span></div>
             {scan.result?.status === "saved" && <p className={styles.savedDetail}>연결: {activeCustomers.find((c) => c.customerId === scan.result?.customerId)?.name ?? "거래처"}</p>}
-            {scan.state === "failed" && <div className={styles.error}><p>{scan.error}</p><div className={styles.inlineActions}><button type="button" disabled={busy} onClick={() => void retry(scan)}>저장 결과 다시 확인</button><button type="button" disabled={busy} onClick={() => { files.current.delete(scan.id); setScans((old) => old.filter((s) => s.id !== scan.id)); }}>이 장 제외</button></div><small>분석에 실패했다면 이 장을 제외한 뒤 다시 선택해주세요.</small></div>}
+            {scan.state === "failed" && <div className={styles.error}><p>{scan.error}</p><div className={styles.inlineActions}><button type="button" disabled={busy} onClick={() => retry(scan)}>저장 결과 다시 확인</button><button type="button" disabled={busy} onClick={() => { files.current.delete(scan.id); scanCount.current--; setScans((old) => old.filter((s) => s.id !== scan.id)); }}>이 장 제외</button></div><small>분석에 실패했다면 이 장을 제외한 뒤 다시 선택해주세요.</small></div>}
             {scan.result?.status === "review" && <InvoiceReview result={scan.result} customers={activeCustomers} busy={busy} onConfirm={(customerId, dateConfirmed) => void action(async () => {
               const result = await repository.confirm({ requestId: crypto.randomUUID(), scanId: scan.id, deliveryDateKey: day.deliveryDateKey, customerId, dateConfirmed }); accept(scan.id, result);
             })} />}
@@ -158,6 +181,8 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
       </>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </div>
-    {!configuring && <BottomSheetActions busy={busy} className={styles.footer ?? ""}><span>{saved ? `${saved}곳 저장됨` : `오늘 ${today.length}곳`}</span><button type="button" disabled={busy} onClick={() => { if (guard()) onClose(); }}>{busy ? "처리 중…" : "완료"}</button></BottomSheetActions>}
+    {!configuring && <BottomSheetActions busy={busy} className={styles.footer ?? ""}><span>{processing ? `저장 ${saved} · 대기 ${waiting}` : saved ? `${saved}곳 저장됨` : `오늘 ${today.length}곳`}</span>
+      {mode === "invoice" && scans.length > 0 && <button type="button" disabled={actionBusy || scans.length >= 60} onClick={() => camera.current?.click()}>다음 촬영</button>}
+      <button type="button" disabled={busy} onClick={() => { if (guard()) onClose(); }}>{busy ? "처리 중…" : "완료"}</button></BottomSheetActions>}
   </BottomSheet>;
 }

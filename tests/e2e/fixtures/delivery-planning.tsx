@@ -23,18 +23,31 @@ let count = 0; let recommendCount = 0;
 Object.assign(window, { planningPreviewStats: () => ({ recommendCount, analyzed: count }) });
 const applyRequests: string[] = []; const receipts = new Map<string, PlanningLists["day"]>();
 Object.assign(window, { planningApplyRequests: () => [...applyRequests] });
+const scanRequests: string[] = []; const scanGates: (() => void)[] = [];
+let activeScans = 0; let maxActiveScans = 0;
+Object.assign(window, {
+  releasePreviewScan: () => scanGates.shift()?.(),
+  previewScanStats: () => ({ requests: [...scanRequests], active: activeScans, maxActive: maxActiveScans }),
+});
 const register = (id: string) => { const ids = [...new Set([...lists.day.customerIds, id])]; lists = { ...lists, day: { ...lists.day, customerIds: ids, revision: (lists.day.revision ?? 0) + 1 } }; return lists; };
 const repository: PlanningRepository = {
   context: async () => ({ settings, canConfigure: true }),
   saveSettings: async ({ draft }) => { settings = { ...draft, vehicle: DEFAULT_DELIVERY_VEHICLE, revision: (settings.revision ?? 0) + 1 }; return settings; },
   analyze: async ({ requestId }) => {
+    scanRequests.push(requestId); activeScans++; maxActiveScans = Math.max(maxActiveScans, activeScans);
+    try {
+    if (params.has("holdScans")) await new Promise<void>((resolve) => scanGates.push(resolve));
     await new Promise((resolve) => setTimeout(resolve, 150));
     const old = results.get(requestId); if (old) return old;
+    if (params.has("failScan") && scanRequests.length === 1) throw new Error("사진 분석을 다시 확인해주세요.");
     const index = count++ % customers.length; const c = customers[index]!; const review = params.has("review") && index === 1;
     const result: InvoiceResult = { scanId: requestId, fields: { recipientName: `${c.name}(대전)`, recipientAddress: c.officialAddress, invoiceDate: review ? "2026-11-09" : date, uncertain: review },
       status: review ? "review" : "saved", regionHint: "대전", customerId: review ? null : c.customerId, candidateIds: [c.customerId], reason: review ? "명세서 날짜를 확인해주세요." : "상호와 주소가 일치해 저장했어요.", elapsedMs: 7400 + index * 200,
       lists: review ? null : register(c.customerId) };
-    results.set(requestId, result); return result;
+    results.set(requestId, result);
+    if (params.has("lostScanResponse") && scanRequests.length === 1) throw new Error("저장 응답 확인 실패");
+    return result;
+    } finally { activeScans--; }
   },
   confirm: async ({ scanId, customerId }) => { const result: InvoiceResult = { ...results.get(scanId)!, status: "saved", customerId, lists: register(customerId) }; results.set(scanId, result); return result; },
   recommend: async ({ requestId, lastCustomerId }) => {
@@ -72,4 +85,6 @@ function Preview() {
       onClose={() => { setEditing(false); setMode("route"); setOpen(true); }} />}
   </main>;
 }
-createRoot(document.getElementById("root")!).render(<Preview />);
+const root = createRoot(document.getElementById("root")!);
+Object.assign(window, { unmountPlanningPreview: () => root.unmount() });
+root.render(<Preview />);
