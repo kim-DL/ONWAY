@@ -1,9 +1,9 @@
-.entries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 12px}
-.entries .entry{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;min-height:100px;padding:7px 6px 9px;border:1px solid #acc3d9;border-radius:14px;background:linear-gradient(155deg,#fff 0%,#eff5fb 45%,var(--face,#dce8f5) 100%);color:#284d72;box-shadow:inset 0 2px 1px #fff,inset 0 -1px 2px #a7bed64d,0 4px 0 var(--base,#acbfd3),0 7px 11px #365b7d1a;text-align:center;-webkit-tap-highlight-color:transparent}
-.entries .route{--face:#dcebea;--base:#aec5c7;border-color:#aac5ca;color:#315c66}
-.entry img{display:block;width:72px;height:58px;object-fit:contain;pointer-events:none}
-.entry strong{display:block;font-size:.875rem;font-weight:750;line-height:1.35;letter-spacing:-.035em;overflow-wrap:anywhere}
-.entries .entry:active{transform:translateY(3px);box-shadow:inset 0 1px 3px #365b7d14,0 1px 0 #a9bfd0}
-.entries .entry:focus-visible{outline:3px solid #376e9e;outline-offset:4px}
+.entries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 10px}
+.entries .entry{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:48px;padding:7px 8px;border:1px solid #bacddd;border-radius:10px;background:linear-gradient(#fff,#edf3f9);color:#284d72;box-shadow:inset 0 1px #fff,0 2px 0 #bfd0df;text-align:center;-webkit-tap-highlight-color:transparent}
+.entries .route{border-color:#bdd0d1;background:linear-gradient(#fff,#edf5f4);color:#315c66;box-shadow:inset 0 1px #fff,0 2px 0 #bed1d2}
+.entry img{display:block;flex-shrink:0;width:26px;height:26px;pointer-events:none}
+.entry strong{font-size:.8125rem;font-weight:700;line-height:1.3;letter-spacing:-.035em;overflow-wrap:anywhere}
+.entries .entry:active{transform:translateY(2px);box-shadow:inset 0 1px 2px #365b7d14}
+.entries .entry:focus-visible{outline:3px solid #376e9e;outline-offset:3px}
 @media(prefers-reduced-motion:no-preference){.entries .entry{transition:transform .12s,box-shadow .12s}}
 @media(forced-colors:active){.entries .entry{border:2px solid ButtonText;background:ButtonFace;color:ButtonText;box-shadow:none}.entries .entry:focus-visible{outline-color:Highlight}}

@@ -160,9 +160,10 @@ test("delivery photo header uses the active customer mode and raised planning bu
     for (const action of [invoice, route]) {
       await expect(action).toBeVisible();
       const box = (await action.boundingBox())!;
-      expect(box.height).toBeGreaterThanOrEqual(90);
+      expect(box.height).toBeGreaterThanOrEqual(48);
+      expect(box.height).toBeLessThanOrEqual(56);
       expect(await action.evaluate(el => getComputedStyle(el).boxShadow)).not.toBe("none");
-      expect(await action.locator("img").evaluate(async el => { await (el as HTMLImageElement).decode(); return (el as HTMLImageElement).naturalWidth; })).toBe(128);
+      expect(await action.locator("img").evaluate(async el => { await (el as HTMLImageElement).decode(); return (el as HTMLImageElement).naturalWidth; })).toBe(32);
     }
     const first = (await invoice.boundingBox())!, second = (await route.boundingBox())!;
     expect(first.y).toBe(second.y);

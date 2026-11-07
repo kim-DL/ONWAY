@@ -1,24 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="104" viewBox="0 0 128 104" fill="none">
-<defs>
-<linearGradient id="paper" x1="28" y1="15" x2="81" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#dce9f5"/></linearGradient>
-<linearGradient id="edge" x1="82" y1="34" x2="113" y2="94" gradientUnits="userSpaceOnUse"><stop stop-color="#6696c8"/><stop offset="1" stop-color="#284f7d"/></linearGradient>
-<linearGradient id="glass" x1="87" y1="44" x2="112" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#f3fbff"/><stop offset="1" stop-color="#afcfe8"/></linearGradient>
-<filter id="shadow" x="0" y="0" width="128" height="104" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#26496c" flood-opacity=".2"/></filter>
-</defs>
-<ellipse cx="65" cy="93" rx="45" ry="6" fill="#53799e" opacity=".12"/>
-<g filter="url(#shadow)">
-<rect x="16" y="24" width="50" height="63" rx="5" transform="rotate(-14 16 24)" fill="#b4cce2" stroke="#799fc1"/>
-<rect x="24" y="17" width="50" height="65" rx="5" transform="rotate(-6 24 17)" fill="#e1edf6" stroke="#9bb8d1"/>
-<path d="M39 12h31l15 15v52a5 5 0 0 1-5 5H39a5 5 0 0 1-5-5V17a5 5 0 0 1 5-5Z" fill="url(#paper)" stroke="#8daecb"/>
-<path d="M70 12v11a4 4 0 0 0 4 4h11" fill="#c0d6e9" stroke="#8daecb"/>
-<path d="M43 30h17M43 39h32M43 49h32M43 59h32M43 69h21" stroke="#789bb9" stroke-width="3" stroke-linecap="round"/>
-<path d="M54 44v31M67 44v31" stroke="#bed1e1" stroke-width="1.5"/>
-<rect x="77" y="34" width="36" height="59" rx="8" fill="url(#edge)" stroke="#345c86" stroke-width="1.5" transform="rotate(7 77 34)"/>
-<g transform="rotate(7 77 34)">
-<rect x="81" y="39" width="28" height="46" rx="4" fill="url(#glass)" stroke="#f4fbff" stroke-opacity=".8"/>
-<path d="M91 40h8" stroke="#537ba3" stroke-width="2.5" stroke-linecap="round"/>
-<path d="M85 54v-4h4m12 0h4v4m0 15v4h-4m-12 0h-4v-4" stroke="#4f81ac" stroke-width="2" stroke-linecap="round"/>
-<rect x="89" y="55" width="12" height="15" rx="2" fill="#fff"/>
-<path d="m91 63 3 3 5-6" stroke="#4e8a84" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M91 89h8" stroke="#d4e5f3" stroke-width="2" stroke-linecap="round"/>
-</g></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#426b90" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7 6H4v20h12M10 3H7v20h10"/>
+<path d="M11 3h10l4 4v7M11 3v17h6M21 3v5h4M14 10h6M14 14h3"/>
+<rect x="19" y="15" width="10" height="15" rx="2" fill="#f5f9fc"/>
+<path d="M23 18h2M23 27h2m-2-5 1.5 1.5L26 21"/>
+</svg>
