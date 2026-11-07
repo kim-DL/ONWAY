@@ -467,8 +467,12 @@ assertBudget(salesWorkspaceGzipBytes <= 14 * 1024, `sales workspace gzip ${sales
 // school/sales/customer/admin assets and all isolation checks remain unchanged.
 // P2-B's coordinator and freshness state measure 25,028B gzip. Give this lazy
 // boundary a 1KiB allowance without changing any initial or unrelated budget.
-assertBudget(inventoryStylesheetRawBytes <= 28.5 * 1024, `inventory CSS raw ${inventoryStylesheetRawBytes}B exceeds 28.5KiB`);
-assertBudget(inventoryStylesheetGzipBytes <= 6.5 * 1024, `inventory CSS gzip ${inventoryStylesheetGzipBytes}B exceeds 6.5KiB`);
+// Box entry adds a responsive three-field calculator, packaging input and live
+// total, inset units and keyboard focus frames. Final measured CSS is
+// 30,878B raw / 7,050B gzip. Allocate 2KiB raw / 512B gzip to this deferred
+// feature only; initial assets and every JS limit stay fixed.
+assertBudget(inventoryStylesheetRawBytes <= 30.5 * 1024, `inventory CSS raw ${inventoryStylesheetRawBytes}B exceeds 30.5KiB`);
+assertBudget(inventoryStylesheetGzipBytes <= 7 * 1024, `inventory CSS gzip ${inventoryStylesheetGzipBytes}B exceeds 7KiB`);
 // Retained-DOM groups, memoized list and reorder-safe focus restoration:
 // 25,861B gzip vs the previous 25,563B (+298B). Allocate 384B over 25KiB;
 // initial assets, CSS, other features and the
@@ -514,8 +518,8 @@ const report = {
     deliveryPhotoUploadJavascriptGzipBytes: 5 * 1024,
     deliveryPhotoPreparationJavascriptGzipBytes: 3 * 1024,
     salesWorkspaceGzipBytes: 14 * 1024,
-    inventoryStylesheetRawBytes: 28.5 * 1024,
-    inventoryStylesheetGzipBytes: 6.5 * 1024,
+    inventoryStylesheetRawBytes: 30.5 * 1024,
+    inventoryStylesheetGzipBytes: 7 * 1024,
     inventoryJavascriptGzipBytes: 25.375 * 1024,
     inventoryViewerJavascriptGzipBytes: 2.25 * 1024,
   },

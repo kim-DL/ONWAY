@@ -3,7 +3,7 @@
 import { lazy, Suspense, useId, useRef, useState, type FormEvent } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
-import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryLocation, type InventoryLotDraft, type InventoryProductSaveResult, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
+import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, type InventoryPackageQuantity, type InventoryLocation, type InventoryLotDraft, type InventoryProductSaveResult, type InventoryProductDraft, type SaveInventoryProductInput } from "@/domain/inventory";
 import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo-picker";
 import { inventoryRepository } from "./inventory-repository";
 import { useInventoryEditorReady } from "./use-inventory-editor-ready";
@@ -19,16 +19,17 @@ const UNIT_PRESETS = ["봉", "개", "팩", "병"];
 function PresetChoices({ label, presets, selected, disabled, displayLabel, wideCustom = false, onSelect }: { label: string; presets: readonly string[]; selected: string | null; disabled: boolean; displayLabel?: (value: string) => string; wideCustom?: boolean; onSelect: (value: string | null) => void }) {
   return <fieldset className={`${formStyles.expiryStatus} ${formStyles.presetChoices}`} disabled={disabled}><legend>{label}</legend><div>{[...presets, null].map((option) => <label key={option ?? label} className={!option && wideCustom ? formStyles.presetWide : undefined}><input type="radio" name={label} checked={option === selected} onChange={() => onSelect(option)} />{option ? displayLabel?.(option) ?? option : "직접입력"}</label>)}</div></fieldset>;
 }
-const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "봉", unitsPerBox: 1, defaultLocationId: location, urgent: false });
+const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "봉", unitsPerBox: 1, boxPackSize: null, defaultLocationId: location, urgent: false });
 
 export function InventoryProductEditorImpl({ product, location, canCreateManufacturer = true, canManageManufacturers = false, onClose, onSaved }: InventoryProductEditorProps) {
   const ready = useInventoryEditorReady();
   const id = useId();
-  const [draft, setDraft] = useState<InventoryProductDraft>(() => product ? { name: product.name, manufacturer: product.manufacturer, specification: product.specification, origin: product.origin, note: product.note, unitLabel: product.unitLabel, unitsPerBox: product.unitsPerBox, defaultLocationId: product.defaultLocationId, urgent: product.urgent } : newDraft(location));
+  const [draft, setDraft] = useState<InventoryProductDraft>(() => product ? { name: product.name, manufacturer: product.manufacturer, specification: product.specification, origin: product.origin, note: product.note, unitLabel: product.unitLabel, unitsPerBox: product.unitsPerBox, boxPackSize: product.boxPackSize ?? null, defaultLocationId: product.defaultLocationId, urgent: product.urgent } : newDraft(location));
   const [file, setFile] = useState<File | null>(null);
   const [removed, setRemoved] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [initialQuantity, setInitialQuantity] = useState<number>(Number.NaN);
+  const [initialPackages, setInitialPackages] = useState<InventoryPackageQuantity | undefined>();
   const [initialLot, setInitialLot] = useState<InventoryLotDraft>(blankLot);
   const [validationError, setValidationError] = useState("");
   const [specificationPicker, setSpecificationPicker] = useState(false);
@@ -52,7 +53,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
     if (file && upload.current?.file !== file) upload.current = { file, id: crypto.randomUUID(), ready: false };
     const staged = file ? upload.current : null;
     const photoChange: SaveInventoryProductInput["photoChange"] = staged ? { action: "replace", uploadId: staged.id } : removed ? { action: "remove" } : undefined;
-    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { includeDetail: true, initialStock: { quantity: initialQuantity, lot: initialLot } } : {}), ...(photoChange ? { photoChange } : {}) };
+    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { includeDetail: true, initialStock: { quantity: initialQuantity, lot: initialLot, ...(initialPackages ? { packageQuantity: initialPackages } : {}) } } : {}), ...(photoChange ? { photoChange } : {}) };
     await action.run(input, async (requestId, assertCurrent) => {
       if (staged && !staged.ready) {
         const fileBase64 = await inventoryPhotoBase64(staged.file);
@@ -81,7 +82,12 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       <PresetChoices label="기준 단위 (필수)" presets={UNIT_PRESETS} selected={customUnit ? null : unitPreset} disabled={busy || !!product?.hasHistory} displayLabel={(value) => value === "개" ? "낱개" : value} wideCustom onSelect={(value) => selectPreset("unitLabel", value)} />
       {customUnit ? customInput("기준 단위 직접입력", "unitLabel", 20, true) : null}
       {product?.hasHistory ? <p className={styles.muted}>입출고 기록이 있는 품목은 기준 단위를 바꿀 수 없어요.</p> : null}
-      {!product ? <><LotFields draft={initialLot} onChange={setInitialLot} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} value={initialQuantity} onChange={setInitialQuantity} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
+      <label className={styles.field}>박스 입수 수량 (선택)
+        <div className={formStyles.packSizeRow}><span>1박스 =</span><input aria-label="박스 입수 수량" aria-describedby={`${id}-pack-help`} type="number" inputMode="numeric" min={1} max={1_000_000} step={1} placeholder="예: 10" value={draft.boxPackSize ?? ""} disabled={busy}
+          onChange={(event) => { set("boxPackSize", event.target.value === "" ? null : event.target.valueAsNumber); if (initialPackages) { setInitialQuantity(Number.NaN); setInitialPackages(undefined); } }} /><span>{draft.unitLabel || "기준 단위"}</span></div>
+        <small id={`${id}-pack-help`} className={formStyles.packageHelp}>한 박스에 들어 있는 {draft.unitLabel || "기준 단위"} 수를 입력하세요. 모르면 비워두고 나중에 등록할 수 있어요.</small>
+      </label>
+      {!product ? <><LotFields draft={initialLot} onChange={setInitialLot} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} key={draft.boxPackSize ?? "unknown"} value={initialQuantity} onChange={(total, packages) => { setInitialQuantity(total); setInitialPackages(packages); }} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
       <details><summary className={styles.label}>참고 메모 (선택)</summary><label className={styles.field}>메모<textarea maxLength={2000} rows={2} value={draft.note} onChange={(event) => set("note", event.target.value)} disabled={busy} /></label></details>
       </div>
       {validationError ? <p role="alert" className={styles.error}>{validationError}</p> : null}

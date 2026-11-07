@@ -99,5 +99,5 @@ export const inventoryManufacturerRepository = {
     return manufacturer;
   },
   reference: (productId: string) => call("getInventoryProduct", getInventoryProductWithManufacturerInputSchema.parse({ productId, includeManufacturerReference: true }), inventoryProductDetailWithManufacturerSchema),
-  saveProduct: (input: SaveInventoryProductInput) => call("saveInventoryProduct", saveInventoryProductWithManufacturerInputSchema.parse({ ...input, includeSummary: true, includeManufacturerReference: true }), inventoryProductSaveResultWithManufacturerSchema),
+  saveProduct: (input: SaveInventoryProductInput) => call("saveInventoryProduct", saveInventoryProductWithManufacturerInputSchema.parse({ ...input, includeSummary: true, includePackaging: true, includeManufacturerReference: true }), inventoryProductSaveResultWithManufacturerSchema),
 };

@@ -53,8 +53,29 @@
 .calendarHelp { margin: 12px 0 0; font-size: 12px; color: #5b6e85; text-align: center; }
 
 
-.select:global(.glass-button.glass-button--glass) { position: relative; min-height: 50px; padding: 12px 36px; background: #ff467a; color: #351529; border-color: #b83244; border-radius: 12px; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; box-shadow: 0 3px 0 #b83244; }
-.select:global(.glass-button.glass-button--glass):active { transform: translateY(2px); box-shadow: 0 1px 0 #b83244; }
+.select:global(.glass-button.glass-button--glass) { position: relative; min-height: 50px; padding: 12px 36px; background: #dce8f5; color: #25476a; border-color: #9bb3ce; border-radius: 12px; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; box-shadow: 0 3px 0 #8da7c5; }
+.select:global(.glass-button.glass-button--glass):active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #8da7c5; }
+@media (hover: hover) { .select:global(.glass-button.glass-button--glass):hover:not(:disabled) { background: #d0e0f0; border-color: #789abc; } }
 .select > svg { position: absolute; right: 14px; }
 :is(.productForm, .presetChoices) label:has(input:checked) { border-color: #b58a00; background: #ffd444; color: #000; }
 :is(.productForm, .presetChoices) input:checked { accent-color: #000; }
+
+.quantitySection { display: grid; gap: 10px; min-width: 0; }
+.quantitySection input[type="number"] { text-align: center; }
+.packageGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; }
+.packageInput { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-width: 0; border: 1px solid #d1d6db; border-radius: 10px; background: #fff; }
+.quantitySection .packageInput input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 4px; border: 0; background: transparent; font-size: 16px; font-variant-numeric: tabular-nums; appearance: textfield; }
+.packageInput input::-webkit-inner-spin-button, .packageInput input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+.quantitySection .packageInput input:focus-visible { outline: none; }
+.packageInput:has(input:focus-visible) { outline: 3px solid #3182f6; outline-offset: 3px; }
+.packageInput:has(input:disabled) { background: #f2f4f6; }
+.packageInput > span { padding-right: 10px; white-space: nowrap; font-size: 12px; color: #53667d; pointer-events: none; }
+.packageHelp { margin: 0; color: #53667d; font-size: 12px; line-height: 1.6; font-weight: 400; }
+.packageTotal { display: grid; gap: 4px; padding: 12px 14px; border-left: 3px solid #3975a8; border-radius: 4px; background: #edf4fb; color: #285b87; overflow-wrap: anywhere; }
+.packageTotal > span { font-size: 13px; line-height: 1.6; }
+.packageTotal > strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.packageTotal small { font-size: 14px; font-weight: 500; }
+.packSizeRow { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.packSizeRow input { width: 100%; min-width: 0; max-width: 150px; min-height: 48px; font-size: 16px; text-align: center; }
+.packSizeRow > span { flex-shrink: 0; }
+@media (max-width: 360px) { .packageGrid { gap: 6px; } .packageInput > span { padding-right: 6px; font-size: 11px; } }

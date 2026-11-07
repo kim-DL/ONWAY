@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type FormEvent, typ
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
-import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, inventoryLotDraftSchema, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryLotDraft, type InventoryProduct, type InventoryProductDetail, type InventoryMovementInput } from "@/domain/inventory";
+import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, INVENTORY_MAX_QUANTITY, inventoryLotDraftSchema, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryLotDraft, type InventoryProduct, type InventoryProductDetail, type InventoryMovementInput, type InventoryPackageQuantity } from "@/domain/inventory";
 import { inventoryLotDateLabel, inventoryTransferPreview, inventoryUnitDisplayLabel } from "./inventory-model";
 import { inventoryRepository, inventoryErrorMessage } from "./inventory-repository";
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
@@ -13,6 +13,9 @@ import formStyles from "./inventory-form.module.css";
 import { getLoadedInventoryProductEditor, loadInventoryProductEditor } from "./inventory-editor-loader";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
 import { inventoryAccessGeneration, inventoryAuthenticationError } from "./inventory-access-boundary";
+
+import { QuantityFields } from "./inventory-quantity-fields";
+export { QuantityFields } from "./inventory-quantity-fields";
 
 const InventoryProductEditorImpl = lazy(loadInventoryProductEditor);
 
@@ -70,12 +73,6 @@ export function InventoryProductEditor(props: InventoryProductEditorProps) {
   return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면 여는 중</p></BottomSheet>}><Editor {...props} /></Suspense>;
 }
 
-export function QuantityFields({ product, value, onChange, disabled, minimum = 0, label = "수량" }: { product: Pick<InventoryProduct, "unitLabel">; value: number; onChange: (value: number) => void; disabled: boolean; minimum?: number; label?: string }) {
-  const id = useId();
-  const invalid = Number.isFinite(value) && (!Number.isSafeInteger(value) || value < minimum || value > INVENTORY_MAX_QUANTITY);
-  const fieldLabel = `${label} (${inventoryUnitDisplayLabel(product.unitLabel || "개")})`;
-  return <label className={styles.field}>{fieldLabel}<input type="number" inputMode="numeric" placeholder="예: 10" required min={minimum} max={INVENTORY_MAX_QUANTITY} step={1} value={Number.isFinite(value) ? value : ""} aria-label={fieldLabel} aria-invalid={invalid} aria-describedby={invalid ? `${id}-quantity-error` : undefined} onChange={(event) => onChange(event.target.valueAsNumber)} disabled={disabled} />{invalid ? <span id={`${id}-quantity-error`} className={styles.error}>{value > INVENTORY_MAX_QUANTITY ? "입력 가능한 수량을 초과했어요." : minimum === 0 ? "0 이상의 정수를 입력해주세요." : "1 이상의 정수를 입력해주세요."}</span> : null}</label>;
-}
 export function LotFields({ draft, onChange, disabled, dateLabel = "유통기한 날짜", compact = false }: { draft: InventoryLotDraft; onChange: (draft: InventoryLotDraft) => void; disabled: boolean; dateLabel?: string; compact?: boolean }) {
   const id = useId();
   return <><div className={formStyles.expiryFields}><fieldset className={formStyles.expiryStatus} disabled={disabled}><legend>유통기한 상태</legend><div>{(["dated", "unknown"] as const).map((state) => <label key={state}><input type="radio" name={`${id}-expiry-state`} value={state} checked={draft.expiryState === state} onChange={() => onChange({ ...draft, expiryState: state, expiryDate: state === "dated" ? draft.expiryDate ?? "" : null })} /><span>{state === "dated" ? "날짜 입력" : "미확인"}</span></label>)}</div></fieldset>{draft.expiryState === "not_applicable" ? <p className={styles.muted}>기존 ‘해당 없음’ 기록을 유지하고 있어요. 바꾸려면 위에서 상태를 선택해주세요.</p> : null}{draft.expiryState === "dated" ? <InventoryDateField label={dateLabel} value={draft.expiryDate ?? ""} onChange={(value) => onChange({ ...draft, expiryDate: value })} disabled={disabled} /> : null}</div>{!compact ? <details><summary className={styles.label}>추가 구분명 (선택)</summary><label className={styles.field}>재고 구분명<input maxLength={200} placeholder="예: 9월 첫 입고" value={draft.label} onChange={(event) => onChange({ ...draft, label: event.target.value })} disabled={disabled} /></label></details> : null}</>;
@@ -89,6 +86,7 @@ export function InventoryMovementForm({ detail, location, kind, initialLotId, in
   const [lotId, setLotId] = useState(initialLotId ?? (kind === "receive" ? "" : lots[0]?.lotId ?? ""));
   const [quantity, setQuantity] = useState(kind === "adjust" ? lots.find((lot) => lot.lotId === (initialLotId ?? lots[0]?.lotId))?.quantity ?? Number.NaN : Number.NaN);
   const [draft, setDraft] = useState<InventoryLotDraft>(blankLot);
+  const [packageQuantity, setPackageQuantity] = useState<InventoryPackageQuantity | undefined>();
   const [toLocation, setToLocation] = useState<InventoryLocation | "">("");
   const title = kind === "receive" ? "입고 기록" : kind === "issue" ? "출고 기록" : kind === "transfer" ? "보관 장소 이동" : "수량 조정";
   const selectedLot = lots.find((lot) => lot.lotId === lotId);
@@ -98,15 +96,15 @@ export function InventoryMovementForm({ detail, location, kind, initialLotId, in
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
-    const input: Omit<InventoryMovementInput, "requestId"> = { productId: detail.product.productId, expectedStockRevision: detail.product.stockRevision, kind, locationId: location, lotId: lotId || null, quantity, reason: "", includeDetail: true, ...(inspectionCycleId ? { inspectionCycleId } : {}), ...(kind === "receive" && !lotId ? { newLot: draft } : {}), ...(kind === "transfer" && toLocation ? { toLocationId: toLocation } : {}) };
+    const input: Omit<InventoryMovementInput, "requestId"> = { productId: detail.product.productId, expectedStockRevision: detail.product.stockRevision, kind, locationId: location, lotId: lotId || null, quantity, ...(packageQuantity ? { packageQuantity } : {}), reason: "", includeDetail: true, ...(inspectionCycleId ? { inspectionCycleId } : {}), ...(kind === "receive" && !lotId ? { newLot: draft } : {}), ...(kind === "transfer" && toLocation ? { toLocationId: toLocation } : {}) };
     void action.run(input, (requestId) => inventoryRepository.movement({ ...input, requestId }), (result) => onSaved(result.product, result.replayed ? undefined : result.detail));
   }
   return <BottomSheet open title={title} description={`${detail.product.name} · ${INVENTORY_LOCATION_LABELS[location]}`} onClose={onClose} dismissible={!action.busy}><form id={id} className={styles.sheet} onSubmit={submit}>
-    {initialLotId === undefined && (kind === "receive" || lots.length > 1) ? <label className={styles.field}>유통기한 선택<select value={lotId} required={kind !== "receive"} onChange={(event) => { const nextId = event.target.value; setLotId(nextId); setQuantity(kind === "adjust" ? lots.find((lot) => lot.lotId === nextId)?.quantity ?? Number.NaN : Number.NaN); }} disabled={action.busy}>{kind === "receive" ? <option value="">새 유통기한으로 추가</option> : null}{lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>{lotOption(lot, detail.product)}</option>)}</select></label> : selectedLot ? <div className={styles.notice}><strong>{inventoryLotDateLabel(selectedLot)}</strong><p className={styles.muted}>현재 {selectedLot.quantity.toLocaleString("ko-KR")} {inventoryUnitDisplayLabel(detail.product.unitLabel)}</p>{selectedLot.label ? <details><summary>추가 구분명</summary><p className={styles.muted}>{selectedLot.label}</p></details> : null}</div> : <p role="status" className={styles.notice}>{initialLotId === undefined ? "이 장소에는 처리할 재고가 없어요." : "선택한 재고를 다시 확인해주세요. 창을 닫고 다시 열어주세요."}</p>}
+    {initialLotId === undefined && (kind === "receive" || lots.length > 1) ? <label className={styles.field}>유통기한 선택<select value={lotId} required={kind !== "receive"} onChange={(event) => { const nextId = event.target.value; setLotId(nextId); setPackageQuantity(undefined); setQuantity(kind === "adjust" ? lots.find((lot) => lot.lotId === nextId)?.quantity ?? Number.NaN : Number.NaN); }} disabled={action.busy}>{kind === "receive" ? <option value="">새 유통기한으로 추가</option> : null}{lots.map((lot) => <option key={lot.lotId} value={lot.lotId}>{lotOption(lot, detail.product)}</option>)}</select></label> : selectedLot ? <div className={styles.notice}><strong>{inventoryLotDateLabel(selectedLot)}</strong><p className={styles.muted}>현재 {selectedLot.quantity.toLocaleString("ko-KR")} {inventoryUnitDisplayLabel(detail.product.unitLabel)}</p>{selectedLot.label ? <details><summary>추가 구분명</summary><p className={styles.muted}>{selectedLot.label}</p></details> : null}</div> : <p role="status" className={styles.notice}>{initialLotId === undefined ? "이 장소에는 처리할 재고가 없어요." : "선택한 재고를 다시 확인해주세요. 창을 닫고 다시 열어주세요."}</p>}
     {kind === "receive" && !lotId && initialLotId === undefined ? <LotFields draft={draft} onChange={setDraft} disabled={action.busy} /> : null}
     {kind === "transfer" ? <label className={styles.field}>도착 보관 장소<select required value={toLocation} disabled={action.busy} onChange={(event) => setToLocation(event.target.value as InventoryLocation | "")}><option value="">이동할 장소 선택</option>{INVENTORY_LOCATIONS.filter((item) => item !== location).map((item) => <option key={item} value={item}>{INVENTORY_LOCATION_LABELS[item]}</option>)}</select></label> : null}
     {kind === "transfer" ? <p className={styles.muted}>유통기한을 유지하며, 전체 재고 수량은 바뀌지 않아요.</p> : null}
-    <QuantityFields key={`${kind}:${lotId}`} product={detail.product} value={quantity} onChange={setQuantity} disabled={action.busy} minimum={kind === "adjust" ? 0 : 1} label={kind === "adjust" ? "조정 후 최종 수량" : kind === "issue" ? "출고 수량" : kind === "transfer" ? "이동 수량" : "입고 수량"} />
+    <QuantityFields key={`${kind}:${lotId}`} product={detail.product} value={quantity} onChange={(total, packages) => { setQuantity(total); setPackageQuantity(packages); }} disabled={action.busy} minimum={kind === "adjust" ? 0 : 1} label={kind === "adjust" ? "조정 후 최종 수량" : kind === "issue" ? "출고 수량" : kind === "transfer" ? "이동 수량" : "입고 수량"} />
     {kind === "transfer" ? <div aria-live="polite" className={styles.notice}>{transferPreview && toLocation ? <><strong>이동 후 장소별 수량</strong><p className={styles.muted}>{INVENTORY_LOCATION_LABELS[location]}: {detail.product.quantityByLocation[location]} → {transferPreview.sourceAfter} {inventoryUnitDisplayLabel(detail.product.unitLabel)}</p><p className={styles.muted}>{INVENTORY_LOCATION_LABELS[toLocation]}: {detail.product.quantityByLocation[toLocation]} → {transferPreview.destinationAfter} {inventoryUnitDisplayLabel(detail.product.unitLabel)}</p></> : <span>도착 장소와 이동 수량을 입력해주세요.</span>}</div> : null}
     {kind === "issue" && quantity > (selectedLot?.quantity ?? 0) ? <p role="alert" className={styles.error}>현재 재고보다 많이 출고할 수 없어요.</p> : null}
     {action.error ? <p role="alert" className={styles.error}>{action.error}</p> : null}

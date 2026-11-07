@@ -53,8 +53,9 @@ function handler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, ac
       const includeSummary = input.data !== null && typeof input.data === "object" && "includeSummary" in input.data && input.data.includeSummary === true;
       const includeManufacturerReference = input.data !== null && typeof input.data === "object"
         && "includeManufacturerReference" in input.data && input.data.includeManufacturerReference === true;
+      const includePackaging = input.data !== null && typeof input.data === "object" && "includePackaging" in input.data && input.data.includePackaging === true;
       const wireResult = filterProductCompatibility
-        ? inventorySummaryResponse(result, includeSummary, includeManufacturerReference)
+        ? inventorySummaryResponse(result, includeSummary, includeManufacturerReference, includePackaging)
         : result;
       return fieldCompute("responseValidation", () => resultSchema.parse(wireResult));
     } catch (error) { throw safeInventoryError(error); }

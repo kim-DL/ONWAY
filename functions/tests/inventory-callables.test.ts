@@ -47,6 +47,17 @@ beforeEach(() => {
   fixture.save.mockImplementation(async () => { fixture.trace.push("commit"); return product; });
 });
 
+it("returns box metadata only to opted-in clients, including nested committed detail", async () => {
+  const packed = { ...product, boxPackSize: 10 };
+  fixture.save.mockResolvedValue({ ...packed, detail: { product: packed, lots: [] } });
+  const legacy = await saveInventoryProduct.run(request({ ...input, includeDetail: true }).value);
+  expect(legacy).not.toHaveProperty("boxPackSize");
+  expect(legacy.detail!.product).not.toHaveProperty("boxPackSize");
+  const current = await saveInventoryProduct.run(request({ ...input, includeDetail: true, includePackaging: true }).value);
+  expect(current.boxPackSize).toBe(10);
+  expect(current.detail!.product.boxPackSize).toBe(10);
+});
+
 describe("inventory callable confirmation and privacy boundaries", () => {
   it.each([[false, false], [true, false], [false, true], [true, true]])(
     "filters both committed registration product snapshots for opted-in clients (summary=%s, manufacturer=%s)",

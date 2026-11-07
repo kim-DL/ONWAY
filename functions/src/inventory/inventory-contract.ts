@@ -25,9 +25,23 @@ export const inventoryDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refin
 const locationMap = <T extends z.ZodType>(value: T) => z.object({ refrigerated: value, freezer1: value, freezer2: value, sample: value }).strict();
 
 export const inventoryPhotoSchema = z.object({ photoId: z.uuid(), width: z.number().int().positive().max(2560), height: z.number().int().positive().max(2560) }).strict();
+export const inventoryBoxPackSizeSchema = z.number().int().positive().max(1_000_000);
+export const inventoryPackageQuantitySchema = z.object({
+  boxes: inventoryQuantitySchema, unitsPerBox: inventoryBoxPackSizeSchema, loose: inventoryQuantitySchema,
+}).strict();
+export type InventoryPackageQuantity = z.infer<typeof inventoryPackageQuantitySchema>;
+export function inventoryPackageQuantityMatches(quantity: number, packages?: InventoryPackageQuantity): boolean {
+  if (!packages) return true;
+  const parsed = inventoryPackageQuantitySchema.safeParse(packages);
+  if (!parsed.success) return false;
+  const total = parsed.data.boxes * parsed.data.unitsPerBox + parsed.data.loose;
+  return inventoryQuantitySchema.safeParse(total).success && total === quantity;
+}
 export const inventoryProductDraftSchema = z.object({
   name: z.string().trim().min(1).max(200), manufacturer: text, specification: text, origin: text,
   unitLabel: z.string().trim().min(1).max(20), unitsPerBox: z.number().int().positive().max(1_000_000),
+  // Independently editable packaging hint; never reinterpret historical stock units.
+  boxPackSize: inventoryBoxPackSizeSchema.nullable().optional(),
   defaultLocationId: inventoryLocationSchema, note, urgent: z.boolean(),
 }).strict();
 export const inventoryCountSummarySchema = z.object({
@@ -87,9 +101,9 @@ export const inventoryContextSchema = z.object({
   settings: inventorySettingsSchema, cycle: inventoryCycleSchema, today: inventoryDateSchema,
   canWrite: z.boolean(), canAdmin: z.boolean(),
 }).strict();
-export const inventoryListInputSchema = z.object({ afterId: inventoryIdSchema.nullable().default(null), includeSummary: z.boolean().optional() }).strict();
+export const inventoryListInputSchema = z.object({ afterId: inventoryIdSchema.nullable().default(null), includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional() }).strict();
 export const inventoryListPageSchema = z.object({ products: z.array(inventoryProductSchema).max(100), nextCursor: inventoryIdSchema.nullable() }).strict();
-export const getInventoryProductInputSchema = z.object({ productId: inventoryIdSchema, includeSummary: z.boolean().optional() }).strict();
+export const getInventoryProductInputSchema = z.object({ productId: inventoryIdSchema, includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional() }).strict();
 export const inventoryProductDetailSchema = z.object({ product: inventoryProductSchema, lots: z.array(inventoryLotSchema).max(INVENTORY_MAX_LOTS) }).strict();
 export const inventoryProductSaveResultSchema = inventoryProductSchema.extend({
   // First registration only: the already committed lot working set. Replays
@@ -97,14 +111,14 @@ export const inventoryProductSaveResultSchema = inventoryProductSchema.extend({
   detail: inventoryProductDetailSchema.optional(),
 });
 export const inventoryInitialStockSchema = z.object({
-  quantity: inventoryQuantitySchema.positive(), lot: inventoryLotDraftSchema,
+  quantity: inventoryQuantitySchema.positive(), lot: inventoryLotDraftSchema, packageQuantity: inventoryPackageQuantitySchema.optional(),
 }).strict();
 export const saveInventoryProductInputSchema = z.object({
   requestId: z.uuid(), productId: inventoryIdSchema.nullable(), expectedRevision: revision.nullable(),
   // Only an exact retry performs the extra canonical read; first saves retain
   // their one-call response and older clients retain original-receipt replay.
   refreshOnReplay: z.boolean().optional(),
-  includeSummary: z.boolean().optional(),
+  includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional(),
   includeDetail: z.boolean().optional(),
   draft: inventoryProductDraftSchema,
   // Optional for older clients. New registration commits its first expiry lot
@@ -121,10 +135,10 @@ export const saveInventoryProductInputSchema = z.object({
 export const inventoryMovementInputSchema = z.object({
   requestId: z.uuid(), productId: inventoryIdSchema, expectedStockRevision: revision,
   includeDetail: z.boolean().optional(),
-  includeSummary: z.boolean().optional(),
+  includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional(),
   inspectionCycleId: inventoryIdSchema.optional(),
   kind: z.enum(["receive", "issue", "adjust", "transfer"]), locationId: inventoryLocationSchema,
-  lotId: inventoryIdSchema.nullable(), quantity: inventoryQuantitySchema,
+  lotId: inventoryIdSchema.nullable(), quantity: inventoryQuantitySchema, packageQuantity: inventoryPackageQuantitySchema.optional(),
   newLot: inventoryLotDraftSchema.optional(), toLocationId: inventoryLocationSchema.optional(), reason: note,
 }).strict().superRefine((value, context) => {
   if (value.kind !== "adjust" && value.quantity === 0) context.addIssue({ code: "custom", path: ["quantity"], message: "수량은 1 이상이어야 합니다." });
@@ -135,7 +149,7 @@ export const inventoryMovementInputSchema = z.object({
 export const inventoryCountInputSchema = z.object({
   requestId: z.uuid(), productId: inventoryIdSchema, locationId: inventoryLocationSchema,
   includeDetail: z.boolean().optional(),
-  includeSummary: z.boolean().optional(),
+  includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional(),
   matchOnly: z.boolean().optional(),
   cycleId: inventoryIdSchema, expectedStockRevision: revision,
   // Include every currently positive lot at this location, even when counted 0.
@@ -147,17 +161,17 @@ export const inventoryCountInputSchema = z.object({
 export const updateInventoryLotInputSchema = z.object({
   requestId: z.uuid(), productId: inventoryIdSchema, lotId: inventoryIdSchema,
   includeDetail: z.boolean().optional(),
-  includeSummary: z.boolean().optional(),
+  includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional(),
   expectedStockRevision: revision, draft: inventoryLotDraftSchema, reason: note,
 }).strict();
 export const setInventoryProductStatusInputSchema = z.object({
   requestId: z.uuid(), productId: inventoryIdSchema, expectedRevision: revision,
   refreshOnReplay: z.boolean().optional(),
-  includeSummary: z.boolean().optional(),
+  includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional(),
   status: z.enum(["active", "inactive"]), reason: note,
 }).strict();
 export const deleteInventoryProductInputSchema = z.object({ requestId: z.uuid(), productId: inventoryIdSchema, expectedRevision: revision,
-  refreshOnReplay: z.boolean().optional(), includeSummary: z.boolean().optional(), reason: z.string().trim().min(1).max(2_000) }).strict();
+  refreshOnReplay: z.boolean().optional(), includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional(), reason: z.string().trim().min(1).max(2_000) }).strict();
 export const updateInventorySettingsInputSchema = z.object({
   requestId: z.uuid(), expectedRevision: revision, weekday: z.number().int().min(0).max(6), urgentDays: z.number().int().min(0).max(365),
 }).strict();
@@ -172,10 +186,10 @@ export const inventoryEventSchema = z.object({
   locationId: inventoryLocationSchema, lines: z.array(inventoryEventLineSchema).max(INVENTORY_MAX_LOTS),
   reason: note, actorEmployeeId: inventoryIdSchema, createdAt: z.iso.datetime(),
   cycleId: inventoryIdSchema.nullable(), unitLabel: z.string().min(1).max(20), unitsPerBox: z.number().int().positive(),
-  stockRevision: revision,
+  stockRevision: revision, packageQuantity: inventoryPackageQuantitySchema.optional(),
   lotMetadataChange: z.object({ originLotId: inventoryIdSchema, before: inventoryLotDraftSchema, after: inventoryLotDraftSchema }).strict().optional(),
 }).strict();
-export const inventoryHistoryInputSchema = z.object({ productId: inventoryIdSchema, afterId: z.uuid().nullable().default(null) }).strict();
+export const inventoryHistoryInputSchema = z.object({ includePackaging: z.boolean().optional(), productId: inventoryIdSchema, afterId: z.uuid().nullable().default(null) }).strict();
 export const inventoryHistoryPageSchema = z.object({ events: z.array(inventoryEventSchema).max(50), nextCursor: z.uuid().nullable() }).strict();
 export const inventoryMutationResultSchema = z.object({
   product: inventoryProductSchema, event: inventoryEventSchema, replayed: z.boolean(),

@@ -37,20 +37,20 @@ export function summarizeInventoryLotGroups(lots: InventoryLot[]): InventoryLotS
 
 // Older installed clients validate strict objects, so new fields must be sent
 // only when requested. Do not strip unrelated fields or change stored receipts.
-export function inventorySummaryResponse(value: unknown, includeSummary: boolean, includeManufacturerReference = false): unknown {
+export function inventorySummaryResponse(value: unknown, includeSummary: boolean, includeManufacturerReference = false, includePackaging = false): unknown {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) {
-    const filtered = value.map((item) => inventorySummaryResponse(item, includeSummary, includeManufacturerReference));
+    const filtered = value.map((item) => inventorySummaryResponse(item, includeSummary, includeManufacturerReference, includePackaging));
     return filtered.some((item, index) => item !== value[index]) ? filtered : value;
   }
   let changed = false;
   const entries: Array<[string, unknown]> = [];
   for (const [key, item] of Object.entries(value)) {
-    if ((!includeSummary && key === "lotSummary") || (!includeManufacturerReference && key === "manufacturerId")) {
+    if ((!includeSummary && key === "lotSummary") || (!includeManufacturerReference && key === "manufacturerId") || (!includePackaging && (key === "boxPackSize" || key === "packageQuantity"))) {
       changed = true;
       continue;
     }
-    const filtered = inventorySummaryResponse(item, includeSummary, includeManufacturerReference);
+    const filtered = inventorySummaryResponse(item, includeSummary, includeManufacturerReference, includePackaging);
     if (filtered !== item) changed = true;
     entries.push([key, filtered]);
   }

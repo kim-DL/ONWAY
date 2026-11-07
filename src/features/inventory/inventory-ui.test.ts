@@ -112,7 +112,7 @@ describe("inventory UI contracts", () => {
     expect(html).not.toContain("앨범에서 선택");
     expect(html).not.toContain("파일에서 선택");
     expect(html).toContain("기준 단위를 바꿀 수 없어요");
-    expect(html).not.toContain("박스");
+    expect(html).toContain("박스 입수 수량 (선택)");
     expect(html).not.toContain("임박 품목으로 직접 지정");
   });
   it("explains delayed weekday changes", () => {

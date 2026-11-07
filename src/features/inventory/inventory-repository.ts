@@ -43,7 +43,7 @@ async function list(onProgress?: (products: contract.InventoryProduct[], progres
   let afterId: string | null = null;
   let pageCount = 0;
   do {
-    const page: z.infer<typeof contract.inventoryListPageSchema> = await call("listInventoryProducts", { afterId, includeSummary: true }, contract.inventoryListPageSchema);
+    const page: z.infer<typeof contract.inventoryListPageSchema> = await call("listInventoryProducts", { afterId, includeSummary: true, includePackaging: true }, contract.inventoryListPageSchema);
     if (getFirebaseClientServices()?.auth.currentUser?.uid !== initialUid) throw inventoryAuthenticationError();
     page.products.forEach((product) => products.set(product.productId, product));
     afterId = page.nextCursor;
@@ -57,15 +57,15 @@ async function list(onProgress?: (products: contract.InventoryProduct[], progres
 export const inventoryRepository = {
   list,
   context: () => call("getInventoryContext", {}, contract.inventoryContextSchema),
-  detail: (productId: string) => call("getInventoryProduct", contract.getInventoryProductInputSchema.parse({ productId, includeSummary: true }), contract.inventoryProductDetailSchema),
-  save: (input: contract.SaveInventoryProductInput) => call("saveInventoryProduct", contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryProductSaveResultSchema),
-  movement: (input: contract.InventoryMovementInput) => call("recordInventoryMovement", contract.inventoryMovementInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryMutationResultSchema),
-  count: (input: contract.InventoryCountInput) => call("recordInventoryCount", contract.inventoryCountInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryMutationResultSchema),
-  updateLot: (input: contract.UpdateInventoryLotInput) => call("updateInventoryLot", contract.updateInventoryLotInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryMutationResultSchema),
-  status: (input: contract.SetInventoryProductStatusInput) => call("setInventoryProductStatus", contract.setInventoryProductStatusInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryProductSchema),
-  remove: (input: contract.DeleteInventoryProductInput) => call("deleteInventoryProduct", contract.deleteInventoryProductInputSchema.parse({ ...input, includeSummary: true }), contract.inventoryProductSchema),
+  detail: (productId: string) => call("getInventoryProduct", contract.getInventoryProductInputSchema.parse({ productId, includeSummary: true, includePackaging: true }), contract.inventoryProductDetailSchema),
+  save: (input: contract.SaveInventoryProductInput) => call("saveInventoryProduct", contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryProductSaveResultSchema),
+  movement: (input: contract.InventoryMovementInput) => call("recordInventoryMovement", contract.inventoryMovementInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryMutationResultSchema),
+  count: (input: contract.InventoryCountInput) => call("recordInventoryCount", contract.inventoryCountInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryMutationResultSchema),
+  updateLot: (input: contract.UpdateInventoryLotInput) => call("updateInventoryLot", contract.updateInventoryLotInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryMutationResultSchema),
+  status: (input: contract.SetInventoryProductStatusInput) => call("setInventoryProductStatus", contract.setInventoryProductStatusInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryProductSchema),
+  remove: (input: contract.DeleteInventoryProductInput) => call("deleteInventoryProduct", contract.deleteInventoryProductInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryProductSchema),
   settings: (input: contract.UpdateInventorySettingsInput) => call("updateInventorySettings", contract.updateInventorySettingsInputSchema.parse(input), contract.inventorySettingsSchema),
-  history: (productId: string, afterId: string | null = null) => call("listInventoryHistory", contract.inventoryHistoryInputSchema.parse({ productId, afterId }), contract.inventoryHistoryPageSchema),
+  history: (productId: string, afterId: string | null = null) => call("listInventoryHistory", contract.inventoryHistoryInputSchema.parse({ productId, afterId, includePackaging: true }), contract.inventoryHistoryPageSchema),
   uploadPhoto: (input: z.infer<typeof contract.uploadInventoryPhotoInputSchema>) => call("uploadInventoryPhoto", contract.uploadInventoryPhotoInputSchema.parse(input), contract.inventoryPhotoUploadResultSchema),
   photo: (productId: string, photoId: string, variant: "thumbnail" | "preview" = "preview") => call("getInventoryPhoto", contract.getInventoryPhotoInputSchema.parse({ productId, photoId, variant }), contract.inventoryPhotoDownloadSchema),
 };

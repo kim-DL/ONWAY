@@ -76,7 +76,7 @@ describe("compact inventory detail actions", () => {
     for (const label of ["출고", "입고", "조정", "수량 일치 확인", "품목 정보 수정", "더보기"]) expect(button(tree, label)).not.toBeNull();
     for (const label of ["입출고·실사 이력", "비활성화", "품목 삭제"]) expect(button(tree, label)).toBeNull();
     expect(button(tree, "보관 장소 이동")).toBeNull(); expect(button(tree, "계산기")).toBeNull();
-    expect(text(tree)).not.toContain("박스"); expect(text(tree)).toContain("29봉");
+    expect(text(tree)).toContain("박스 입수량미등록"); expect(text(tree)).toContain("29봉");
   });
 
   it("never exposes write/admin controls to a read-only employee", async () => {

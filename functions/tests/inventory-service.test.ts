@@ -132,6 +132,79 @@ async function stocked() {
   return { ...state, product: first.product, lotId: first.event.lines[0]!.lotId };
 }
 
+describe("editable box packaging without changing historical units", () => {
+  it("adds and edits packaging while retaining quantities, lots, events and legacy unit locks", async () => {
+    const state = await stocked();
+    const before = [...state.values].filter(([path]) => path.includes("/lots/") || path.includes("/events/"));
+    const input = { requestId: randomUUID(), productId: state.product.productId, expectedRevision: state.product.revision,
+      draft: { ...draft, boxPackSize: 10 } };
+    const updated = await state.service.save(input, actor);
+    expect(updated.boxPackSize).toBe(10);
+    expect(updated.unitsPerBox).toBe(state.product.unitsPerBox);
+    expect(updated.quantityByLocation).toEqual(state.product.quantityByLocation);
+    expect(updated.lastCountByLocation).toEqual(state.product.lastCountByLocation);
+    expect([...state.values].filter(([path]) => path.includes("/lots/") || path.includes("/events/"))).toEqual(before);
+    expect(updated.stockRevision).toBe(state.product.stockRevision + 1);
+    await expect(state.service.move(receive(state.product), actor)).rejects.toMatchObject({ code: "aborted" });
+    await expect(state.service.save({ ...input, requestId: randomUUID(), expectedRevision: updated.revision,
+      draft: { ...draft, unitsPerBox: 20 } }, actor)).rejects.toMatchObject({ code: "failed-precondition" });
+    // An older client omits the new property; editing its name must preserve it.
+    const legacy = await state.service.save({ ...input, requestId: randomUUID(), expectedRevision: updated.revision,
+      draft: { ...draft, name: "수정한 상품명" } }, actor);
+    expect(legacy.boxPackSize).toBe(10);
+    expect(legacy.stockRevision).toBe(updated.stockRevision);
+    const cleared = await state.service.save({ ...input, requestId: randomUUID(), expectedRevision: legacy.revision,
+      draft: { ...draft, boxPackSize: null } }, actor);
+    expect(cleared.boxPackSize).toBeNull();
+    expect(cleared.quantityByLocation).toEqual(state.product.quantityByLocation);
+  });
+  it("records a package calculation once and rejects a forged total", async () => {
+    const state = await stocked();
+    const packageQuantity = { boxes: 3, unitsPerBox: 10, loose: 2 };
+    const input = { ...receive(state.product, 32), packageQuantity };
+    await expect(state.service.move({ ...input, quantity: 33 }, actor)).rejects.toMatchObject({ code: "invalid-argument" });
+    const result = await state.service.move(input, actor);
+    expect(result.event.packageQuantity).toEqual(packageQuantity);
+    expect(result.product.quantityByLocation.freezer1).toBe(42);
+    const replay = await state.service.move({ ...input, includePackaging: true }, actor);
+    expect(replay.replayed).toBe(true);
+    expect(replay.product.quantityByLocation.freezer1).toBe(42);
+    expect((await state.service.history(state.product.productId, null)).events.filter(event => event.eventId === input.requestId)).toHaveLength(1);
+  });
+  it("preserves packaging when an old client edits a manufacturer-linked product", async () => {
+    const state = fixture();
+    const manufacturerId = randomUUID();
+    state.values.set(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`, {
+      manufacturerId, name: "온누리 식품", normalizedName: "온누리식품", active: true, revision: 1,
+      createdAt: Timestamp.fromDate(initialNow), updatedAt: Timestamp.fromDate(initialNow), createdBy: actor.employeeId,
+    });
+    const product = await state.service.save({ ...initialStockInput(), draft: { ...draft, manufacturerId, boxPackSize: 10 } }, actor);
+    const before = [...state.values].filter(([path]) => path.includes("/lots/") || path.includes("/events/"));
+    const legacy = await state.service.save({ requestId: randomUUID(), productId: product.productId,
+      expectedRevision: product.revision, draft: { ...draft, name: "구버전 상품명 수정" } }, actor);
+    expect(legacy.boxPackSize).toBe(10);
+    expect(legacy.manufacturerId).toBe(manufacturerId);
+    expect(legacy.quantityByLocation).toEqual(product.quantityByLocation);
+    expect(legacy.stockRevision).toBe(product.stockRevision);
+    expect([...state.values].filter(([path]) => path.includes("/lots/") || path.includes("/events/"))).toEqual(before);
+  });
+  it("records the first receipt calculation and rejects an inconsistent initial receipt atomically", async () => {
+    const state = fixture();
+    const packageQuantity = { boxes: 1, unitsPerBox: 10, loose: 9 };
+    const input = initialStockInput();
+    input.draft = { ...input.draft, boxPackSize: 10 };
+    input.initialStock = { ...input.initialStock!, packageQuantity };
+    await expect(state.service.save({ ...input, initialStock: { ...input.initialStock, quantity: 20 } }, actor)).rejects.toMatchObject({ code: "invalid-argument" });
+    expect([...state.values.keys()].filter(path => path.startsWith(INVENTORY_PRODUCT_PATH))).toHaveLength(0);
+    const product = await state.service.save(input, actor);
+    expect(product.boxPackSize).toBe(10);
+    expect((await state.service.history(product.productId, null)).events[0]!.packageQuantity).toEqual(packageQuantity);
+  });
+  it.each([0, -1, 0.5, NaN, Infinity, 1_000_001])("rejects invalid box pack size %s", (boxPackSize) => {
+    expect(inventoryProductDraftSchema.safeParse({ ...draft, boxPackSize }).success).toBe(false);
+  });
+});
+
 describe("inventory wire boundaries and calendar", () => {
   it("accepts a bounded initial receipt only on new-product registration and keeps legacy registration compatible", () => {
     expect(saveInventoryProductInputSchema.safeParse(createInput()).success).toBe(true);

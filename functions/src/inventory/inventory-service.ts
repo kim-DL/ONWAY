@@ -7,7 +7,7 @@ import { inventoryCycle, inventoryToday, nextInventorySettings } from "./invento
 import {
   INVENTORY_COMPANY_ID, INVENTORY_CYCLE_PATH, INVENTORY_LOCATIONS, INVENTORY_MAX_LOTS,
   INVENTORY_PRODUCT_PATH, INVENTORY_SETTINGS_PATH, inventoryEventSchema, inventoryInitialStockSchema, inventoryLocationMap, inventoryLotSchema,
-  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryStatusChangeSchema,
+  inventoryAuditReasonSchema, inventoryLotChangeSchema, inventoryStatusChangeSchema, inventoryPackageQuantityMatches,
   type DeleteInventoryProductInput, type InventoryCountInput, type InventoryEvent, type InventoryLocation,
   type InventoryLot, type InventoryLotChange, type InventoryMovementInput, type InventoryMutationResult, type InventoryProduct, type InventoryStatusChange,
   type InventoryProductSaveResult, type InventorySettings, type SetInventoryProductStatusInput,
@@ -71,7 +71,7 @@ export class InventoryService {
     replay?: (transaction: Transaction) => Promise<T>): Promise<T> {
     // Response expansion is not part of a stock command's identity. A delayed
     // request made by an older client remains the same command after an update.
-    const command = Object.fromEntries(Object.entries(input).filter(([key]) => !["includeDetail", "refreshOnReplay", "includeSummary", "includeManufacturerReference"].includes(key)));
+    const command = Object.fromEntries(Object.entries(input).filter(([key]) => !["includeDetail", "refreshOnReplay", "includeSummary", "includeManufacturerReference", "includePackaging"].includes(key)));
     const fingerprint = createHash("sha256").update(JSON.stringify(command)).digest("hex");
     const receiptRef = this.db.doc(`${REQUEST_PATH}/${input.requestId}`);
     return fieldStage("transaction", () => this.db.runTransaction(async (realTransaction) => {
@@ -158,9 +158,16 @@ export class InventoryService {
       if (current?.hasHistory && unitChanged) {
         throw new HttpsError("failed-precondition", "이력이 있는 상품은 재고 단위를 바꿀 수 없습니다. 규격이 달라졌다면 새 상품으로 등록해주세요.", { reason: "inventory-unit-locked" });
       }
+      const packagingChanged = current !== null && input.draft.boxPackSize !== undefined
+        && (current.boxPackSize ?? null) !== input.draft.boxPackSize;
+      if (input.initialStock && !inventoryPackageQuantityMatches(input.initialStock.quantity, input.initialStock.packageQuantity)) {
+        throw new HttpsError("invalid-argument", "박스 계산과 초기 수량이 일치하지 않습니다.");
+      }
       const clearManufacturerReference = input.clearManufacturerReference === true;
       const manufacturerId = clearManufacturerReference ? undefined : input.draft.manufacturerId ?? current?.manufacturerId;
-      let draft = clearManufacturerReference ? { ...input.draft, manufacturer: "" } : input.draft;
+      let draft = { ...input.draft,
+        ...(input.draft.boxPackSize === undefined && current?.boxPackSize !== undefined ? { boxPackSize: current.boxPackSize } : {}),
+        ...(clearManufacturerReference ? { manufacturer: "" } : {}) };
       if (clearManufacturerReference) delete draft.manufacturerId;
       if (manufacturerId) {
         const manufacturerSnapshot = await transaction.get(this.db.doc(`${INVENTORY_MANUFACTURER_PATH}/${manufacturerId}`));
@@ -172,14 +179,14 @@ export class InventoryService {
         if (newlyLinked && !manufacturer.active) {
           throw new HttpsError("failed-precondition", "비활성 제조사는 새 상품에 연결할 수 없습니다.", { reason: "inventory-manufacturer-inactive" });
         }
-        draft = { ...input.draft, manufacturerId, manufacturer: newlyLinked ? manufacturer.name : current!.manufacturer };
+        draft = { ...draft, manufacturerId, manufacturer: newlyLinked ? manufacturer.name : current!.manufacturer };
       }
       const photo = await resolveInventoryPhotoChange(this.db, transaction, input, current, actor, Timestamp.fromDate(now));
       const updated = inventoryProductWithManufacturerSchema.parse({ ...draft,
         productId, companyId: INVENTORY_COMPANY_ID, status: current?.status ?? "active", revision: (current?.revision ?? 0) + 1,
         // A first-receipt form may already have converted boxes using the old
         // unit definition. Invalidate that stock snapshot when units change.
-        stockRevision: (current?.stockRevision ?? 0) + (unitChanged ? 1 : 0), hasHistory: current?.hasHistory ?? false,
+        stockRevision: (current?.stockRevision ?? 0) + (unitChanged || packagingChanged ? 1 : 0), hasHistory: current?.hasHistory ?? false,
         quantityByLocation: current?.quantityByLocation ?? inventoryLocationMap(0),
         nearestExpiryByLocation: current?.nearestExpiryByLocation ?? inventoryLocationMap(null),
         lastCountByLocation: current?.lastCountByLocation ?? inventoryLocationMap(null), photo: photo.photo ?? null,
@@ -196,7 +203,7 @@ export class InventoryService {
         // The first receipt, photo claim, product and permanent retry receipt
         // share this transaction. One audit represents the combined creation;
         // writeStock must not also create the same request's second audit ID.
-        const result = this.writeStock(transaction, { requestId: input.requestId, productId, locationId, reason: "신규 상품 초기 입고", includeDetail: input.includeDetail },
+        const result = this.writeStock(transaction, { requestId: input.requestId, productId, locationId, reason: "신규 상품 초기 입고", ...(input.initialStock.packageQuantity ? { packageQuantity: input.initialStock.packageQuantity } : {}), includeDetail: input.includeDetail },
           actor, now, updated, [lot], [lot], "receive",
           [{ lotId: lot.lotId, locationId, before: 0, after: lot.quantity, delta: lot.quantity }], null, undefined,
           { eventType: "INVENTORY_PRODUCT_CREATED", changedFields: [...changedFields, "quantity", "lots"] });
@@ -210,7 +217,7 @@ export class InventoryService {
       return { ...updated, ...(!current && input.includeDetail ? { detail: { product: updated, lots: [] } } : {}) };
     }, (transaction) => this.replayedProduct(transaction, input.productId ?? input.requestId));
   }
-  private writeStock(transaction: Transaction, input: { requestId: string; productId: string; locationId: InventoryLocation; reason: string; includeDetail?: boolean | undefined },
+  private writeStock(transaction: Transaction, input: { requestId: string; productId: string; locationId: InventoryLocation; reason: string; includeDetail?: boolean | undefined; packageQuantity?: InventoryEvent["packageQuantity"] },
     actor: InventoryActor, now: Date, product: InventoryProductRecord, lots: InventoryLot[], changedLots: InventoryLot[],
     kind: InventoryEvent["kind"], lines: InventoryEvent["lines"], cycleId: string | null = null,
     lotMetadataChange?: InventoryEvent["lotMetadataChange"],
@@ -228,6 +235,7 @@ export class InventoryService {
         return lot ? { ...line, lotLabel: lot.label, expiryState: lot.expiryState, expiryDate: lot.expiryDate } : line;
       }), reason: input.reason, actorEmployeeId: actor.employeeId,
       createdAt: now.toISOString(), cycleId, unitLabel: product.unitLabel, unitsPerBox: product.unitsPerBox, stockRevision,
+      ...(input.packageQuantity ? { packageQuantity: input.packageQuantity } : {}),
       ...(lotMetadataChange ? { lotMetadataChange } : {}) });
     for (const lot of changedLots) transaction.set(this.lotRef(input.productId, lot.lotId), persisted(lot));
     transaction.set(this.productRef(input.productId), persisted({ ...next, inspectionByLot }));
@@ -240,6 +248,9 @@ export class InventoryService {
       ...(input.includeDetail ? { detail: { product: next, lots: activeSortedLots(lots) } } : {}) });
   }
   async move(input: InventoryMovementInput, actor: InventoryActor): Promise<InventoryMutationResult> {
+    if (!inventoryPackageQuantityMatches(input.quantity, input.packageQuantity)) {
+      throw new HttpsError("invalid-argument", "박스 계산과 저장 수량이 일치하지 않습니다.");
+    }
     return this.mutation("recordInventoryMovement", input, actor, "write", async (transaction, now) => {
       const [product, activeSnapshot, settingsSnapshot] = await Promise.all([
         this.product(transaction, input.productId), transaction.get(this.lotsQuery(input.productId)),

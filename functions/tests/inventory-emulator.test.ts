@@ -53,6 +53,43 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     // randomly named demo project, preserving any existing test data.
   });
 
+  it("preserves legacy stock and history when adding packaging and commits a box movement exactly once", async () => {
+    const draft = inventoryProductDraftSchema.parse({ name: "박스 계산 보존 통합검증", unitLabel: "봉", unitsPerBox: 1,
+      defaultLocationId: "freezer1", manufacturer: "", specification: "", origin: "", note: "", urgent: false });
+    const initial = await service.save({ requestId: randomUUID(), productId: null, expectedRevision: null, draft,
+      initialStock: { quantity: 47, lot: { label: "기존 재고", expiryState: "dated", expiryDate: "2027-01-01" } } }, member);
+    const productRef = db.doc(`${INVENTORY_PRODUCT_PATH}/${initial.productId}`);
+    const storedLots = async () => (await productRef.collection("lots").get()).docs.map((item) => ({ id: item.id, data: item.data() }));
+    const storedEvents = async () => (await productRef.collection("events").get()).docs.map((item) => ({ id: item.id, data: item.data() }));
+    const beforeLots = await storedLots();
+    const beforeEvents = await storedEvents();
+    const packed = await service.save({ requestId: randomUUID(), productId: initial.productId, expectedRevision: initial.revision,
+      draft: { ...draft, boxPackSize: 10 } }, member);
+    expect(packed.quantityByLocation).toEqual(initial.quantityByLocation);
+    expect(packed.lastCountByLocation).toEqual(initial.lastCountByLocation);
+    expect(packed.unitsPerBox).toBe(1);
+    expect(await storedLots()).toEqual(beforeLots);
+    expect(await storedEvents()).toEqual(beforeEvents);
+    const input: InventoryMovementInput = { requestId: randomUUID(), productId: initial.productId,
+      expectedStockRevision: packed.stockRevision, kind: "issue", locationId: "freezer1",
+      lotId: beforeLots[0]!.id, quantity: 32, packageQuantity: { boxes: 3, unitsPerBox: 10, loose: 2 }, reason: "" };
+    await expect(service.move({ ...input, expectedStockRevision: initial.stockRevision }, member)).rejects.toMatchObject({ code: "aborted" });
+    await expect(service.move({ ...input, quantity: 33 }, member)).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(await storedEvents()).toEqual(beforeEvents);
+    const results = await Promise.all([service.move(input, member), service.move(input, member)]);
+    expect(results.map((result) => result.replayed).sort()).toEqual([false, true]);
+    expect(results.every((result) => result.product.quantityByLocation.freezer1 === 15)).toBe(true);
+    const events = await storedEvents();
+    expect(events).toHaveLength(2);
+    expect(events.find((event) => event.id === beforeEvents[0]!.id)).toEqual(beforeEvents[0]);
+    expect(events.find((event) => event.id === input.requestId)!.data.packageQuantity).toEqual(input.packageQuantity);
+    const legacy = await service.save({ requestId: randomUUID(), productId: initial.productId, expectedRevision: packed.revision,
+      draft: { ...draft, name: "구버전 수정 보존 검증" } }, member);
+    expect(legacy.boxPackSize).toBe(10);
+    expect(legacy.quantityByLocation.freezer1).toBe(15);
+    expect(await storedEvents()).toEqual(events);
+  }, 40_000);
+
   it("atomically confirms individual scheduled-day lots, rejects changed match-only counts, and safely backfills a concurrent legacy summary", async () => {
     const input: SaveInventoryProductInput = { requestId: randomUUID(), productId: null, expectedRevision: null,
       draft: inventoryProductDraftSchema.parse({ name: "날짜별 확인 통합검증", unitLabel: "봉", unitsPerBox: 8,

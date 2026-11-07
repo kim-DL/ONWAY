@@ -131,9 +131,9 @@ describe("single-submit inventory registration", () => {
     const Component = quantityField.type as (props: Props) => ReactElement<Props>;
     harness.states = []; harness.stateCursor = 0; harness.refCursor = 0;
     const tree = Component({ ...quantityField.props, value: 1.5 });
-    const input = find(tree, (type) => type === "input")!;
+    const input = find(tree, (type, props) => type === "input" && props.type === "number")!;
     expect(input.props["aria-invalid"]).toBe(true);
-    expect(input.props["aria-describedby"]).toBe("inventory-registration-test-quantity-error");
+    expect(input.props["aria-describedby"]).toBe("inventory-registration-test-error");
     expect(input.props["aria-label"]).toBe("초기 수량 (필수) (봉)");
   });
 

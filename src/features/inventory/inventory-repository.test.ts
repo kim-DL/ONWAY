@@ -22,7 +22,7 @@ describe("inventory callable boundary", () => {
     mock.invoke.mockResolvedValueOnce({ data: { ...saved, detail } });
     await expect(inventoryRepository.save(input)).resolves.toEqual({ ...saved, detail });
     expect(mock.invoke).toHaveBeenCalledOnce();
-    expect(mock.invoke.mock.calls[0]).toEqual(["saveInventoryProduct", { ...input, includeSummary: true }]);
+    expect(mock.invoke.mock.calls[0]).toEqual(["saveInventoryProduct", { ...input, includeSummary: true, includePackaging: true }]);
     mock.invoke.mockResolvedValueOnce({ data: { ...saved, detail: { product: saved, lots: [{ lotId: "invalid" }] } } });
     await expect(inventoryRepository.save(input)).rejects.toThrow();
   });
@@ -48,8 +48,8 @@ describe("inventory callable boundary", () => {
     expect(result.product).not.toHaveProperty("lotSummary");
     await inventoryRepository.save({ requestId: "41bd2065-a415-4e30-8b97-3dca1f8a66cc", productId: "product-1", expectedRevision: 0,
       draft: { name: "품목", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 10, defaultLocationId: "refrigerated", note: "", urgent: false } });
-    expect(mock.invoke.mock.calls[0]).toEqual(["getInventoryProduct", { productId: "product-1", includeSummary: true }]);
-    expect(mock.invoke.mock.calls[1]![1]).toMatchObject({ includeSummary: true });
+    expect(mock.invoke.mock.calls[0]).toEqual(["getInventoryProduct", { productId: "product-1", includeSummary: true, includePackaging: true }]);
+    expect(mock.invoke.mock.calls[1]![1]).toMatchObject({ includeSummary: true, includePackaging: true });
   });
   it("requests the thumbnail variant only when explicitly selected and keeps detail previews unchanged", async () => {
     const photoId = "37f53804-77f5-49e7-82ae-bdbf7c6f7bc9";
@@ -65,7 +65,7 @@ describe("inventory callable boundary", () => {
     mock.invoke.mockResolvedValueOnce({ data: { products: [product()], nextCursor: "product-1" } }).mockResolvedValueOnce({ data: { products: [product(), product("product-2")], nextCursor: null } });
     const rows = await inventoryRepository.list();
     expect(rows.map((row) => row.productId)).toEqual(["product-1", "product-2"]);
-    expect(mock.invoke.mock.calls).toEqual([["listInventoryProducts", { afterId: null, includeSummary: true }], ["listInventoryProducts", { afterId: "product-1", includeSummary: true }]]);
+    expect(mock.invoke.mock.calls).toEqual([["listInventoryProducts", { afterId: null, includeSummary: true, includePackaging: true }], ["listInventoryProducts", { afterId: "product-1", includeSummary: true, includePackaging: true }]]);
   });
   it("publishes each accumulated page without adding requests", async () => {
     mock.invoke.mockResolvedValueOnce({ data: { products: [product()], nextCursor: "product-1" } }).mockResolvedValueOnce({ data: { products: [product("product-2")], nextCursor: null } });
