@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { customerSchema, type Customer } from "@/domain/customer";
 import { CustomerCard, CustomerCardDirectionsLink, RecentCustomerCard, CustomerPhoneLink, confirmClosedCustomer, customerPasswordLabel, customerPhoneHref } from "./customer-card";
 import { customerDirectionsHref } from "./customer-directions";
+vi.mock("./customer-directions", async (original) => ({ ...await original<object>(), openCustomerDirections: vi.fn() }));
 
 const customer: Customer = customerSchema.parse({
   customerId: "UI-CUSTOMER", companyId: "onnuri", name: "강은유통", normalizedName: "강은유통", choseongName: "ㄱㅇㅇㅌ",
@@ -116,7 +117,7 @@ describe("customer cards and contact actions", () => {
 
   it("opens directions independently without opening detail", () => {
     const link = CustomerCardDirectionsLink({ customer });
-    expect(link.props.href).toBe(`https://map.kakao.com/link/to/${encodeURIComponent(customer.name)},36.35,127.38`);
+    expect(link.props.href).toBe(`https://map.kakao.com/link/search/${encodeURIComponent(customer.deliveryAddress)}`);
     expect(link.props.target).toBe("_blank");
     expect(link.props.rel).toBe("noopener noreferrer");
     const event = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -125,13 +126,13 @@ describe("customer cards and contact actions", () => {
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
 
-  it("does not guess a destination for missing or malformed unloading pins", () => {
-    expect(customerDirectionsHref({ ...customer, deliveryPoint: null })).toBeNull();
-    expect(customerDirectionsHref({ ...customer, deliveryPoint: { latitude: NaN, longitude: 127 } })).toBeNull();
-    expect(customerDirectionsHref({ ...customer, deliveryPoint: { latitude: 91, longitude: 127 } })).toBeNull();
+  it("allows displayed-address directions without an unloading pin", () => {
+    expect(customerDirectionsHref(customer)).toContain(encodeURIComponent(customer.deliveryAddress));
     const html = renderToStaticMarkup(CustomerCardDirectionsLink({ customer: { ...customer, deliveryPoint: null } }));
-    expect(html).toContain("위치 미등록");
-    expect(html).not.toContain("href=");
+    expect(html).toContain("href=");
+    const missing = renderToStaticMarkup(CustomerCardDirectionsLink({ customer: { ...customer, deliveryAddress: "", officialAddress: "" } }));
+    expect(missing).toContain("주소 미등록");
+    expect(missing).not.toContain("href=");
   });
 
   it("keeps directory rows compact while retaining independent phone and directions targets", () => {

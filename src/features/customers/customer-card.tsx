@@ -11,7 +11,7 @@ import { getPrimaryCustomerContact, sanitizeCustomerPhone } from "./customer-sea
 import { customerAddress } from "./customer-address";
 import { customerContactDisplayName } from "./customer-contact-name";
 import { CustomerOverviewPhoto } from "./customer-overview-photo";
-import { customerDirectionsHref } from "./customer-directions";
+import { customerDirectionsHref, openCustomerDirections } from "./customer-directions";
 import styles from "./customer.module.css";
 
 export const primaryCustomerContact = getPrimaryCustomerContact;
@@ -70,9 +70,10 @@ function CustomerPasswordSummary({ customer, id }: { customer: Customer; id: str
 
 export function CustomerCardDirectionsLink({ customer }: { customer: Customer }) {
   const href = customerDirectionsHref(customer);
-  if (!href) return <span className={styles.directionsLink} aria-disabled="true"><Icon name="route" size={18} />위치 미등록</span>;
+  if (!href) return <span className={styles.directionsLink} aria-disabled="true"><Icon name="route" size={18} />주소 미등록</span>;
   return <a className={styles.directionsLink} href={href} target="_blank" rel="noopener noreferrer"
-    aria-label={`${customer.name} 납품지 길안내`} onClick={(event) => confirmClosedCustomer(event, customer)}>
+    aria-label={`${customer.name} 납품지 길안내`} onClick={(event) => { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); }}
+    onAuxClick={(event) => { if (event.button === 1) { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); } }}>
     <Icon name="route" size={18} />길안내
   </a>;
 }

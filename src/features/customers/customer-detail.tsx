@@ -10,7 +10,7 @@ import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
 
 import { customerAddress } from "./customer-address";
-import { customerDirectionsHref } from "./customer-directions";
+import { customerDirectionsHref, openCustomerDirections } from "./customer-directions";
 import { CustomerBadges, CustomerCoreInformation, CustomerPhoneLink, confirmClosedCustomer, customerPasswordLabel, customerPhoneHref } from "./customer-card";
 import { customerDetailContacts } from "./customer-detail-contacts";
 import { customerContactDisplayName } from "./customer-contact-name";
@@ -26,8 +26,10 @@ const dateFormat = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeZ
 
 export function CustomerDirectionsLink({ customer }: { customer: Customer }) {
   const href = customerDirectionsHref(customer);
-  if (!href) return <span className={styles.action} aria-disabled="true"><Icon name="route" size={20} />위치 미등록</span>;
-  return <a className={`${styles.action} ${styles.primaryAction}`} href={href} target="_blank" rel="noopener noreferrer" onClick={(event) => confirmClosedCustomer(event, customer)}><Icon name="route" size={20} />길찾기</a>;
+  if (!href) return <span className={styles.action} aria-disabled="true"><Icon name="route" size={20} />주소 미등록</span>;
+  return <a className={`${styles.action} ${styles.primaryAction}`} href={href} target="_blank" rel="noopener noreferrer"
+    onClick={(event) => { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); }}
+    onAuxClick={(event) => { if (event.button === 1) { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); } }}><Icon name="route" size={20} />길찾기</a>;
 }
 
 function ContactList({ customer, contacts }: { customer: Customer; contacts: readonly CustomerContact[] }) {

@@ -12,6 +12,7 @@ import {
 } from "./customer-contract.js";
 import { CustomerNotFound, CustomerRequestCollision, CustomerRevisionConflict, CustomerService, customerResponse } from "./customer-service.js";
 import { reverseCustomerAddress } from "./customer-location.js";
+import { createRegisteredAddressResolver } from "../delivery-planning/registered-address.js";
 
 const emulator = process.env.FUNCTIONS_EMULATOR === "true";
 const kakaoRestApiKey = defineSecret("KAKAO_REST_API_KEY");
@@ -62,12 +63,19 @@ function locationClient() {
   return new KakaoLocalClient({ restApiKey: key });
 }
 
+const resolveRegisteredAddress = createRegisteredAddressResolver(() => emulator ? process.env.KAKAO_REST_API_KEY ?? "" : kakaoRestApiKey.value());
+
 export const searchCustomerLocations = onCall(locationOptions, async (request) => {
   setPrivateCallableResponse(request);
   try {
     await requireCustomerActor(request);
-    const parsed = z.object({ query: z.string().trim().min(2).max(200) }).strict().safeParse(request.data);
+    const parsed = z.object({ query: z.string().trim().min(2).max(500), addressOnly: z.boolean().optional() }).strict().safeParse(request.data);
     if (!parsed.success) throw new HttpsError("invalid-argument", "주소 또는 장소를 두 글자 이상 입력해주세요.");
+    if (parsed.data.addressOnly) {
+      const point = await resolveRegisteredAddress(parsed.data.query);
+      await requireCustomerActor(request);
+      return point ? [{ id: "address", name: parsed.data.query, address: parsed.data.query, point }] : [];
+    }
     const client = locationClient();
     const [address, places] = await Promise.allSettled([
       client.searchAddress(parsed.data.query), client.searchKeyword({ query: parsed.data.query }),

@@ -448,7 +448,10 @@ assertBudget(customerStylesheetGzipBytes <= 9.75 * 1024, `customer CSS gzip ${cu
 // initial, inventory, school/sales and stylesheet budgets remain unchanged.
 // Invoice planning reuses the customer schema/search boundary. The new split
 // measures 36,939B (+75B over its previous envelope); allocate 128B here only.
-assertBudget(customerJavascriptGzipBytes <= 36 * 1024 + 128, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 36KiB + 128B`);
+// Displayed-address directions add an authenticated lookup and guarded popup lifecycle.
+// Lookup code loads on click; the customer boundary measures 37,373B (+434B).
+// Allow 512B more here, preserving the existing delivery-photo and initial JS caps.
+assertBudget(customerJavascriptGzipBytes <= 36 * 1024 + 640, `deferred customer JavaScript gzip ${customerJavascriptGzipBytes}B exceeds 36KiB + 640B`);
 assertBudget(deliveryPhotoStylesheetRawBytes <= 6 * 1024, `delivery photo CSS raw ${deliveryPhotoStylesheetRawBytes}B exceeds 6KiB`);
 assertBudget(deliveryPhotoStylesheetGzipBytes <= 2 * 1024, `delivery photo CSS gzip ${deliveryPhotoStylesheetGzipBytes}B exceeds 2KiB`);
 // Only the planning entry and session/date-bound mount live in this workspace.
@@ -511,7 +514,7 @@ const report = {
     combinedSchoolStylesheetGzipBytes: (44.5 + 1.625) * 1024,
     customerStylesheetRawBytes: 48 * 1024,
     customerStylesheetGzipBytes: 9.75 * 1024,
-    customerJavascriptGzipBytes: 36 * 1024 + 128,
+    customerJavascriptGzipBytes: 36 * 1024 + 640,
     deliveryPhotoStylesheetRawBytes: 6 * 1024,
     deliveryPhotoStylesheetGzipBytes: 2 * 1024,
     deliveryPhotoJavascriptGzipBytes: 10 * 1024 + 256,
