@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { createRegisteredAddressResolver, registeredAddressQuery, registeredCustomerAddress, resolveRegisteredStops } from "../src/delivery-planning/registered-address.js";
+import { createRegisteredAddressResolver, customerRouteAddress, registeredAddressQuery, registeredCustomerAddress, resolveRegisteredStops } from "../src/delivery-planning/registered-address.js";
 
 const address = "대전 대덕구 우암동로17번길 10, 1층(비래동)";
 const document = { address_type: "ROAD_ADDR", x: "127.4518", y: "36.3598" };
 const payload = (documents = [document], count = documents.length) => ({ meta: { total_count: count }, documents });
 const response = (data: unknown) => ({ ok: true, status: 200, json: async () => data });
 describe("registered address routing", () => {
+  it("matches the customer screen address and only falls back when that address is blank", () => {
+    expect(customerRouteAddress({ deliveryAddress: "대전 대덕구 예시로 38", officialAddress: "예전동(메모)", district: "대덕구" })).toBe("대전 대덕구 예시로 38");
+    expect(customerRouteAddress({ deliveryAddress: "  ", officialAddress: "대전 중구 예시로 10", district: "중구" })).toBe("대전 중구 예시로 10");
+  });
   it("uses the saved district only to supplement abbreviated addresses", () => {
     expect(registeredCustomerAddress("오정동 69-1", "대덕구")).toBe("대덕구 오정동 69-1");
     expect(registeredCustomerAddress("대전 대덕구 오정동 69-1", "서구")).toBe("대전 대덕구 오정동 69-1");

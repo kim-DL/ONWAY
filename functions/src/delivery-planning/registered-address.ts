@@ -21,6 +21,11 @@ export function registeredCustomerAddress(address: string, district: string) {
     ? `${region} ${query}` : query;
 }
 
+export function customerRouteAddress(customer: { deliveryAddress: string; officialAddress: string; district: string }) {
+  // Match the address shown on customer cards/details. Stored map-pin coordinates are independent.
+  return registeredCustomerAddress(customer.deliveryAddress.trim() || customer.officialAddress.trim(), customer.district);
+}
+
 const coordinate = z.union([z.number(), z.string().trim().min(1).pipe(z.coerce.number())]);
 const responseSchema = z.object({
   meta: z.object({ total_count: z.number().int().nonnegative() }),

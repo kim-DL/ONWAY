@@ -10,7 +10,7 @@ import { deliveryPhotoDayResultSchema, deliveryPhotoRouteSchema } from "../deliv
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { matchInvoice, type MatchCustomer } from "./invoice-matching.js";
 import { invoiceImage, type PlanningProviders } from "./planning-providers.js";
-import { registeredCustomerAddress, resolveRegisteredStops } from "./registered-address.js";
+import { customerRouteAddress, resolveRegisteredStops } from "./registered-address.js";
 import {
   DEFAULT_ORIGIN_ADDRESS, DEFAULT_ORIGIN_POINT, DEFAULT_DELIVERY_VEHICLE, PLANNING_NOTICE, invoiceResultSchema, planningSettingsSchema, routeRecommendationSchema,
   type analyzeInvoiceSchema, type confirmInvoiceSchema, type recommendRouteSchema, type applyRecommendationSchema,
@@ -189,11 +189,11 @@ export class PlanningService {
     if (photos.some((p) => ids.includes(p.customerId))) throw new HttpsError("failed-precondition", "이미 납품사진이 있어요. 회사 출발 경로는 출발 전에 준비해주세요. 오늘 순서는 직접 편집할 수 있습니다.");
     const catalog = await this.customers(tx); const customers = ids.map((id) => catalog.find((c) => c.customerId === id));
     if (customers.some((c) => !c)) throw new HttpsError("failed-precondition", "오늘 목록의 거래처 정보를 새로 확인해주세요.");
-    const destinations = customers.map((c) => ({ customerId: c!.customerId, name: c!.name, address: registeredCustomerAddress(c!.officialAddress, c!.district) }));
+    const destinations = customers.map((c) => ({ customerId: c!.customerId, name: c!.name, address: customerRouteAddress(c!) }));
     const missing = destinations.filter((c) => !c.address);
     if (missing.length) throw new HttpsError("failed-precondition", `등록 주소를 확인해주세요: ${missing.slice(0, 3).map((c) => c.name).join(", ")}${missing.length > 3 ? ` 외 ${missing.length - 3}곳` : ""}`);
-    const basis = fingerprint({ locationSource: "registered-address-v1", settings, dayRevision: day!.get("revision") ?? null, ids,
-      customers: customers.map((c) => ({ id: c!.customerId, revision: c!.revision, address: c!.officialAddress.trim(), district: c!.district })) });
+    const basis = fingerprint({ locationSource: "displayed-address-v1", settings, dayRevision: day!.get("revision") ?? null, ids,
+      customers: customers.map((c) => ({ id: c!.customerId, revision: c!.revision, address: c!.deliveryAddress.trim() || c!.officialAddress.trim(), district: c!.district })) });
     return { settings, ids, destinations, basis, dayRevision: day!.get("revision") as number | undefined ?? null };
   }
   async recommend(input: z.infer<typeof recommendRouteSchema>, actor: CustomerActor) {

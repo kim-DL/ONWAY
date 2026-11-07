@@ -148,9 +148,11 @@ await test("registered address changes invalidate previous recommendation even w
 await test("registered addresses work without delivery coordinates and preserve customer data", async () => {
   const ref = db.doc(`companies/onnuri/customers/${a}`); const old = (await ref.get()).data()!;
   try {
-    await ref.update({ deliveryPoint: null, deliveryAddress: "다른 실제 납품 장소 123" });
+    await ref.update({ deliveryPoint: null, deliveryAddress: "대전 대덕구 예시로 38" });
     const before = (await ref.get()).data(); let calls = 0;
-    const addressService = new PlanningService({ ...providers, optimize: async (settings, stops, last, now) => {
+    const addressService = new PlanningService({ ...providers,
+      resolveAddress: async (address) => address === "대전 대덕구 예시로 38" ? { latitude: 36.6, longitude: 127.7 } : address === customers[0]!.officialAddress ? null : providers.resolveAddress(address),
+      optimize: async (settings, stops, last, now) => {
       calls++; assert.deepEqual(stops.find((stop) => stop.customerId === a), { customerId: a, latitude: 36.6, longitude: 127.7 });
       assert.notDeepEqual(stops.find((stop) => stop.customerId === b), { customerId: b, ...customers[1]!.deliveryPoint });
       return providers.optimize(settings, stops, last, now);
@@ -159,6 +161,8 @@ await test("registered addresses work without delivery coordinates and preserve 
     const recommendation = await addressService.recommend(request, routeStaff);
     assert.deepEqual(await addressService.recommend(request, routeStaff), recommendation); assert.equal(calls, 1);
     assert.deepEqual((await ref.get()).data(), before);
+    await ref.update({ deliveryAddress: "대전 대덕구 예시로 39" });
+    await assert.rejects(addressService.apply({ requestId: randomUUID(), recommendationId: recommendation.recommendationId, deliveryDateKey: date }, routeStaff), /바뀌/);
   } finally { await ref.set(old); }
 });
 await test("failed address lookup names customer and does not call route API", async () => {
