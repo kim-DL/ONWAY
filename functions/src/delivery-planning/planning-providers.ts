@@ -3,11 +3,13 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { detectPhotoContentType } from "../photo/photo-processor.js";
 import { INVOICE_MAX_BYTES, invoiceFieldsSchema, type InvoiceFields, type PlanningSettings } from "./planning-contract.js";
+import { createRegisteredAddressResolver, type AddressResolver } from "./registered-address.js";
 
 export type ProviderFetch = (url: string, init: RequestInit) => Promise<Pick<Response, "ok" | "status" | "json">>;
 export interface RouteStop { customerId: string; latitude: number; longitude: number }
 export interface OptimizedRoute { customerIds: string[]; totalSeconds: number; totalMeters: number }
 export interface PlanningProviders {
+  resolveAddress: AddressResolver;
   readInvoice(image: Buffer): Promise<InvoiceFields>;
   optimize(settings: PlanningSettings, stops: RouteStop[], lastId: string, now: Date): Promise<OptimizedRoute>;
 }
@@ -78,8 +80,9 @@ export function tmapRequest(settings: PlanningSettings, stops: RouteStop[], last
     viaPoints: stops.filter((s) => s.customerId !== lastId).map((s, index) => ({ viaPointId: s.customerId, viaPointName: `stop-${index + 1}`, viaX: String(s.longitude), viaY: String(s.latitude), viaTime: 0 })),
   };
 }
-export function createPlanningProviders(keys: { openai: () => string; tmap: () => string; model?: string }, fetcher: ProviderFetch = fetch): PlanningProviders {
+export function createPlanningProviders(keys: { openai: () => string; tmap: () => string; kakao?: () => string; model?: string }, fetcher: ProviderFetch = fetch): PlanningProviders {
   return {
+    resolveAddress: createRegisteredAddressResolver(keys.kakao ?? (() => ""), fetcher),
     async readInvoice(image) {
       const key = keys.openai().trim();
       if (!key) throw new HttpsError("failed-precondition", "명세서 인식 서비스 설정이 필요합니다. 관리자에게 알려주세요.");

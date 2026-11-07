@@ -28,6 +28,7 @@ const input = () => ({ requestId: randomUUID(), deliveryDateKey: date, contentTy
 const fieldsFor = (index: number): InvoiceFields => ({ recipientName: customers[index]!.name, recipientAddress: customers[index]!.officialAddress, invoiceDate: date, uncertain: false });
 let reads = 0, optimizations = 0; let fields = fieldsFor(0);
 const providers: PlanningProviders = {
+  async resolveAddress(address) { const index = customers.findIndex((c) => c.officialAddress === address); return index < 0 ? null : { latitude: 36.6 + index / 100, longitude: 127.7 + index / 100 }; },
   async readInvoice() { reads++; return fields; },
   async optimize(routeSettings, stops, last) { assert.deepEqual(routeSettings.vehicle, DEFAULT_DELIVERY_VEHICLE); optimizations++; return { customerIds: [...stops.filter((s) => s.customerId !== last).map((s) => s.customerId), last], totalSeconds: 1500, totalMeters: 8500 }; },
 };
@@ -136,10 +137,45 @@ await test("fixed last stop recommendation only changes today's order when appli
   const result = await service.apply(request, routeStaff); assert.deepEqual(result.customerIds, [b, a]);
   assert.deepEqual(await service.apply(request, routeStaff), result); assert.deepEqual((await routeRef(routeStaff).get()).data(), before);
 });
-await test("customer location changes invalidate previous recommendation", async () => {
+await test("registered address changes invalidate previous recommendation even without revision change", async () => {
   const recommendation = await service.recommend({ requestId: randomUUID(), deliveryDateKey: date, expectedDayRevision: 3, lastCustomerId: a }, routeStaff);
-  await db.doc(`companies/onnuri/customers/${a}`).update({ revision: 2 });
-  await assert.rejects(service.apply({ requestId: randomUUID(), recommendationId: recommendation.recommendationId, deliveryDateKey: date }, routeStaff), /바뀌/);
+  const ref = db.doc(`companies/onnuri/customers/${a}`); const old = (await ref.get()).data()!;
+  try {
+    await ref.update({ officialAddress: "변경된 주소 123" });
+    await assert.rejects(service.apply({ requestId: randomUUID(), recommendationId: recommendation.recommendationId, deliveryDateKey: date }, routeStaff), /바뀌/);
+  } finally { await ref.set(old); }
+});
+await test("registered addresses work without delivery coordinates and preserve customer data", async () => {
+  const ref = db.doc(`companies/onnuri/customers/${a}`); const old = (await ref.get()).data()!;
+  try {
+    await ref.update({ deliveryPoint: null, deliveryAddress: "다른 실제 납품 장소 123" });
+    const before = (await ref.get()).data(); let calls = 0;
+    const addressService = new PlanningService({ ...providers, optimize: async (settings, stops, last, now) => {
+      calls++; assert.deepEqual(stops.find((stop) => stop.customerId === a), { customerId: a, latitude: 36.6, longitude: 127.7 });
+      assert.notDeepEqual(stops.find((stop) => stop.customerId === b), { customerId: b, ...customers[1]!.deliveryPoint });
+      return providers.optimize(settings, stops, last, now);
+    } }, db, () => clock);
+    const request = { requestId: randomUUID(), deliveryDateKey: date, expectedDayRevision: 3, lastCustomerId: a };
+    const recommendation = await addressService.recommend(request, routeStaff);
+    assert.deepEqual(await addressService.recommend(request, routeStaff), recommendation); assert.equal(calls, 1);
+    assert.deepEqual((await ref.get()).data(), before);
+  } finally { await ref.set(old); }
+});
+await test("failed address lookup names customer and does not call route API", async () => {
+  const before = optimizations;
+  const unresolved = new PlanningService({ ...providers, resolveAddress: async () => null }, db, () => clock);
+  await assert.rejects(unresolved.recommend({ requestId: randomUUID(), deliveryDateKey: date, expectedDayRevision: 3, lastCustomerId: a }, routeStaff), /등록 주소를 확인해주세요: .*예시식품0/);
+  assert.equal(optimizations, before);
+});
+await test("address changes during geocoding block paid route call", async () => {
+  const ref = db.doc(`companies/onnuri/customers/${a}`); const old = (await ref.get()).data()!; const before = optimizations;
+  try {
+    const changing = new PlanningService({ ...providers, resolveAddress: async (address) => {
+      await ref.update({ officialAddress: "다른 주소 234" }); return providers.resolveAddress(address);
+    } }, db, () => clock);
+    await assert.rejects(changing.recommend({ requestId: randomUUID(), deliveryDateKey: date, expectedDayRevision: 3, lastCustomerId: a }, routeStaff), /바뀌/);
+    assert.equal(optimizations, before);
+  } finally { await ref.set(old); }
 });
 await test("shared daily TMAP cap blocks calls", async () => {
   const before = optimizations; await db.doc("deliveryPlanningRates/route_company").set({ date, count: 45 });

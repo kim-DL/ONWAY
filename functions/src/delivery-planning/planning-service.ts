@@ -3,13 +3,14 @@ import { Timestamp, type Firestore, type Transaction, type DocumentData } from "
 import { HttpsError } from "firebase-functions/v2/https";
 import type { z } from "zod";
 import { verifyCustomerTransactionActor, type CustomerActor } from "../customer/customer-authorization.js";
-import { CUSTOMER_COLLECTION_PATH, customerPointSchema } from "../customer/customer-contract.js";
+import { CUSTOMER_COLLECTION_PATH } from "../customer/customer-contract.js";
 import { deliveryDateKeyInSeoul } from "../delivery-photo/delivery-photo-service.js";
 import { DELIVERY_PHOTO_DAY_PATH, DELIVERY_PHOTO_PATH, DELIVERY_PHOTO_ROUTE_PATH } from "../delivery-photo/delivery-photo-store.js";
 import { deliveryPhotoDayResultSchema, deliveryPhotoRouteSchema } from "../delivery-photo/delivery-photo-contract.js";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { matchInvoice, type MatchCustomer } from "./invoice-matching.js";
-import { invoiceImage, type PlanningProviders, type RouteStop } from "./planning-providers.js";
+import { invoiceImage, type PlanningProviders } from "./planning-providers.js";
+import { registeredCustomerAddress, resolveRegisteredStops } from "./registered-address.js";
 import {
   DEFAULT_ORIGIN_ADDRESS, DEFAULT_ORIGIN_POINT, DEFAULT_DELIVERY_VEHICLE, PLANNING_NOTICE, invoiceResultSchema, planningSettingsSchema, routeRecommendationSchema,
   type analyzeInvoiceSchema, type confirmInvoiceSchema, type recommendRouteSchema, type applyRecommendationSchema,
@@ -76,13 +77,12 @@ export class PlanningService {
     if (result.size > 2000) throw new HttpsError("resource-exhausted", "오늘 기록이 많아 자동 목록을 준비하지 못했습니다. 수동 편집을 이용해주세요.");
     return result.docs.map((doc) => doc.data()).filter((p) => p.status === "active" && p.expiresAt instanceof Timestamp && p.expiresAt.toMillis() > this.clock().toMillis());
   }
-  private async customers(tx: Transaction): Promise<Array<MatchCustomer & { revision: number; point: z.infer<typeof customerPointSchema> | null }>> {
+  private async customers(tx: Transaction): Promise<Array<MatchCustomer & { revision: number; district: string }>> {
     const result = await tx.get(this.db.collection(CUSTOMER_COLLECTION_PATH).limit(5001));
     if (result.size > 5000) throw new HttpsError("resource-exhausted", "거래처 목록을 자동 확인할 수 없습니다.");
     return result.docs.filter((doc) => doc.get("status") === "active" && doc.get("companyId") === "onnuri" && doc.get("customerId") === doc.id)
       .map((doc) => ({ customerId: doc.id, name: String(doc.get("name") ?? ""), officialAddress: String(doc.get("officialAddress") ?? ""),
-        deliveryAddress: String(doc.get("deliveryAddress") ?? ""), revision: Number(doc.get("revision")),
-        point: customerPointSchema.safeParse(doc.get("deliveryPoint")).data ?? null }));
+        deliveryAddress: String(doc.get("deliveryAddress") ?? ""), revision: Number(doc.get("revision")), district: String(doc.get("district") ?? "") }));
   }
   // All reads precede writes. Addition merges the latest state rather than replacing a stale client snapshot.
   private async addCustomer(tx: Transaction, actor: CustomerActor, customerId: string, date: string): Promise<PlanningLists> {
@@ -188,10 +188,13 @@ export class PlanningService {
     const photos = await this.photos(tx, date);
     if (photos.some((p) => ids.includes(p.customerId))) throw new HttpsError("failed-precondition", "이미 납품사진이 있어요. 회사 출발 경로는 출발 전에 준비해주세요. 오늘 순서는 직접 편집할 수 있습니다.");
     const catalog = await this.customers(tx); const customers = ids.map((id) => catalog.find((c) => c.customerId === id));
-    if (customers.some((c) => !c?.point)) throw new HttpsError("failed-precondition", "오늘 납품처 중 위치가 없는 거래처가 있어요. 거래처의 실제 납품 위치를 먼저 등록해주세요.");
-    const stops: RouteStop[] = customers.map((c) => ({ customerId: c!.customerId, ...c!.point! }));
-    const basis = fingerprint({ settings, dayRevision: day!.get("revision") ?? null, ids, customers: customers.map((c) => ({ id: c!.customerId, revision: c!.revision, point: c!.point })) });
-    return { settings, ids, stops, basis, dayRevision: day!.get("revision") as number | undefined ?? null };
+    if (customers.some((c) => !c)) throw new HttpsError("failed-precondition", "오늘 목록의 거래처 정보를 새로 확인해주세요.");
+    const destinations = customers.map((c) => ({ customerId: c!.customerId, name: c!.name, address: registeredCustomerAddress(c!.officialAddress, c!.district) }));
+    const missing = destinations.filter((c) => !c.address);
+    if (missing.length) throw new HttpsError("failed-precondition", `등록 주소를 확인해주세요: ${missing.slice(0, 3).map((c) => c.name).join(", ")}${missing.length > 3 ? ` 외 ${missing.length - 3}곳` : ""}`);
+    const basis = fingerprint({ locationSource: "registered-address-v1", settings, dayRevision: day!.get("revision") ?? null, ids,
+      customers: customers.map((c) => ({ id: c!.customerId, revision: c!.revision, address: c!.officialAddress.trim(), district: c!.district })) });
+    return { settings, ids, destinations, basis, dayRevision: day!.get("revision") as number | undefined ?? null };
   }
   async recommend(input: z.infer<typeof recommendRouteSchema>, actor: CustomerActor) {
     const initial = await this.db.runTransaction(async (tx) => { await this.authorize(tx, actor); return this.routeBasis(tx, actor, input.deliveryDateKey); });
@@ -199,7 +202,10 @@ export class PlanningService {
     const hash = fingerprint(input);
     const cached = await this.reserve(actor, input.requestId, "route", hash, input.deliveryDateKey);
     if (cached) return routeRecommendationSchema.parse(cached);
-    const optimized = await this.providers.optimize(initial.settings, initial.stops, input.lastCustomerId, this.clock().toDate());
+    const stops = await resolveRegisteredStops(initial.destinations, this.providers.resolveAddress);
+    // Address lookup is outside transactions. Recheck before the route API as well as after it.
+    await this.db.runTransaction(async (tx) => { await this.authorize(tx, actor); if (initial.basis !== (await this.routeBasis(tx, actor, input.deliveryDateKey)).basis) throw conflict(); });
+    const optimized = await this.providers.optimize(initial.settings, stops, input.lastCustomerId, this.clock().toDate());
     return this.db.runTransaction(async (tx) => {
       await this.authorize(tx, actor);
       const current = await this.routeBasis(tx, actor, input.deliveryDateKey);
