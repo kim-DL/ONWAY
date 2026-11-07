@@ -1,13 +1,13 @@
 .workspace{min-width:0;max-width:48rem;margin:0 auto;padding:1rem}
-.header{display:grid;gap:.2rem;margin-bottom:.65rem}
-.header h1{margin:0;font-size:1.65rem;line-height:1.2}
-.summary{display:flex;align-items:center;justify-content:space-between;gap:.4rem;min-width:0}
-.summary strong{font-size:.9rem;font-weight:750;line-height:1.4}
+.header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.5rem;margin-bottom:.65rem}
+.header h1{margin:0;font-size:1.5rem;line-height:1.2}
+.summary{display:grid;gap:.2rem;min-width:0}
+.summary strong{font-size:.78rem;color:#52687c;line-height:1.4}
 .workspace button{min-width:44px;min-height:44px;border:0;border-radius:9px;padding:.45rem .65rem;background:transparent;color:var(--mode-customer-text);font-weight:750;cursor:pointer}
-.workspace :is(.summary,.secondaryActions,.notice) button{border:1px solid #cbd6e9;background:#fff;box-shadow:0 3px #d5dfef}
+.workspace :is(.header,.secondaryActions,.notice) button{border:1px solid #cbd6e9;background:#fff;box-shadow:0 3px #d5dfef}
 .workspace button:disabled{opacity:.5;cursor:default}
 :is(.workspace,.editorContent,.actions) button:focus-visible,.search input:focus-visible,.completed summary:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}
-.search{display:block;margin-bottom:.9rem}
+.search{display:block;margin-bottom:.5rem}
 .search input{width:100%;min-width:0;min-height:48px;border:1px solid #cbd6e9;border-radius:11px;padding:.55rem .8rem;background:#fff;font-size:1rem}
 .srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .section{min-width:0;margin:.7rem 0 1rem}

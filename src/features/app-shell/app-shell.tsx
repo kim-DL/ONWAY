@@ -473,8 +473,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   } else if (view === "settings") {
     content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : mode === "customer" ? { onBack: closeCustomerPage, backLabel: "거래처로 돌아가기" } : {})} />;
   } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
-    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto}
-      backAction={<GlassButton compact variant="quiet" onClick={closeCustomerPage} aria-label="거래처로 돌아가기" title="거래처로 돌아가기"><Icon name="return-refined" />거래처</GlassButton>} />;
+    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} />;
   } else if (mode === "customer") {
     content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session}
       requestedCustomerId={customerDetailRequest}
@@ -496,6 +495,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         mode={mode}
         availableModes={availableModes}
         onModeChange={changeMode}
+        onActiveModeClick={mode === "customer" && view === "activity" ? closeCustomerPage : undefined}
         onDetailBack={selectedSchool ? closeSchool : undefined}
       />
       {mode !== "inventory" && mode !== "customer" ? <ShellNavigation mode={mode} view={view} onNavigate={navigate} /> : null}

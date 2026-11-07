@@ -27,7 +27,8 @@ export const customerRepository = { save: blockedWrite, reverseLocation: blocked
 export const customerErrorMessage = () => "미리보기에서는 조회·저장을 서버에 요청하지 않습니다.";
 export function useDeliveryPhotoData() {
   const deliveryDateKey = deliveryPhotoDateKey();
-  return { snapshot: { route: null, day: { deliveryDateKey, revision: 1, isOverride: false, customerIds: [] },
+  const customerIds = new URLSearchParams(location.search).has("photoSamples") ? customers.slice(0, 8).map(customer => customer.customerId) : [];
+  return { snapshot: { route: null, day: { deliveryDateKey, revision: 1, isOverride: customerIds.length > 0, customerIds },
     today: { deliveryDateKey, customers: [], truncated: false }, refreshedAt: Date.now() }, loading: false, error: "", clear() {}, accept() {}, refresh() {} };
 }
 export function useDeliveryPhotoCatalog() { return { customers, status: "ready", retry() {} }; }

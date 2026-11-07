@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { searchInputProps } from "@/components/ui/search-input-props";
 import { LoadingStatus } from "@/components/ui/loading-status";
@@ -26,7 +26,7 @@ const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu")
 const DeliveryPhotoUploadPanel = dynamic(() => import("./delivery-photo-upload-panel"), { ssr: false });
 const PlanningEntry = dynamic(() => import("../delivery-planning/planning-entry"), { ssr: false });
 
-export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backAction }: { session: AuthenticatedSession; onOpenCustomerDetail?: (customerId: string) => void; backAction?: ReactNode }) {
+export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { session: AuthenticatedSession; onOpenCustomerDetail?: (customerId: string) => void }) {
   const data = useDeliveryPhotoData(session);
   const snapshot = data.snapshot;
   const catalog = useDeliveryPhotoCatalog(session, data.clear);
@@ -89,9 +89,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
 
   return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
     <header className={styles.header}>
-      <h1 id="delivery-photo-heading">납품사진</h1>{backAction}
-      <div className={styles.summary}><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong>
-        {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
+      <div className={styles.summary}><h1 id="delivery-photo-heading">납품사진</h1><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong></div>
+      {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}
     </header>
     {ready && snapshot ? <PlanningEntry key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${snapshot.day.deliveryDateKey}`}
       customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh}

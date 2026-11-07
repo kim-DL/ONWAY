@@ -20,7 +20,8 @@ const launchLogo = "/brand/onnuri-food-logo-auth.webp";
 const glassAssets = ["/ui/mode-glass-three-v2.webp", "/ui/mode-glass-four-v2.webp"];
 const ceramicAssets = ["search", "directory", "camera", "register"].map((name) => `/ui/customer-ceramic-${name}-v1.webp`);
 const panelAssets = [...glassAssets, ...ceramicAssets];
-const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...panelAssets, ...expectedIcons.keys()]);
+const planningIcons = ["/ui/delivery-invoice-stack.svg", "/ui/delivery-smart-route.svg"];
+const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...panelAssets, ...planningIcons, ...expectedIcons.keys()]);
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -143,7 +144,7 @@ async function verifyLocal() {
     check(pathname.startsWith("/_next/static/") || publicFiles.has(pathname), `Unexpected precached response: ${pathname}.`);
     check((await stat(outputFile(pathname))).isFile(), `Precached asset is missing from out: ${pathname}.`);
   }
-  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...panelAssets, ...manifest.icons.map((icon) => icon.src)])
+  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...panelAssets, ...planningIcons, ...manifest.icons.map((icon) => icon.src)])
     check(precached.includes(pathname), `PWA installation asset is not precached: ${pathname}.`);
   check(!precached.some((pathname) => pathname.startsWith("/api/") || pathname.startsWith("/__/")), "Connectivity and private/server responses must never be precached.");
 
@@ -163,6 +164,11 @@ async function verifyLocal() {
     check(sha256(bytes) === sha256(await readFile(join(root, "public", pathname))), `Exported panel asset differs from the reviewed asset: ${pathname}.`);
   }
   const initialAssets = [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+\.(?:js|css))(?:\?[^" ]*)?"/gu)].map((match) => match[1]))];
+  for (const pathname of planningIcons) {
+    const bytes = await readFile(outputFile(pathname));
+    check(bytes.length <= 4 * 1024 && bytes.toString().startsWith("<svg "), `${pathname} must be a lightweight SVG.`);
+    check(sha256(bytes) === sha256(await readFile(join(root, "public", pathname))), `Exported planning icon differs: ${pathname}.`);
+  }
   check(initialAssets.some((asset) => asset.endsWith(".js")) && initialAssets.some((asset) => asset.endsWith(".css")), "Initial JavaScript/CSS assets were not found in the exported HTML.");
   for (const asset of initialAssets) {
     check((await stat(outputFile(asset))).isFile(), `Initial asset is missing: ${asset}.`);
@@ -203,6 +209,11 @@ async function verifyRemote(base, local) {
     const material = await request(pathname, "GET");
     assertMime(material.headers, /^image\/webp\b/i, pathname);
     check(sha256(Buffer.from(await material.arrayBuffer())) === sha256(await readFile(outputFile(pathname))), `Remote panel asset differs from this build: ${pathname}.`);
+  }
+  for (const pathname of planningIcons) {
+    const icon = await request(pathname, "GET");
+    assertMime(icon.headers, /^image\/svg\+xml\b/i, pathname);
+    check(sha256(Buffer.from(await icon.arrayBuffer())) === sha256(await readFile(outputFile(pathname))), `Remote planning icon differs: ${pathname}.`);
   }
   for (const pathname of local.initialAssets) {
     const asset = await request(pathname);

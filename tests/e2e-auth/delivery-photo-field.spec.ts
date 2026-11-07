@@ -487,7 +487,7 @@ test("P0: switching workspace during native file copying preserves the photo", a
   const buffer = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#82a4b2" } }).jpeg().toBuffer();
   try {
     await chooseRowPhoto(page, "대전식품", "카메라 촬영", buffer, "slow-copy.jpg");
-    await page.getByRole("button", { name: "거래처로 돌아가기", exact: true }).click();
+    await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "거래처", exact: true }).click();
     await expect.poll(async () => (await db().collection("companies/onnuri/deliveryPhotos").where("customerId", "==", ids[1]).get()).size, { timeout: 30_000 }).toBe(1);
     await openPhotoWorkspace(page);
     await expect(page.getByRole("region", { name: "촬영 사진과 저장 상태" }).getByText("✓ 저장 완료", { exact: true })).toBeVisible();
@@ -961,7 +961,7 @@ test("field route, completion, search, today override and reorder survive re-ent
   await page.keyboard.press("Enter");
   await reorder.getByRole("button", { name: "저장", exact: true }).click();
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
-  await page.getByRole("button", { name: "거래처로 돌아가기", exact: true }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "거래처", exact: true }).click();
   await openPhotoWorkspace(page);
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
   await expect(page.getByRole("region", { name: "오늘 남은 납품처" }).getByText("대전식품")).toHaveCount(0);

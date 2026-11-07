@@ -13,9 +13,12 @@ export default function PlanningEntry({ customers, snapshot, accept, refresh, on
 }) {
   const [open, setOpen] = useState<"invoice" | "route" | null>(null);
   return <><div className={styles.entries}><button type="button" className={styles.entry} onClick={() => setOpen("invoice")}>
-    <span aria-hidden="true">▤</span><span><strong>명세서로 등록</strong></span><span aria-hidden="true">›</span>
-  </button><button type="button" className={styles.entry} onClick={() => setOpen("route")}>
-    <span aria-hidden="true">↗</span><span><strong>인공지능 경로 추천</strong></span><span aria-hidden="true">›</span>
+    {/* Static vectors retain their dimensions before the deferred stylesheet loads. */}
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src="/ui/delivery-invoice-stack.svg" width="72" height="58" alt="" aria-hidden="true" /><strong>명세서로 등록</strong>
+  </button><button type="button" className={`${styles.entry} ${styles.route}`} onClick={() => setOpen("route")}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src="/ui/delivery-smart-route.svg" width="72" height="58" alt="" aria-hidden="true" /><strong>인공지능 경로 추천</strong>
   </button></div>{open && <Sheet mode={open} customers={customers} day={snapshot.day} onClose={() => setOpen(null)} onRefresh={refresh}
     onEditToday={() => { setOpen(null); onEditToday(() => setOpen("route")); }}
     onLists={(lists) => accept((current) => ({ ...current,

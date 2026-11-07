@@ -19,11 +19,12 @@ const GLASS_MATERIALS = {
   "--glass-four": 'url("/ui/mode-glass-four-v2.webp")',
 } as CSSProperties;
 
-export function ShellHeader({ mode, availableModes, onModeChange, onDetailBack }: {
+export function ShellHeader({ mode, availableModes, onModeChange, onDetailBack, onActiveModeClick }: {
   mode: WorkMode;
   availableModes: readonly WorkMode[];
   onModeChange: (mode: WorkMode) => void;
   onDetailBack?: (() => void) | undefined;
+  onActiveModeClick?: (() => void) | undefined;
 }) {
   const options = MODE_OPTIONS.filter((option) => availableModes.includes(option.value));
 
@@ -44,7 +45,7 @@ export function ShellHeader({ mode, availableModes, onModeChange, onDetailBack }
               data-mode={option.value}
               aria-pressed={option.value === mode}
               aria-label={option.label}
-              onClick={() => { if (option.value !== mode) onModeChange(option.value); }}
+              onClick={() => { if (option.value !== mode) onModeChange(option.value); else onActiveModeClick?.(); }}
             >
               <span className={styles.glassSurface} aria-hidden="true"><span className={styles.glassMaterial} /></span>
               <span className={styles.modeLabel}>{option.label}</span>

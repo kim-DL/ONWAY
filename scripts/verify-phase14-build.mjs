@@ -21,6 +21,8 @@ for (const required of [
   "customer-ceramic-directory-v1.webp",
   "customer-ceramic-camera-v1.webp",
   "customer-ceramic-register-v1.webp",
+  "delivery-invoice-stack.svg",
+  "delivery-smart-route.svg",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {
