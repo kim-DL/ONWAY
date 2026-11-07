@@ -39,6 +39,7 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
   const [busy, setBusy] = useState(false); const running = useRef(false); const alive = useRef(true);
   const [error, setError] = useState(""); const [lastId, setLastId] = useState("");
   const [recommendation, setRecommendation] = useState<RouteRecommendation | null>(null); const [applied, setApplied] = useState(false);
+  const applyRequest = useRef<{ recommendationId: string; requestId: string } | null>(null);
   const camera = useRef<HTMLInputElement>(null); const gallery = useRef<HTMLInputElement>(null);
   const activeCustomers = customers.filter((c) => c.status === "active");
   const today = day.customerIds.map((id) => activeCustomers.find((c) => c.customerId === id)).filter((c): c is Customer => Boolean(c));
@@ -89,6 +90,15 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
     try { await work(); } catch (e) { if (alive.current) { setError(planningError(e)); onRefresh(); } }
     finally { running.current = false; if (alive.current) setBusy(false); }
   };
+  const applyRecommendation = async (route: RouteRecommendation) => {
+    if (!alive.current) return;
+    // Reuse the receipt after a lost response; never repeat the paid route calculation to retry saving.
+    if (applyRequest.current?.recommendationId !== route.recommendationId) {
+      applyRequest.current = { recommendationId: route.recommendationId, requestId: crypto.randomUUID() };
+    }
+    const result = await repository.apply({ ...applyRequest.current, deliveryDateKey: route.deliveryDateKey });
+    if (alive.current) { onDay(result); setApplied(true); }
+  };
   const canRecommend = context?.settings.originPoint && today.length >= 2 && today.length <= 20 && today.some((c) => c.customerId === lastId) && !reviews && !scans.some((s) => s.state === "failed");
   const guard = () => !scans.some((s) => s.result?.status === "review" || s.state === "failed") || window.confirm("확인하지 않은 명세서 사진은 보관되지 않습니다. 이미 저장한 납품처는 유지하고 닫을까요?");
 
@@ -131,8 +141,9 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
           {context?.canConfigure && <button type="button" className={styles.textButton} disabled={busy} onClick={() => setConfiguring(true)}>회사 출발지 설정</button>}
           {!context && <button type="button" disabled={busy} onClick={() => void loadContext()}>출발지 설정 다시 확인</button>}
           <button type="button" className={styles.recommendButton} disabled={busy || !canRecommend} onClick={() => void action(async () => {
+            setRecommendation(null); setApplied(false);
             const result = await repository.recommend({ requestId: crypto.randomUUID(), deliveryDateKey: day.deliveryDateKey, expectedDayRevision: day.revision, lastCustomerId: lastId });
-            if (alive.current) { setRecommendation(result); setApplied(false); }
+            if (alive.current) { setRecommendation(result); await applyRecommendation(result); }
           })}>{busy ? "처리 중…" : recommendation ? "인공지능으로 다시 계산" : "인공지능 경로 추천"}</button>
           {reviews > 0 && <p className={styles.hint}>확인이 필요한 명세서를 먼저 연결해주세요.</p>}
           {today.length > 20 && <p className={styles.hint}>경로 추천은 한 번에 20곳까지 지원해요. 오늘 순서 편집을 이용해주세요.</p>}
@@ -140,7 +151,7 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
             <div className={styles.routeStats}><span>예상 이동<strong>{Math.ceil(recommendation.totalSeconds / 60)}<small>분</small></strong></span><span>전체 거리<strong>{(recommendation.totalMeters / 1000).toFixed(1)}<small>km</small></strong></span></div>
             <p className={styles.hint}>하차·납품 시간 제외</p>
             <ol className={styles.routeList}>{recommendation.customerIds.map((id, index) => <li key={id}><span>{index + 1}</span><div><strong>{activeCustomers.find((c) => c.customerId === id)?.name ?? "거래처"}</strong>{index === recommendation.customerIds.length - 1 && <small>마지막 납품처</small>}</div></li>)}</ol>
-            <button type="button" className={styles.primary} disabled={busy || applied} onClick={() => void action(async () => { const result = await repository.apply({ requestId: crypto.randomUUID(), recommendationId: recommendation.recommendationId, deliveryDateKey: day.deliveryDateKey }); if (alive.current) { onDay(result); setApplied(true); } })}>{applied ? "오늘 순서에 적용했어요" : "이 순서를 오늘 목록에 적용"}</button>
+            <button type="button" className={styles.primary} disabled={busy || applied} onClick={() => void action(() => applyRecommendation(recommendation))}>{applied ? "오늘 순서에 적용했어요" : busy ? "오늘 목록에 저장 중…" : "오늘 목록 저장 다시 시도"}</button>
             {applied && onEditToday && <button type="button" className={styles.editOrder} disabled={busy} onClick={onEditToday}>순서 직접 바꾸기</button>}
           </div>}
         </section>

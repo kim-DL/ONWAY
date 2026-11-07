@@ -23,11 +23,43 @@ test("scanning auto saves; last stop remains fixed; repeated viewing does not ca
   await page.getByRole("button", { name: "인공지능 경로 추천" }).click();
   await expect(page.getByText("예상 이동")).toContainText("82");
   await expect(page.getByRole("list").last().getByRole("listitem").last()).toContainText("예시푸드");
-  await page.getByRole("button", { name: "이 순서를 오늘 목록에 적용" }).click();
   await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
   expect(await page.evaluate(() => (window as unknown as { planningPreviewStats: () => { recommendCount: number } }).planningPreviewStats().recommendCount)).toBe(1);
   expect(await page.evaluate(async () => ({ local: localStorage.length, session: sessionStorage.length, databases: (await indexedDB.databases()).length }))).toEqual({ local: 0, session: 0, databases: 0 });
+  await page.getByRole("button", { name: "완료", exact: true }).click();
+  await expect(page.getByRole("list", { name: "오늘 남은 납품처", exact: true }).getByRole("listitem")).toHaveText(["늘봄식품", "한빛유통", "예시푸드"]);
 });
+
+test("recommendation saves before completion and keeps photo-completed customers out of remaining stops", async ({ page }) => {
+  await open(page, "?route&completed&slowSave");
+  await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-0");
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await expect(page.getByText("예상 이동")).toBeVisible();
+  await expect(page.getByRole("button", { name: "오늘 목록에 저장 중…" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
+  await page.getByRole("button", { name: "완료", exact: true }).click();
+  await expect(page.getByRole("list", { name: "오늘 남은 납품처", exact: true }).getByRole("listitem")).toHaveText(["정다운푸드", "푸른급식", "늘봄식품", "예시푸드"]);
+});
+
+for (const failure of ["failSave", "lostResponse"]) {
+  test(`${failure}: retries the same save receipt without recalculating the route`, async ({ page }) => {
+    await open(page, `?route&${failure}`);
+    await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-0");
+    await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toHaveCount(0);
+    if (failure === "failSave") {
+      await expect(page.locator('ol[aria-label="오늘 남은 납품처"] li')).toHaveText(["예시푸드", "한빛유통", "늘봄식품", "푸른급식", "정다운푸드"]);
+    }
+    await page.getByRole("button", { name: "오늘 목록 저장 다시 시도" }).click();
+    await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
+    const requests = await page.evaluate(() => (window as unknown as { planningApplyRequests: () => string[] }).planningApplyRequests());
+    expect(requests).toHaveLength(2); expect(requests[0]).toBe(requests[1]);
+    expect(await page.evaluate(() => (window as unknown as { planningPreviewStats: () => { recommendCount: number } }).planningPreviewStats().recommendCount)).toBe(1);
+    await page.getByRole("button", { name: "완료", exact: true }).click();
+    await expect(page.getByRole("list", { name: "오늘 남은 납품처", exact: true }).getByRole("listitem")).toHaveText(["정다운푸드", "푸른급식", "늘봄식품", "한빛유통", "예시푸드"]);
+  });
+}
 test("wrong date requires confirmation; only origin setup is needed with the default truck", async ({ page }) => {
   await open(page, "?empty&review&unconfigured"); await photos(page, 2);
   await expect(page.getByText("1곳 저장 · 1장 확인 필요")).toBeVisible();
@@ -67,7 +99,7 @@ test("manual search additions can be recommended and reordered without another A
   await expect(page.getByRole("list", { name: "현재 오늘 납품처" }).getByRole("listitem")).toHaveCount(3);
   await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-0");
   await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
-  await page.getByRole("button", { name: "이 순서를 오늘 목록에 적용" }).click();
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
   await page.getByRole("button", { name: "순서 직접 바꾸기" }).click();
   const order = page.getByRole("list", { name: "오늘 납품 순서" });
   await expect(order.getByRole("listitem").last()).toContainText("예시푸드");
