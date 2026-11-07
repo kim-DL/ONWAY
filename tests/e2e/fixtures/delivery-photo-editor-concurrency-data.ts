@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { getCustomerChoseong, normalizeCustomerName, type Customer } from "../../../src/domain/customer";
 import type { AuthenticatedSession } from "../../../src/features/auth/auth-context";
 import { deliveryPhotoDateKey, type DeliveryPhotoSnapshot } from "../../../src/features/delivery-photos/delivery-photo-memory";
+import { DEFAULT_DELIVERY_VEHICLE, DEFAULT_ORIGIN_ADDRESS } from "../../../src/domain/delivery-planning";
 
 type SaveInput = { requestId: string; expectedRevision: number | null; customerIds: string[] };
 type SaveRequest = SaveInput & { mode: "route" | "day" };
@@ -79,3 +80,16 @@ async function save(input: SaveInput, target: "route" | "day") {
 }
 export const deliveryPhotoRepository = { saveRoute: (input: SaveInput) => save(input, "route"), saveDay: (input: SaveInput) => save(input, "day") };
 export const deliveryPhotoErrorKind = (error: { code?: string }) => error.code === "functions/aborted" ? "conflict" : "temporary";
+
+let recommendedIds: string[] = [];
+export const planningError = (error: Error) => error.message;
+export const planningRepository = {
+  context: async () => ({ canConfigure: false, settings: { revision: 1, originAddress: DEFAULT_ORIGIN_ADDRESS,
+    originPoint: { latitude: 36.3, longitude: 127.4 }, vehicle: DEFAULT_DELIVERY_VEHICLE } }),
+  recommend: async ({ lastCustomerId }: { lastCustomerId: string }) => {
+    recommendedIds = [...snapshot.day.customerIds.filter((id) => id !== lastCustomerId).reverse(), lastCustomerId];
+    return { recommendationId: "fixture-recommendation", deliveryDateKey: date, customerIds: recommendedIds,
+      totalSeconds: 600, totalMeters: 3000, calculatedAt: new Date().toISOString(), notice: "" };
+  },
+  apply: async () => save({ requestId: "fixture-apply", expectedRevision: serverRevision, customerIds: recommendedIds }, "day"),
+};

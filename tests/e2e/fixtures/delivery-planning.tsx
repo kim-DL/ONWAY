@@ -4,6 +4,8 @@ import DeliveryPlanningSheet from "../../../src/features/delivery-planning/deliv
 import { type PlanningRepository } from "../../../src/features/delivery-planning/planning-repository";
 import { DEFAULT_ORIGIN_ADDRESS, DEFAULT_DELIVERY_VEHICLE, PLANNING_NOTICE, type InvoiceResult, type PlanningSettings, type PlanningLists, type RouteRecommendation } from "../../../src/domain/delivery-planning";
 import type { Customer } from "../../../src/domain/customer";
+import type { AuthenticatedSession } from "../../../src/features/auth/auth-context";
+import DeliveryPhotoEditor from "../../../src/features/delivery-photos/delivery-photo-editor";
 
 const date = "2026-11-07"; const params = new URLSearchParams(location.search);
 const names = ["예시푸드", "한빛유통", "늘봄식품", "푸른급식", "정다운푸드"];
@@ -42,12 +44,19 @@ const repository: PlanningRepository = {
 };
 function Preview() {
   const [day, setDay] = useState(lists.day); const [open, setOpen] = useState(true);
+  const [mode, setMode] = useState<"invoice" | "route">(params.has("route") ? "route" : "invoice");
+  const [editing, setEditing] = useState(false);
+  const session = { uid: "preview", claims: { sessionVersion: 1, permissionsVersion: 1 } } as AuthenticatedSession;
   return <main style={{ maxWidth: 600, margin: "0 auto", padding: "24px 20px", color: "#30475d" }}>
     <p style={{ fontSize: 12, background: "#e9eff5", padding: 12, borderRadius: 8 }}>로컬 미리보기 · 예시 거래처 / 모의 분석·경로 · 운영 데이터와 연결하지 않습니다.</p>
     <h1 style={{ fontSize: 24, fontWeight: 750, margin: "24px 0" }}>납품사진</h1>
     <button type="button" onClick={() => setOpen(true)} style={{ width: "100%", padding: 18, border: "1px solid #c0d0df", borderRadius: 12, background: "#eaf1f7", color: "#3d6387", fontWeight: 700 }}>명세서로 납품 준비</button>
     <h2 style={{ margin: "24px 0 8px" }}>오늘 남은 납품처 {day.customerIds.length}곳</h2><ol>{day.customerIds.map((id) => <li key={id} style={{ padding: 16, borderBottom: "1px solid #d5dfe8" }}>{customers.find((c) => c.customerId === id)?.name}</li>)}</ol>
-    {open && <DeliveryPlanningSheet customers={customers} day={day} repository={repository} onLists={(value) => setDay(value.day)} onDay={setDay} onRefresh={() => setDay(lists.day)} onClose={() => setOpen(false)} />}
+    {open && <DeliveryPlanningSheet mode={mode} customers={customers} day={day} repository={repository} onLists={(value) => setDay(value.day)} onDay={setDay} onRefresh={() => setDay(lists.day)} onClose={() => setOpen(false)}
+      onEditToday={() => { setOpen(false); setEditing(true); }} />}
+    {editing && <DeliveryPhotoEditor mode="day" session={session} customers={customers} initialIds={day.customerIds} revision={day.revision}
+      onSave={async (ids, revision) => { if (revision !== lists.day.revision) return "conflict"; lists = { ...lists, day: { ...lists.day, customerIds: [...ids], revision: (revision ?? 0) + 1 } }; setDay(lists.day); return "saved"; }}
+      onClose={() => { setEditing(false); setMode("route"); setOpen(true); }} />}
   </main>;
 }
 createRoot(document.getElementById("root")!).render(<Preview />);

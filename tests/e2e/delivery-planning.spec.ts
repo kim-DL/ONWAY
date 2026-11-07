@@ -10,7 +10,7 @@ async function open(page: import("@playwright/test").Page, params = "") {
     return route.abort();
   });
   await page.goto(`http://127.0.0.1:3197/${params}`);
-  await expect(page.getByRole("dialog", { name: "명세서로 납품 준비" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: params.includes("route") ? "인공지능 경로 추천" : "명세서로 납품 준비" })).toBeVisible();
 }
 async function photos(page: import("@playwright/test").Page, count: number) {
   const buffer = await sharp({ create: { width: 160, height: 120, channels: 3, background: "white" } }).jpeg().toBuffer();
@@ -54,4 +54,27 @@ test("mobile layout fits 320px and exposes clear errors without saving files", a
   await page.getByLabel("명세서 갤러리", { exact: true }).setInputFiles({ name: "invalid.txt", mimeType: "text/plain", buffer: Buffer.from("not an invoice") });
   await expect(page.getByRole("alert")).toContainText("JPEG·PNG·WebP");
   await expect(page.getByRole("button", { name: "완료", exact: true })).toBeEnabled();
+});
+test("manual search additions can be recommended and reordered without another API call", async ({ page }) => {
+  await open(page, "?route&empty");
+  await expect(page.getByRole("button", { name: "명세서 촬영" })).toHaveCount(0);
+  await page.getByRole("button", { name: "납품처 추가 · 순서 편집" }).click();
+  for (const name of ["예시푸드", "한빛유통", "늘봄식품"]) {
+    await page.getByRole("searchbox", { name: "거래처 검색" }).fill(name);
+    await page.getByRole("button", { name: `${name} 오늘만 추가` }).click();
+  }
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.getByRole("list", { name: "현재 오늘 납품처" }).getByRole("listitem")).toHaveCount(3);
+  await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-0");
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await page.getByRole("button", { name: "이 순서를 오늘 목록에 적용" }).click();
+  await page.getByRole("button", { name: "순서 직접 바꾸기" }).click();
+  const order = page.getByRole("list", { name: "오늘 납품 순서" });
+  await expect(order.getByRole("listitem").last()).toContainText("예시푸드");
+  await page.getByRole("button", { name: "예시푸드 위로 이동" }).click();
+  await page.getByRole("button", { name: "예시푸드 위로 이동" }).click();
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.getByRole("list", { name: "현재 오늘 납품처" }).getByRole("listitem").first()).toContainText("예시푸드");
+  await expect(page.getByText("예상 이동")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { planningPreviewStats: () => unknown }).planningPreviewStats())).toEqual({ recommendCount: 1, analyzed: 0 });
 });

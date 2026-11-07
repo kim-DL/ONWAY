@@ -28,10 +28,11 @@ function InvoiceReview({ result, customers, busy, onConfirm }: { result: Invoice
   </div>;
 }
 
-export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, onRefresh, onClose, repository = planningRepository }: {
+export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, onRefresh, onClose, onEditToday, mode = "invoice", repository = planningRepository }: {
   customers: readonly Customer[]; day: DeliveryPhotoDayResult;
   onLists: (lists: PlanningLists) => void; onDay: (day: DeliveryPhotoDayResult) => void; onRefresh: () => void; onClose: () => void;
   repository?: PlanningRepository;
+  mode?: "invoice" | "route"; onEditToday?: () => void;
 }) {
   const [context, setContext] = useState<PlanningContext | null>(null); const [configuring, setConfiguring] = useState(false);
   const [scans, setScans] = useState<Scan[]>([]); const files = useRef(new Map<string, File>());
@@ -91,17 +92,17 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
   const canRecommend = context?.settings.originPoint && today.length >= 2 && today.length <= 20 && today.some((c) => c.customerId === lastId) && !reviews && !scans.some((s) => s.state === "failed");
   const guard = () => !scans.some((s) => s.result?.status === "review" || s.state === "failed") || window.confirm("확인하지 않은 명세서 사진은 보관되지 않습니다. 이미 저장한 납품처는 유지하고 닫을까요?");
 
-  return <BottomSheet open title="명세서로 납품 준비" onClose={onClose} beforeClose={guard} dismissible={!busy && !configuring}>
+  return <BottomSheet open title={mode === "route" ? "인공지능 경로 추천" : "명세서로 납품 준비"} onClose={onClose} beforeClose={guard} dismissible={!busy && !configuring}>
     <div className={styles.content}>
       {configuring && context ? <PlanningSettingsForm settings={context.settings} repository={repository}
         onSaved={(settings) => { setContext({ ...context, settings }); setConfiguring(false); setRecommendation(null); }} onCancel={() => setConfiguring(false)} /> : <>
-        <section className={styles.captureCard} aria-label="명세서 사진 선택">
+        {mode === "invoice" && <section className={styles.captureCard} aria-label="명세서 사진 선택">
           <div className={styles.captureHeading}><svg viewBox="0 0 40 40" width="40" height="40" fill="none" aria-hidden="true"><rect x="9" y="5" width="23" height="30" rx="3" stroke="currentColor" strokeWidth="1.8"/><path d="M15 13h11M15 19h11M15 25h6M5 11v-5a4 4 0 0 1 4-4M26 38h5a4 4 0 0 0 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
             <div><h3>오늘 명세서</h3></div></div>
           <div className={styles.captureActions}><button type="button" className={styles.primary} disabled={busy} onClick={() => camera.current?.click()}>명세서 촬영</button><button type="button" disabled={busy} onClick={() => gallery.current?.click()}>갤러리에서 선택</button></div>
           <p className={styles.privacy}>명세서 사진은 Firebase에 저장하지 않아요.</p>
           <details className={styles.privacyDetail}><summary>사진 처리</summary><p>OpenAI로 전송해 분석합니다. 급식길에는 연결 결과만 남으며, OpenAI의 보존 정책은 별도로 적용됩니다.</p></details>
-        </section>
+        </section>}
         <input ref={camera} hidden type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="명세서 카메라" onChange={(e) => { const picked = Array.from(e.target.files ?? []); e.target.value = ""; void addFiles(picked); }} />
         <input ref={gallery} hidden type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="명세서 갤러리" onChange={(e) => { const picked = Array.from(e.target.files ?? []); e.target.value = ""; void addFiles(picked); }} />
         {scans.length > 0 && <section className={styles.scanSection} aria-label="명세서 처리 결과">
@@ -120,6 +121,9 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
         </section>}
         <section className={styles.routeSection} aria-label="납품 경로 추천">
           <div className={styles.sectionTitle}><h3>오늘의 납품 순서</h3><span>{today.length}곳</span></div>
+          {!recommendation && <ol className={styles.routeList} aria-label="현재 오늘 납품처">{today.map((c, index) => <li key={c.customerId}><span>{index + 1}</span><strong>{c.name}</strong></li>)}</ol>}
+          {onEditToday && <button type="button" className={styles.textButton} disabled={busy} onClick={() => { if (guard()) onEditToday(); }}>납품처 추가 · 순서 편집</button>}
+          {today.length < 2 && <p className={styles.hint}>오늘 납품처를 2곳 이상 선택해주세요.</p>}
           <div className={styles.origin}><span className={styles.originDot} /><div><strong>회사에서 출발</strong><p>{context?.settings.originAddress ?? "출발지 확인 중…"}</p></div></div>
           <label className={styles.lastSelect}>마지막 납품처<select value={lastId} disabled={busy} onChange={(e) => { setLastId(e.target.value); setRecommendation(null); setApplied(false); }}><option value="">거래처 선택</option>{today.map((c) => <option key={c.customerId} value={c.customerId}>{c.name}</option>)}</select></label>
           <div className={styles.vehicleNote}><strong>봉고3 냉동탑차 · 높이 {(context?.settings.vehicle ?? DEFAULT_DELIVERY_VEHICLE).heightCm / 100}m</strong><p>{PLANNING_NOTICE}</p></div>
@@ -137,6 +141,7 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
             <p className={styles.hint}>하차·납품 시간 제외</p>
             <ol className={styles.routeList}>{recommendation.customerIds.map((id, index) => <li key={id}><span>{index + 1}</span><div><strong>{activeCustomers.find((c) => c.customerId === id)?.name ?? "거래처"}</strong>{index === recommendation.customerIds.length - 1 && <small>마지막 납품처</small>}</div></li>)}</ol>
             <button type="button" className={styles.primary} disabled={busy || applied} onClick={() => void action(async () => { const result = await repository.apply({ requestId: crypto.randomUUID(), recommendationId: recommendation.recommendationId, deliveryDateKey: day.deliveryDateKey }); if (alive.current) { onDay(result); setApplied(true); } })}>{applied ? "오늘 순서에 적용했어요" : "이 순서를 오늘 목록에 적용"}</button>
+            {applied && onEditToday && <button type="button" className={styles.editOrder} disabled={busy} onClick={onEditToday}>순서 직접 바꾸기</button>}
           </div>}
         </section>
       </>}

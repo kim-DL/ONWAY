@@ -39,7 +39,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
   const uploads = useDeliveryPhotoUploads(session, acceptConfirmed, Boolean(snapshot), refreshData);
   const activeCustomers = useMemo(() => catalog.customers.filter((customer) => customer.status === "active"), [catalog.customers]);
   const [query, setQuery] = useState("");
-  const [editor, setEditor] = useState<{ mode: DeliveryPhotoEditorMode; addId?: string } | null>(null);
+  const [editor, setEditor] = useState<{ mode: DeliveryPhotoEditorMode; addId?: string; onDone?: () => void } | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const [moreCustomer, setMoreCustomer] = useState<Customer | null>(null);
   const [captureId, setCaptureId] = useState<string | null>(null);
@@ -94,7 +94,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
         {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}</div>
     </header>
     {ready && snapshot ? <PlanningEntry key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${snapshot.day.deliveryDateKey}`}
-      customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh} /> : null}
+      customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh}
+      onEditToday={(onDone) => setEditor({ mode: "day", onDone })} /> : null}
     {uploads.storageError ? <p className={styles.notice} role="alert">사진 보관을 준비하지 못했어요. 기기 저장 공간과 브라우저의 저장소 허용을 확인한 뒤 앱을 다시 열어주세요.</p> : null}
     {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
       if (data.error) data.refresh();
@@ -128,7 +129,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, backActi
     {editor && ready ? <DeliveryPhotoEditor key={`${editor.mode}:${editor.addId ?? ""}`} mode={editor.mode} session={session} customers={activeCustomers}
       initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}
       revision={snapshot?.[editor.mode]?.revision}
-      onSave={saveEditor} onClose={() => setEditor(null)} /> : null}
+      onSave={saveEditor} onClose={() => { const onDone = editor.onDone; setEditor(null); onDone?.(); }} /> : null}
     {historyCustomer ? <DeliveryPhotoHistoryLoader key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${historyCustomer.customerId}`}
       customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} sync={data.accept} /> : null}
     {moreCustomer ? <DeliveryPhotoMoreMenu customer={moreCustomer} albumDisabled={!captureAvailable(moreCustomer.customerId)}

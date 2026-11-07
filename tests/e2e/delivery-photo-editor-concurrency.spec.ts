@@ -11,13 +11,14 @@ test.beforeAll(async () => {
     "use-delivery-photo-catalog": `export {useDeliveryPhotoCatalog} from ${data}`,
     "use-delivery-photo-uploads": `export {useDeliveryPhotoUploads} from ${data}`,
     "delivery-photo-repository": `export {deliveryPhotoRepository,deliveryPhotoErrorKind} from ${data}`,
+    "planning-repository": `export {planningRepository,planningError} from ${data}`,
     "delivery-photo-history-loader": "export const DeliveryPhotoHistoryLoader=()=>null;",
     "delivery-photo-upload-panel": "export default ()=>null;",
     "firebase-client": "export function getFirebaseClientServices(){throw Error('Network services are disabled in the editor fixture')} export function getFirebaseAuthIfInitialized(){return null}",
   };
   fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/delivery-photo-editor-concurrency.tsx", [{
     name: "delivery-photo-editor-isolation", setup(builder) {
-      builder.onResolve({ filter: /use-delivery-photo-data$|use-delivery-photo-catalog$|use-delivery-photo-uploads$|delivery-photo-repository$|delivery-photo-history-loader$|delivery-photo-upload-panel$|firebase\/client$/ }, (args) => ({
+      builder.onResolve({ filter: /use-delivery-photo-data$|use-delivery-photo-catalog$|use-delivery-photo-uploads$|delivery-photo-repository$|planning-repository$|delivery-photo-history-loader$|delivery-photo-upload-panel$|firebase\/client$/ }, (args) => ({
         path: args.path.endsWith("firebase/client") ? "firebase-client" : args.path.split("/").at(-1)!, namespace: "editor-fixture",
       }));
       builder.onLoad({ filter: /.*/, namespace: "editor-fixture" }, ({ path }) => ({ loader: "tsx", resolveDir: root, contents: mocks[path]! }));
@@ -88,3 +89,30 @@ for (const mode of ["route", "day"] as const) {
     expect(external).toEqual([]);
   });
 }
+
+test("recommended and manually adjusted order is reflected in the photo workspace", async ({ page }) => {
+  const { dialog, errors, external } = await openFixture(page, "day", false, false);
+  await dialog.getByRole("button", { name: "취소", exact: true }).click();
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await page.getByRole("button", { name: "납품처 추가 · 순서 편집" }).click();
+  await page.getByRole("searchbox", { name: "거래처 검색", exact: true }).fill("다온");
+  await page.getByRole("button", { name: "다온상회 오늘만 추가" }).click();
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  const planning = page.getByRole("dialog", { name: "인공지능 경로 추천", exact: true });
+  await expect(planning).toBeVisible();
+  await planning.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("EDITOR-0");
+  await planning.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await planning.getByRole("button", { name: "이 순서를 오늘 목록에 적용" }).click();
+  await expect(planning.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeVisible();
+  await planning.getByRole("button", { name: "완료", exact: true }).click();
+  const photoNames = page.getByRole("button", { name: / 사진 기록$/ });
+  await expect(photoNames).toHaveText(["다온상회둔산1동", "나래상회둔산1동", "가람상회둔산1동"]);
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await page.getByRole("button", { name: "납품처 추가 · 순서 편집" }).click();
+  await page.getByRole("button", { name: "가람상회 위로 이동" }).click();
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await planning.getByRole("button", { name: "완료", exact: true }).click();
+  await expect(photoNames).toHaveText(["다온상회둔산1동", "가람상회둔산1동", "나래상회둔산1동"]);
+  expect(errors).toEqual([]);
+  expect(external).toEqual([]);
+});
