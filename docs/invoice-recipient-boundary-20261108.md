@@ -1,6 +1,6 @@
 # 공급자와 공급받는 자 인식 분리
 
-2026-11-08. 사용자 운영 화면에서 공급자 온누리종합식품과 회사 주소가 명세서 거래처 확인 항목으로 표시되는 오류를 제보받았다. 사용자가 복원한 실제 명세서 5장의 시험과 문제 없을 때 운영 배포를 승인했다. 아래 최종 소스를 두 인식 서버에 반영할 준비를 마쳤으며, 배포 결과는 별도로 기록한다.
+2026-11-08. 사용자 운영 화면에서 공급자 온누리종합식품과 회사 주소가 명세서 거래처 확인 항목으로 표시되는 오류를 제보받았다. 사용자가 복원한 실제 명세서 5장의 시험과 문제 없을 때 운영 배포를 승인했다. 최종 소스 `3f89b59`를 두 인식 서버에 배포하고 14:44 KST 사후 검증을 완료했다.
 
 ## 원인과 변경
 
@@ -20,7 +20,7 @@
 - 관련 단위 92개 통과: 공급자/수취인 분리, 자사 공급자·동일 사업자번호·역할 불명·빈 수취인 거부, 일부 잘못된 복수 명세서 거부, 첫 응답으로의 fallback 금지, 손글씨 단일 호출 유지.
 - 사진 일괄 서비스 에뮬레이터 22개 통과. 정상 수취인만 자동 저장하는 경로와 공급자 오인 시 목록·별칭·확정 가능한 결과가 만들어지지 않는 경로를 추가했다.
 - Functions build, 변경 파일 ESLint, diff 공백 검사 통과.
-- 기존 소은푸드 명세서 실제 OpenAI API 1회: `소은푸드 (금산)`과 수취인 주소 추출, Sol→Luna 2호출, 6.246초.
+- 확대본 추가 전 구역 분리안 대조군 — 기존 소은푸드 명세서 실제 OpenAI API 1회: `소은푸드 (금산)`과 수취인 주소 추출, Sol→Luna 2호출, 6.246초.
 - 기존 손글씨 사진 실제 API 1회: customer_list 12줄 유지, Sol 1호출, 4.285초.
 - 위 시간은 각 1회 로컬→API→로컬 결과이며 평균·일반 성능이나 휴대폰 전체 처리 시간으로 해석하지 않는다. 운영 데이터 시험 쓰기 없음.
 
@@ -48,3 +48,16 @@
 ## 배포 범위
 
 사용자가 승인한 대상은 인식 서버 두 개(`analyzeDeliveryPhotoBatch`, `analyzeDeliveryInvoice`)다. UI와 Hosting 재배포는 필요하지 않다. 배포 전후 서버 82개 및 상품·lot·입출고·거래처·납품사진·내 납품처·오늘 납품처 문서 해시를 비교한다. 배포 완료 여부와 revision은 아래 후속 기록에서 확인한다.
+
+## 운영 배포 확인 — 2026-11-08 14:44 KST
+
+- 검증·배포 소스: `3f89b5934730aef79e039be31ce0bef6442227c4`. 사용자 승인 범위 내 Functions 두 개만 배포했다. 코드 커밋과 배포 직전 함수 소스 해시가 사후에도 같음을 확인했다.
+- `analyzeDeliveryInvoice`: `analyzedeliveryinvoice-00001-ret` → `analyzedeliveryinvoice-00002-qiz`, ACTIVE.
+- `analyzeDeliveryPhotoBatch`: `analyzedeliveryphotobatch-00001-rik` → `analyzedeliveryphotobatch-00002-cus`, ACTIVE.
+- 다른 Functions 80개 metadata/revision/build 동일. Hosting `27f3bd0902c9d2c1`와 release 시각 동일.
+- 두 서버 모두 Node.js 22, 최대 인스턴스 4·동시 요청 1, 기존 서비스 계정·Secret 연결·OpenAI 프로젝트 유지. 기본 모델 Sol 6.1/Luna 유지. 비인증 요청 각각 HTTP 401.
+- 상품 92, lot 89, 입출고 240, 거래처 223, 납품사진 159, 내 납품처 3, 오늘 납품처 17 — 총 823개 기존 문서의 개별 해시 및 전체 다이제스트가 모두 동일했다. 운영 시험 쓰기·사진 업로드 없음.
+- 마지막 Functions 배포 전 TypeScript build 성공. 관련 단위 91개 전체 통과 후 복수 명세서 확대 방지 검사 1개 추가와 해당 41개 파일 검사를 통과해 관련 총 92개를 확인했다. 초기 JPEG 테스트 fixture 변경 시 예전 literal을 기대하던 검사 1개는 기대값을 실제 fixture로 고쳐 통과했다.
+- 기존 서비스 에뮬레이터 22개와 실제 응답 재생 30개 통과. ESLint·diff 검사 통과. UI 변경이 없어 전체 Hosting 빌드·브라우저 CI를 반복하지 않았다.
+- 검증 경계: 실제 OpenAI 호출은 로컬에서 운영과 동일한 이미지 처리/공급자 분리 코드로 실행했다. 등록은 운영 거래처 읽기 전용 사본을 사용한 에뮬레이터에서만 실행했다. 배포 후 실제 사용자 계정의 저장이나 실물 휴대폰 촬영을 시험했다고 주장하지 않는다.
+- 실행 증거: Git 제외 `output/invoice-recipient-fix/`의 before/after·중간 실패 결과, `emulator-final.log`, `actual-emulator-result.json`; `release/`의 candidate, deploy log, cloud snapshots, runtime-verification, inventory-preservation, verified.
