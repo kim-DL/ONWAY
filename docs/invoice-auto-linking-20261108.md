@@ -1,6 +1,6 @@
 # 등록 상호·주소 표기 차이의 자동 연결
 
-2026-11-08. 사용자는 인식된 상호가 맞아도 등록 표기 차이 때문에 매번 확인하는 불편을 줄이고, 같은 거래처는 자동 연결하며 실제로 애매한 경우만 확인하도록 요청했다. 로컬 구현·검증 완료 상태이며 이번 자동 연결 확대는 아직 운영 배포하지 않았다.
+2026-11-08. 사용자는 인식된 상호가 맞아도 등록 표기 차이 때문에 매번 확인하는 불편을 줄이고, 같은 거래처는 자동 연결하며 실제로 애매한 경우만 확인하도록 요청했다. 로컬 구현·검증 후 사용자가 서버 4개의 배포를 승인했고, 소스 `b58f065`를 운영 반영한 뒤 15:09 KST 검증을 완료했다.
 
 ## 기존 원인과 변경
 
@@ -16,7 +16,7 @@
 - 추가 OpenAI 요청 없음. Sol/Luna와 명세서 공급자 차단 구조는 이전 배포 그대로다. 주소 검색에는 주소 문자열만 보내며 사진·상호·직원 정보를 보내지 않는다.
 - 주소 검색과 정규화는 서버 RAM에서 처리한다. 조회 결과는 메모리에 정상 주소 24시간, 0건 5분 동안만 캐시한다. 한 번의 분석에서 최대 24개 주소, 동시 4개, 새 조회 시작 예산 8초, 각 실제 HTTP 요청 2초 한도를 둔다. 검색 실패는 해당 항목 확인으로 끝내며 다른 정상 항목의 등록을 막지 않는다.
 - 외부 검색은 Firestore 트랜잭션 밖에서 수행한다. 최종 저장 시 권한·날짜·최신 거래처 목록/별칭을 다시 확인하고, 거래처 이름·주소·revision 등이 바뀌면 이전 검색 증거를 사용하지 않는다.
-- `analyzeDeliveryInvoice`, `analyzeDeliveryPhotoBatch`가 기존 `KAKAO_REST_API_KEY` Secret을 함께 사용하도록 선언했다. 새 키 발급·키 변경·운영 IAM 변경은 하지 않았다. 로컬 코드 선언과 실제 운영 Secret 연결은 구분한다.
+- `analyzeDeliveryInvoice`, `analyzeDeliveryPhotoBatch`가 기존 `KAKAO_REST_API_KEY` Secret을 함께 사용하도록 선언했다. 새 키 발급·키 변경은 하지 않았다. 승인된 배포 중 Firebase CLI가 기존 실행 서비스 계정의 해당 Secret 읽기 권한을 확보했다. 범위는 `KAKAO_REST_API_KEY`의 `secretAccessor`이며 새 키나 광범위한 IAM 역할은 만들지 않았다.
 - 기존 Callable/App Check·request ID·감사 이력·목록 병합·중복 방지·서버 확인 후 완료·사진 Firebase 미저장 계약을 유지한다. UI 및 응답 스키마 변경은 없다.
 
 ## 실제 사진에 대한 비교
@@ -43,4 +43,18 @@
 - 새 연결 서비스 에뮬레이터 8개 통과: 기존 목록 보존·중복 재요청, 단일 명세서 호환, 조회 중 거래처 변경·신규 동명 추가·권한 취소 차단, 주소 서비스 실패 시 부분 정상 등록, 날짜 확인 유지, 기억한 줄임말의 지번/도로명 자동 연결과 별칭 중복 생성 방지.
 - 실제 인식 응답 15개를 두 날짜로 재생한 등록 시나리오 30개 통과. 납품일 일치 시 자동 등록과 request ID 재요청, 날짜 차이 시 수동 확인 후 저장, 사진/공급자 증거 미저장 검증.
 - Functions TypeScript build, 변경 파일 ESLint, diff 검사 통과. UI 변경이 없어 Hosting build/브라우저 검사는 반복하지 않았다.
-- 운영 배포 전 단계다. 배포 대상은 `analyzeDeliveryInvoice`, `analyzeDeliveryPhotoBatch`, `confirmDeliveryPhotoBatch`, `updateDeliveryPhotoAlias` 네 개다. 뒤의 두 서버는 줄임말 저장/변경 시 새 정규화 규칙으로 다른 거래처의 정식 상호를 가리지 않도록 함께 반영해야 한다. 이후 운영 반영 시 승인 범위와 서버/데이터 보존 증거를 기록한다.
+- 사용자가 승인하고 배포한 대상은 `analyzeDeliveryInvoice`, `analyzeDeliveryPhotoBatch`, `confirmDeliveryPhotoBatch`, `updateDeliveryPhotoAlias` 네 개다. 뒤의 두 서버는 줄임말 저장/변경 시 새 정규화 규칙으로 다른 거래처의 정식 상호를 가리지 않도록 함께 반영해야 한다. 이후 운영 반영 시 승인 범위와 서버/데이터 보존 증거를 기록한다.
+
+## 운영 배포 확인 — 2026-11-08 15:09 KST
+
+- 소스 `b58f065b709630a46e742f7204b8912275e94c22`. `--project onnuriway`와 네 Functions 이름을 명시해 배포했다. Git 작업 트리와 배포 전후 함수 소스 해시 일치를 확인했다.
+- `analyzeDeliveryInvoice`: `analyzedeliveryinvoice-00003-vaw`, ACTIVE.
+- `analyzeDeliveryPhotoBatch`: `analyzedeliveryphotobatch-00003-suy`, ACTIVE.
+- `confirmDeliveryPhotoBatch`: `confirmdeliveryphotobatch-00002-xec`, ACTIVE.
+- `updateDeliveryPhotoAlias`: `updatedeliveryphotoalias-00002-kaj`, ACTIVE.
+- 다른 Functions 78개 metadata/revision/build 동일. Hosting `27f3bd0902c9d2c1`와 release 시각 동일.
+- 네 서버 모두 기존 실행 서비스 계정, Node.js 22·최대 인스턴스 4·동시 요청 1, Sol 6.1/Luna 기본값과 OpenAI 프로젝트 설정 유지. 두 인식 서버의 기존 OpenAI·Kakao Secret 연결 확인. 비인증 요청 네 개 모두 HTTP 401.
+- 배포 전후 상품 92, lot 89, 입출고 240, 거래처 223, 납품사진 159, 내 납품처 3, 오늘 납품처 17 — 총 823개 기존 문서의 개별 해시/전체 다이제스트 동일. 운영 시험 쓰기·사진 업로드 없음.
+- 새 분석 요청부터 적용된다. 이전에 저장된 스캔 receipt나 확인 대기 결과를 소급 변경하지 않으며, 같은 request ID는 기존 결과를 재사용한다.
+- 실제 OpenAI 인식 결과와 현재 운영 거래처의 읽기 전용 사본, 실제 Kakao 주소 응답으로 연결을 시험했다. 저장은 에뮬레이터에서 검증했다. 배포 후 실사용자 계정의 저장/실물 휴대폰 촬영을 시험했다고 주장하지 않는다.
+- 증거: Git 제외 `output/invoice-linking/`의 comparison.local, address-responses.local, emulator/alias-emulator 로그 및 실제 응답 재생 결과; `release/`의 candidate, deploy, cloud-before/after, runtime-verification, inventory-preservation, verified.
