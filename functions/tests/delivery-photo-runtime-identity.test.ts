@@ -8,7 +8,10 @@ const deliveryPhotoFunctionNames = [
   "createDeliveryPhoto", "deleteDeliveryPhoto", "expireDeliveryPhotos", "getDeliveryPhoto",
   "getDeliveryPhotoDay", "getDeliveryPhotoRoute", "listDeliveryPhotos", "saveDeliveryPhotoDay", "saveDeliveryPhotoRoute",
 ];
-const deliveryPlanningFunctionNames = ["analyzeDeliveryInvoice", "confirmDeliveryInvoice", "getDeliveryPlanningContext", "saveDeliveryPlanningSettings", "recommendDeliveryRoute", "applyDeliveryRoute"];
+const deliveryPlanningFunctionNames = [
+  "analyzeDeliveryInvoice", "confirmDeliveryInvoice", "getDeliveryPlanningContext", "saveDeliveryPlanningSettings", "recommendDeliveryRoute", "applyDeliveryRoute",
+  "analyzeDeliveryPhotoBatch", "confirmDeliveryPhotoBatch", "getDeliveryPhotoAliases", "updateDeliveryPhotoAlias",
+];
 
 function endpoint(value: unknown) {
   return (value as { __endpoint: { serviceAccountEmail?: string; callableTrigger?: object; scheduleTrigger?: object } }).__endpoint;
@@ -57,7 +60,7 @@ describe("delivery-photo dedicated runtime identity", () => {
       .rejects.toThrow("DELIVERY_PHOTO_SERVICE_ACCOUNT");
   });
 
-  it("keeps the dedicated identity limited to nine photo and six planning deployment specs", async () => {
+  it("keeps the dedicated identity limited to nine photo and ten planning deployment specs", async () => {
     vi.stubEnv("FUNCTIONS_EMULATOR", "false");
     vi.stubEnv("GCLOUD_PROJECT", projectId);
     vi.stubEnv("GOOGLE_CLOUD_PROJECT", projectId);
