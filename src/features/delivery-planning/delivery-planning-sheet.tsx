@@ -10,10 +10,10 @@ import { PlanningSettingsForm } from "./planning-settings";
 import styles from "./planning.module.css";
 
 const PhotoBatchReview = dynamic(() => import("./photo-batch-review").then((module) => module.PhotoBatchReview), {
-  ssr: false, loading: () => <p role="status">확인 항목 준비 중…</p>,
+  ssr: false, loading: () => <p role="status">준비 중…</p>,
 });
 const PhotoAliasManager = dynamic(() => import("./photo-alias-manager").then((module) => module.PhotoAliasManager), {
-  ssr: false, loading: () => <p role="status">기억한 줄임말 준비 중…</p>,
+  ssr: false, loading: () => <p role="status">준비 중…</p>,
 });
 
 type Scan = { id: string; state: "waiting" | "reading" | "failed" | "done"; result?: PhotoBatchResult; error?: string };
@@ -158,7 +158,7 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
             const skippedRows = result?.rows.filter((row) => row.status === "skipped") ?? [];
             return <li key={scan.id}>
               <div className={styles.scanRow}><span className={styles.scanNumber}>{String(index + 1).padStart(2, "0")}</span><div><strong>{result ? result.kind === "invoice" ? "명세서" : result.kind === "customer_list" ? "거래처 목록" : "사진 확인" : `사진 ${index + 1}`}</strong>
-                <small>{result ? `${result.rows.length}개 항목${skippedRows.length ? ` · 제외 ${skippedRows.length}` : ""}` : scan.state === "reading" ? "거래처를 읽고 있어요…" : scan.state === "waiting" ? "순서대로 확인할게요" : ""}</small></div>
+                <small>{result ? `${result.rows.length}개 항목${skippedRows.length ? ` · 제외 ${skippedRows.length}` : ""}` : ""}</small></div>
                 <span className={result && result.rows.length && !unresolved.length ? styles.savedBadge : styles.reviewBadge}>{result ? !result.rows.length ? "판독 불가" : unresolved.length ? `${unresolved.length}곳 확인` : savedRows.length ? "저장됨" : "확인 완료" : scan.state === "failed" ? "재확인" : scan.state === "waiting" ? "대기" : "분석 중"}</span></div>
               {savedRows.length > 0 && <details className={styles.savedRows}><summary>{savedRows.length}개 항목 연결됨</summary>{savedRows.map((row) => <p key={row.rowId}><span>{row.rawName}</span><strong>{activeCustomers.find((c) => c.customerId === row.customerId)?.name ?? "거래처"}</strong></p>)}</details>}
               {result?.message && <p className={styles.hint}>{result.message}</p>}
