@@ -37,10 +37,10 @@ async function run<T, R>(request: CallableRequest<unknown>, schema: z.ZodType<T>
 }
 export const getDeliveryPlanningContext = onCall(options, (r) => run(r, z.object({}).strict(), (_, actor, s) => s.context(actor)));
 export const saveDeliveryPlanningSettings = onCall(options, (r) => run(r, savePlanningSettingsSchema, (input, actor, s) => s.saveSettings(input, actor)));
-export const analyzeDeliveryInvoice = onCall({ ...options, memory: "1GiB", timeoutSeconds: 120, secrets: emulator ? [] : [openai] },
+export const analyzeDeliveryInvoice = onCall({ ...options, memory: "1GiB", timeoutSeconds: 120, secrets: emulator ? [] : [openai, kakao] },
   (r) => run(r, analyzeInvoiceSchema, (input, actor, s) => s.analyze(input, actor)));
 export const confirmDeliveryInvoice = onCall(options, (r) => run(r, confirmInvoiceSchema, (input, actor, s) => s.confirm(input, actor)));
-export const analyzeDeliveryPhotoBatch = onCall({ ...options, memory: "1GiB", timeoutSeconds: 120, secrets: emulator ? [] : [openai] },
+export const analyzeDeliveryPhotoBatch = onCall({ ...options, memory: "1GiB", timeoutSeconds: 120, secrets: emulator ? [] : [openai, kakao] },
   (r) => run(r, analyzePhotoBatchSchema, (input, actor, s) => s.analyzePhotoBatch(input, actor)));
 export const confirmDeliveryPhotoBatch = onCall(options, (r) => run(r, confirmPhotoBatchSchema, (input, actor, s) => s.confirmPhotoBatch(input, actor)));
 export const getDeliveryPhotoAliases = onCall(options, (r) => run(r, z.object({}).strict(), (_, actor, s) => s.photoAliases(actor)));

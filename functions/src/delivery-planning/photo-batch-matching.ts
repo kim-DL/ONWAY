@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { normalizeCustomerName } from "../customer/customer-contract.js";
 import { invoiceAddressMatches, matchInvoice, type MatchCustomer } from "./invoice-matching.js";
 import type { PhotoAlias, PhotoBatchRow, PhotoExtraction, PhotoExtractionRow } from "./photo-batch-contract.js";
+import { normalizedInvoiceName, registeredInvoiceNames } from "./invoice-names.js";
+import { invoiceAddressRelation, type InvoiceAddressEvidence } from "./invoice-address.js";
 
 export function photoAliasKey(text: string) {
   return createHash("sha256").update(normalizeCustomerName(text)).digest("hex");
@@ -10,8 +12,7 @@ export function validAliasText(text: string) {
   return /[\p{L}\p{N}]/u.test(normalizeCustomerName(text));
 }
 export function registeredPhotoNames(text: string) {
-  const parts = /[()（）]/u.test(text) ? [text] : [text, ...text.split(/[,，;；]/u)];
-  return [...new Set(parts.map(normalizeCustomerName).filter(Boolean))];
+  return [...new Set(registeredInvoiceNames(text).map(normalizedInvoiceName).filter(Boolean))];
 }
 export function photoDateStatus(row: PhotoExtractionRow, today: string): PhotoBatchRow["dateStatus"] {
   if (row.dateUncertain) return "uncertain";
@@ -37,11 +38,11 @@ function nearbyName(left: string, right: string) {
   }
   return previous[right.length]! <= limit;
 }
-export function matchPhotoRows(extraction: PhotoExtraction, customers: readonly MatchCustomer[], aliases: readonly PhotoAlias[], today: string): PhotoBatchRow[] {
+export function matchPhotoRows(extraction: PhotoExtraction, customers: readonly MatchCustomer[], aliases: readonly PhotoAlias[], today: string, evidence?: InvoiceAddressEvidence): PhotoBatchRow[] {
   if (extraction.kind === "unsupported") return [];
   return extraction.rows.map((row, index) => {
     const dateStatus = photoDateStatus(row, today);
-    const name = normalizeCustomerName(row.rawName);
+    const name = normalizedInvoiceName(row.rawName);
     const storedAlias = aliases.find((a) => a.aliasKey === photoAliasKey(row.rawName));
     const alias = storedAlias?.enabled ? storedAlias : undefined;
     const exact = customers.filter((c) => name && (extraction.kind === "customer_list"
@@ -55,11 +56,11 @@ export function matchPhotoRows(extraction: PhotoExtraction, customers: readonly 
     let reason = "기존 거래처를 선택해주세요.";
     if (extraction.kind === "invoice") {
       const match = matchInvoice({ recipientName: row.rawName, recipientAddress: row.address,
-        invoiceDate: dateStatus === "current" ? today : null, uncertain: row.uncertain }, [...customers], today);
+        invoiceDate: dateStatus === "current" ? today : null, uncertain: row.uncertain }, customers, today, evidence);
       customerId = match.customerId; candidateIds = match.candidateIds; reason = match.reason;
       if (customerId) matchSource = "invoice_address";
       if (!customerId && safeAlias && !aliasConflict && !row.uncertain && dateStatus === "current"
-        && [aliasTarget.officialAddress, aliasTarget.deliveryAddress].some((a) => invoiceAddressMatches(row.address, a))) {
+        && [aliasTarget.officialAddress, aliasTarget.deliveryAddress].some((a) => invoiceAddressRelation(row.address, a, evidence) === "match")) {
         customerId = aliasTarget.customerId; matchSource = "alias"; reason = "기억한 이름과 주소가 일치해요.";
       }
     } else {

@@ -3,7 +3,7 @@ import { Timestamp, type Firestore, type Transaction, type DocumentData } from "
 import { HttpsError } from "firebase-functions/v2/https";
 import type { z } from "zod";
 import { verifyCustomerTransactionActor, type CustomerActor } from "../customer/customer-authorization.js";
-import { CUSTOMER_COLLECTION_PATH, normalizeCustomerName } from "../customer/customer-contract.js";
+import { CUSTOMER_COLLECTION_PATH } from "../customer/customer-contract.js";
 import { deliveryDateKeyInSeoul } from "../delivery-photo/delivery-photo-service.js";
 import { DELIVERY_PHOTO_DAY_PATH, DELIVERY_PHOTO_PATH, DELIVERY_PHOTO_ROUTE_PATH } from "../delivery-photo/delivery-photo-store.js";
 import { deliveryPhotoDayResultSchema, deliveryPhotoRouteSchema } from "../delivery-photo/delivery-photo-contract.js";
@@ -13,8 +13,10 @@ import { invoiceImage, type PlanningProviders } from "./planning-providers.js";
 import { customerRouteAddress, resolveRegisteredStops } from "./registered-address.js";
 import { photoAliasSchema, photoAliasesSchema, photoBatchResultSchema, photoExtractionSchema,
   type analyzePhotoBatchSchema, type confirmPhotoBatchSchema, type updatePhotoAliasSchema,
-  type PhotoAlias, type PhotoBatchResult } from "./photo-batch-contract.js";
+  type PhotoAlias, type PhotoBatchResult, type PhotoExtractionRow } from "./photo-batch-contract.js";
 import { matchPhotoRows, photoAliasKey, registeredPhotoNames, rowNeedsDateConfirmation, validAliasText } from "./photo-batch-matching.js";
+import { prepareInvoiceAddressEvidence } from "./invoice-address-lookup.js";
+import { normalizedInvoiceName } from "./invoice-names.js";
 import {
   DEFAULT_ORIGIN_ADDRESS, DEFAULT_ORIGIN_POINT, DEFAULT_DELIVERY_VEHICLE, PLANNING_NOTICE, invoiceResultSchema, planningSettingsSchema, routeRecommendationSchema,
   type analyzeInvoiceSchema, type confirmInvoiceSchema, type recommendRouteSchema, type applyRecommendationSchema,
@@ -153,12 +155,15 @@ export class PlanningService {
     const cached = await this.reserve(actor, input.requestId, "scan", hash, input.deliveryDateKey);
     if (cached) return invoiceResultSchema.parse(cached);
     const fields = await this.providers.readInvoice(image);
+    const proof = await this.invoiceEvidence([{ rawName: fields.recipientName, address: fields.recipientAddress,
+      date: fields.invoiceDate, uncertain: fields.uncertain, dateUncertain: false }], actor);
     return this.db.runTransaction(async (tx) => {
       await this.authorize(tx, actor); this.today(input.deliveryDateKey);
       const ref = this.db.doc(lockPath(input.requestId)); const lock = await tx.get(ref);
       this.checkReceipt(lock.data()!, actor, "scan", hash);
       if (lock.get("state") === "complete") return invoiceResultSchema.parse(lock.get("result"));
-      const matched = matchInvoice(fields, await this.customers(tx), input.deliveryDateKey);
+      const catalog = await this.customers(tx);
+      const matched = matchInvoice(fields, catalog, input.deliveryDateKey, proof?.catalogHash === fingerprint(catalog) ? proof.evidence : undefined);
       const lists = matched.customerId ? await this.addCustomers(tx, actor, [matched.customerId], input.deliveryDateKey) : null;
       const result = invoiceResultSchema.parse({ scanId: input.requestId, fields, ...matched, status: lists ? "saved" : "review", lists,
         elapsedMs: Math.max(0, this.clock().toMillis() - started) });
@@ -201,11 +206,21 @@ export class PlanningService {
   async photoAliases(actor: CustomerActor): Promise<PhotoAlias[]> {
     return this.db.runTransaction(async (tx) => { await this.authorize(tx, actor); return photoAliasesSchema.parse(await this.aliases(tx, actor)); });
   }
+  private async invoiceEvidence(rows: readonly PhotoExtractionRow[], actor: CustomerActor) {
+    const resolve = this.providers.resolveInvoiceAddress;
+    if (!resolve) return null;
+    const initial = await this.db.runTransaction(async (tx) => {
+      await this.authorize(tx, actor);
+      return { catalog: await this.customers(tx), aliases: await this.aliases(tx, actor) };
+    });
+    return { catalogHash: fingerprint(initial.catalog),
+      evidence: await prepareInvoiceAddressEvidence(rows, initial.catalog, initial.aliases, resolve) };
+  }
   private aliasTarget(aliasText: string, customerId: string, catalog: readonly MatchCustomer[]) {
     if (!validAliasText(aliasText)) throw new HttpsError("invalid-argument", "기억할 이름을 입력해주세요.");
     const customer = catalog.find((c) => c.customerId === customerId);
     if (!customer) throw new HttpsError("failed-precondition", "활성 거래처를 다시 선택해주세요.");
-    const normalized = normalizeCustomerName(aliasText);
+    const normalized = normalizedInvoiceName(aliasText);
     if (catalog.some((c) => c.customerId !== customerId && registeredPhotoNames(c.name).includes(normalized))) {
       throw new HttpsError("failed-precondition", "다른 거래처의 정식 상호는 줄임말로 기억할 수 없어요.");
     }
@@ -222,6 +237,7 @@ export class PlanningService {
     const extraction = photoExtractionSchema.parse(await this.providers.readPhotoBatch(image));
     if (extraction.truncated) throw new HttpsError("failed-precondition", "목록이 너무 길거나 일부가 잘렸어요. 60곳 이하로 나누어 다시 촬영해주세요.");
     if (extraction.kind === "unsupported" && extraction.rows.length) throw new HttpsError("unavailable", "사진 종류를 확인하지 못했어요.");
+    const proof = extraction.kind === "invoice" ? await this.invoiceEvidence(extraction.rows, actor) : null;
     return this.db.runTransaction(async (tx) => {
       await this.authorize(tx, actor); this.today(input.deliveryDateKey);
       const ref = this.db.doc(lockPath(input.requestId)); const lock = await tx.get(ref);
@@ -229,7 +245,8 @@ export class PlanningService {
       this.checkReceipt(lock.data()!, actor, "scan", hash);
       if (lock.get("state") === "complete") return photoBatchResultSchema.parse(lock.get("result"));
       const catalog = await this.customers(tx); const aliases = await this.aliases(tx, actor);
-      const rows = matchPhotoRows(extraction, catalog, aliases, input.deliveryDateKey);
+      const rows = matchPhotoRows(extraction, catalog, aliases, input.deliveryDateKey,
+        proof?.catalogHash === fingerprint(catalog) ? proof.evidence : undefined);
       const ids = rows.flatMap((r) => r.customerId ? [r.customerId] : []);
       const lists = ids.length ? await this.addCustomers(tx, actor, ids, input.deliveryDateKey) : null;
       const result = photoBatchResultSchema.parse({ scanId: input.requestId, revision: 1, kind: extraction.kind, rows,

@@ -6,12 +6,15 @@ import { INVOICE_MAX_BYTES, invoiceFieldsSchema, type InvoiceFields, type Planni
 import { createRegisteredAddressResolver, type AddressResolver } from "./registered-address.js";
 import { photoExtractionSchema, type PhotoExtraction } from "./photo-batch-contract.js";
 import { INVOICE_PARTIES_INSTRUCTIONS, invoicePartiesJsonSchema, invoicePartiesToExtraction } from "./invoice-parties.js";
+import { createInvoiceAddressResolver } from "./invoice-address-lookup.js";
+import type { AddressIdentityResolver } from "./invoice-address.js";
 
 export type ProviderFetch = (url: string, init: RequestInit) => Promise<Pick<Response, "ok" | "status" | "json">>;
 export interface RouteStop { customerId: string; latitude: number; longitude: number }
 export interface OptimizedRoute { customerIds: string[]; totalSeconds: number; totalMeters: number }
 export interface PlanningProviders {
   resolveAddress: AddressResolver;
+  resolveInvoiceAddress?: AddressIdentityResolver;
   readInvoice(image: Buffer): Promise<InvoiceFields>;
   readPhotoBatch(image: Buffer): Promise<PhotoExtraction>;
   optimize(settings: PlanningSettings, stops: RouteStop[], lastId: string, now: Date): Promise<OptimizedRoute>;
@@ -135,6 +138,7 @@ export function createPlanningProviders(keys: { openai: () => string; tmap: () =
   };
   return {
     resolveAddress: createRegisteredAddressResolver(keys.kakao ?? (() => ""), fetcher),
+    resolveInvoiceAddress: createInvoiceAddressResolver(keys.kakao ?? (() => ""), fetcher),
     async readInvoice(image) {
       const key = keys.openai().trim();
       if (!key) throw new HttpsError("failed-precondition", "명세서 인식 서비스 설정이 필요합니다. 관리자에게 알려주세요.");
