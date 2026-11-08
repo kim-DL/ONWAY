@@ -124,7 +124,7 @@ test("name-only search shows all field information, map controls and private sel
   const footer = dialog.locator(".bottom-sheet__actions");
   await expect(footer.getByRole("link", { name: "길찾기" })).toBeInViewport({ ratio: 1 });
   const direction = await footer.getByRole("link", { name: "길찾기" }).getAttribute("href");
-  expect(direction).toContain("36.35,127.38");
+  expect(direction).toBe(`https://map.kakao.com/link/search/${encodeURIComponent("테스트 후면 창고 주소")}`);
   expect(direction).not.toMatch(/0012|0100000|탄방동/);
   await expect(footer.getByRole("button", { name: "정보 수정", exact: true })).toBeInViewport({ ratio: 1 });
   await expect(dialog.getByRole("region", { name: "전체 연락처" })).toContainText("042-000-1234");
@@ -164,7 +164,9 @@ test("closed-customer actions confirm and missing coordinates never invent a map
   const detail = page.getByRole("dialog", { name: "위치없는유통" });
   await expect(detail).toContainText("실제 납품 위치가 등록되지 않았습니다.");
   await expect(detail.locator("[data-customer-map-canvas]")).toHaveCount(0);
-  await expect(detail.getByRole("link", { name: "길찾기" })).toHaveCount(0);
+  await expect(detail.getByRole("link", { name: "길찾기" })).toHaveAttribute(
+    "href", `https://map.kakao.com/link/search/${encodeURIComponent("테스트 후면 창고 주소")}`,
+  );
   await page.setViewportSize({ width: 320, height: 740 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).include("dialog[open]").analyze()).violations).toEqual([]);
@@ -341,7 +343,11 @@ test("employee registers and edits from customer home with audit and a single gu
     await expect(selectedPhoto).toBeVisible();
     await expect.poll(() => selectedPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth)).toBe(120);
     await expect(editor.getByRole("button", { name: "거래처 저장", exact: true })).toBeInViewport({ ratio: 1 });
+    const savedCustomer = page.waitForResponse((response) =>
+      response.url().endsWith("/saveCustomer") && response.request().method() === "POST",
+    );
     await editor.getByRole("button", { name: "거래처 저장", exact: true }).click();
+    expect((await savedCustomer).status()).toBe(200);
     const detail = page.getByRole("dialog", { name: "직원등록검증유통", exact: true });
     await expect(detail).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(1);

@@ -233,8 +233,9 @@ test("field action layout audit and customer detail history use one customer sco
   });
   expect(cameraAlignment.x).toBeLessThan(1);
   expect(cameraAlignment.y).toBeLessThan(1);
-  const editButton = page.getByRole("button", { name: "내 납품처 편집" });
-  await expect(editButton).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  const editButton = page.getByRole("button", { name: "내 납품처", exact: true });
+  await expect(editButton).toHaveCSS("background-image", "linear-gradient(170deg, rgb(255, 255, 255), rgb(240, 245, 249))");
+  await expect(editButton).toHaveCSS("color", "rgb(52, 75, 99)");
   expect(await editButton.evaluate((button) => getComputedStyle(button).boxShadow)).not.toBe("none");
   for (const width of [320, 360, 390, 412]) {
     await page.setViewportSize({ width, height: 840 });
@@ -264,8 +265,8 @@ test("field action layout audit and customer detail history use one customer sco
   }
   await page.evaluate(() => { document.documentElement.style.fontSize = "100%"; });
   await page.setViewportSize({ width: 390, height: 840 });
-  await auditEditorActions(page, "내 납품처 편집", "내 납품처 편집", output, "route-editor");
-  await auditEditorActions(page, "오늘 거래처 추가", "오늘 순서 편집", output, "day-editor");
+  await auditEditorActions(page, "내 납품처", "내 납품처 편집", output, "route-editor");
+  await auditEditorActions(page, "오늘 납품처", "오늘 순서 편집", output, "day-editor");
   const customerLists: unknown[] = [];
   page.on("request", (request) => {
     if (request.url().endsWith("/listDeliveryPhotos")) customerLists.push(request.postDataJSON()?.data);
@@ -965,7 +966,7 @@ test("field route, completion, search, today override and reorder survive re-ent
   await openPhotoWorkspace(page);
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
   await expect(page.getByRole("region", { name: "오늘 남은 납품처" }).getByText("대전식품")).toHaveCount(0);
-  await page.getByRole("button", { name: "내 납품처 편집" }).click();
+  await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   const routeEditor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await routeEditor.getByRole("searchbox", { name: "거래처 검색" }).fill("테스트거래처1");
   await routeEditor.getByRole("button", { name: "테스트거래처1 내 납품처에 추가", exact: true }).click();
@@ -977,13 +978,13 @@ test("field route, completion, search, today override and reorder survive re-ent
   await page.reload();
   await openPhotoWorkspace(page);
   await expect(page.getByText("남음 2곳 · 기록완료 1곳")).toBeVisible();
-  await page.getByRole("button", { name: "내 납품처 편집" }).click();
+  await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   const recentEditor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await expect(recentEditor.getByText("최근 거래처")).toBeVisible();
   await expect(recentEditor.locator("ul li")).toHaveCount(16);
   await page.keyboard.press("Escape");
   await expect(recentEditor).toHaveCount(0);
-  await page.getByRole("button", { name: "내 납품처 편집" }).click();
+  await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   await page.goBack();
   await expect(page.getByRole("dialog", { name: "내 납품처 편집" })).toHaveCount(0);
   for (const width of [360, 320]) {
@@ -1006,14 +1007,14 @@ test("empty route offers setup without changing the day until Save", async ({ pa
   await db().doc(`companies/onnuri/deliveryPhotoDays/EMP-DELIVERY_${dateKey}`).delete();
   await db().doc(routePath).delete();
   await login(page);
-  await expect(page.getByRole("button", { name: "내 납품처 설정" })).toBeVisible();
-  await page.getByRole("button", { name: "내 납품처 설정" }).click();
+  await expect(page.getByRole("button", { name: "내 납품처", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await editor.getByRole("searchbox", { name: "거래처 검색" }).fill("한빛");
   await editor.getByRole("button", { name: "한빛유통 내 납품처에 추가" }).click();
   await editor.getByRole("button", { name: "취소" }).click();
-  await expect(page.getByRole("button", { name: "내 납품처 설정" })).toBeVisible();
-  await page.getByRole("button", { name: "내 납품처 설정" }).click();
+  await expect(page.getByRole("button", { name: "내 납품처", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   const reopened = page.getByRole("dialog", { name: "내 납품처 편집" });
   await reopened.getByRole("searchbox", { name: "거래처 검색" }).fill("한빛");
   await reopened.getByRole("button", { name: "한빛유통 내 납품처에 추가" }).click();
@@ -1024,7 +1025,7 @@ test("empty route offers setup without changing the day until Save", async ({ pa
 test("revision conflict refreshes server state without overwriting the draft", async ({ page }) => {
   await login(page);
   await expect(page.getByText("남음 0곳 · 기록완료 1곳")).toBeVisible();
-  await page.getByRole("button", { name: "내 납품처 편집" }).click();
+  await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await editor.getByRole("searchbox", { name: "거래처 검색" }).fill("푸른상회");
   await editor.getByRole("button", { name: `${names[2]} 내 납품처에 추가` }).click();

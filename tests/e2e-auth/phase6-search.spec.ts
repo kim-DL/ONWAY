@@ -32,9 +32,21 @@ test("search ranks exact, abbreviation, initials, alias, and fuzzy matches local
 });
 
 test("typing performs no external or Firestore requests and cached search survives offline", async ({ page, context }) => {
+  // Authorization keeps an existing Listen stream alive independently of typing.
+  // Only GET polling of sessions observed before typing is allowed; new streams,
+  // subscription changes (POST), reads, and external searches remain forbidden.
+  const existingListenSessions = new Set<string>();
+  const observeSession = (request: Request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/google.firestore.v1.Firestore/Listen/channel") && url.searchParams.get("SID")) {
+      existingListenSessions.add(url.searchParams.get("SID")!);
+    }
+  };
+  page.on("request", observeSession);
   const input = await loginAndOpenSearch(page);
-  const requests: string[] = [];
-  const capture = (request: Request) => requests.push(request.url());
+  page.off("request", observeSession);
+  const requests: Request[] = [];
+  const capture = (request: Request) => requests.push(request);
   page.on("request", capture);
 
   for (let index = 0; index < 20; index += 1) {
@@ -42,9 +54,14 @@ test("typing performs no external or Firestore requests and cached search surviv
   }
   page.off("request", capture);
 
-  const forbiddenRequests = requests.filter((url) =>
-    /firestore|googleapis|open\.neis|kakao/iu.test(url),
-  );
+  const forbiddenRequests = requests.filter((request) => {
+    const url = new URL(request.url());
+    const existingPoll = request.method() === "GET"
+      && url.pathname.endsWith("/google.firestore.v1.Firestore/Listen/channel")
+      && url.searchParams.get("RID") === "rpc"
+      && existingListenSessions.has(url.searchParams.get("SID") ?? "");
+    return /firestore|googleapis|open\.neis|kakao/iu.test(request.url()) && !existingPoll;
+  }).map((request) => request.url());
   expect(forbiddenRequests).toEqual([]);
   const databaseNames = await page.evaluate(async () =>
     (await indexedDB.databases()).map((database) => database.name),
