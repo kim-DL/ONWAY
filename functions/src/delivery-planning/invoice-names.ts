@@ -27,10 +27,11 @@ export function registeredInvoiceNames(text: string) {
 export function invoiceNameCandidates<T extends { name: string }>(name: string, customers: readonly T[]): T[] {
   const full = normalizedInvoiceName(name), source = splitInvoiceName(name);
   if (!full) return [];
-  const exact = customers.filter((c) => registeredInvoiceNames(c.name).some((n) => normalizedInvoiceName(n) === full));
+  const exact = customers.filter((c) => normalizedInvoiceName(c.name) === full
+    || registeredInvoiceNames(c.name).some((n) => normalizedInvoiceName(n) === full));
   if (exact.length && source.regionHint) return exact;
   const base = normalizedInvoiceName(source.base);
-  return customers.filter((c) => registeredInvoiceNames(c.name).some((n) => {
+  return customers.filter((c) => exact.includes(c) || registeredInvoiceNames(c.name).some((n) => {
     const target = splitInvoiceName(n);
     return normalizedInvoiceName(target.base) === base && (!source.regionHint || !target.regionHint
       || normalizeCustomerName(source.regionHint) === normalizeCustomerName(target.regionHint));

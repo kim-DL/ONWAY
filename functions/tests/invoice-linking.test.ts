@@ -10,6 +10,11 @@ describe("invoice identity across registered spelling variants", () => {
   it("uses an explicitly registered alternate company name and corporate prefix", () => {
     expect(matchInvoice(fields, [customer], today).customerId).toBe("one");
   });
+  it("preserves matching the complete original registered name as well as its parts", () => {
+    expect(matchInvoice({ ...fields, recipientName: customer.name }, [customer], today).customerId).toBe("one");
+    expect(matchPhotoRows({ kind: "customer_list", truncated: false, rows: [{ rawName: customer.name, address: "", date: null,
+      dateUncertain: false, uncertain: false }] }, [customer], [], today)[0]?.customerId).toBe("one");
+  });
   it.each(["(주)찬솔유통(비:0000)", "주식회사 찬솔유통", "찬솔유통㈜"])("ignores corporate/operational notation in %s", (recipientName) => {
     expect(matchInvoice({ ...fields, recipientName }, [{ ...customer, name: "찬솔유통" }], today).customerId).toBe("one");
   });

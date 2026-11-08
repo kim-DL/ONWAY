@@ -12,7 +12,7 @@ export function validAliasText(text: string) {
   return /[\p{L}\p{N}]/u.test(normalizeCustomerName(text));
 }
 export function registeredPhotoNames(text: string) {
-  return [...new Set(registeredInvoiceNames(text).map(normalizedInvoiceName).filter(Boolean))];
+  return [...new Set([text, ...registeredInvoiceNames(text)].map(normalizedInvoiceName).filter(Boolean))];
 }
 export function photoDateStatus(row: PhotoExtractionRow, today: string): PhotoBatchRow["dateStatus"] {
   if (row.dateUncertain) return "uncertain";
