@@ -349,9 +349,6 @@ export class PlanningService {
     const settings = settingsValue(config!.data());
     const ids: string[] = day!.get("hasOverride") ? day!.get("customerIds") : route!.get("customerIds") ?? [];
     if (ids.length < 2 || ids.length > 20) throw new HttpsError("failed-precondition", "오늘 납품처가 2~20곳일 때 경로를 추천할 수 있어요.");
-    if (!settings.originPoint) throw new HttpsError("failed-precondition", "관리자가 회사 출발 위치를 먼저 확인해야 합니다.");
-    const photos = await this.photos(tx, date);
-    if (photos.some((p) => ids.includes(p.customerId))) throw new HttpsError("failed-precondition", "이미 납품사진이 있어요. 회사 출발 경로는 출발 전에 준비해주세요. 오늘 순서는 직접 편집할 수 있습니다.");
     const catalog = await this.customers(tx); const customers = ids.map((id) => catalog.find((c) => c.customerId === id));
     if (customers.some((c) => !c)) throw new HttpsError("failed-precondition", "오늘 목록의 거래처 정보를 새로 확인해주세요.");
     const destinations = customers.map((c) => ({ customerId: c!.customerId, name: c!.name, address: customerRouteAddress(c!) }));
@@ -363,21 +360,24 @@ export class PlanningService {
   }
   async recommend(input: z.infer<typeof recommendRouteSchema>, actor: CustomerActor) {
     const initial = await this.db.runTransaction(async (tx) => { await this.authorize(tx, actor); return this.routeBasis(tx, actor, input.deliveryDateKey); });
-    if (input.expectedDayRevision !== initial.dayRevision || !initial.ids.includes(input.lastCustomerId)) throw conflict();
+    if (input.expectedDayRevision !== initial.dayRevision || !initial.ids.includes(input.lastCustomerId)
+      || (input.firstCustomerId && (!initial.ids.includes(input.firstCustomerId) || input.firstCustomerId === input.lastCustomerId))) throw conflict();
+    if (!input.firstCustomerId && !initial.settings.originPoint) throw new HttpsError("failed-precondition", "관리자가 회사 출발 위치를 먼저 확인해야 합니다.");
     const hash = fingerprint(input);
     const cached = await this.reserve(actor, input.requestId, "route", hash, input.deliveryDateKey);
     if (cached) return routeRecommendationSchema.parse(cached);
     const stops = await resolveRegisteredStops(initial.destinations, this.providers.resolveAddress);
     // Address lookup is outside transactions. Recheck before the route API as well as after it.
     await this.db.runTransaction(async (tx) => { await this.authorize(tx, actor); if (initial.basis !== (await this.routeBasis(tx, actor, input.deliveryDateKey)).basis) throw conflict(); });
-    const optimized = await this.providers.optimize(initial.settings, stops, input.lastCustomerId, this.clock().toDate());
+    const optimized = await this.providers.optimize(initial.settings, stops, input.lastCustomerId, this.clock().toDate(), input.firstCustomerId);
     return this.db.runTransaction(async (tx) => {
       await this.authorize(tx, actor);
       const current = await this.routeBasis(tx, actor, input.deliveryDateKey);
       if (initial.basis !== current.basis) throw conflict();
       const result = routeRecommendationSchema.parse({ ...optimized, recommendationId: input.requestId, deliveryDateKey: input.deliveryDateKey,
         calculatedAt: this.clock().toDate().toISOString(), notice: PLANNING_NOTICE });
-      if (result.customerIds.at(-1) !== input.lastCustomerId || new Set(result.customerIds).size !== initial.ids.length || result.customerIds.length !== initial.ids.length
+      if (result.customerIds.at(-1) !== input.lastCustomerId || (input.firstCustomerId && result.customerIds[0] !== input.firstCustomerId)
+        || new Set(result.customerIds).size !== initial.ids.length || result.customerIds.length !== initial.ids.length
         || initial.ids.some((id) => !result.customerIds.includes(id))) throw new HttpsError("unavailable", "추천 경로의 납품처가 일치하지 않습니다.");
       tx.update(this.db.doc(lockPath(input.requestId)), { state: "complete", result, basis: initial.basis });
       this.audit(tx, actor, "DELIVERY_ROUTE_RECOMMENDED", input.requestId, { customerCount: initial.ids.length });

@@ -19,6 +19,9 @@ async function photos(page: import("@playwright/test").Page, count: number) {
 async function scanStats(page: import("@playwright/test").Page) {
   return page.evaluate(() => (window as unknown as { previewScanStats: () => { requests: string[]; active: number; maxActive: number } }).previewScanStats());
 }
+async function recommendRequests(page: import("@playwright/test").Page) {
+  return page.evaluate(() => (window as unknown as { planningRecommendRequests: () => Array<{ firstCustomerId?: string; lastCustomerId: string }> }).planningRecommendRequests());
+}
 async function releaseScan(page: import("@playwright/test").Page) {
   await page.evaluate(() => (window as unknown as { releasePreviewScan: () => void }).releasePreviewScan());
 }
@@ -106,6 +109,74 @@ test("recommendation saves before completion and keeps photo-completed customers
   await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
   await page.getByRole("button", { name: "완료", exact: true }).click();
   await expect(page.getByRole("list", { name: "오늘 남은 납품처", exact: true }).getByRole("listitem")).toHaveText(["정다운푸드", "푸른급식", "늘봄식품", "예시푸드"]);
+});
+
+test("pins a selected first and last customer and omits the first field when returning to company departure", async ({ page }) => {
+  await open(page, "?route&completed");
+  const first = page.getByRole("combobox", { name: "출발지", exact: true });
+  const last = page.getByRole("combobox", { name: "마지막 납품처", exact: true });
+  await expect(first).toHaveValue("");
+  await first.selectOption("preview-1");
+  await expect(page.getByText("대전 대덕구 예시로 11", { exact: true })).toBeVisible();
+  await last.selectOption("preview-4");
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
+  const order = page.getByRole("dialog").getByRole("list").last().getByRole("listitem");
+  await expect(order.first()).toContainText("한빛유통"); await expect(order.first()).toContainText("첫 납품처");
+  await expect(order.last()).toContainText("정다운푸드");
+  expect((await recommendRequests(page))[0]).toMatchObject({ firstCustomerId: "preview-1", lastCustomerId: "preview-4" });
+  await first.selectOption("");
+  await expect(page.getByText("예상 이동")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toHaveCount(0);
+  await expect(last).toHaveValue("preview-4");
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
+  expect((await recommendRequests(page))[1]).not.toHaveProperty("firstCustomerId");
+  await page.getByRole("button", { name: "완료", exact: true }).click();
+  await expect(page.getByRole("list", { name: "오늘 남은 납품처" }).getByRole("listitem")).toHaveCount(4);
+  await expect(page.getByRole("list", { name: "오늘 남은 납품처" })).not.toContainText("한빛유통");
+});
+
+test("changing the first customer clears a matching last choice and blocks the duplicate endpoint", async ({ page }) => {
+  await open(page, "?route");
+  const first = page.getByRole("combobox", { name: "출발지", exact: true });
+  const last = page.getByRole("combobox", { name: "마지막 납품처", exact: true });
+  await last.selectOption("preview-0"); await first.selectOption("preview-0");
+  await expect(last).toHaveValue("");
+  await expect(last.locator('option[value="preview-0"]')).toHaveJSProperty("disabled", true);
+  await expect(page.getByRole("button", { name: "인공지능 경로 추천", exact: true })).toBeDisabled();
+  expect(await recommendRequests(page)).toEqual([]);
+  await last.selectOption("preview-1");
+  await expect(page.getByRole("button", { name: "인공지능 경로 추천", exact: true })).toBeEnabled();
+});
+
+test("customer departure works without company coordinates and returning to company requires them", async ({ page }) => {
+  await open(page, "?route&unconfigured");
+  const first = page.getByRole("combobox", { name: "출발지", exact: true });
+  await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-4");
+  await expect(page.getByRole("button", { name: "인공지능 경로 추천", exact: true })).toBeDisabled();
+  await expect(page.getByText("회사 출발 위치를 설정해주세요.", { exact: true })).toBeVisible();
+  await first.selectOption("preview-0");
+  await expect(page.getByText("회사 출발 위치를 설정해주세요.", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
+  await first.selectOption("");
+  await expect(page.getByRole("button", { name: "인공지능 경로 추천", exact: true })).toBeDisabled();
+});
+
+test("long route names fit 320px with customer departure and both fixed endpoints", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 }); await open(page, "?route&longRouteName");
+  await page.getByRole("combobox", { name: "출발지", exact: true }).selectOption("preview-0");
+  await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-4");
+  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await expect(page.getByRole("button", { name: "오늘 순서에 적용했어요" })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const firstRow = page.getByRole("dialog").getByRole("list").last().getByRole("listitem").first();
+  await expect(firstRow).toContainText("ABCDEFGHIJKLMN");
+  await firstRow.scrollIntoViewIfNeeded();
+  await expect(firstRow).toBeInViewport();
+  const bounds = await firstRow.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
 });
 
 for (const failure of ["failSave", "lostResponse"]) {

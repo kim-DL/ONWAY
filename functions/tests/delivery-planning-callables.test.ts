@@ -23,6 +23,17 @@ describe("planning callable boundary", () => {
     f.authorize.mockRejectedValue(new HttpsError("unauthenticated", "세션 만료"));
     await expect(api.getDeliveryPlanningContext.run(request({}).value)).rejects.toMatchObject({ code: "unauthenticated" }); expect(f.context).not.toHaveBeenCalled();
   });
+  it("accepts company or customer departure and rejects identical endpoints before the service", async () => {
+    const company = { requestId: randomUUID(), deliveryDateKey: "2026-11-08", expectedDayRevision: 1, lastCustomerId: "last" };
+    f.recommend.mockResolvedValue({ result: "test" });
+    await api.recommendDeliveryRoute.run(request(company).value);
+    expect(f.recommend).toHaveBeenLastCalledWith(company, actor);
+    const customer = { ...company, requestId: randomUUID(), firstCustomerId: "first" };
+    await api.recommendDeliveryRoute.run(request(customer).value);
+    expect(f.recommend).toHaveBeenLastCalledWith(customer, actor);
+    await expect(api.recommendDeliveryRoute.run(request({ ...customer, firstCustomerId: "last" }).value)).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(f.recommend).toHaveBeenCalledTimes(2);
+  });
   it("sanitizes arbitrary upstream errors rather than leaking image/key data", async () => {
     f.context.mockRejectedValue(new Error("secret-base64-and-key"));
     await expect(api.getDeliveryPlanningContext.run(request({}).value)).rejects.toMatchObject({ code: "unavailable", message: "납품 준비 요청을 완료하지 못했습니다. 목록을 새로 확인해주세요." });

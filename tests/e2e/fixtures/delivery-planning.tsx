@@ -9,7 +9,7 @@ import DeliveryPhotoEditor from "../../../src/features/delivery-photos/delivery-
 import { projectDeliveryPhotoCompletion } from "../../../src/features/delivery-photos/delivery-photo-domain";
 
 const date = "2026-11-07"; const params = new URLSearchParams(location.search);
-const names = ["예시푸드", "한빛유통", "늘봄식품", "푸른급식", "정다운푸드"];
+const names = [params.has("longRouteName") ? "주식회사아주긴학교급식식자재종합유통대전중앙물류사업부ABCDEFGHIJKLMN" : "예시푸드", "한빛유통", "늘봄식품", "푸른급식", "정다운푸드"];
 const customers: Customer[] = names.map((name, i) => ({ customerId: `preview-${i}`, companyId: "onnuri", name, normalizedName: name, choseongName: name,
   district: "대덕구", administrativeDong: "예시동", officialAddress: `대전 대덕구 예시로 ${10 + i}`, deliveryAddress: `대전 대덕구 예시로 ${10 + i}`,
   accessPassword: "", accessPasswordState: "none", deliveryLocationDescription: "", deliveryPoint: { latitude: 36.3 + i / 100, longitude: 127.4 + i / 100 },
@@ -28,6 +28,8 @@ let count = 0; let recommendCount = 0;
 Object.assign(window, { planningPreviewStats: () => ({ recommendCount, analyzed: count }) });
 const applyRequests: string[] = []; const receipts = new Map<string, PlanningLists["day"]>();
 Object.assign(window, { planningApplyRequests: () => [...applyRequests] });
+const recommendRequests: Parameters<PlanningRepository["recommend"]>[0][] = [];
+Object.assign(window, { planningRecommendRequests: () => structuredClone(recommendRequests) });
 const scanRequests: string[] = []; const scanGates: (() => void)[] = [];
 let activeScans = 0; let maxActiveScans = 0;
 Object.assign(window, {
@@ -108,9 +110,12 @@ const repository: PlanningRepository = {
     const value: PhotoAlias = { ...old, customerId: customer?.customerId ?? old.customerId, targetName: customer?.name ?? old.targetName, enabled: Boolean(customerId), revision: old.revision + 1 };
     aliases[index] = value; return value;
   },
-  recommend: async ({ requestId, lastCustomerId }) => {
+  recommend: async (input) => {
+    const { requestId, lastCustomerId, firstCustomerId } = input;
+    recommendRequests.push(structuredClone(input));
+    if (firstCustomerId === lastCustomerId) throw new Error("출발지와 마지막 납품처를 다르게 선택해주세요.");
     recommendCount++; await new Promise((resolve) => setTimeout(resolve, 200));
-    const result: RouteRecommendation = { recommendationId: requestId, deliveryDateKey: date, customerIds: [...lists.day.customerIds.filter((id) => id !== lastCustomerId).reverse(), lastCustomerId],
+    const result: RouteRecommendation = { recommendationId: requestId, deliveryDateKey: date, customerIds: [...(firstCustomerId ? [firstCustomerId] : []), ...lists.day.customerIds.filter((id) => id !== lastCustomerId && id !== firstCustomerId).reverse(), lastCustomerId],
       totalSeconds: 4920, totalMeters: 38400, calculatedAt: `${date}T00:00:00Z`, notice: PLANNING_NOTICE };
     recommendations.set(requestId, result); return result;
   },

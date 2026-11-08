@@ -17,7 +17,7 @@ export interface PlanningProviders {
   resolveInvoiceAddress?: AddressIdentityResolver;
   readInvoice(image: Buffer): Promise<InvoiceFields>;
   readPhotoBatch(image: Buffer): Promise<PhotoExtraction>;
-  optimize(settings: PlanningSettings, stops: RouteStop[], lastId: string, now: Date): Promise<OptimizedRoute>;
+  optimize(settings: PlanningSettings, stops: RouteStop[], lastId: string, now: Date, firstId?: string): Promise<OptimizedRoute>;
 }
 
 export async function invoiceImage(base64: string, contentType: string) {
@@ -81,7 +81,7 @@ export function parseInvoicePartiesResponse(raw: unknown): PhotoExtraction {
   }
 }
 const numeric = z.union([z.number(), z.string().regex(/^\d+(?:\.\d+)?$/)]).transform(Number).pipe(z.number().finite().nonnegative());
-export function parseTmapResponse(raw: unknown, stops: RouteStop[], lastId: string): OptimizedRoute {
+export function parseTmapResponse(raw: unknown, stops: RouteStop[], lastId: string, firstId?: string): OptimizedRoute {
   const parsed = z.object({ properties: z.object({ totalTime: numeric, totalDistance: numeric }),
     features: z.array(z.object({ geometry: z.object({ type: z.string() }), properties: z.object({
       index: numeric.optional(), viaPointId: z.string().optional(), pointType: z.string().optional(),
@@ -90,24 +90,37 @@ export function parseTmapResponse(raw: unknown, stops: RouteStop[], lastId: stri
   const points = parsed.features.filter((f) => f.geometry.type === "Point");
   const vias = points.filter((f) => f.properties.viaPointId).sort((a, b) => (a.properties.index ?? -1) - (b.properties.index ?? -1));
   const ids = vias.map((v) => v.properties.viaPointId!);
-  const expected = stops.filter((s) => s.customerId !== lastId).map((s) => s.customerId);
+  const expected = stops.filter((s) => s.customerId !== lastId && s.customerId !== firstId).map((s) => s.customerId);
   if (vias.some((v) => v.properties.index === undefined) || new Set(vias.map((v) => v.properties.index)).size !== vias.length
     || ids.length !== expected.length || new Set(ids).size !== ids.length || expected.some((id) => !ids.includes(id))
     || !points.some((p) => p.properties.pointType === "E")) {
     throw new HttpsError("unavailable", "추천 결과의 납품처가 일치하지 않습니다. 다시 계산해주세요.");
   }
-  return { customerIds: [...ids, lastId], totalSeconds: parsed.properties.totalTime, totalMeters: parsed.properties.totalDistance };
+  return { customerIds: [...(firstId ? [firstId] : []), ...ids, lastId], totalSeconds: parsed.properties.totalTime, totalMeters: parsed.properties.totalDistance };
 }
-export function tmapRequest(settings: PlanningSettings, stops: RouteStop[], lastId: string, now: Date) {
-  const vehicle = settings.vehicle; const origin = settings.originPoint; const last = stops.find((s) => s.customerId === lastId);
-  if (!origin || !last || stops.length < 2 || stops.length > 20) throw new HttpsError("failed-precondition", "회사 출발 위치와 납품처 2~20곳을 확인해주세요.");
+export function parseTmapTruckResponse(raw: unknown, firstId: string, lastId: string): OptimizedRoute {
+  const parsed = z.object({ features: z.array(z.object({ geometry: z.object({ type: z.string() }), properties: z.object({
+    totalTime: numeric.optional(), totalDistance: numeric.optional(), pointType: z.string().optional(),
+  }) })).min(1).max(10_000) }).parse(raw);
+  const totals = parsed.features[0]?.properties;
+  const points = parsed.features.filter((feature) => feature.geometry.type === "Point");
+  if (totals?.totalTime === undefined || totals.totalDistance === undefined
+    || !points.some((point) => point.properties.pointType === "S") || !points.some((point) => point.properties.pointType === "E")) {
+    throw new HttpsError("unavailable", "출발지와 마지막 납품처의 경로를 확인하지 못했습니다. 다시 계산해주세요.");
+  }
+  return { customerIds: [firstId, lastId], totalSeconds: totals.totalTime, totalMeters: totals.totalDistance };
+}
+export function tmapRequest(settings: PlanningSettings, stops: RouteStop[], lastId: string, now: Date, firstId?: string) {
+  const vehicle = settings.vehicle; const first = firstId ? stops.find((s) => s.customerId === firstId) : null;
+  const origin = first ?? settings.originPoint; const last = stops.find((s) => s.customerId === lastId);
+  if (!origin || !last || (firstId && !first) || firstId === lastId || stops.length < 2 || stops.length > 20) throw new HttpsError("failed-precondition", "출발지와 서로 다른 납품처 2~20곳을 확인해주세요.");
   const seoul = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 16).replace(/[-T:]/gu, "");
-  return { reqCoordType: "WGS84GEO", resCoordType: "WGS84GEO", startName: "company", startX: String(origin.longitude), startY: String(origin.latitude),
+  return { reqCoordType: "WGS84GEO", resCoordType: "WGS84GEO", startName: first ? "first" : "company", startX: String(origin.longitude), startY: String(origin.latitude),
     startTime: seoul, endName: "last", endX: String(last.longitude), endY: String(last.latitude), searchOption: "2", carType: "1", coordinateFlag: "1",
     truckType: "1", truckHeight: String(vehicle.heightCm), truckWidth: String(vehicle.widthCm), truckLength: String(vehicle.lengthCm),
     truckWeight: String(vehicle.loadKg), truckTotalWeight: String(vehicle.totalWeightKg),
     // No customer names, invoice data, or employee identifiers are sent to TMAP.
-    viaPoints: stops.filter((s) => s.customerId !== lastId).map((s, index) => ({ viaPointId: s.customerId, viaPointName: `stop-${index + 1}`, viaX: String(s.longitude), viaY: String(s.latitude), viaTime: 0 })),
+    viaPoints: stops.filter((s) => s.customerId !== lastId && s.customerId !== firstId).map((s, index) => ({ viaPointId: s.customerId, viaPointName: `stop-${index + 1}`, viaX: String(s.longitude), viaY: String(s.latitude), viaTime: 0 })),
   };
 }
 export function createPlanningProviders(keys: { openai: () => string; tmap: () => string; kakao?: () => string; model?: string; photoModel?: string; openaiProject?: string }, fetcher: ProviderFetch = fetch): PlanningProviders {
@@ -174,11 +187,16 @@ export function createPlanningProviders(keys: { openai: () => string; tmap: () =
       }
       return invoice;
     },
-    async optimize(settings, stops, lastId, now) {
+    async optimize(settings, stops, lastId, now, firstId) {
       const key = keys.tmap().trim();
       if (!key) throw new HttpsError("failed-precondition", "인공지능 경로 추천 설정이 필요합니다. 관리자에게 알려주세요.");
-      const raw = await post(fetcher, "https://apis.openapi.sk.com/tmap/routes/routeOptimization20?version=1", { appKey: key }, tmapRequest(settings, stops, lastId, now));
-      return parseTmapResponse(raw, stops, lastId);
+      const { viaPoints, startTime, ...route } = tmapRequest(settings, stops, lastId, now, firstId);
+      if (firstId && !viaPoints.length) {
+        const raw = await post(fetcher, "https://apis.openapi.sk.com/tmap/truck/routes?version=1", { appKey: key }, { ...route, trafficInfo: "Y" });
+        return parseTmapTruckResponse(raw, firstId, lastId);
+      }
+      const raw = await post(fetcher, "https://apis.openapi.sk.com/tmap/routes/routeOptimization20?version=1", { appKey: key }, { ...route, startTime, viaPoints });
+      return parseTmapResponse(raw, stops, lastId, firstId);
     },
   };
 }

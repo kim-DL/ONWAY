@@ -32,12 +32,16 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
   const [processing, setProcessing] = useState(false); const draining = useRef(false);
   const pending = useRef<string[]>([]); const scanCount = useRef(0);
   const busy = actionBusy || processing;
-  const [error, setError] = useState(""); const [lastId, setLastId] = useState("");
+  const [error, setError] = useState(""); const [firstChoice, setFirstId] = useState(""); const [lastChoice, setLastId] = useState("");
   const [recommendation, setRecommendation] = useState<RouteRecommendation | null>(null); const [applied, setApplied] = useState(false);
   const applyRequest = useRef<{ recommendationId: string; requestId: string } | null>(null);
   const camera = useRef<HTMLInputElement>(null); const gallery = useRef<HTMLInputElement>(null);
   const activeCustomers = customers.filter((c) => c.status === "active");
   const today = day.customerIds.map((id) => activeCustomers.find((c) => c.customerId === id)).filter((c): c is Customer => Boolean(c));
+  const firstCustomer = today.find((c) => c.customerId === firstChoice);
+  const firstId = firstCustomer?.customerId ?? "";
+  const lastId = today.some((c) => c.customerId === lastChoice && c.customerId !== firstId) ? lastChoice : "";
+  const originAddress = firstId ? firstCustomer?.deliveryAddress.trim() || firstCustomer?.officialAddress.trim() || "등록 주소를 확인해주세요." : context?.settings.originAddress ?? "출발지 확인 중…";
   const reviews = scans.reduce((count, scan) => count + (scan.result?.rows.filter((row) => row.status === "review").length ?? 0), 0);
   const saved = new Set(scans.flatMap((s) => s.result?.rows.flatMap((row) => row.status === "saved" && row.customerId ? [row.customerId] : []) ?? [])).size;
   const done = scans.filter((s) => s.state === "done" || s.state === "failed").length;
@@ -125,7 +129,7 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
     const result = await repository.apply({ ...applyRequest.current, deliveryDateKey: route.deliveryDateKey });
     if (alive.current) { onDay(result); setApplied(true); }
   };
-  const canRecommend = context?.settings.originPoint && today.length >= 2 && today.length <= 20 && today.some((c) => c.customerId === lastId) && !reviews && !scans.some((s) => s.state === "failed");
+  const canRecommend = context && (firstId ? firstCustomer : context.settings.originPoint) && today.length >= 2 && today.length <= 20 && today.some((c) => c.customerId === lastId) && firstId !== lastId && !reviews && !scans.some((s) => s.state === "failed");
   const guard = () => !scans.some((s) => s.result?.rows.some((row) => row.status === "review") || s.state === "failed") || window.confirm("확인하지 않은 사진은 보관되지 않습니다. 이미 저장한 납품처는 유지하고 닫을까요?");
 
   return <BottomSheet open title={mode === "route" ? "인공지능 경로 추천" : "사진으로 납품 준비"} onClose={onClose} beforeClose={guard} dismissible={!busy && !configuring}>
@@ -172,26 +176,29 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
           })} />}</details>}
         <section className={styles.routeSection} aria-label="납품 경로 추천">
           <div className={styles.sectionTitle}><h3>오늘의 납품 순서</h3><span>{today.length}곳</span></div>
-          {!recommendation && <ol className={styles.routeList} aria-label="현재 오늘 납품처">{today.map((c, index) => <li key={c.customerId}><span>{index + 1}</span><strong>{c.name}</strong></li>)}</ol>}
           {onEditToday && <button type="button" className={styles.textButton} disabled={busy} onClick={() => { if (guard()) onEditToday(); }}>납품처 추가 · 순서 편집</button>}
           {today.length < 2 && <p className={styles.hint}>오늘 납품처를 2곳 이상 선택해주세요.</p>}
-          <div className={styles.origin}><span className={styles.originDot} /><div><strong>회사에서 출발</strong><p>{context?.settings.originAddress ?? "출발지 확인 중…"}</p></div></div>
-          <label className={styles.lastSelect}>마지막 납품처<select value={lastId} disabled={busy} onChange={(e) => { setLastId(e.target.value); setRecommendation(null); setApplied(false); }}><option value="">거래처 선택</option>{today.map((c) => <option key={c.customerId} value={c.customerId}>{c.name}</option>)}</select></label>
+          <label className={styles.lastSelect}>출발지<select value={firstId} disabled={busy} onChange={(e) => {
+            const next = e.target.value; setFirstId(next); if (next === lastId) setLastId(""); setRecommendation(null); setApplied(false); setError("");
+          }}><option value="">회사에서 출발</option>{today.map((c) => <option key={c.customerId} value={c.customerId}>{c.name}</option>)}</select></label>
+          <p className={styles.originAddress}>{originAddress}</p>
+          <label className={styles.lastSelect}>마지막 납품처<select value={lastId} disabled={busy} onChange={(e) => { setLastId(e.target.value); setRecommendation(null); setApplied(false); setError(""); }}><option value="">거래처 선택</option>{today.map((c) => <option key={c.customerId} value={c.customerId} disabled={c.customerId === firstId}>{c.name}</option>)}</select></label>
           <div className={styles.vehicleNote}><strong>봉고3 냉동탑차 · 높이 {(context?.settings.vehicle ?? DEFAULT_DELIVERY_VEHICLE).heightCm / 100}m</strong><p>{PLANNING_NOTICE}</p></div>
-          {context && !context.settings.originPoint && <p className={styles.configNotice}>{context.canConfigure ? "회사 출발 위치를 설정해주세요." : "관리자의 출발지 설정이 필요해요."}</p>}
+          {context && !context.settings.originPoint && !firstId && <p className={styles.configNotice}>{context.canConfigure ? "회사 출발 위치를 설정해주세요." : "관리자의 출발지 설정이 필요해요."}</p>}
           {context?.canConfigure && <button type="button" className={styles.textButton} disabled={busy} onClick={() => setConfiguring(true)}>회사 출발지 설정</button>}
           {!context && <button type="button" disabled={busy} onClick={() => void loadContext()}>출발지 설정 다시 확인</button>}
           <button type="button" className={styles.recommendButton} disabled={busy || !canRecommend} onClick={() => void action(async () => {
             setRecommendation(null); setApplied(false);
-            const result = await repository.recommend({ requestId: crypto.randomUUID(), deliveryDateKey: day.deliveryDateKey, expectedDayRevision: day.revision, lastCustomerId: lastId });
+            const result = await repository.recommend({ requestId: crypto.randomUUID(), deliveryDateKey: day.deliveryDateKey, expectedDayRevision: day.revision, ...(firstId ? { firstCustomerId: firstId } : {}), lastCustomerId: lastId });
             if (alive.current) { setRecommendation(result); await applyRecommendation(result); }
           })}>{busy ? "처리 중…" : recommendation ? "인공지능으로 다시 계산" : "인공지능 경로 추천"}</button>
           {reviews > 0 && <p className={styles.hint}>확인이 필요한 항목을 연결하거나 제외해주세요.</p>}
           {today.length > 20 && <p className={styles.hint}>경로 추천은 한 번에 20곳까지 지원해요. 오늘 순서 편집을 이용해주세요.</p>}
+          {!recommendation && <ol className={styles.routeList} aria-label="현재 오늘 납품처">{today.map((c, index) => <li key={c.customerId}><span>{index + 1}</span><strong>{c.name}</strong></li>)}</ol>}
           {recommendation && <div className={styles.recommendation}>
             <div className={styles.routeStats}><span>예상 이동<strong>{Math.ceil(recommendation.totalSeconds / 60)}<small>분</small></strong></span><span>전체 거리<strong>{(recommendation.totalMeters / 1000).toFixed(1)}<small>km</small></strong></span></div>
             <p className={styles.hint}>하차·납품 시간 제외</p>
-            <ol className={styles.routeList}>{recommendation.customerIds.map((id, index) => <li key={id}><span>{index + 1}</span><div><strong>{activeCustomers.find((c) => c.customerId === id)?.name ?? "거래처"}</strong>{index === recommendation.customerIds.length - 1 && <small>마지막 납품처</small>}</div></li>)}</ol>
+            <ol className={styles.routeList}>{recommendation.customerIds.map((id, index) => <li key={id}><span>{index + 1}</span><div><strong>{activeCustomers.find((c) => c.customerId === id)?.name ?? "거래처"}</strong>{index === 0 && firstId && <small>첫 납품처</small>}{index === recommendation.customerIds.length - 1 && <small>마지막 납품처</small>}</div></li>)}</ol>
             <button type="button" className={styles.primary} disabled={busy || applied} onClick={() => void action(() => applyRecommendation(recommendation))}>{applied ? "오늘 순서에 적용했어요" : busy ? "오늘 목록에 저장 중…" : "오늘 목록 저장 다시 시도"}</button>
             {applied && onEditToday && <button type="button" className={styles.editOrder} disabled={busy} onClick={onEditToday}>순서 직접 바꾸기</button>}
           </div>}

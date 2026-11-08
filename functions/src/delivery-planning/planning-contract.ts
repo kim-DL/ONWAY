@@ -48,8 +48,8 @@ export const confirmInvoiceSchema = z.object({
 }).strict();
 export const recommendRouteSchema = z.object({
   requestId: z.uuid(), deliveryDateKey: deliveryDateKeySchema, expectedDayRevision: revision,
-  lastCustomerId: id,
-}).strict();
+  lastCustomerId: id, firstCustomerId: id.optional(),
+}).strict().refine((input) => input.firstCustomerId !== input.lastCustomerId, { message: "출발지와 마지막 납품처를 다르게 선택해주세요.", path: ["firstCustomerId"] });
 export const routeRecommendationSchema = z.object({
   recommendationId: z.uuid(), deliveryDateKey: deliveryDateKeySchema, customerIds: z.array(id).min(2).max(20),
   totalSeconds: z.number().finite().nonnegative(), totalMeters: z.number().finite().nonnegative(),

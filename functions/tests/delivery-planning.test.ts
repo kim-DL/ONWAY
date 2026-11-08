@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { invoiceAddressMatches, matchInvoice, splitInvoiceName } from "../src/delivery-planning/invoice-matching.js";
-import { createPlanningProviders, invoiceImage, parseInvoiceResponse, parseTmapResponse, tmapRequest } from "../src/delivery-planning/planning-providers.js";
-import { DEFAULT_DELIVERY_VEHICLE, planningSettingsDraftSchema, vehicleSchema, type InvoiceFields, type PlanningSettings } from "../src/delivery-planning/planning-contract.js";
+import { createPlanningProviders, invoiceImage, parseInvoiceResponse, parseTmapResponse, parseTmapTruckResponse, tmapRequest } from "../src/delivery-planning/planning-providers.js";
+import { DEFAULT_DELIVERY_VEHICLE, planningSettingsDraftSchema, recommendRouteSchema, vehicleSchema, type InvoiceFields, type PlanningSettings } from "../src/delivery-planning/planning-contract.js";
 
 const testImage = await sharp({ create: { width: 800, height: 1200, channels: 3, background: "white" } }).jpeg().toBuffer();
 
@@ -15,6 +15,11 @@ const tmap = { type: "FeatureCollection", properties: { totalTime: "1757", total
   { geometry: { type: "Point" }, properties: { index: "0", pointType: "S", viaPointId: "" } },
   { geometry: { type: "Point" }, properties: { index: "1", pointType: "B1", viaPointId: "a" } },
   { geometry: { type: "Point" }, properties: { index: "2", pointType: "E", viaPointId: "" } },
+] };
+const truckRoute = { type: "FeatureCollection", features: [
+  { geometry: { type: "Point" }, properties: { totalTime: "488", totalDistance: "3161", pointType: "S" } },
+  { geometry: { type: "Point" }, properties: { pointType: "N" } },
+  { geometry: { type: "Point" }, properties: { pointType: "E" } },
 ] };
 describe("invoice matching is conservative", () => {
   it("splits region and matches a uniquely corroborated address", () => {
@@ -68,6 +73,55 @@ describe("provider privacy and route contracts", () => {
   });
   it("extracts returned order, time in seconds, and distance in metres", () => {
     expect(parseTmapResponse(tmap, stops, "b")).toEqual({ customerIds: ["a", "b"], totalSeconds: 1757, totalMeters: 6230 });
+  });
+  it("keeps the old company input unchanged and permits a distinct first customer", () => {
+    const request = { requestId: "d777964b-4767-4d94-bdb2-237673803fb4", deliveryDateKey: "2026-11-08", expectedDayRevision: 2, lastCustomerId: "b" };
+    expect(recommendRouteSchema.parse(request)).toEqual(request);
+    expect(recommendRouteSchema.parse({ ...request, firstCustomerId: "a" })).toEqual({ ...request, firstCustomerId: "a" });
+    expect(recommendRouteSchema.safeParse({ ...request, firstCustomerId: "b" }).success).toBe(false);
+    expect(recommendRouteSchema.safeParse({ ...request, firstCustomerId: null }).success).toBe(false);
+  });
+  it("starts at the chosen customer without company coordinates or a duplicate via point", () => {
+    const request = tmapRequest({ ...settings, originPoint: null }, stops, "b", new Date("2026-11-07T23:15:00Z"), "a");
+    expect(request).toMatchObject({ startName: "first", startX: "127.5", startY: "36.4", endX: "127.6", endY: "36.5", viaPoints: [], truckHeight: "240" });
+    expect(() => tmapRequest(settings, stops, "b", new Date(), "missing")).toThrow();
+    expect(() => tmapRequest(settings, stops, "b", new Date(), "b")).toThrow();
+  });
+  it("restores fixed first and last customers around only the returned middle stops", () => {
+    const direct = { ...tmap, features: [tmap.features[0], tmap.features[2]] };
+    expect(parseTmapResponse(direct, stops, "b", "a")).toEqual({ customerIds: ["a", "b"], totalSeconds: 1757, totalMeters: 6230 });
+    const three = [...stops, { customerId: "c", latitude: 36.6, longitude: 127.7 }];
+    const response = { ...tmap, features: [tmap.features[0], { geometry: { type: "Point" }, properties: { index: 1, viaPointId: "b" } }, tmap.features[2]] };
+    expect(tmapRequest(settings, three, "c", new Date(), "a").viaPoints.map(point => point.viaPointId)).toEqual(["b"]);
+    expect(parseTmapResponse(response, three, "c", "a").customerIds).toEqual(["a", "b", "c"]);
+    expect(() => parseTmapResponse(tmap, stops, "b", "a")).toThrow();
+  });
+  it("uses one truck route request for two fixed endpoints, with all vehicle restrictions", async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, status: 200, json: async () => truckRoute }));
+    const providers = createPlanningProviders({ openai: () => "unused", tmap: () => "route-key" }, fetcher);
+    expect(await providers.optimize(settings, stops, "b", new Date(), "a")).toEqual({ customerIds: ["a", "b"], totalSeconds: 488, totalMeters: 3161 });
+    const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
+    expect(calls).toHaveLength(1); expect(calls[0]![0]).toBe("https://apis.openapi.sk.com/tmap/truck/routes?version=1");
+    const body = JSON.parse(String(calls[0]![1].body));
+    expect(body).toMatchObject({ startX: "127.5", startY: "36.4", endX: "127.6", endY: "36.5", trafficInfo: "Y",
+      truckHeight: "240", truckWidth: "175", truckLength: "520", truckType: "1", truckWeight: "1000", truckTotalWeight: "4000" });
+    expect(body.viaPoints).toBeUndefined(); expect(body.startTime).toBeUndefined();
+  });
+  it("reads truck totals from the first feature and requires both route endpoints", () => {
+    expect(parseTmapTruckResponse(truckRoute, "a", "b")).toEqual({ customerIds: ["a", "b"], totalSeconds: 488, totalMeters: 3161 });
+    const numericRoute = { ...truckRoute, features: [{ ...truckRoute.features[0], properties: { pointType: "S", totalTime: 0, totalDistance: 0 } }, truckRoute.features[2]] };
+    expect(parseTmapTruckResponse(numericRoute, "a", "b")).toEqual({ customerIds: ["a", "b"], totalSeconds: 0, totalMeters: 0 });
+    for (const features of [[], [{ geometry: { type: "Point" }, properties: { pointType: "S" } }, truckRoute.features[2]],
+      [{ ...truckRoute.features[0], properties: { ...truckRoute.features[0]!.properties, pointType: "N" } }, truckRoute.features[2]],
+      [truckRoute.features[0], truckRoute.features[1]], [{ ...truckRoute.features[0], properties: { pointType: "S", totalTime: "invalid", totalDistance: "3161" } }, truckRoute.features[2]]]) {
+      expect(() => parseTmapTruckResponse({ features }, "a", "b")).toThrow();
+    }
+  });
+  it("does not retry a failed two-endpoint route through the optimizer", async () => {
+    const fetcher = vi.fn(async () => ({ ok: false, status: 400, json: async () => ({}) }));
+    const providers = createPlanningProviders({ openai: () => "unused", tmap: () => "route-key" }, fetcher);
+    await expect(providers.optimize(settings, stops, "b", new Date(), "a")).rejects.toThrow("연결하지 못했습니다");
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it("rejects missing, duplicated, unknown or end-less routes", () => {
     for (const features of [[], [...tmap.features, tmap.features[1]], tmap.features.slice(0, 2), [tmap.features[0], { geometry: { type: "Point" }, properties: { index: 1, viaPointId: "unknown" } }, tmap.features[2]]]) {
