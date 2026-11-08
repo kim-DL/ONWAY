@@ -24,4 +24,16 @@
 
 사용자가 최종 점검 후 배포를 명시적으로 승인했다. 대상은 `recommendDeliveryRoute`, `applyDeliveryRoute`와 `hosting:onnuriway`다. MCP 서버, 다른 Functions, Rules, Auth, Storage와 업무 데이터는 배포하지 않는다. 배포 전후 기존 업무 문서와 줄임말 해시를 비교한다.
 
-정확한 후보 CI, 운영 build/PWA/성능/Hosting 검사, 배포·공개 주소·런타임 및 데이터 대조 결과는 완료 후 이 기록에 추가한다. 원시 증거는 기본 작업공간의 git 제외 `output/route-replanning/`에 보관한다.
+원시 증거는 기본 작업공간의 git 제외 `output/route-replanning/`에 보관한다.
+
+## 최종 배포와 확인
+
+- 배포 소스는 `3b701db66b2c33bd2a2718128e411f6a90ff201d`다. 최종 운영 빌드와 PWA·성능·Hosting gate, 전체 타입/lint 및 최종 화면 E2E 30개가 통과했다. 정상 의존성 배치의 경로 화면 gzip은 8,169B/8,192B, 기존 영업 화면은 14,333B/14,336B다. 예산·검사 기준·의존성·지연 로딩 경계는 변경하지 않았다.
+- 정확한 소스의 [Quality Gate 42475110049](https://github.com/kim-DL/ONWAY/actions/runs/42475110049)는 full profile로 한 번 실행해 필수 14개가 성공했다. 선택에서 제외된 ui/presentation/ci-policy 3개는 별도 skip이다. 단위 2,034개 통과·23개 조건부 skip, 브라우저 510개 통과·8개 skip·flaky 0, 업무 흐름 83개 통과·19개 skip, 납품사진 16개, 재고사진 브라우저 4개와 단위 13개, 지연 도구 2개가 통과했다. skip을 통과 수에 더하지 않았다. 로컬 빌드 조정의 실패 내역은 앞 항목과 원시 로그에 별도로 보존했다.
+- 추천 서버는 `recommenddeliveryroute-00003-cug`, 적용 서버는 `applydeliveryroute-00004-buc`이며 두 서버 모두 ACTIVE·ready·새 revision 트래픽100%다. 각 업로드의 소스·컴파일 파일 281개가 후보 해시와 모두 일치했다. 각 서버 기존 환경 6개, 비밀정보 연결과 서비스 한도를 유지했다.
+- Hosting은 2026-11-08 20:37:38 KST에 `ba2b6437acf28fe4`로 배포했다. 두 운영 주소 각각 공개 검사 34개와 JavaScript/CSS 106개의 후보 해시 대조가 통과했다. 서비스워커·앱 정체성과 새 정적 파일을 확인했다.
+- 두 서버 이외의 80개 Functions와 MCP Hosting은 변경하지 않았다. `employeeMcp`는 배포 전후 `employeemcp-00036-wag`다. MCP 1.15.2의 목록·크게 보기와 사용자가 직접 등록한 납품처는 유지했다.
+- 기존 업무 문서 823개(상품92·lot89·입출고240·거래처223·사진159·내 목록3·일별 목록17)와 줄임말7개는 배포 전후 문서 수·키·해시가 모두 동일하다. 운영 시험 등록·추천 적용·재고 변경은 0건이다.
+- 운영 인증 화면에서 출발지·마지막 납품처·회사에서 출발 옵션을 확인했다. 이 브라우저 계정은 오늘0곳이라 2곳 이상 선택 안내와 추천 비활성화가 정상이다. 실제 운영 순서를 시험 변경하지 않았으며 선택·사진 이후 재추천·저장과 재시도는 격리 fixture/demo에서 검증했다. 브라우저 드라이버의 locator 체인·역할 조회·객체형 option 선택과 DOM selector 오류를 실제 제품 결함이나 정상 선택 완료로 보고하지 않았다. 점검용 탭만 닫았다. 실물 휴대폰·설치 PWA·실주행 검증은 별도다.
+
+Hosting 직전 버전 `27f3bd0902c9d2c1`, 추천 직전 revision `recommenddeliveryroute-00002-ton`, 적용 직전 `applydeliveryroute-00003-fer`와 두 서버 이전 소스 ZIP을 증거 경로에 보존했다. 롤백은 실행하지 않았다. 배포 후 문서만 기록하며 제품을 다시 배포하지 않는다.
