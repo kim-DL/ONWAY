@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { QuantumCloudLoader } from "@/components/ui/quantum-cloud-loader";
 import { useHeaderMotionPreference } from "./header-motion-preference";
 import { TypingGreeting } from "./typing-greeting";
@@ -31,10 +31,11 @@ const serverMotionRestricted = () => 3;
 type WelcomeGreetingProps = {
   children?: string;
   className?: string;
+  renderCharacters?: (characters: readonly ReactNode[]) => ReactNode;
 } & ({ variant: "copy"; title?: never; accent?: never; titleId?: never }
   | { variant?: "default" | "customer"; title: string; accent: string; titleId: string });
 
-export function WelcomeGreeting({ children, title, accent, titleId, className = "", variant = "default" }: WelcomeGreetingProps) {
+export function WelcomeGreeting({ children, title, accent, titleId, className = "", variant = "default", renderCharacters }: WelcomeGreetingProps) {
   const mascotRef = useRef<HTMLSpanElement>(null);
   const copyRef = useRef<HTMLParagraphElement>(null);
   const { paused } = useHeaderMotionPreference();
@@ -66,7 +67,7 @@ export function WelcomeGreeting({ children, title, accent, titleId, className = 
   return (
     <div className={styles.greeting} data-welcome-greeting data-welcome-variant={variant}>
       <p ref={copyRef} className={`${className} ${styles.copy}`} data-greeting-copy>
-        <TypingGreeting text={children ?? ""} disabled={paused || (environment & 2) !== 0} active={copyInView && (environment & 1) === 0} />
+        <TypingGreeting text={children ?? ""} disabled={paused || (environment & 2) !== 0} active={copyInView && (environment & 1) === 0} {...(renderCharacters ? { renderCharacters } : {})} />
       </p>
       {variant !== "copy" ? <div className={styles.headline} data-welcome-headline>
         <h1 id={titleId} className={styles.title} data-welcome-title>

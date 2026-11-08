@@ -188,7 +188,7 @@ test("planning cards open their tools and a populated photo screen stays compact
   await expect(workspace.getByText("남음 8곳 · 기록완료 0곳", { exact: true })).toBeVisible();
   const header = workspace.locator(":scope > header");
   expect((await header.boundingBox())!.height).toBeLessThan(58);
-  await expect(header.getByRole("button", { name: "순서 편집", exact: true })).toBeVisible();
+  await expect(workspace.getByRole("group", { name: "납품처 관리" }).getByRole("button", { name: "순서 편집", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "거래처로 돌아가기", exact: true })).toHaveCount(0);
   for (const [button, title] of [["명세서로 등록", "명세서로 납품 준비"], ["인공지능 경로 추천", "인공지능 경로 추천"]] as const) {
     await workspace.getByRole("button", { name: button, exact: true }).click();

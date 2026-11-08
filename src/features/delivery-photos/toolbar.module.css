@@ -1,0 +1,23 @@
+.header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.5rem;margin-bottom:.65rem}
+.header h1{margin:0;color:#253e53;font-size:1.625rem;font-weight:800;letter-spacing:-1.1px;line-height:1.22;text-shadow:0 1px #ffffffb3}
+.summary{display:grid;gap:.25rem;min-width:0;padding-left:8px}
+.welcome{width:clamp(150px,44vw,230px);min-width:0;padding-left:8px}
+.welcome .greetingCopy{width:max-content;max-width:100%;margin:0 0 0 auto;position:relative;padding-left:12px;color:#344b63;font-size:12px;font-weight:700;letter-spacing:-.35px;line-height:1.6;text-align:left}
+.welcome .greetingCopy::before{content:"";position:absolute;left:0;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,transparent,#8eada766 35%,#8eada766 65%,transparent);pointer-events:none}
+.hello{display:flex;align-items:baseline;min-width:0;white-space:nowrap}
+.welcomeName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.helloSuffix{flex:none;white-space:pre}
+.welcomeMessage{display:block;margin-top:3px;color:#527b76;font-size:11px;font-weight:500;white-space:nowrap}
+@media(forced-colors:active){.welcome .greetingCopy::before{display:none}}
+@media(max-width:359px){.header h1{font-size:24px}.welcome{width:150px;padding-left:4px}.welcome .greetingCopy{font-size:11px}.header .summary strong{font-size:11px}}
+.summary strong{font-size:.78rem;color:#52687c;line-height:1.4}
+.manageActions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 10px}
+.manageActions.manageActions button{min-width:0;min-height:44px;padding:8px 3px;border:1px solid #c6d2dd;border-radius:9px;background:linear-gradient(170deg,#fff 0%,#f0f5f9 100%);color:#344b63;font:inherit;font-size:13px;font-weight:700;letter-spacing:-.45px;white-space:nowrap;box-shadow:inset 0 1px #fff,0 2px 0 #c6d2dd,0 3px 6px #344b630a;transition:background 140ms,box-shadow 140ms,transform 140ms}
+.manageActions.manageActions button:nth-child(2){color:#2f625f;border-color:#bdd2ce;background:linear-gradient(170deg,#fff,#eff6f3);box-shadow:inset 0 1px #fff,0 2px 0 #bdd2ce,0 3px 6px #344b630a}
+@media(hover:hover){.manageActions.manageActions button:hover:not(:disabled){background:#eaf1f6}}
+.manageActions.manageActions button:active:not(:disabled){transform:translateY(1px);box-shadow:inset 0 1px 3px #344b6318}
+.manageActions.manageActions button:disabled{box-shadow:none}
+@media(prefers-reduced-motion:reduce){.manageActions.manageActions button{transition:none}}
+@media(forced-colors:active){.manageActions.manageActions button{border-color:ButtonText;box-shadow:none}}
+@media(max-width:380px){.summary strong{font-size:.82rem}.summary button{font-size:.8rem}.manageActions.manageActions button{font-size:12px;letter-spacing:-.5px}}
+.manageActions button:focus-visible{outline:3px solid var(--mode-customer-text);outline-offset:2px}

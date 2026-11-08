@@ -1,6 +1,7 @@
 "use client";
 
 import "@/app/workspace.css";
+import "@/components/ui/search-field.module.css";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";

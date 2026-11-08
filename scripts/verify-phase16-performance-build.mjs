@@ -151,6 +151,7 @@ const deliveryPhotoFieldLayers = [
   // measure this new feature explicitly instead of charging it to legacy CSS.
   { name: "planning-entry", boundaries: ["planning-entry"], javascript: 1.5 * 1024, cssRaw: 1.5 * 1024, cssGzip: .75 * 1024 },
   { name: "invoice-planning", boundaries: ["delivery-planning-sheet"], javascript: 8 * 1024, cssRaw: 9 * 1024, cssGzip: 2.5 * 1024 },
+  { name: "toolbar", boundaries: ["delivery-photo-toolbar"], javascript: 3 * 1024, cssRaw: 4 * 1024, cssGzip: 1.5 * 1024 },
 ].map((layer) => {
   const assets = [...new Set(dynamicEntries.filter((entry) => layer.boundaries.some((name) => entry.boundary.endsWith(`/${name}`)))
     .flatMap((entry) => entry.files))];

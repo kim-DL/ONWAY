@@ -8,6 +8,7 @@ import { customerSchema, getCustomerChoseong, normalizeCustomerName, type Custom
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { DeliveryPhotoRow } from "./delivery-photo-row";
 import { DeliveryPhotoWorkspace } from "./delivery-photo-workspace";
+import DeliveryPhotoToolbar from "./delivery-photo-toolbar";
 
 const session: AuthenticatedSession = {
   uid: "uid_1",
@@ -28,11 +29,20 @@ describe("delivery photo field workspace", () => {
     const html = renderToStaticMarkup(createElement(DeliveryPhotoWorkspace, { session }));
     expect(html).toContain("납품사진");
     expect(html).toContain("불러오는 중");
-    expect(html).toContain('aria-label="납품사진 거래처 검색"');
     expect(html).toContain('aria-label="납품사진 카메라 촬영"');
     expect(html).toContain('capture="environment"');
     expect(html).toContain('aria-label="납품사진 앨범 선택"');
     expect(html.match(/type="file"/gu)).toHaveLength(2);
+  });
+
+  it("renders the deferred toolbar with its shared search and full accessible greeting", () => {
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoToolbar, { displayName: session.displayName, summary: "남음 2곳 · 기록완료 0곳",
+      ready: true, hasToday: true, onEdit: () => undefined, query: "", onQueryChange: () => undefined }));
+    expect(html).toContain('aria-label="납품사진 거래처 검색"');
+    expect(html).toContain("홍길동님 안녕하세요.");
+    expect(html).toContain("내 납품처");
+    expect(html).toContain("오늘 납품처");
+    expect(html).not.toContain("새로고침");
   });
 
   it("keeps narrow-screen containers shrinkable and touch controls at least 44px", () => {

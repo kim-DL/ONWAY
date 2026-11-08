@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { searchInputProps } from "@/components/ui/search-input-props";
 import { LoadingStatus } from "@/components/ui/loading-status";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
@@ -20,6 +19,7 @@ import { useDeliveryPhotoUploads } from "./use-delivery-photo-uploads";
 import type { DeliveryPhotoEditorMode } from "./delivery-photo-editor";
 import styles from "./photo.module.css";
 
+const DeliveryPhotoToolbar = dynamic(() => import("./delivery-photo-toolbar"), { ssr: false });
 const DeliveryPhotoRow = dynamic(() => import("./delivery-photo-row"), { ssr: false });
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { ssr: false });
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
@@ -88,13 +88,13 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
   };
 
   return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
-    <header className={styles.header}>
-      <div className={styles.summary}><h1 id="delivery-photo-heading">납품사진</h1><strong>{ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}</strong></div>
-      {ready && todayIds.length ? <button type="button" onClick={() => setEditor({ mode: "day" })}>순서 편집</button> : null}
-    </header>
-    {ready && snapshot ? <PlanningEntry key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${snapshot.day.deliveryDateKey}`}
-      customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh}
-      onEditToday={(onDone) => setEditor({ mode: "day", onDone })} /> : null}
+    <DeliveryPhotoToolbar displayName={session.displayName}
+      summary={ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"}
+      ready={ready} hasToday={todayIds.length > 0} onEdit={(mode) => setEditor({ mode })} query={query} onQueryChange={setQuery}>
+      {ready && snapshot ? <PlanningEntry key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${snapshot.day.deliveryDateKey}`}
+        customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh}
+        onEditToday={(onDone) => setEditor({ mode: "day", onDone })} /> : null}
+    </DeliveryPhotoToolbar>
     {uploads.storageError ? <p className={styles.notice} role="alert">사진 보관을 준비하지 못했어요. 기기 저장 공간과 브라우저의 저장소 허용을 확인한 뒤 앱을 다시 열어주세요.</p> : null}
     {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
       if (data.error) data.refresh();
@@ -102,7 +102,6 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
     }}>다시 시도</button></div> : null}
     {data.loading && snapshot ? <LoadingStatus className={styles.freshness} label="최신 목록 확인 중" detail="오늘 납품 기록을 확인하고 있습니다." /> : null}
     {snapshot?.today.truncated ? <p className={styles.notice}>오늘 사진이 많아 기록완료 수가 정확하지 않을 수 있습니다. 관리자에게 확인하세요.</p> : null}
-    <label className={styles.search}><span className={styles.srOnly}>거래처 검색</span><input {...searchInputProps} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" /></label>
     {query.trim() ? <section className={styles.section} aria-label="거래처 검색 결과"><h2>검색 결과</h2>
       {searchResults.length ? <ul className={styles.list}>{searchResults.filter((customer) => customer.customerId !== captureId).map((customer) => renderRow(customer.customerId, true))}</ul>
         : <p className={styles.empty}>일치하는 거래처가 없습니다.</p>}</section> : null}
@@ -119,11 +118,6 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail }: { sess
       <details className={styles.completed}><summary>기록완료 {completion.completedCustomerIds.length}곳</summary>
         {completion.completedCustomerIds.length ? <ul className={styles.list}>{completion.completedCustomerIds.filter((id) => id !== captureId).map((id) => renderRow(id))}</ul> : <p className={styles.empty}>아직 기록된 납품사진이 없습니다.</p>}
       </details>
-      <div className={styles.secondaryActions}>
-        <button type="button" onClick={() => setEditor({ mode: "route" })}>{routeIds.length ? "내 납품처 편집" : "내 납품처 설정"}</button>
-        <button type="button" onClick={() => setEditor({ mode: "day" })}>오늘 거래처 추가</button>
-        <button type="button" onClick={() => data.refresh()}>새로고침</button>
-      </div>
     </> : null}
     {editor && ready ? <DeliveryPhotoEditor key={`${editor.mode}:${editor.addId ?? ""}`} mode={editor.mode} session={session} customers={activeCustomers}
       initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}

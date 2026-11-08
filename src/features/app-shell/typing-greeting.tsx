@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { buildGreetingTypingSchedule } from "./greeting-typing-rhythm";
 import styles from "./typing-greeting.module.css";
 
@@ -16,10 +16,11 @@ export function splitGreeting(text: string): string[] {
 }
 
 /** A once-per-page entrance, not a live announcement or a repeating loader. */
-export function TypingGreeting({ text, disabled, active }: {
+export function TypingGreeting({ text, disabled, active, renderCharacters }: {
   text: string;
   disabled: boolean;
   active: boolean;
+  renderCharacters?: (characters: readonly ReactNode[]) => ReactNode;
 }) {
   const ready = useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
   const characters = useMemo(() => splitGreeting(text), [text]);
@@ -63,16 +64,18 @@ export function TypingGreeting({ text, disabled, active }: {
   let cursorIndex = visibleCount - 1;
   while (cursorIndex >= 0 && !characters[cursorIndex]?.trim()) cursorIndex -= 1;
 
+  const rendered = characters.map((character, index) => (
+    <span key={index} className={styles.character} data-greeting-character
+      data-cursor={typing && active && index === cursorIndex ? "true" : undefined}
+      style={{ visibility: index < visibleCount ? "visible" : "hidden" }}>{character}</span>
+  ));
+
   return (
     <>
       <span className={styles.accessible} data-greeting-accessible>{text}</span>
       <span className={styles.visual} aria-hidden="true" data-greeting-visual
         data-typing={typing ? (visibleCount === 0 ? "pending" : "typing") : "complete"}>
-        {characters.map((character, index) => (
-          <span key={index} className={styles.character} data-greeting-character
-            data-cursor={typing && active && index === cursorIndex ? "true" : undefined}
-            style={{ visibility: index < visibleCount ? "visible" : "hidden" }}>{character}</span>
-        ))}
+        {renderCharacters ? renderCharacters(rendered) : rendered}
       </span>
     </>
   );

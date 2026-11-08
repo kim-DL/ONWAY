@@ -4,6 +4,7 @@ import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { inventoryLocationMap, type InventoryContext, type InventoryProduct } from "@/domain/inventory";
 import { clearInventoryWorkspaceSnapshot, getInventoryWorkspaceSession, updateInventoryWorkspaceUi } from "./inventory-workspace-snapshot";
 import { reportInventoryAccessFailure } from "./inventory-access-boundary";
+import { SearchField } from "@/components/ui/search-field";
 
 const harness = vi.hoisted(() => ({ states: [] as unknown[], refs: [] as Array<{ current: unknown }>, effects: [] as Array<() => void | (() => void)>, stateCursor: 0, refCursor: 0, online: true, context: vi.fn(), list: vi.fn() }));
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(),
@@ -42,7 +43,7 @@ async function settle() { for (let index = 0; index < 12; index += 1) await Prom
 const hasEditor = (tree: ReactNode) => find(tree, (type) => typeof type === "function" && type.name === "InventoryProductEditor") !== null;
 const catalog = () => getInventoryWorkspaceSession("employee-1:1:1").snapshot.catalog;
 const isLoading = () => find(render(), (type, props) => typeof type === "function" && type.name === "LoadingStatus" && props.label === "재고 불러오는 중") !== null;
-const searchField = () => find(render(), (type, props) => type === "input" && props["aria-label"] === "품목 검색")!;
+const searchField = () => find(render(), (type, props) => type === SearchField && props.label === "품목 검색")!;
 const card = (productId: string) => find(render(), (type, props) => type === InventoryCard && (props.product as InventoryProduct).productId === productId);
 function expectNoPrivateSurfaces() {
   const tree = render();
@@ -82,7 +83,7 @@ describe("inventory in-memory draft lifecycle", () => {
     (editor.onSaved as (product: InventoryProduct) => void)(product);
     expect(find(render(), (type) => typeof type === "function" && type.name === "InventoryDetail")).not.toBeNull();
     (find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")!.onClick as () => void)();
-    (searchField().onChange as (event: { target: { value: string } }) => void)({ target: { value: "private query" } });
+    (searchField().onChange as (value: string) => void)("private query");
     (find(render(), (_type, props) => props["aria-label"] === "새 품목 등록")!.onClick as () => void)();
     reportInventoryAccessFailure(cause, session.uid);
     expect(hasEditor(render())).toBe(false);
@@ -422,7 +423,7 @@ describe("inventory in-memory draft lifecycle", () => {
       nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null) } as InventoryProduct;
     harness.list.mockResolvedValue([product]);
     const catalogCleanup = await openEditor();
-    (searchField().onChange as (event: { target: { value: string } }) => void)({ target: { value: "calendar draft" } });
+    (searchField().onChange as (value: string) => void)("calendar draft");
     (find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")!.onClick as () => void)();
     expect(card(product.productId)?.product).toEqual(product);
     render(); const calendarCleanup = harness.effects[1]!() as () => void;
@@ -456,8 +457,8 @@ describe("inventory in-memory draft lifecycle", () => {
     expect(trigger).toMatchObject({ "aria-expanded": false });
     (trigger.onClick as () => void)(); tree = render();
     expect(find(tree, (_type, props) => props.title === "목록 옵션")?.open).toBe(true);
-    const search = find(tree, (type, props) => type === "input" && props["aria-label"] === "품목 검색")!;
-    (search.onChange as (event: { target: { value: string } }) => void)({ target: { value: "닭" } });
+    const search = find(tree, (type, props) => type === SearchField && props.label === "품목 검색")!;
+    (search.onChange as (value: string) => void)("닭");
     const urgent = find(tree, (type, props) => type === "label" && textContent(props.children).includes("임박 상품만 보기"))!;
     const urgentInput = find(urgent.children, (type) => type === "input")!;
     (urgentInput.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
@@ -471,7 +472,7 @@ describe("inventory in-memory draft lifecycle", () => {
     tree = render();
     const sheet = find(tree, (_type, props) => props.title === "목록 옵션")!;
     (sheet.onClose as () => void)(); tree = render();
-    expect(find(tree, (type, props) => type === "input" && props["aria-label"] === "품목 검색")?.value).toBe("닭");
+    expect(find(tree, (type, props) => type === SearchField && props.label === "품목 검색")?.value).toBe("닭");
     expect(find(tree, (_type, props) => props["aria-label"] === "목록 옵션")).toMatchObject({ "aria-expanded": false, "data-active": true });
     expect(find(tree, (_type, props) => props.role === "status" && textContent(props.children) === "재고조사 ON")).not.toBeNull();
     const reopen = find(tree, (_type, props) => props["aria-label"] === "목록 옵션")!;
