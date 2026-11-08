@@ -6,7 +6,7 @@ import sharp from "sharp";
 import { PlanningService } from "../functions/src/delivery-planning/planning-service";
 import { photoAliasKey } from "../functions/src/delivery-planning/photo-batch-matching";
 import type { PhotoBatchDecision, PhotoBatchResult, PhotoExtraction, PhotoExtractionRow } from "../functions/src/delivery-planning/photo-batch-contract";
-import type { PlanningProviders } from "../functions/src/delivery-planning/planning-providers";
+import { createPlanningProviders, type PlanningProviders } from "../functions/src/delivery-planning/planning-providers";
 import type { CustomerActor } from "../functions/src/customer/customer-authorization";
 
 if (!/^(127\.0\.0\.1|localhost):\d+$/u.test(process.env.FIRESTORE_EMULATOR_HOST ?? "")
@@ -224,6 +224,38 @@ await test("registered name parts save and cannot become another customer's reme
     assert.equal((await aliasesRef(staff).get()).size, 0);
     assert.deepEqual((await dayRef(staff).get()).get("customerIds"), [ids[0]]);
   } finally { await customerRef.set(catalog[0]!); }
+});
+await test("invoice party evidence selects only the recipient before automatic registration", async () => {
+  const staff = await makeActor(); let calls = 0;
+  const evidence = { kind: "invoice", truncated: false, rows: [{
+    supplier: { name: catalog[1]!.name, address: catalog[1]!.officialAddress, businessNumber: "111-22-33333" },
+    recipient: { name: catalog[0]!.name, address: catalog[0]!.officialAddress, businessNumber: "444-55-66666" },
+    recipientRole: "공급받는자", date, dateUncertain: false, uncertain: false,
+  }] };
+  const provider = createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, async () => {
+    const value = calls++ === 0 ? document([row(catalog[1]!.name)], "invoice") : evidence;
+    return { ok: true, status: 200, json: async () => ({ status: "completed", output: [{ type: "message",
+      content: [{ type: "output_text", text: JSON.stringify(value) }] }] }) };
+  });
+  const scan = await new PlanningService(provider, db, () => clock).analyzePhotoBatch(input(), staff);
+  assert.equal(calls, 2); assert.equal(scan.rows[0]!.rawName, catalog[0]!.name);
+  assert.deepEqual(scan.lists!.day.customerIds, [ids[0]]);
+  assert.deepEqual(scan.lists!.route.customerIds, [ids[0]]);
+});
+await test("supplier-as-recipient failure creates no list, alias or confirmable result", async () => {
+  const staff = await makeActor(); let calls = 0; const request = input();
+  const party = { name: "온누리종합식품", address: "공급자 주소", businessNumber: "306-28-68765" };
+  const provider = createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, async () => {
+    const value = calls++ === 0 ? document([row(party.name)], "invoice") : { kind: "invoice", truncated: false,
+      rows: [{ supplier: party, recipient: party, recipientRole: "공급받는자", date, dateUncertain: false, uncertain: false }] };
+    return { ok: true, status: 200, json: async () => ({ status: "completed", output: [{ type: "message",
+      content: [{ type: "output_text", text: JSON.stringify(value) }] }] }) };
+  });
+  await assert.rejects(new PlanningService(provider, db, () => clock).analyzePhotoBatch(request, staff), /공급받는 자/);
+  assert.equal(calls, 2); assert.equal((await dayRef(staff).get()).exists, false);
+  assert.equal((await routeRef(staff).get()).exists, false); assert.equal((await aliasesRef(staff).get()).size, 0);
+  const receipt = await db.doc(`requestLocks/delivery-planning-${request.requestId}`).get();
+  assert.equal(receipt.get("result"), undefined); assert.notEqual(receipt.get("state"), "complete");
 });
 console.log(`PHOTO_BATCH_GATE_PASS ${passed}`);
 await db.terminate();

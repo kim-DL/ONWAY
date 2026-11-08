@@ -4,6 +4,8 @@ import { matchPhotoRows, photoAliasKey, photoDateStatus, validAliasText } from "
 import { confirmPhotoBatchSchema, photoExtractionSchema, type PhotoAlias, type PhotoExtraction, type PhotoExtractionRow } from "../src/delivery-planning/photo-batch-contract.js";
 import { createPlanningProviders, parsePhotoBatchResponse } from "../src/delivery-planning/planning-providers.js";
 
+const testImage = await sharp({ create: { width: 800, height: 1200, channels: 3, background: "white" } }).jpeg().toBuffer();
+
 const catalog = [
   { customerId: "soeun", name: "소은푸드", officialAddress: "대전 중구 안영동 659-4", deliveryAddress: "" },
   { customerId: "hanbit", name: "한빛유통", officialAddress: "대전 대덕구 중리동로 38", deliveryAddress: "" },
@@ -13,6 +15,10 @@ const extraction = (rows: PhotoExtractionRow[], kind: PhotoExtraction["kind"] = 
 const alias = (change: Partial<PhotoAlias> = {}): PhotoAlias => ({ aliasKey: photoAliasKey("소은"), aliasText: "소은", customerId: "soeun", targetName: "소은푸드", revision: 1, enabled: true, ...change });
 const match = (rows: PhotoExtractionRow[], aliases: PhotoAlias[] = [], customers = catalog, kind: PhotoExtraction["kind"] = "customer_list") => matchPhotoRows(extraction(rows, kind), customers, aliases, "2026-11-08");
 const response = (value: unknown) => ({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] });
+const invoiceEvidence = (value: PhotoExtraction) => ({ ...value, rows: value.rows.map(({ rawName, address, ...fields }) => ({
+  supplier: { name: "온누리종합식품", address: "공급자 주소", businessNumber: "306-28-68765" },
+  recipient: { name: rawName, address, businessNumber: "" }, recipientRole: "공급받는자", ...fields,
+})) });
 
 describe("photo batch matching", () => {
   it("matches a unique explicitly registered alternate name without inventing an alias", () => {
@@ -116,14 +122,21 @@ describe("photo batch provider boundary", () => {
     const first = extraction([row("오독상호", { address: "다른 주소" })], "invoice");
     const invoice = extraction([row("한빛유통", { address: "대전 중구 예시로 1", date: "2026-11-08" })], "invoice");
     const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(first) })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoice) });
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoiceEvidence(invoice)) });
     const provider = createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher);
-    expect(await provider.readPhotoBatch(Buffer.from("test"))).toEqual(invoice);
+    expect(await provider.readPhotoBatch(testImage)).toEqual(invoice);
     expect(fetcher).toHaveBeenCalledTimes(2);
     const requests = fetcher.mock.calls.map((call) => JSON.parse(String(call[1].body)));
     expect(requests.map((body) => body.model)).toEqual(["gpt-6.1-sol", "gpt-6-luna"]);
-    expect(requests[1].input).toEqual(requests[0].input);
+    expect(requests[1].input[0].content[0]).toEqual(requests[0].input[0].content[0]);
+    expect(requests[1].input[0].content).toHaveLength(3);
+    expect(requests[1].input[0].content[1].text).toContain("SAME invoice");
+    const header = Buffer.from(requests[1].input[0].content[2].image_url.split(",")[1], "base64");
+    expect(await sharp(header).metadata()).toMatchObject({ width: 800, height: 600 });
     expect(requests[1].store).toBe(false);
+    expect(requests[1].text.format.name).toBe("delivery_invoice_parties");
+    expect(requests[1].text.format.schema.properties.rows.items.properties).toHaveProperty("recipient");
+    expect(requests[1].text.format.schema.properties.rows.items.properties).toHaveProperty("supplier");
     expect(JSON.stringify(requests[1])).not.toContain("오독상호");
   });
   it.each([
@@ -133,23 +146,43 @@ describe("photo batch provider boundary", () => {
   ])("rejects conflicting document kinds or invoice counts after the second reading", async (second) => {
     const first = extraction([row("한빛유통")], "invoice");
     const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(first) })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(second) });
-    await expect(createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher).readPhotoBatch(Buffer.from("test")))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoiceEvidence(second)) });
+    await expect(createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher).readPhotoBatch(testImage))
       .rejects.toMatchObject({ code: "unavailable" });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
-  it("does not repeat a read when both configured models are the same", async () => {
+  it("still requires recipient evidence when both configured models are the same", async () => {
     const invoice = extraction([row("한빛유통")], "invoice");
-    const fetcher = vi.fn(async () => ({ ok: true, status: 200, json: async () => response(invoice) }));
+    const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoice) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoiceEvidence(invoice)) });
     expect(await createPlanningProviders({ openai: () => "test-key", tmap: () => "", photoModel: "gpt-6-luna" }, fetcher)
-      .readPhotoBatch(Buffer.from("test"))).toEqual(invoice);
-    expect(fetcher).toHaveBeenCalledTimes(1);
+      .readPhotoBatch(testImage)).toEqual(invoice);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("keeps the full image without a single-header crop for multiple invoices", async () => {
+    const invoices = extraction([row("한빛유통"), row("새봄식품")], "invoice");
+    const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoices) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(invoiceEvidence(invoices)) });
+    expect(await createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher)
+      .readPhotoBatch(testImage)).toEqual(invoices);
+    const requests = fetcher.mock.calls.map((call) => JSON.parse(String(call[1].body)));
+    expect(requests[1].input).toEqual(requests[0].input);
+    expect(requests[1].input[0].content).toHaveLength(1);
+  });
+  it("never exposes a supplier selected by Luna as a reviewable customer or falls back to Sol", async () => {
+    const first = extraction([row("받는 거래처")], "invoice");
+    const wrong = invoiceEvidence(extraction([row("온누리종합식품")], "invoice"));
+    const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(first) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(wrong) });
+    await expect(createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher).readPhotoBatch(testImage))
+      .rejects.toMatchObject({ code: "failed-precondition" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
   it("does not fall back to the first invoice or retry after a second-provider failure", async () => {
     const first = extraction([row("한빛유통")], "invoice");
     const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => response(first) })
       .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) });
-    await expect(createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher).readPhotoBatch(Buffer.from("test")))
+    await expect(createPlanningProviders({ openai: () => "test-key", tmap: () => "" }, fetcher).readPhotoBatch(testImage))
       .rejects.toMatchObject({ code: "unavailable" });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });

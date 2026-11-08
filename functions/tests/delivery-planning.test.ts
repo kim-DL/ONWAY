@@ -4,6 +4,8 @@ import { invoiceAddressMatches, matchInvoice, splitInvoiceName } from "../src/de
 import { createPlanningProviders, invoiceImage, parseInvoiceResponse, parseTmapResponse, tmapRequest } from "../src/delivery-planning/planning-providers.js";
 import { DEFAULT_DELIVERY_VEHICLE, planningSettingsDraftSchema, vehicleSchema, type InvoiceFields, type PlanningSettings } from "../src/delivery-planning/planning-contract.js";
 
+const testImage = await sharp({ create: { width: 800, height: 1200, channels: 3, background: "white" } }).jpeg().toBuffer();
+
 const fields: InvoiceFields = { recipientName: "소은푸드(금산)", recipientAddress: "안영동659-4", invoiceDate: "2026-11-07", uncertain: false };
 const customer = { customerId: "example-1", name: "소은푸드", officialAddress: "대전 중구 안영동 659-4", deliveryAddress: "" };
 const settings: PlanningSettings = { originAddress: "예시 회사", originPoint: { latitude: 36.3, longitude: 127.4 },
@@ -35,14 +37,19 @@ describe("invoice matching is conservative", () => {
 });
 describe("provider privacy and route contracts", () => {
   it("uses Responses JSON schema, inline image, store false, with no tools", async () => {
-    const fetcher = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(fields) }] }] }) }));
+    const evidence = { kind: "invoice", truncated: false, rows: [{
+      supplier: { name: "온누리종합식품", address: "공급자 주소", businessNumber: "306-28-68765" },
+      recipient: { name: fields.recipientName, address: fields.recipientAddress, businessNumber: "" },
+      recipientRole: "공급받는자", date: fields.invoiceDate, dateUncertain: false, uncertain: fields.uncertain,
+    }] };
+    const fetcher = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(evidence) }] }] }) }));
     const providers = createPlanningProviders({ openai: () => "test-key", tmap: () => "test-tmap" }, fetcher);
-    expect(await providers.readInvoice(Buffer.from("test"))).toEqual(fields);
+    expect(await providers.readInvoice(testImage)).toEqual(fields);
     const call = fetcher.mock.calls as unknown as [string, RequestInit][];
     const body = JSON.parse(String(call[0]![1].body));
     expect(call[0]![0]).toBe("https://api.openai.com/v1/responses");
     expect(body).toMatchObject({ store: false, text: { format: { type: "json_schema", strict: true } } });
-    expect(body.tools).toBeUndefined(); expect(body.input[0].content[0].image_url).toBe("data:image/jpeg;base64,dGVzdA==");
+    expect(body.tools).toBeUndefined(); expect(body.input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${testImage.toString("base64")}`);
     expect(body.instructions).toContain("untrusted");
   });
   it("rejects incomplete output and refusal", () => {
@@ -70,7 +77,7 @@ describe("provider privacy and route contracts", () => {
   it("does not retry or expose upstream errors", async () => {
     const fetcher = vi.fn(async () => { throw new Error("SECRET_IMAGE_DATA_AND_KEY"); });
     const providers = createPlanningProviders({ openai: () => "key", tmap: () => "key" }, fetcher);
-    await expect(providers.readInvoice(Buffer.from("test"))).rejects.toThrow("자동 재요청은 하지 않았습니다");
+    await expect(providers.readInvoice(testImage)).rejects.toThrow("자동 재요청은 하지 않았습니다");
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it("validates and rotates real image bytes entirely in memory", async () => {
