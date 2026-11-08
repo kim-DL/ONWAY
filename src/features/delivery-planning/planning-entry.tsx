@@ -15,7 +15,7 @@ export default function PlanningEntry({ customers, snapshot, accept, refresh, on
   return <><div className={styles.entries}><button type="button" className={styles.entry} onClick={() => setOpen("invoice")}>
     {/* Static vectors retain their dimensions before the deferred stylesheet loads. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img src="/ui/delivery-invoice-stack.svg" width="26" height="26" alt="" aria-hidden="true" /><strong>명세서로 등록</strong>
+    <img src="/ui/delivery-invoice-stack.svg" width="26" height="26" alt="" aria-hidden="true" /><strong>사진으로 등록</strong>
   </button><button type="button" className={`${styles.entry} ${styles.route}`} onClick={() => setOpen("route")}>
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <img src="/ui/delivery-smart-route.svg" width="26" height="26" alt="" aria-hidden="true" /><strong>인공지능 경로 추천</strong>

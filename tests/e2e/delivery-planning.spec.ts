@@ -10,11 +10,11 @@ async function open(page: import("@playwright/test").Page, params = "") {
     return route.abort();
   });
   await page.goto(`http://127.0.0.1:3197/${params}`);
-  await expect(page.getByRole("dialog", { name: params.includes("route") ? "인공지능 경로 추천" : "명세서로 납품 준비" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: params.includes("route") ? "인공지능 경로 추천" : "사진으로 납품 준비" })).toBeVisible();
 }
 async function photos(page: import("@playwright/test").Page, count: number) {
   const buffer = await sharp({ create: { width: 160, height: 120, channels: 3, background: "white" } }).jpeg().toBuffer();
-  await page.getByLabel("명세서 갤러리", { exact: true }).setInputFiles(Array.from({ length: count }, (_, i) => ({ name: `example-${i}.jpg`, mimeType: "image/jpeg", buffer })));
+  await page.getByLabel("납품처 갤러리", { exact: true }).setInputFiles(Array.from({ length: count }, (_, i) => ({ name: `example-${i}.jpg`, mimeType: "image/jpeg", buffer })));
 }
 async function scanStats(page: import("@playwright/test").Page) {
   return page.evaluate(() => (window as unknown as { previewScanStats: () => { requests: string[]; active: number; maxActive: number } }).previewScanStats());
@@ -27,14 +27,14 @@ test("camera remains available while analysis drains newly appended photos in or
   await page.setViewportSize({ width: 320, height: 760 });
   await open(page, "?empty&holdScans"); await photos(page, 1);
   await expect.poll(async () => (await scanStats(page)).requests.length).toBe(1);
-  await expect(page.getByRole("button", { name: "명세서 촬영", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "사진 촬영", exact: true })).toBeEnabled();
   await expect(page.getByRole("button", { name: "갤러리에서 선택", exact: true })).toBeEnabled();
   const next = page.getByRole("button", { name: "다음 촬영", exact: true });
   const chooser = page.waitForEvent("filechooser"); await next.click();
   const buffer = await sharp({ create: { width: 160, height: 120, channels: 3, background: "white" } }).jpeg().toBuffer();
   await (await chooser).setFiles({ name: "next.jpg", mimeType: "image/jpeg", buffer });
   await photos(page, 1);
-  const result = page.getByRole("region", { name: "명세서 처리 결과" });
+  const result = page.getByRole("region", { name: "사진 처리 결과" });
   await expect(result.getByRole("listitem")).toHaveCount(3);
   await expect(result.getByText("대기", { exact: true })).toHaveCount(2);
   expect((await scanStats(page)).requests).toHaveLength(1);
@@ -42,7 +42,7 @@ test("camera remains available while analysis drains newly appended photos in or
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `output/invoice-capture-queue/queue-${test.info().project.name}.png`, scale: "css" });
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "명세서로 납품 준비" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "사진으로 납품 준비" })).toBeVisible();
   await releaseScan(page);
   await expect.poll(async () => (await scanStats(page)).requests.length).toBe(2);
   await expect(result.getByText("저장됨", { exact: true })).toHaveCount(1);
@@ -62,7 +62,7 @@ for (const failure of ["failScan", "lostScanResponse"]) {
   test(`${failure}: a failed photo does not stop later photos and retry keeps its request ID`, async ({ page }) => {
     await open(page, `?empty&${failure}`); await photos(page, 2);
     await expect(page.getByText("1곳 저장 · 1장 재확인", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "명세서 촬영", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "사진 촬영", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "저장 결과 다시 확인", exact: true }).click();
     await expect(page.getByText("2곳 저장 완료", { exact: true })).toBeVisible();
     const stats = await scanStats(page);
@@ -75,7 +75,7 @@ test("queue limits include photos added during processing; unmount prevents rema
   await photos(page, 20);
   await expect.poll(async () => (await scanStats(page)).requests.length).toBe(1);
   await photos(page, 20); await photos(page, 20); await photos(page, 1);
-  await expect(page.getByRole("region", { name: "명세서 처리 결과" }).getByRole("listitem")).toHaveCount(60);
+  await expect(page.getByRole("region", { name: "사진 처리 결과" }).getByRole("listitem")).toHaveCount(60);
   await expect(page.getByRole("alert")).toContainText("최대 60장");
   await expect(page.getByRole("button", { name: "다음 촬영", exact: true })).toBeDisabled();
   await page.evaluate(() => (window as unknown as { unmountPlanningPreview: () => void }).unmountPlanningPreview());
@@ -129,9 +129,10 @@ for (const failure of ["failSave", "lostResponse"]) {
 }
 test("wrong date requires confirmation; only origin setup is needed with the default truck", async ({ page }) => {
   await open(page, "?empty&review&unconfigured"); await photos(page, 2);
-  await expect(page.getByText("1곳 저장 · 1장 확인 필요")).toBeVisible();
-  await expect(page.getByRole("button", { name: "이 거래처로 저장" })).toBeDisabled();
-  await page.getByRole("checkbox").check(); await page.getByRole("button", { name: "이 거래처로 저장" }).click();
+  await expect(page.getByText("1곳 저장 · 1곳 확인 필요")).toBeVisible();
+  await page.getByRole("button", { name: /한빛유통.*예시로/ }).click();
+  await expect(page.getByRole("button", { name: "선택한 1곳 등록" })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "사진의 날짜와 관계없이 오늘 납품 건으로 등록" }).check(); await page.getByRole("button", { name: "선택한 1곳 등록" }).click();
   await expect(page.getByText("2곳 저장 완료")).toBeVisible();
   await page.getByRole("combobox", { name: "마지막 납품처", exact: true }).selectOption("preview-0");
   await expect(page.getByRole("button", { name: "인공지능 경로 추천" })).toBeDisabled();
@@ -150,13 +151,13 @@ test("wrong date requires confirmation; only origin setup is needed with the def
 test("mobile layout fits 320px and exposes clear errors without saving files", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 760 }); await open(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByLabel("명세서 갤러리", { exact: true }).setInputFiles({ name: "invalid.txt", mimeType: "text/plain", buffer: Buffer.from("not an invoice") });
+  await page.getByLabel("납품처 갤러리", { exact: true }).setInputFiles({ name: "invalid.txt", mimeType: "text/plain", buffer: Buffer.from("not an invoice") });
   await expect(page.getByRole("alert")).toContainText("JPEG·PNG·WebP");
   await expect(page.getByRole("button", { name: "완료", exact: true })).toBeEnabled();
 });
 test("manual search additions can be recommended and reordered without another API call", async ({ page }) => {
   await open(page, "?route&empty");
-  await expect(page.getByRole("button", { name: "명세서 촬영" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "사진 촬영" })).toHaveCount(0);
   await page.getByRole("button", { name: "납품처 추가 · 순서 편집" }).click();
   for (const name of ["예시푸드", "한빛유통", "늘봄식품"]) {
     await page.getByRole("searchbox", { name: "거래처 검색" }).fill(name);

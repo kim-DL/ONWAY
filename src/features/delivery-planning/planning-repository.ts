@@ -4,13 +4,14 @@ import { httpsCallable } from "firebase/functions";
 import { z } from "zod";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
 import { deliveryPhotoDayResultSchema } from "@/domain/delivery-photo";
-import { analyzeInvoiceSchema, applyRecommendationSchema, confirmInvoiceSchema, invoiceResultSchema, planningContextSchema,
-  planningSettingsSchema, recommendRouteSchema, routeRecommendationSchema, savePlanningSettingsSchema } from "@/domain/delivery-planning";
+import { applyRecommendationSchema, planningContextSchema,
+  planningSettingsSchema, recommendRouteSchema, routeRecommendationSchema, savePlanningSettingsSchema,
+  analyzePhotoBatchSchema, confirmPhotoBatchSchema, photoBatchResultSchema, photoAliasesSchema, photoAliasSchema, updatePhotoAliasSchema } from "@/domain/delivery-planning";
 
 async function call<I, O>(name: string, input: I, output: z.ZodType<O>): Promise<O> {
   const services = getFirebaseClientServices(); const user = services?.auth.currentUser;
   if (!services || !user) throw Object.assign(new Error("로그인이 필요합니다."), { code: "unauthenticated" });
-  if (!navigator.onLine) throw new Error("인터넷 연결 후 다시 시도해주세요. 명세서 사진은 오프라인으로 보관하지 않습니다.");
+  if (!navigator.onLine) throw new Error("인터넷 연결 후 다시 시도해주세요. 등록용 사진은 오프라인으로 보관하지 않습니다.");
   const before = (await user.getIdTokenResult()).claims;
   const result = await httpsCallable<I, unknown>(services.functions, name, { timeout: 120_000 })(input);
   const current = services.auth.currentUser;
@@ -27,8 +28,10 @@ export function planningError(error: unknown) {
 export const planningRepository = {
   context: () => call("getDeliveryPlanningContext", {}, planningContextSchema),
   saveSettings: (input: z.infer<typeof savePlanningSettingsSchema>) => call("saveDeliveryPlanningSettings", savePlanningSettingsSchema.parse(input), planningSettingsSchema),
-  analyze: (input: z.infer<typeof analyzeInvoiceSchema>) => call("analyzeDeliveryInvoice", analyzeInvoiceSchema.parse(input), invoiceResultSchema),
-  confirm: (input: z.infer<typeof confirmInvoiceSchema>) => call("confirmDeliveryInvoice", confirmInvoiceSchema.parse(input), invoiceResultSchema),
+  analyzeBatch: (input: z.infer<typeof analyzePhotoBatchSchema>) => call("analyzeDeliveryPhotoBatch", analyzePhotoBatchSchema.parse(input), photoBatchResultSchema),
+  confirmBatch: (input: z.infer<typeof confirmPhotoBatchSchema>) => call("confirmDeliveryPhotoBatch", confirmPhotoBatchSchema.parse(input), photoBatchResultSchema),
+  aliases: () => call("getDeliveryPhotoAliases", {}, photoAliasesSchema),
+  updateAlias: (input: z.infer<typeof updatePhotoAliasSchema>) => call("updateDeliveryPhotoAlias", updatePhotoAliasSchema.parse(input), photoAliasSchema),
   recommend: (input: z.infer<typeof recommendRouteSchema>) => call("recommendDeliveryRoute", recommendRouteSchema.parse(input), routeRecommendationSchema),
   apply: (input: z.infer<typeof applyRecommendationSchema>) => call("applyDeliveryRoute", applyRecommendationSchema.parse(input), deliveryPhotoDayResultSchema),
 };

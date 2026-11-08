@@ -8,6 +8,7 @@ import { setPrivateCallableResponse } from "../shared/private-callable-response.
 import { analyzeInvoiceSchema, applyRecommendationSchema, confirmInvoiceSchema, recommendRouteSchema, savePlanningSettingsSchema } from "./planning-contract.js";
 import { createPlanningProviders } from "./planning-providers.js";
 import { PlanningService } from "./planning-service.js";
+import { analyzePhotoBatchSchema, confirmPhotoBatchSchema, updatePhotoAliasSchema } from "./photo-batch-contract.js";
 
 const emulator = process.env.FUNCTIONS_EMULATOR === "true";
 const openai = defineSecret("OPENAI_API_KEY"); const tmap = defineSecret("TMAP_APP_KEY"); const kakao = defineSecret("KAKAO_REST_API_KEY");
@@ -18,6 +19,8 @@ const service = () => new PlanningService(providers ??= createPlanningProviders(
   tmap: () => emulator ? process.env.TMAP_APP_KEY ?? "" : tmap.value(),
   kakao: () => emulator ? process.env.KAKAO_REST_API_KEY ?? "" : kakao.value(),
   model: process.env.INVOICE_OPENAI_MODEL || "gpt-6-luna",
+  photoModel: process.env.PHOTO_OPENAI_MODEL || "gpt-6.1-sol",
+  ...(process.env.OPENAI_PROJECT_ID ? { openaiProject: process.env.OPENAI_PROJECT_ID } : {}),
 }));
 async function run<T, R>(request: CallableRequest<unknown>, schema: z.ZodType<T>, action: (input: T, actor: Awaited<ReturnType<typeof requireCustomerActor>>, service: PlanningService) => Promise<R>) {
   setPrivateCallableResponse(request);
@@ -37,6 +40,11 @@ export const saveDeliveryPlanningSettings = onCall(options, (r) => run(r, savePl
 export const analyzeDeliveryInvoice = onCall({ ...options, memory: "1GiB", timeoutSeconds: 120, secrets: emulator ? [] : [openai] },
   (r) => run(r, analyzeInvoiceSchema, (input, actor, s) => s.analyze(input, actor)));
 export const confirmDeliveryInvoice = onCall(options, (r) => run(r, confirmInvoiceSchema, (input, actor, s) => s.confirm(input, actor)));
+export const analyzeDeliveryPhotoBatch = onCall({ ...options, memory: "1GiB", timeoutSeconds: 120, secrets: emulator ? [] : [openai] },
+  (r) => run(r, analyzePhotoBatchSchema, (input, actor, s) => s.analyzePhotoBatch(input, actor)));
+export const confirmDeliveryPhotoBatch = onCall(options, (r) => run(r, confirmPhotoBatchSchema, (input, actor, s) => s.confirmPhotoBatch(input, actor)));
+export const getDeliveryPhotoAliases = onCall(options, (r) => run(r, z.object({}).strict(), (_, actor, s) => s.photoAliases(actor)));
+export const updateDeliveryPhotoAlias = onCall(options, (r) => run(r, updatePhotoAliasSchema, (input, actor, s) => s.updatePhotoAlias(input, actor)));
 export const recommendDeliveryRoute = onCall({ ...options, timeoutSeconds: 120, secrets: emulator ? [] : [tmap, kakao] },
   (r) => run(r, recommendRouteSchema, (input, actor, s) => s.recommend(input, actor)));
 export const applyDeliveryRoute = onCall(options, (r) => run(r, applyRecommendationSchema, (input, actor, s) => s.apply(input, actor)));

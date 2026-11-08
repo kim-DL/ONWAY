@@ -30,6 +30,7 @@ let reads = 0, optimizations = 0; let fields = fieldsFor(0);
 const providers: PlanningProviders = {
   async resolveAddress(address) { const index = customers.findIndex((c) => c.officialAddress === address); return index < 0 ? null : { latitude: 36.6 + index / 100, longitude: 127.7 + index / 100 }; },
   async readInvoice() { reads++; return fields; },
+  async readPhotoBatch() { throw new Error("Legacy gate must not call the batch provider"); },
   async optimize(routeSettings, stops, last) { assert.deepEqual(routeSettings.vehicle, DEFAULT_DELIVERY_VEHICLE); optimizations++; return { customerIds: [...stops.filter((s) => s.customerId !== last).map((s) => s.customerId), last], totalSeconds: 1500, totalMeters: 8500 }; },
 };
 const service = new PlanningService(providers, db, () => clock);

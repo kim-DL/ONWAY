@@ -155,7 +155,7 @@ test("delivery photo header uses the active customer mode and raised planning bu
     const back = page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "거래처", exact: true });
     await expect(back).toBeVisible();
     await expect(back).toHaveAttribute("aria-pressed", "true");
-    const invoice = workspace.getByRole("button", { name: "명세서로 등록", exact: true });
+    const invoice = workspace.getByRole("button", { name: "사진으로 등록", exact: true });
     const route = workspace.getByRole("button", { name: "인공지능 경로 추천", exact: true });
     for (const action of [invoice, route]) {
       await expect(action).toBeVisible();
@@ -190,7 +190,7 @@ test("planning cards open their tools and a populated photo screen stays compact
   expect((await header.boundingBox())!.height).toBeLessThan(58);
   await expect(workspace.getByRole("group", { name: "납품처 관리" }).getByRole("button", { name: "순서 편집", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "거래처로 돌아가기", exact: true })).toHaveCount(0);
-  for (const [button, title] of [["명세서로 등록", "명세서로 납품 준비"], ["인공지능 경로 추천", "인공지능 경로 추천"]] as const) {
+  for (const [button, title] of [["사진으로 등록", "사진으로 납품 준비"], ["인공지능 경로 추천", "인공지능 경로 추천"]] as const) {
     await workspace.getByRole("button", { name: button, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: title, exact: true });
     await expect(dialog).toBeVisible();
@@ -203,15 +203,15 @@ test("planning cards open their tools and a populated photo screen stays compact
   await page.setViewportSize({ width: 320, height: 760 });
   await page.addStyleTag({ content: "html{font-size:200%}" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  for (const name of ["명세서로 등록", "인공지능 경로 추천"]) {
+  for (const name of ["사진으로 등록", "인공지능 경로 추천"]) {
     const button = workspace.getByRole("button", { name, exact: true });
     expect(await button.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   }
   await page.emulateMedia({ forcedColors: "active" });
-  const invoice = workspace.getByRole("button", { name: "명세서로 등록", exact: true });
+  const invoice = workspace.getByRole("button", { name: "사진으로 등록", exact: true });
   await invoice.focus(); await expect(invoice).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "명세서로 납품 준비", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "사진으로 납품 준비", exact: true })).toBeVisible();
 });
 
 for (const target of ["납품사진"]) {

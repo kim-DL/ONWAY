@@ -69,7 +69,9 @@ export {
   previewNeisSchoolSync,
 } from "./sync/callables.js";
 
-export { getDeliveryPlanningContext, saveDeliveryPlanningSettings, analyzeDeliveryInvoice, confirmDeliveryInvoice, recommendDeliveryRoute, applyDeliveryRoute } from "./delivery-planning/planning-callables.js";
+export { getDeliveryPlanningContext, saveDeliveryPlanningSettings, analyzeDeliveryInvoice, confirmDeliveryInvoice,
+  analyzeDeliveryPhotoBatch, confirmDeliveryPhotoBatch, getDeliveryPhotoAliases, updateDeliveryPhotoAlias,
+  recommendDeliveryRoute, applyDeliveryRoute } from "./delivery-planning/planning-callables.js";
 
 setGlobalOptions({
   region: "asia-northeast3",
