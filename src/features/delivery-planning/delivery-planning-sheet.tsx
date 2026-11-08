@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import type { Customer } from "@/domain/customer";
@@ -16,7 +16,7 @@ const PhotoAliasManager = dynamic(() => import("./photo-alias-manager").then((mo
   ssr: false, loading: () => <p role="status">기억한 줄임말 준비 중…</p>,
 });
 
-type Scan = { id: string; name: string; state: "waiting" | "reading" | "failed" | "done"; result?: PhotoBatchResult; error?: string };
+type Scan = { id: string; state: "waiting" | "reading" | "failed" | "done"; result?: PhotoBatchResult; error?: string };
 
 export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, onRefresh, onClose, onEditToday, mode = "invoice", repository = planningRepository }: {
   customers: readonly Customer[]; day: DeliveryPhotoDayResult;
@@ -41,24 +41,22 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
   const firstCustomer = today.find((c) => c.customerId === firstChoice);
   const firstId = firstCustomer?.customerId ?? "";
   const lastId = today.some((c) => c.customerId === lastChoice && c.customerId !== firstId) ? lastChoice : "";
-  const originAddress = firstId ? firstCustomer?.deliveryAddress.trim() || firstCustomer?.officialAddress.trim() || "등록 주소를 확인해주세요." : context?.settings.originAddress ?? "출발지 확인 중…";
-  const reviews = scans.reduce((count, scan) => count + (scan.result?.rows.filter((row) => row.status === "review").length ?? 0), 0);
-  const saved = new Set(scans.flatMap((s) => s.result?.rows.flatMap((row) => row.status === "saved" && row.customerId ? [row.customerId] : []) ?? [])).size;
+  const originAddress = firstCustomer ? firstCustomer.deliveryAddress.trim() || firstCustomer.officialAddress.trim() || "주소 미등록" : context?.settings.originAddress ?? "확인 중…";
+  const rows = scans.flatMap((scan) => scan.result?.rows ?? []);
+  const reviews = rows.filter((row) => row.status === "review").length;
+  const saved = new Set(rows.flatMap((row) => row.status === "saved" && row.customerId ? [row.customerId] : [])).size;
   const done = scans.filter((s) => s.state === "done" || s.state === "failed").length;
   const waiting = scans.filter((s) => s.state === "waiting").length;
   const failed = scans.filter((s) => s.state === "failed").length;
   const empty = scans.filter((s) => s.result?.rows.length === 0).length;
-  const loadContext = async () => { try { const value = await repository.context(); if (alive.current) setContext(value); } catch (e) { if (alive.current) setError(planningError(e)); } };
-  const loadAliases = async () => {
-    try { const values = await repository.aliases(); if (alive.current) { setAliases(values); setAliasError(""); } }
-    catch (cause) { if (alive.current) setAliasError(planningError(cause)); }
-  };
+  const loadContext = useCallback(() => repository.context().then((value) => { if (alive.current) setContext(value); }).catch((e: unknown) => { if (alive.current) setError(planningError(e)); }), [repository]);
+  const loadAliases = useCallback(() => repository.aliases().then((values) => { if (alive.current) { setAliases(values); setAliasError(""); } }).catch((cause: unknown) => { if (alive.current) setAliasError(planningError(cause)); }), [repository]);
   useEffect(() => {
     alive.current = true; const pendingFiles = files.current; const pendingQueue = pending.current;
-    void repository.context().then((value) => { if (alive.current) setContext(value); }).catch((e: unknown) => { if (alive.current) setError(planningError(e)); });
-    if (mode === "invoice") void repository.aliases().then((value) => { if (alive.current) setAliases(value); }).catch((e: unknown) => { if (alive.current) setAliasError(planningError(e)); });
+    void loadContext();
+    if (mode === "invoice") void loadAliases();
     return () => { alive.current = false; pendingQueue.length = 0; pendingFiles.clear(); };
-  }, [repository, mode]);
+  }, [loadContext, loadAliases, mode]);
   useEffect(() => {
     if (!processing && !failed && !reviews) return;
     const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
@@ -95,10 +93,10 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
   };
   const addFiles = (selected: File[]) => {
     if (running.current || !alive.current || !selected.length) return;
-    if (selected.length > 20 || scanCount.current + selected.length > 60) { setError("한 번에 20장, 이 화면에서 최대 60장까지 확인할 수 있어요."); return; }
+    if (selected.length > 20 || scanCount.current + selected.length > 60) { setError("한 번에 20장, 최대 60장까지 선택해주세요."); return; }
     if (selected.some((f) => f.size > 20 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/u.test(f.type))) { setError("20MB 이하의 JPEG·PNG·WebP 사진을 선택해주세요."); return; }
     setError(""); setRecommendation(null); setApplied(false);
-    const queue = selected.map((file) => { const id = crypto.randomUUID(); files.current.set(id, file); return { id, name: file.name, state: "waiting" as const }; });
+    const queue = selected.map((file) => { const id = crypto.randomUUID(); files.current.set(id, file); return { id, state: "waiting" as const }; });
     scanCount.current += queue.length;
     pending.current.push(...queue.map((scan) => scan.id));
     setScans((old) => [...old, ...queue]);
@@ -129,8 +127,13 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
     const result = await repository.apply({ ...applyRequest.current, deliveryDateKey: route.deliveryDateKey });
     if (alive.current) { onDay(result); setApplied(true); }
   };
-  const canRecommend = context && (firstId ? firstCustomer : context.settings.originPoint) && today.length >= 2 && today.length <= 20 && today.some((c) => c.customerId === lastId) && firstId !== lastId && !reviews && !scans.some((s) => s.state === "failed");
-  const guard = () => !scans.some((s) => s.result?.rows.some((row) => row.status === "review") || s.state === "failed") || window.confirm("확인하지 않은 사진은 보관되지 않습니다. 이미 저장한 납품처는 유지하고 닫을까요?");
+  const canRecommend = context && (firstId || context.settings.originPoint) && today.length >= 2 && today.length <= 20 && lastId && !reviews && !failed;
+  const endpointField = (first: boolean) => <label className={styles.lastSelect}>{first ? "출발지" : "마지막 납품처"}<select value={first ? firstId : lastId} disabled={busy} onChange={(event) => {
+    const value = event.target.value;
+    if (first) { setFirstId(value); if (value === lastId) setLastId(""); } else setLastId(value);
+    setRecommendation(null); setApplied(false); setError("");
+  }}><option value="">{first ? "회사에서 출발" : "거래처 선택"}</option>{today.map((c) => <option key={c.customerId} value={c.customerId} disabled={!first && c.customerId === firstId}>{c.name}</option>)}</select></label>;
+  const guard = () => !reviews && !failed || window.confirm("미확인 사진은 보관되지 않아요. 저장한 납품처는 유지하고 닫을까요?");
 
   return <BottomSheet open title={mode === "route" ? "인공지능 경로 추천" : "사진으로 납품 준비"} onClose={onClose} beforeClose={guard} dismissible={!busy && !configuring}>
     <div className={styles.content}>
@@ -159,7 +162,7 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
                 <span className={result && result.rows.length && !unresolved.length ? styles.savedBadge : styles.reviewBadge}>{result ? !result.rows.length ? "판독 불가" : unresolved.length ? `${unresolved.length}곳 확인` : savedRows.length ? "저장됨" : "확인 완료" : scan.state === "failed" ? "재확인" : scan.state === "waiting" ? "대기" : "분석 중"}</span></div>
               {savedRows.length > 0 && <details className={styles.savedRows}><summary>{savedRows.length}개 항목 연결됨</summary>{savedRows.map((row) => <p key={row.rowId}><span>{row.rawName}</span><strong>{activeCustomers.find((c) => c.customerId === row.customerId)?.name ?? "거래처"}</strong></p>)}</details>}
               {result?.message && <p className={styles.hint}>{result.message}</p>}
-              {scan.state === "failed" && <div className={styles.error}><p>{scan.error}</p><div className={styles.inlineActions}><button type="button" disabled={busy} onClick={() => retry(scan)}>저장 결과 다시 확인</button><button type="button" disabled={busy} onClick={() => { files.current.delete(scan.id); scanCount.current--; setScans((old) => old.filter((s) => s.id !== scan.id)); }}>이 장 제외</button></div><small>분석에 실패했다면 이 장을 제외한 뒤 다시 선택해주세요.</small></div>}
+              {scan.state === "failed" && <div className={styles.error}><p>{scan.error}</p><div className={styles.inlineActions}><button type="button" disabled={busy} onClick={() => retry(scan)}>저장 결과 다시 확인</button><button type="button" disabled={busy} onClick={() => { files.current.delete(scan.id); scanCount.current--; setScans((old) => old.filter((s) => s.id !== scan.id)); }}>이 장 제외</button></div><small>분석 실패 시 제외하고 다시 선택해주세요.</small></div>}
               {result && unresolved.length > 0 && <PhotoBatchReview key={`${scan.id}-${result.revision}`} result={result} customers={activeCustomers} aliases={aliases} deliveryDateKey={day.deliveryDateKey} busy={busy}
                 onConfirm={(input) => runAction(async () => {
                   try { accept(scan.id, await repository.confirmBatch(input)); await loadAliases(); }
@@ -177,23 +180,21 @@ export default function DeliveryPlanningSheet({ customers, day, onLists, onDay, 
         <section className={styles.routeSection} aria-label="납품 경로 추천">
           <div className={styles.sectionTitle}><h3>오늘의 납품 순서</h3><span>{today.length}곳</span></div>
           {onEditToday && <button type="button" className={styles.textButton} disabled={busy} onClick={() => { if (guard()) onEditToday(); }}>납품처 추가 · 순서 편집</button>}
-          {today.length < 2 && <p className={styles.hint}>오늘 납품처를 2곳 이상 선택해주세요.</p>}
-          <label className={styles.lastSelect}>출발지<select value={firstId} disabled={busy} onChange={(e) => {
-            const next = e.target.value; setFirstId(next); if (next === lastId) setLastId(""); setRecommendation(null); setApplied(false); setError("");
-          }}><option value="">회사에서 출발</option>{today.map((c) => <option key={c.customerId} value={c.customerId}>{c.name}</option>)}</select></label>
+          {today.length < 2 && <p className={styles.hint}>납품처를 2곳 이상 선택해주세요.</p>}
+          {endpointField(true)}
           <p className={styles.originAddress}>{originAddress}</p>
-          <label className={styles.lastSelect}>마지막 납품처<select value={lastId} disabled={busy} onChange={(e) => { setLastId(e.target.value); setRecommendation(null); setApplied(false); setError(""); }}><option value="">거래처 선택</option>{today.map((c) => <option key={c.customerId} value={c.customerId} disabled={c.customerId === firstId}>{c.name}</option>)}</select></label>
+          {endpointField(false)}
           <div className={styles.vehicleNote}><strong>봉고3 냉동탑차 · 높이 {(context?.settings.vehicle ?? DEFAULT_DELIVERY_VEHICLE).heightCm / 100}m</strong><p>{PLANNING_NOTICE}</p></div>
           {context && !context.settings.originPoint && !firstId && <p className={styles.configNotice}>{context.canConfigure ? "회사 출발 위치를 설정해주세요." : "관리자의 출발지 설정이 필요해요."}</p>}
           {context?.canConfigure && <button type="button" className={styles.textButton} disabled={busy} onClick={() => setConfiguring(true)}>회사 출발지 설정</button>}
-          {!context && <button type="button" disabled={busy} onClick={() => void loadContext()}>출발지 설정 다시 확인</button>}
+          {!context && <button type="button" disabled={busy} onClick={() => void loadContext()}>다시 확인</button>}
           <button type="button" className={styles.recommendButton} disabled={busy || !canRecommend} onClick={() => void action(async () => {
             setRecommendation(null); setApplied(false);
             const result = await repository.recommend({ requestId: crypto.randomUUID(), deliveryDateKey: day.deliveryDateKey, expectedDayRevision: day.revision, ...(firstId ? { firstCustomerId: firstId } : {}), lastCustomerId: lastId });
             if (alive.current) { setRecommendation(result); await applyRecommendation(result); }
           })}>{busy ? "처리 중…" : recommendation ? "인공지능으로 다시 계산" : "인공지능 경로 추천"}</button>
           {reviews > 0 && <p className={styles.hint}>확인이 필요한 항목을 연결하거나 제외해주세요.</p>}
-          {today.length > 20 && <p className={styles.hint}>경로 추천은 한 번에 20곳까지 지원해요. 오늘 순서 편집을 이용해주세요.</p>}
+          {today.length > 20 && <p className={styles.hint}>20곳 이내로 선택해주세요.</p>}
           {!recommendation && <ol className={styles.routeList} aria-label="현재 오늘 납품처">{today.map((c, index) => <li key={c.customerId}><span>{index + 1}</span><strong>{c.name}</strong></li>)}</ol>}
           {recommendation && <div className={styles.recommendation}>
             <div className={styles.routeStats}><span>예상 이동<strong>{Math.ceil(recommendation.totalSeconds / 60)}<small>분</small></strong></span><span>전체 거리<strong>{(recommendation.totalMeters / 1000).toFixed(1)}<small>km</small></strong></span></div>
