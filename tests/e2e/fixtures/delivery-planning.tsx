@@ -17,7 +17,7 @@ const customers: Customer[] = names.map((name, i) => ({ customerId: `preview-${i
 let settings: PlanningSettings = { revision: 1, originAddress: DEFAULT_ORIGIN_ADDRESS, originPoint: params.has("unconfigured") ? null : { latitude: 36.3, longitude: 127.4 },
   vehicle: DEFAULT_DELIVERY_VEHICLE };
 let lists: PlanningLists = { route: { employeeId: "preview", customerIds: customers.map((c) => c.customerId), revision: 1, updatedAt: `${date}T00:00:00Z`, updatedByEmployeeId: "preview" },
-  day: { deliveryDateKey: date, customerIds: params.has("empty") ? [] : customers.map((c) => c.customerId), revision: 1, isOverride: true } };
+  day: { deliveryDateKey: date, customerIds: params.has("counts") ? ["preview-0", "preview-3"] : params.has("empty") ? [] : customers.map((c) => c.customerId), revision: 1, isOverride: true } };
 const aliases: PhotoAlias[] = [];
 const batches = new Map<string, PhotoBatchResult>();
 const confirmReceipts = new Map<string, PhotoBatchResult>();
@@ -72,11 +72,12 @@ const repository: PlanningRepository = {
       ];
       if (params.has("longName")) rows[2]!.rawName = "아주긴거래처이름을사진에서읽었지만정확한연결을확인해야해요";
       if (params.has("canonicalReview")) rows[1]!.rawName = "한빛유통";
+      if (params.has("counts")) rows[1] = { ...rows[1]!, status: "saved", customerId: "preview-1", matchSource: "exact" };
       rows.filter((r) => r.customerId).forEach((r) => register(r.customerId!));
     }
     const result: PhotoBatchResult = params.has("unsupported")
       ? { scanId: input.requestId, revision: 1, kind: "unsupported", rows: [], dateConfirmed: false, message: "거래처를 읽지 못했어요. 명세서나 목록을 다시 촬영해주세요.", elapsedMs: legacy.elapsedMs, lists: null }
-      : { scanId: input.requestId, revision: 1, kind: params.has("batch") ? "customer_list" : "invoice", rows, dateConfirmed: false, message: "", elapsedMs: legacy.elapsedMs, lists: legacy.lists || rows.some((r) => r.status === "saved") ? lists : null };
+      : { scanId: input.requestId, revision: 1, kind: params.has("batch") ? "customer_list" : "invoice", rows, dateConfirmed: false, message: params.has("counts") ? count === 1 ? "새로 추가 1곳 · 이미 등록 1곳" : "새로 추가 0곳 · 이미 등록 2곳" : "", elapsedMs: legacy.elapsedMs, lists: legacy.lists || rows.some((r) => r.status === "saved") ? lists : null };
     batches.set(input.requestId, result); return result;
   },
   confirmBatch: async (input) => {

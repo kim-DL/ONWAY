@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import sharp from "sharp";
 import { PlanningService } from "../functions/src/delivery-planning/planning-service";
 import { photoAliasKey } from "../functions/src/delivery-planning/photo-batch-matching";
@@ -54,6 +54,7 @@ await test("mixed rows save clear destinations once and leave ambiguous lines fo
   assert.deepEqual(mixed.rows.map((r) => r.status), ["saved", "saved", "review", "review", "saved"]);
   assert.deepEqual(mixed.lists!.route.customerIds, ids.slice(0, 2)); assert.deepEqual(mixed.lists!.day.customerIds, ids.slice(0, 2));
   assert.equal(mixed.lists!.route.revision, 1); assert.equal(mixed.lists!.day.revision, 1);
+  assert.equal(mixed.message, "새로 추가 2곳 · 이미 등록 0곳");
   const before = reads; assert.deepEqual(await service.analyzePhotoBatch(request, actor), mixed); assert.equal(reads, before);
 });
 await test("one confirmation atomically connects, remembers, skips and replays the exact receipt", async () => {
@@ -61,6 +62,7 @@ await test("one confirmation atomically connects, remembers, skips and replays t
   confirmed = await service.confirmPhotoBatch(request, actor);
   assert.deepEqual(confirmed.rows.map((r) => r.status), ["saved", "saved", "saved", "skipped", "saved"]);
   assert.deepEqual(confirmed.lists!.day.customerIds, ids); assert.equal(confirmed.lists!.day.revision, 2);
+  assert.equal(confirmed.message, "새로 추가 3곳 · 이미 등록 0곳");
   const alias = (await service.photoAliases(actor))[0]!;
   assert.equal(alias.aliasText, shorthand); assert.equal(alias.customerId, ids[2]); assert.equal(alias.revision, 1);
   assert.deepEqual(await service.confirmPhotoBatch(request, actor), confirmed);
@@ -70,6 +72,7 @@ await test("a later photo reuses only the current employee's confirmed abbreviat
   extraction = document([row(shorthand)]);
   const mine = await service.analyzePhotoBatch(input(), actor);
   assert.equal(mine.rows[0]!.status, "saved"); assert.equal(mine.rows[0]!.matchSource, "alias");
+  assert.equal(mine.message, "새로 추가 0곳 · 이미 등록 1곳");
   const other = await service.analyzePhotoBatch(input(), await makeActor());
   assert.equal(other.rows[0]!.status, "review"); assert.equal(other.lists, null);
 });
@@ -132,7 +135,53 @@ await test("parallel batches merge latest lists and duplicate scans do not bump 
   await Promise.all([0, 1].map((index) => new PlanningService({ ...providers, readPhotoBatch: async () => document([row(catalog[index]!.name)]) }, db, () => clock).analyzePhotoBatch(input(), staff)));
   assert.deepEqual(new Set((await dayRef(staff).get()).get("customerIds")), new Set(ids.slice(0, 2)));
   const before = (await dayRef(staff).get()).data(); extraction = document([row(catalog[0]!.name), row(catalog[1]!.name)]);
-  await service.analyzePhotoBatch(input(), staff); assert.deepEqual((await dayRef(staff).get()).data(), before);
+  const duplicate = await service.analyzePhotoBatch(input(), staff); assert.deepEqual((await dayRef(staff).get()).data(), before);
+  assert.equal(duplicate.message, "새로 추가 0곳 · 이미 등록 2곳");
+});
+await test("mixed and partially confirmed rows keep exact unique counts and the existing day order", async () => {
+  const staff = await makeActor();
+  await routeRef(staff).set({ employeeId: staff.employeeId, customerIds: [ids[2], ids[0]], revision: 5, updatedAt: clock, updatedByEmployeeId: staff.employeeId });
+  await dayRef(staff).set({ employeeId: staff.employeeId, deliveryDateKey: date, hasOverride: true, customerIds: [ids[2], ids[0]], revision: 3 });
+  extraction = document([row(catalog[0]!.name), row(catalog[1]!.name), row(catalog[1]!.name), row(`확인하나${prefix}`), row(`확인둘${prefix}`)]);
+  const scan = await service.analyzePhotoBatch(input(), staff);
+  assert.equal(scan.message, "새로 추가 1곳 · 이미 등록 1곳");
+  assert.deepEqual(scan.lists!.day.customerIds, [ids[2], ids[0], ids[1]]);
+  const firstRequest = confirm(scan, [connect("row-4", ids[2]!)]);
+  const first = await service.confirmPhotoBatch(firstRequest, staff);
+  assert.equal(first.message, "새로 추가 1곳 · 이미 등록 2곳");
+  assert.deepEqual(await service.confirmPhotoBatch(firstRequest, staff), first);
+  const second = await service.confirmPhotoBatch(confirm(first, [connect("row-5", ids[1]!)]), staff);
+  assert.equal(second.message, "새로 추가 1곳 · 이미 등록 2곳");
+  assert.deepEqual(second.lists!.day, scan.lists!.day);
+  assert.deepEqual((await aliasesRef(staff).get()).docs, []);
+});
+await test("photo-protected destinations count as existing even when absent from the saved day", async () => {
+  const staff = await makeActor();
+  const photoRef = db.doc(`companies/onnuri/deliveryPhotos/${prefix}-counted`);
+  const photo = { customerId: ids[2], deliveryDateKey: date, createdByEmployeeId: staff.employeeId, status: "active", expiresAt: Timestamp.fromMillis(clock.toMillis() + 86400_000) };
+  await photoRef.set(photo);
+  extraction = document([row(catalog[2]!.name), row(catalog[0]!.name)]);
+  const scan = await service.analyzePhotoBatch(input(), staff);
+  assert.equal(scan.message, "새로 추가 1곳 · 이미 등록 1곳");
+  assert.deepEqual(scan.lists!.day.customerIds, [ids[2], ids[0]]); assert.deepEqual((await photoRef.get()).data(), photo);
+});
+for (const mode of ["absent", "route-default", "explicit-empty"] as const) {
+  await test(`counting follows the existing merge policy for a ${mode} day`, async () => {
+    const staff = await makeActor();
+    await routeRef(staff).set({ employeeId: staff.employeeId, customerIds: [ids[0]], revision: 1, updatedAt: clock, updatedByEmployeeId: staff.employeeId });
+    if (mode !== "absent") await dayRef(staff).set({ employeeId: staff.employeeId, deliveryDateKey: date, hasOverride: mode === "explicit-empty", customerIds: [], revision: 1 });
+    extraction = document([row(catalog[0]!.name)]); const scan = await service.analyzePhotoBatch(input(), staff);
+    assert.equal(scan.message, mode === "route-default" ? "새로 추가 0곳 · 이미 등록 1곳" : "새로 추가 1곳 · 이미 등록 0곳");
+    assert.deepEqual(scan.lists!.day.customerIds, [ids[0]]);
+  });
+}
+await test("a legacy scan remains confirmable without inventing historical registration counts", async () => {
+  const staff = await makeActor(); extraction = document([row(catalog[0]!.name), row(`구버전${prefix}`)]);
+  const scan = await service.analyzePhotoBatch(input(), staff);
+  await db.doc(`requestLocks/delivery-planning-${scan.scanId}`).update({ registration: FieldValue.delete(), "result.message": "" });
+  const saved = await service.confirmPhotoBatch(confirm(scan, [connect("row-2", ids[1]!)]), staff);
+  assert.equal(saved.message, ""); assert.deepEqual(saved.lists!.day.customerIds, ids.slice(0, 2));
+  assert.equal(saved.rows[1]!.status, "saved");
 });
 await test("explicit wrong dates require one persisted confirmation for later partial decisions", async () => {
   const staff = await makeActor(); extraction = document([row(catalog[0]!.name, { date: "11-09" }), row(catalog[1]!.name, { date: "11-09" })]);

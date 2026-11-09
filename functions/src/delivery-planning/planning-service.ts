@@ -17,6 +17,7 @@ import { photoAliasSchema, photoAliasesSchema, photoBatchResultSchema, photoExtr
 import { matchPhotoRows, photoAliasKey, registeredPhotoNames, rowNeedsDateConfirmation, validAliasText } from "./photo-batch-matching.js";
 import { prepareInvoiceAddressEvidence } from "./invoice-address-lookup.js";
 import { normalizedInvoiceName } from "./invoice-names.js";
+import { mergePhotoRegistration, photoRegistrationMessage, registrationDelta, type RegistrationDelta } from "./photo-registration-summary.js";
 import {
   DEFAULT_ORIGIN_ADDRESS, DEFAULT_ORIGIN_POINT, DEFAULT_DELIVERY_VEHICLE, PLANNING_NOTICE, invoiceResultSchema, planningSettingsSchema, routeRecommendationSchema,
   type analyzeInvoiceSchema, type confirmInvoiceSchema, type recommendRouteSchema, type applyRecommendationSchema,
@@ -96,7 +97,7 @@ export class PlanningService {
         deliveryAddress: String(doc.get("deliveryAddress") ?? ""), revision: Number(doc.get("revision")), district: String(doc.get("district") ?? "") }));
   }
   // All reads precede writes. Addition merges the latest state rather than replacing a stale client snapshot.
-  private async addCustomers(tx: Transaction, actor: CustomerActor, customerIds: string[], date: string): Promise<PlanningLists> {
+  private async addCustomers(tx: Transaction, actor: CustomerActor, customerIds: string[], date: string): Promise<{ lists: PlanningLists; registration: RegistrationDelta }> {
     this.today(date);
     const additions = unique(customerIds);
     const routeRef = this.db.doc(`${DELIVERY_PHOTO_ROUTE_PATH}/${actor.employeeId}`);
@@ -111,6 +112,7 @@ export class PlanningService {
     // A saved day without override still represents an explicit user choice: preserve its effective list.
     const baseline: string[] = day ? (day.hasOverride ? day.customerIds : myIds) : [];
     const photoIds = photos.filter((p) => p.createdByEmployeeId === actor.employeeId || myIds.includes(p.customerId)).map((p) => String(p.customerId));
+    const registration = registrationDelta([...baseline, ...photoIds], additions);
     const routeIds = unique([...myIds, ...additions]); const todayIds = unique([...baseline, ...photoIds, ...additions]);
     if (routeIds.length > 100 || todayIds.length > 100) throw new HttpsError("resource-exhausted", "납품처는 최대 100곳입니다. 목록을 정리한 뒤 다시 시도해주세요.");
     const now = this.clock(); const routeChanged = !old || additions.some((id) => !myIds.includes(id));
@@ -121,7 +123,7 @@ export class PlanningService {
     if (routeChanged) tx.set(routeRef, { ...route, updatedAt: now });
     if (dayChanged) tx.set(dayRef, { employeeId: actor.employeeId, deliveryDateKey: date, hasOverride: true, customerIds: todayIds, revision: resultDay.revision,
       updatedAt: now, updatedByEmployeeId: actor.employeeId, expiresAt: Timestamp.fromMillis(now.toMillis() + 14 * 86400_000) });
-    return { route, day: resultDay };
+    return { lists: { route, day: resultDay }, registration };
   }
   private async reserve(actor: CustomerActor, requestId: string, operation: "scan" | "route", hash: string, date: string) {
     return this.db.runTransaction(async (tx) => {
@@ -164,7 +166,7 @@ export class PlanningService {
       if (lock.get("state") === "complete") return invoiceResultSchema.parse(lock.get("result"));
       const catalog = await this.customers(tx);
       const matched = matchInvoice(fields, catalog, input.deliveryDateKey, proof?.catalogHash === fingerprint(catalog) ? proof.evidence : undefined);
-      const lists = matched.customerId ? await this.addCustomers(tx, actor, [matched.customerId], input.deliveryDateKey) : null;
+      const lists = matched.customerId ? (await this.addCustomers(tx, actor, [matched.customerId], input.deliveryDateKey)).lists : null;
       const result = invoiceResultSchema.parse({ scanId: input.requestId, fields, ...matched, status: lists ? "saved" : "review", lists,
         elapsedMs: Math.max(0, this.clock().toMillis() - started) });
       tx.update(ref, { state: "complete", result, deliveryDateKey: input.deliveryDateKey });
@@ -186,7 +188,7 @@ export class PlanningService {
         return old;
       }
       if (old.fields.invoiceDate !== input.deliveryDateKey && !input.dateConfirmed) throw new HttpsError("failed-precondition", "이 명세서가 오늘 납품 건인지 확인해주세요.");
-      const lists = await this.addCustomers(tx, actor, [input.customerId], input.deliveryDateKey);
+      const { lists } = await this.addCustomers(tx, actor, [input.customerId], input.deliveryDateKey);
       const result = invoiceResultSchema.parse({ ...old, status: "saved", customerId: input.customerId, lists, reason: "직접 확인한 거래처로 저장했어요." });
       tx.update(scanRef, { result });
       tx.create(receipt, { operation: "confirm", actorUid: actor.uid, employeeId: actor.employeeId, fingerprint: hash, result, createdAt: this.clock() });
@@ -248,11 +250,12 @@ export class PlanningService {
       const rows = matchPhotoRows(extraction, catalog, aliases, input.deliveryDateKey,
         proof?.catalogHash === fingerprint(catalog) ? proof.evidence : undefined);
       const ids = rows.flatMap((r) => r.customerId ? [r.customerId] : []);
-      const lists = ids.length ? await this.addCustomers(tx, actor, ids, input.deliveryDateKey) : null;
+      const addition = ids.length ? await this.addCustomers(tx, actor, ids, input.deliveryDateKey) : null;
+      const registration = mergePhotoRegistration(undefined, [], addition?.registration ?? { addedIds: [], existingIds: [] });
       const result = photoBatchResultSchema.parse({ scanId: input.requestId, revision: 1, kind: extraction.kind, rows,
-        dateConfirmed: false, message: rows.length ? "" : "거래처 목록을 찾지 못했어요. 상호가 잘 보이도록 다시 촬영해주세요.",
-        elapsedMs: Math.max(0, this.clock().toMillis() - started), lists });
-      tx.update(ref, { state: "complete", photoBatchVersion: 1, result, deliveryDateKey: input.deliveryDateKey });
+        dateConfirmed: false, message: rows.length ? photoRegistrationMessage(registration) : "거래처 목록을 찾지 못했어요. 상호가 잘 보이도록 다시 촬영해주세요.",
+        elapsedMs: Math.max(0, this.clock().toMillis() - started), lists: addition?.lists ?? null });
+      tx.update(ref, { state: "complete", photoBatchVersion: 1, result, registration, deliveryDateKey: input.deliveryDateKey });
       this.audit(tx, actor, "DELIVERY_PHOTO_BATCH_ANALYZED", input.requestId,
         { deliveryDateKey: input.deliveryDateKey, rowCount: rows.length, savedCount: unique(ids).length });
       return result;
@@ -301,7 +304,9 @@ export class PlanningService {
       if (new Set([...aliases.map((a) => a.aliasKey), ...learned.keys()]).size > 500) {
         throw new HttpsError("resource-exhausted", "기억한 이름은 최대 500개예요. 이름 기억 옵션을 끄고 등록해주세요.");
       }
-      const lists = ids.length ? await this.addCustomers(tx, actor, ids, input.deliveryDateKey) : old.lists;
+      const addition = ids.length ? await this.addCustomers(tx, actor, ids, input.deliveryDateKey) : null;
+      const registration = mergePhotoRegistration(scan!.get("registration"), old.rows.flatMap((row) => row.status === "saved" && row.customerId ? [row.customerId] : []),
+        addition?.registration ?? { addedIds: [], existingIds: [] });
       const rows = old.rows.map((row) => {
         const decision = decisions.get(row.rowId);
         const aliasRevision = learned.get(photoAliasKey(row.rawName))?.revision ?? row.aliasRevision;
@@ -309,12 +314,12 @@ export class PlanningService {
         if (decision.action === "skip") return { ...row, status: "skipped" as const, customerId: null, matchSource: null, reason: "이번 목록에서 제외했어요.", aliasRevision };
         return { ...row, status: "saved" as const, customerId: decision.customerId, matchSource: "manual" as const, reason: "확인한 거래처로 저장했어요.", aliasRevision };
       });
-      const result = photoBatchResultSchema.parse({ ...old, revision: old.revision + 1, rows, lists,
-        dateConfirmed: old.dateConfirmed || input.dateConfirmed });
+      const result = photoBatchResultSchema.parse({ ...old, revision: old.revision + 1, rows, lists: addition?.lists ?? old.lists,
+        message: photoRegistrationMessage(registration), dateConfirmed: old.dateConfirmed || input.dateConfirmed });
       const now = this.clock();
       for (const alias of learned.values()) tx.set(this.db.doc(`${aliasesPath(actor.employeeId)}/${alias.aliasKey}`),
         { ...alias, updatedAt: now, updatedByEmployeeId: actor.employeeId, confirmedByUid: actor.uid });
-      tx.update(scanRef, { result });
+      tx.update(scanRef, { result, registration });
       tx.create(receipt, { operation: "confirm-photo-batch", actorUid: actor.uid, employeeId: actor.employeeId, fingerprint: hash,
         result, createdAt: now, expiresAt: Timestamp.fromMillis(now.toMillis() + 14 * 86400_000) });
       this.audit(tx, actor, "DELIVERY_PHOTO_BATCH_CONFIRMED", input.requestId,

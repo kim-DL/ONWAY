@@ -18,10 +18,29 @@ async function stats(page: import("@playwright/test").Page) {
   return page.evaluate(() => (window as unknown as { batchPreviewStats: () => { confirmRequests: unknown[]; aliases: { aliasText: string; customerId: string; enabled: boolean }[] } }).batchPreviewStats());
 }
 
+test("photo counts stay visible with an existing day and repeated confirmed destinations", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await open(page, "&counts"); await photo(page);
+  await expect(page.getByText("새로 추가 1곳 · 이미 등록 1곳", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "현재 오늘 납품처" }).getByRole("listitem")).toHaveText(["1예시푸드", "2푸른급식", "3한빛유통"]);
+  const uncertain = page.getByRole("group", { name: "늘봄? 확인", exact: true });
+  await uncertain.getByRole("textbox", { name: "기존 거래처 찾기" }).fill("한빛유통");
+  await uncertain.getByRole("button", { name: /한빛유통/ }).click();
+  await page.getByRole("button", { name: "선택한 1곳 등록", exact: true }).click();
+  await expect(page.getByText("2곳 연결 완료", { exact: true })).toBeVisible();
+  await expect(page.getByText("새로 추가 1곳 · 이미 등록 1곳", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `output/photo-batch/counts-${test.info().project.name}.png`, fullPage: true, scale: "css" });
+  await photo(page);
+  await expect(page.getByText("새로 추가 0곳 · 이미 등록 2곳", { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "현재 오늘 납품처" }).getByRole("listitem")).toHaveText(["1예시푸드", "2푸른급식", "3한빛유통"]);
+});
+
 test("only ambiguous names are expanded and one save confirms selected names and skips unreadable rows", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 760 });
   await open(page); await photo(page);
-  await expect(page.getByText("1곳 저장 · 2곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("1곳 연결 · 2곳 확인 필요", { exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "한빛 확인" })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("region", { name: "사진 처리 결과" }).scrollIntoViewIfNeeded();
@@ -39,11 +58,11 @@ test("only ambiguous names are expanded and one save confirms selected names and
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `output/photo-batch/review-${test.info().project.name}.png`, fullPage: true, scale: "css" });
   await page.getByRole("button", { name: "선택한 1곳 등록", exact: true }).click();
-  await expect(page.getByText("2곳 저장 완료", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 완료", { exact: true })).toBeVisible();
   expect((await stats(page)).confirmRequests).toHaveLength(1);
   expect((await stats(page)).aliases).toMatchObject([{ aliasText: "한빛", customerId: "preview-1", enabled: true }]);
   await photo(page);
-  await expect(page.getByText("2곳 저장 · 1곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "한빛 확인" })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "늘봄? 확인", exact: true })).toBeVisible();
   expect(await page.evaluate(async () => ({ local: localStorage.length, session: sessionStorage.length, databases: (await indexedDB.databases()).length }))).toEqual({ local: 0, session: 0, databases: 0 });
@@ -57,7 +76,7 @@ test("uncertain handwriting is not remembered unless its spelling is explicitly 
   await uncertain.getByRole("checkbox", { name: "이 줄임말 기억" }).check();
   await uncertain.getByRole("textbox", { name: "기억할 이름" }).fill("늘봄");
   await page.getByRole("button", { name: "선택한 1곳 등록", exact: true }).click();
-  await expect(page.getByText("2곳 저장 · 1곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
   expect((await stats(page)).aliases).toMatchObject([{ aliasText: "늘봄", customerId: "preview-2" }]);
 });
 
@@ -69,7 +88,7 @@ test("lost confirmation response locks edits and retries the exact request witho
   await expect(page.getByRole("alert")).toContainText("저장 응답");
   await expect(shorthand.getByRole("textbox", { name: "기억할 이름" })).toBeDisabled();
   await page.getByRole("button", { name: "저장 결과 다시 확인", exact: true }).click();
-  await expect(page.getByText("2곳 저장 · 1곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
   const state = await stats(page);
   expect(state.confirmRequests).toHaveLength(2); expect(state.confirmRequests[0]).toEqual(state.confirmRequests[1]);
   expect(state.aliases).toHaveLength(1);
@@ -79,7 +98,7 @@ test("remembered shorthand can be changed and forgotten without removing today's
   await open(page); await photo(page);
   await page.getByRole("group", { name: "한빛 확인" }).getByRole("button", { name: /한빛유통/ }).click();
   await page.getByRole("button", { name: "선택한 1곳 등록", exact: true }).click();
-  await expect(page.getByText("2곳 저장 · 1곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
   await page.getByText("기억한 줄임말", { exact: false }).click();
   await page.getByRole("button", { name: "변경", exact: true }).click();
   await page.getByRole("textbox", { name: "연결할 거래처" }).fill("푸른급식");
@@ -93,7 +112,7 @@ test("remembered shorthand can be changed and forgotten without removing today's
 test("long handwritten names fit narrow mobile review cards", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 760 });
   await open(page, "&longName"); await photo(page);
-  await expect(page.getByText("1곳 저장 · 2곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("1곳 연결 · 2곳 확인 필요", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -106,13 +125,13 @@ test("a definitive rejected confirmation allows editing instead of locking the e
   await expect(shorthand.getByRole("checkbox", { name: "이 줄임말 기억" })).toBeEnabled();
   await shorthand.getByRole("checkbox", { name: "이 줄임말 기억" }).uncheck();
   await page.getByRole("button", { name: "선택한 1곳 등록", exact: true }).click();
-  await expect(page.getByText("2곳 저장 · 1곳 확인 필요", { exact: true })).toBeVisible();
+  await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
   expect((await stats(page)).aliases).toHaveLength(0);
 });
 
 test("unsupported photos are reported without a success badge or a saved delivery", async ({ page }) => {
   await open(page, "&unsupported"); await photo(page);
-  await expect(page.getByText("0곳 저장 · 인식 없음 1장", { exact: true })).toBeVisible();
+  await expect(page.getByText("0곳 연결 · 인식 없음 1장", { exact: true })).toBeVisible();
   await expect(page.getByText("판독 불가", { exact: true })).toBeVisible();
   await expect(page.getByText("거래처를 읽지 못했어요. 명세서나 목록을 다시 촬영해주세요.")).toBeVisible();
   await expect(page.getByRole("list", { name: "현재 오늘 납품처" }).getByRole("listitem")).toHaveCount(0);
@@ -124,7 +143,7 @@ test("a corrupt image reports a Korean recovery message and the next valid photo
   await page.getByLabel("납품처 갤러리", { exact: true }).setInputFiles({ name: "broken.png", mimeType: "image/png", buffer: Buffer.from("not decodable") });
   await expect(page.getByText("사진을 읽지 못했어요. 원본 사진을 다시 선택해주세요.", { exact: true })).toBeVisible();
   await photo(page);
-  await expect(page.getByText("1곳 저장 · 2곳 확인 필요 · 1장 재확인", { exact: true })).toBeVisible();
+  await expect(page.getByText("1곳 연결 · 2곳 확인 필요 · 1장 재확인", { exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "한빛 확인" })).toBeVisible();
 });
 
@@ -140,7 +159,7 @@ for (const aliasText of ["", "임시줄임말"]) {
     await row.getByRole("button", { name: /한빛유통/ }).click();
     await expect(row.getByRole("textbox", { name: "기억할 이름" })).toHaveCount(0);
     await page.getByRole("button", { name: "선택한 1곳 등록", exact: true }).click();
-    await expect(page.getByText("2곳 저장 · 1곳 확인 필요", { exact: true })).toBeVisible();
+    await expect(page.getByText("2곳 연결 · 1곳 확인 필요", { exact: true })).toBeVisible();
     expect((await stats(page)).aliases).toHaveLength(0);
   });
 }
