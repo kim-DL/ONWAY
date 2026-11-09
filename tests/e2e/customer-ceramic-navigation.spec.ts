@@ -194,7 +194,7 @@ test("planning cards open their tools and a populated photo screen stays compact
     await workspace.getByRole("button", { name: button, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: title, exact: true });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "완료", exact: true }).click();
+    await dialog.getByRole("button", { name: "창 닫기", exact: true }).click();
     await expect(dialog).toHaveCount(0);
   }
   expect((await new AxeBuilder({ page }).include("[data-delivery-photo-workspace]").analyze()).violations).toEqual([]);
