@@ -4,6 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import { z } from "zod";
 import { customerLocationCandidateSchema, type CustomerPoint } from "@/domain/customer";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
+export { renderDirectionsLoading } from "./customer-directions-loading";
 
 export async function resolveDirectionsPoint(query: string): Promise<CustomerPoint | null> {
   const services = getFirebaseClientServices(); const user = services?.auth.currentUser;

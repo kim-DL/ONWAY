@@ -16,7 +16,7 @@ describe("address-based Kakao directions", () => {
     const { popup, browser, event } = setup(); let finish!: (point: { latitude: number; longitude: number }) => void;
     const resolve = vi.fn(() => new Promise<{ latitude: number; longitude: number }>((done) => { finish = done; }));
     const task = openCustomerDirections(event, customer, resolve);
-    expect(browser.open).toHaveBeenCalledOnce(); expect(resolve).toHaveBeenCalledWith(customer.deliveryAddress);
+    expect(browser.open).toHaveBeenCalledOnce(); expect(resolve).toHaveBeenCalledWith(customer.deliveryAddress, popup);
     expect(popup.opener).toBeNull(); expect(popup.location.replace).not.toHaveBeenCalled();
     finish({ latitude: 36.4, longitude: 127.5 }); await task;
     expect(popup.location.replace).toHaveBeenCalledWith(`https://map.kakao.com/link/to/${encodeURIComponent(customer.name)},36.4,127.5`);
@@ -26,6 +26,20 @@ describe("address-based Kakao directions", () => {
     const { browser, event } = setup(true);
     await openCustomerDirections(event, customer, async () => ({ latitude: 36.4, longitude: 127.5 }));
     expect(browser.location.assign).toHaveBeenCalledOnce();
+  });
+  it("does not reopen a reserved window that the user closed during address lookup", async () => {
+    const { popup, browser, event } = setup();
+    await openCustomerDirections(event, customer, async () => { popup.closed = true; return { latitude: 36.4, longitude: 127.5 }; });
+    expect(popup.location.replace).not.toHaveBeenCalled();
+    expect(browser.location.assign).not.toHaveBeenCalled(); expect(browser.alert).not.toHaveBeenCalled();
+  });
+  it("repeated clicks during lookup do not open duplicate windows or repeat the lookup", async () => {
+    const { browser, event } = setup(); let finish!: (point: { latitude: number; longitude: number }) => void;
+    const resolve = vi.fn(() => new Promise<{ latitude: number; longitude: number }>((done) => { finish = done; }));
+    const first = openCustomerDirections(event, customer, resolve);
+    await openCustomerDirections(event, customer, resolve);
+    expect(browser.open).toHaveBeenCalledOnce(); expect(resolve).toHaveBeenCalledOnce();
+    finish({ latitude: 36.4, longitude: 127.5 }); await first;
   });
   it.each([null, { latitude: NaN, longitude: 127 }])("closes the blank window and shows an error for an unresolved address", async (point) => {
     const { popup, browser, event } = setup(); await openCustomerDirections(event, customer, async () => point);

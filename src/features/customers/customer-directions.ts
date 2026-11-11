@@ -15,7 +15,11 @@ export function customerDirectionsHref(customer: DirectionCustomer): string | nu
 
 const pending = new WeakSet<HTMLAnchorElement>();
 export async function openCustomerDirections(event: MouseEvent<HTMLAnchorElement>, customer: DirectionCustomer,
-  resolve: (address: string) => Promise<CustomerPoint | null> = async (address) => (await import("./customer-directions-repository")).resolveDirectionsPoint(address)) {
+  resolve: (address: string, popup: Window | null) => Promise<CustomerPoint | null> = async (address, popup) => {
+    const api = await import("./customer-directions-repository");
+    if (popup && !popup.closed) api.renderDirectionsLoading(popup);
+    return api.resolveDirectionsPoint(address);
+  }) {
   if (event.defaultPrevented || (event.button !== undefined && event.button !== 0 && event.button !== 1)) return;
   event.preventDefault();
   const anchor = event.currentTarget; const originalHref = anchor.href;
@@ -25,8 +29,8 @@ export async function openCustomerDirections(event: MouseEvent<HTMLAnchorElement
   let popup: Window | null = null;
   try {
     popup = window.open("about:blank", "_blank");
-    if (popup) { popup.opener = null; popup.document.title = "길안내 준비"; popup.document.body.textContent = "주소 확인 중…"; }
-    const point = await resolve(addressOf(customer));
+    if (popup) popup.opener = null;
+    const point = await resolve(addressOf(customer), popup);
     if (!anchor.isConnected || anchor.href !== originalHref) { popup?.close(); return; }
     if (!isCustomerPoint(point)) throw new Error("unresolved-address");
     const href = buildKakaoDirectionsUrlToCoordinate(customer.name, point.latitude, point.longitude);

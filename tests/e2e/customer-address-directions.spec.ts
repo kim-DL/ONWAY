@@ -10,11 +10,12 @@ test.beforeAll(async () => {
     builder.onLoad({ filter: /.*/, namespace: "directions-isolation" }, ({ path }) => ({ loader: "ts", resolveDir: root, contents: path === "client-only" ? "export {};" : `
       export const customerRepository = {};
       export const customerErrorMessage=()=>"error";
-      export async function resolveDirectionsPoint(query){window.__directionQueries ??= [];window.__directionQueries.push(query);await new Promise(r=>setTimeout(r,100));return new URLSearchParams(location.search).has('fail')?null:{latitude:36.4,longitude:127.5};}
+      export {renderDirectionsLoading} from "./src/features/customers/customer-directions-loading";
+      export async function resolveDirectionsPoint(query){window.__directionQueries ??= [];window.__directionQueries.push(query);await new Promise(r=>new URLSearchParams(location.search).has('hold')?window.__finishDirections=r:setTimeout(r,100));return new URLSearchParams(location.search).has('fail')?null:{latitude:36.4,longitude:127.5};}
     ` }));
   } }]);
 });
-async function open(page: import("@playwright/test").Page, fail = false) {
+async function open(page: import("@playwright/test").Page, fail = false, hold = false) {
   const errors: string[] = []; page.on("pageerror", (error) => errors.push(error.message));
   await page.context().route("**/*", (route) => {
     const url = new URL(route.request().url());
@@ -22,10 +23,34 @@ async function open(page: import("@playwright/test").Page, fail = false) {
     if (url.hostname === "customer-directions.test") return route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${fixture.css}</style><div id="root"></div><script>${fixture.script.replaceAll("</script>", "<\\/script>")}</script></html>` });
     return route.abort();
   });
-  await page.goto(`https://customer-directions.test/${fail ? "?fail" : ""}`);
+  await page.goto(`https://customer-directions.test/${hold ? "?hold" : fail ? "?fail" : ""}`);
   expect(errors).toEqual([]);
   await expect(page.getByRole("heading", { name: "주소 길안내 검증" })).toBeVisible();
 }
+test("address lookup shows a centered loader without a raw text page", async ({ page }, info) => {
+  await open(page, false, true);
+  const newPage = page.context().waitForEvent("page");
+  await page.getByRole("region", { name: "목록 카드" }).getByRole("link").click();
+  const popup = await newPage;
+  const viewport = info.project.name === "mobile-chromium" ? { width: 320, height: 760 } : { width: 1280, height: 800 };
+  await popup.setViewportSize(viewport);
+  await popup.screenshot({ path: `output/kakao-directions-transition/pending-${info.project.name}.png`, scale: "css" });
+  await expect(popup.getByRole("status", { name: "길안내 연결 중" })).toBeVisible();
+  expect(await popup.locator("body").innerText()).toBe("");
+  const box = await popup.getByRole("status").boundingBox();
+  expect(Math.abs(box!.x + box!.width / 2 - viewport.width / 2)).toBeLessThan(1);
+  expect(Math.abs(box!.y + box!.height / 2 - viewport.height / 2)).toBeLessThan(1);
+  expect(await popup.evaluate(() => ({ language: document.documentElement.lang,
+    viewport: document.querySelector('meta[name="viewport"]')?.getAttribute("content"),
+    overflow: document.documentElement.scrollWidth > innerWidth }))).toEqual({ language: "ko", viewport: "width=device-width, initial-scale=1", overflow: false });
+  await popup.emulateMedia({ reducedMotion: "reduce" });
+  await expect(popup.getByRole("status")).toHaveCSS("animation-name", "none");
+  await popup.emulateMedia({ reducedMotion: "no-preference", forcedColors: "active" });
+  await expect(popup.getByRole("status")).toHaveCSS("animation-name", "none");
+  await page.evaluate(() => (window as unknown as { __finishDirections: () => void }).__finishDirections());
+  await expect(popup).toHaveURL(`https://map.kakao.com/link/to/${encodeURIComponent("예시식품")},36.4,127.5`);
+  await popup.close();
+});
 for (const region of ["목록 카드", "상세 화면"]) {
   test(`${region} opens Kakao directions from the displayed address rather than the old pin`, async ({ page }) => {
     await open(page);
