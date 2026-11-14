@@ -378,10 +378,10 @@ describe("admin preview and one-time security results", () => {
     const state = frame();
     const initial = render(detail, state);
     const openPin = find(initial, (node) => node.type === "button" && all(node.props.children as ReactNode)
-      .some((child) => child.props.children === "PIN 재발급"));
+      .some((child) => child.props.children === "임시 PIN 발급"));
     invoke(openPin, "onClick");
     const confirmation = component(render(detail, state), "AdminDialog");
-    invoke(action(confirmation, "PIN 재발급"), "onClick");
+    invoke(action(confirmation, "임시 PIN 발급"), "onClick");
     invoke(action(confirmation, "취소"), "onClick");
     invoke(confirmation, "onClose");
     expect(harness.rotatePin).toHaveBeenCalledOnce();
@@ -392,7 +392,7 @@ describe("admin preview and one-time security results", () => {
     await flush();
     expect(onReload).not.toHaveBeenCalled();
     const complete = component(render(detail, state), "AdminDialog");
-    expect(complete.props.title).toBe("새 PIN을 확인해주세요.");
+    expect(complete.props.title).toBe("임시 PIN을 확인해주세요.");
     expect(complete.props.busy).toBe(false);
     expect(component(complete, "PinReveal").props.pin).toBe("638527");
     expect(release).not.toHaveBeenCalled();
@@ -423,9 +423,9 @@ describe("admin preview and one-time security results", () => {
     const initial = render(detail, state);
     const unmount = state.effects[0]!() as () => void;
     invoke(find(initial, (node) => node.type === "button" && all(node.props.children as ReactNode)
-      .some((child) => child.props.children === "PIN 재발급")), "onClick");
+      .some((child) => child.props.children === "임시 PIN 발급")), "onClick");
     const confirmation = component(render(detail, state), "AdminDialog");
-    invoke(action(confirmation, "PIN 재발급"), "onClick");
+    invoke(action(confirmation, "임시 PIN 발급"), "onClick");
     return { employee, page, pageState, detail, state, unmount };
   }
 

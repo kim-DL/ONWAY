@@ -73,8 +73,8 @@ export const adminRepository = {
     return adminEmployeeSchema.parse(await call("updateEmployee", { ...input, ...mutationFields() }));
   },
 
-  async rotatePin(input: { employeeId: string; revokeSessions: boolean; reason: string }) {
-    return rotatedPinSchema.parse(await call("rotateEmployeePin", { ...input, ...mutationFields() }));
+  async rotatePin(input: { employeeId: string; revokeSessions: boolean; reason: string; requestId?: string }) {
+    return rotatedPinSchema.parse(await call("rotateEmployeePin", { ...mutationFields(), ...input }));
   },
 
   async revokeSessions(input: { employeeId: string; reason: string }) {

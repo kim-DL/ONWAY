@@ -7,8 +7,10 @@ import {
   type Firestore,
 } from "firebase-admin/firestore";
 
-import { createPinLookupKey, generateRandomPin, hashPin } from "../auth/pin-crypto.js";
+import { createOpaqueKey, createPinLookupKey, generateRandomPin, hashPin } from "../auth/pin-crypto.js";
+import { hasActivePinReservation } from "../auth/pin-reservations.js";
 import { inventoryAuditSummary } from "./inventory-audit-summary.js";
+import { GoogleAdminAccessService, requireActiveAdminTransaction } from "./google-admin-access-service.js";
 import type { VerifiedAdminActor } from "./admin-authorization.js";
 import type {
   CreateEmployeeInput,
@@ -19,18 +21,11 @@ import type {
   UpdatePublicAppSettingsInput,
 } from "./admin-contract.js";
 
-const ADMIN_ACCESS_PATH = "secureSettings/adminAccess";
 const PIN_RESERVATION_TTL_MS = 10 * 60 * 1_000;
 const MAX_PIN_GENERATION_ATTEMPTS = 30;
 const ROLE_SCOPES = new Set(["delivery", "sales", "viewer", "admin"]);
 
 type RoleScope = "delivery" | "sales" | "viewer" | "admin";
-
-type AdminAccessEntry = {
-  email: string;
-  employeeId: string;
-  active: boolean;
-};
 
 type EmployeeRecord = {
   employeeId: string;
@@ -170,86 +165,7 @@ export class AdminService {
     email: string;
     appVersion: string;
   }) {
-    const accessSnapshot = await this.dependencies.db.doc(ADMIN_ACCESS_PATH).get();
-    const entries = Array.isArray(accessSnapshot.data()?.entries)
-      ? accessSnapshot.data()!.entries as AdminAccessEntry[]
-      : [];
-    const entry = entries.find((candidate) =>
-      candidate?.active === true
-      && typeof candidate.email === "string"
-      && candidate.email.trim().toLowerCase() === input.email);
-    if (!entry || typeof entry.employeeId !== "string") {
-      throw new AdminPermissionError("관리자 허용목록에 등록되지 않은 계정입니다.");
-    }
-
-    const employeeRef = this.dependencies.db.doc(`employees/${entry.employeeId}`);
-    const oldEmployeeSnapshot = await employeeRef.get();
-    if (!oldEmployeeSnapshot.exists) throw new AdminPermissionError("관리자 직원 정보를 찾을 수 없습니다.");
-    const employee = employeeRecord(oldEmployeeSnapshot.data(), oldEmployeeSnapshot.id);
-    if (employee.status !== "active" || !employee.roleScopes.includes("admin")) {
-      throw new AdminPermissionError("활성 admin 역할이 필요합니다.");
-    }
-
-    const previousAuthzSnapshot = await this.dependencies.db.doc(`authz/${employee.firebaseUid}`).get();
-    const permissionsVersion = typeof previousAuthzSnapshot.data()?.permissionsVersion === "number"
-      ? previousAuthzSnapshot.data()!.permissionsVersion as number
-      : 1;
-    const activatedAt = Timestamp.fromDate(this.now());
-    const actor: VerifiedAdminActor = {
-      uid: input.uid,
-      employeeId: employee.employeeId,
-      email: input.email,
-    };
-    const activationAudit = audit({
-      eventType: "ADMIN_SESSION_ACTIVATED",
-      actor,
-      targetType: "employee",
-      targetId: employee.employeeId,
-      changedFields: ["firebaseUid", "adminApproved", "authz"],
-      requestId: randomUUID(),
-      appVersion: input.appVersion,
-      createdAt: activatedAt,
-    });
-
-    await this.dependencies.db.runTransaction(async (transaction) => {
-      const freshEmployeeSnapshot = await transaction.get(employeeRef);
-      if (!freshEmployeeSnapshot.exists) throw new AdminPermissionError("관리자 직원 정보를 찾을 수 없습니다.");
-      const freshEmployee = employeeRecord(freshEmployeeSnapshot.data(), freshEmployeeSnapshot.id);
-      if (freshEmployee.status !== "active" || !freshEmployee.roleScopes.includes("admin")) {
-        throw new AdminPermissionError("관리자 권한이 변경되었습니다.");
-      }
-
-      transaction.update(employeeRef, { firebaseUid: input.uid, updatedAt: activatedAt });
-      transaction.set(this.dependencies.db.doc(`authz/${input.uid}`), {
-        employeeId: freshEmployee.employeeId,
-        active: true,
-        sessionVersion: freshEmployee.sessionVersion,
-        permissionsVersion,
-        updatedAt: activatedAt,
-      });
-      if (freshEmployee.firebaseUid !== input.uid) {
-        transaction.delete(this.dependencies.db.doc(`authz/${freshEmployee.firebaseUid}`));
-      }
-      transaction.create(this.dependencies.db.doc(activationAudit.path), activationAudit.data);
-    });
-
-    await this.dependencies.auth.setCustomUserClaims(input.uid, {
-      employeeId: employee.employeeId,
-      roleScopes: employee.roleScopes,
-      sessionVersion: employee.sessionVersion,
-      permissionsVersion,
-      adminApproved: true,
-    });
-    await this.dependencies.auth.updateUser(input.uid, { displayName: employee.displayName });
-    if (employee.firebaseUid !== input.uid) {
-      await this.dependencies.auth.revokeRefreshTokens(employee.firebaseUid).catch(() => undefined);
-    }
-
-    return {
-      ok: true,
-      employeeId: employee.employeeId,
-      displayName: employee.displayName,
-    };
+    return new GoogleAdminAccessService(this.dependencies).activate(input);
   }
 
   async reservePin(requestId: string, actor: VerifiedAdminActor) {
@@ -257,26 +173,20 @@ export class AdminService {
     for (let attempt = 0; attempt < MAX_PIN_GENERATION_ATTEMPTS; attempt += 1) {
       const pin = generateRandomPin();
       const lookupKey = createPinLookupKey(pin, this.dependencies.lookupSecret);
-      const [indexSnapshot, reservationSnapshot] = await Promise.all([
-        this.dependencies.db.doc(`pinIndexes/${lookupKey}`).get(),
-        this.dependencies.db.collection("pinReservations")
-          .where("lookupKey", "==", lookupKey)
-          .limit(1)
-          .get(),
-      ]);
-      if (indexSnapshot.exists || !reservationSnapshot.empty) continue;
-
-      const reservationId = randomUUID();
+      const pinHash = await hashPin(pin, this.dependencies.pinPepper);
+      const reservationId = lookupKey;
       const expiresAt = Timestamp.fromMillis(now.toMillis() + PIN_RESERVATION_TTL_MS);
-      await this.dependencies.db.doc(`pinReservations/${reservationId}`).create({
-        reservationId,
-        lookupKey,
-        pinHash: await hashPin(pin, this.dependencies.pinPepper),
-        requestedBy: actor.employeeId,
-        requestId,
-        createdAt: now,
-        expiresAt,
+      const reserved = await this.dependencies.db.runTransaction(async (transaction) => {
+        await requireActiveAdminTransaction(transaction, this.dependencies.db, actor);
+        const indexSnapshot = await transaction.get(this.dependencies.db.doc(`pinIndexes/${lookupKey}`));
+        const unavailable = await hasActivePinReservation(this.dependencies.db, transaction, lookupKey, now);
+        if (indexSnapshot.exists || unavailable) return false;
+        transaction.set(this.dependencies.db.doc(`pinReservations/${reservationId}`), {
+          reservationId, lookupKey, pinHash, requestedBy: actor.employeeId, requestId, createdAt: now, expiresAt,
+        });
+        return true;
       });
+      if (!reserved) continue;
       return { reservationId, pin, expiresAt: expiresAt.toDate().toISOString() };
     }
     throw new AdminConflictError("고유 PIN을 만들지 못했습니다. 다시 시도해주세요.");
@@ -307,6 +217,7 @@ export class AdminService {
 
     try {
       const result = await this.dependencies.db.runTransaction(async (transaction) => {
+        await requireActiveAdminTransaction(transaction, this.dependencies.db, actor);
         const reservationRef = this.dependencies.db.doc(`pinReservations/${input.reservationId}`);
         const reservationSnapshot = await transaction.get(reservationRef);
         if (!reservationSnapshot.exists) throw new AdminPinReservationError("PIN을 다시 생성해주세요.");
@@ -323,6 +234,9 @@ export class AdminService {
         const indexRef = this.dependencies.db.doc(`pinIndexes/${reservation.lookupKey}`);
         const existingIndex = await transaction.get(indexRef);
         if (existingIndex.exists) throw new AdminPinReservationError("PIN이 중복되었습니다. 새 PIN을 만들어주세요.");
+        if (await hasActivePinReservation(this.dependencies.db, transaction, reservation.lookupKey, now, input.reservationId)) {
+          throw new AdminPinReservationError("PIN이 이미 예약되었습니다. 새 PIN을 만들어주세요.");
+        }
 
         const employee = {
           employeeId,
@@ -393,28 +307,18 @@ export class AdminService {
     }
   }
 
-  private async ensureAdminContinuity(employee: EmployeeRecord, nextRoles: RoleScope[], nextStatus: "active" | "disabled") {
-    if (!employee.roleScopes.includes("admin") || (nextRoles.includes("admin") && nextStatus === "active")) return;
-    const activeAdmins = await this.dependencies.db.collection("employees")
-      .where("status", "==", "active")
-      .where("roleScopes", "array-contains", "admin")
-      .limit(2)
-      .get();
-    if (activeAdmins.docs.filter((document) => document.id !== employee.employeeId).length === 0) {
-      throw new AdminConflictError("마지막 활성 관리자는 비활성화하거나 admin 역할을 제거할 수 없습니다.");
-    }
-  }
-
   async updateEmployee(input: UpdateEmployeeInput, actor: VerifiedAdminActor) {
     const employeeRef = this.dependencies.db.doc(`employees/${input.employeeId}`);
     const snapshot = await employeeRef.get();
     if (!snapshot.exists) throw new AdminNotFoundError("직원을 찾을 수 없습니다.");
     const employee = employeeRecord(snapshot.data(), snapshot.id);
+    if (employee.roleScopes.includes("admin")
+      && (!input.roleScopes.includes("admin") || input.status !== employee.status)) {
+      throw new AdminPermissionError("운영자 권한 해제는 Google 운영자 관리에서 처리해주세요.");
+    }
     if (!employee.roleScopes.includes("admin") && input.roleScopes.includes("admin")) {
       throw new AdminPermissionError("admin 역할은 Google 허용목록 절차로만 부여할 수 있습니다.");
     }
-    await this.ensureAdminContinuity(employee, input.roleScopes, input.status);
-
     const now = Timestamp.fromDate(this.now());
     const authzRef = this.dependencies.db.doc(`authz/${employee.firebaseUid}`);
     const authzSnapshot = await authzRef.get();
@@ -445,6 +349,12 @@ export class AdminService {
     });
 
     await this.dependencies.db.runTransaction(async (transaction) => {
+      await requireActiveAdminTransaction(transaction, this.dependencies.db, actor);
+      const [currentEmployee, currentAuthz] = await transaction.getAll(employeeRef, authzRef);
+      if (!currentEmployee?.updateTime?.isEqual(snapshot.updateTime!)
+        || !currentAuthz?.updateTime?.isEqual(authzSnapshot.updateTime!)) {
+        throw new AdminConflictError("직원 정보나 로그인 상태가 변경되었습니다. 새로고침 후 다시 저장해주세요.");
+      }
       const credentialRef = this.dependencies.db.doc(`authCredentials/${employee.employeeId}`);
       const directoryRef = this.dependencies.db.doc(`employeeDirectory/${employee.employeeId}`);
       const [credential, directory] = await Promise.all([
@@ -519,7 +429,11 @@ export class AdminService {
   }
 
   async rotatePin(input: RotateEmployeePinInput, actor: VerifiedAdminActor) {
-    const employeeSnapshot = await this.dependencies.db.doc(`employees/${input.employeeId}`).get();
+    const receiptRef = this.dependencies.db.doc(`requestLocks/pin-rotate-${input.requestId}`);
+    const fingerprint = createOpaqueKey(JSON.stringify([actor.uid, input.employeeId, input.revokeSessions, input.reason, input.appVersion]),
+      this.dependencies.lookupSecret, "onnuriway-admin-pin-rotation-v1");
+    const employeeRef = this.dependencies.db.doc(`employees/${input.employeeId}`);
+    const employeeSnapshot = await employeeRef.get();
     if (!employeeSnapshot.exists) throw new AdminNotFoundError("직원을 찾을 수 없습니다.");
     const employee = employeeRecord(employeeSnapshot.data(), employeeSnapshot.id);
     if (employee.roleScopes.includes("admin")) {
@@ -528,12 +442,9 @@ export class AdminService {
     const credentialRef = this.dependencies.db.doc(`authCredentials/${employee.employeeId}`);
     const credentialSnapshot = await credentialRef.get();
     if (!credentialSnapshot.exists) throw new AdminNotFoundError("직원 PIN 정보를 찾을 수 없습니다.");
-    const oldLookupKey = credentialSnapshot.get("lookupKey") as string | undefined;
-    if (!oldLookupKey) throw new AdminConflictError("기존 PIN을 먼저 마이그레이션해야 합니다.");
+    if (!credentialSnapshot.get("lookupKey")) throw new AdminConflictError("기존 PIN을 먼저 마이그레이션해야 합니다.");
     const generated = await this.uniquePin();
     const now = Timestamp.fromDate(this.now());
-    const nextSessionVersion = employee.sessionVersion + (input.revokeSessions ? 1 : 0);
-    const pinVersion = (credentialSnapshot.get("pinVersion") as number | undefined ?? 0) + 1;
     const rotatedAudit = audit({
       eventType: "EMPLOYEE_PIN_ROTATED",
       actor,
@@ -547,9 +458,42 @@ export class AdminService {
     });
 
     await this.dependencies.db.runTransaction(async (transaction) => {
+      const [freshEmployeeSnapshot, freshCredential] = await transaction.getAll(employeeRef, credentialRef);
+      await requireActiveAdminTransaction(transaction, this.dependencies.db, actor);
+      const receipt = await transaction.get(receiptRef);
+      if (receipt.exists) {
+        if (receipt.get("actorUid") !== actor.uid || receipt.get("fingerprint") !== fingerprint) {
+          throw new AdminConflictError("재발급 요청 내용이 변경되었습니다. 창을 닫고 새로 시도해주세요.");
+        }
+        throw new AdminConflictError("이미 임시 PIN을 발급했습니다. 번호를 받지 못했다면 창을 닫고 새로 발급해주세요.");
+      }
+      if (!freshEmployeeSnapshot?.exists || !freshCredential?.exists) {
+        throw new AdminNotFoundError("직원 PIN 정보를 찾을 수 없습니다.");
+      }
+      const freshEmployee = employeeRecord(freshEmployeeSnapshot.data(), freshEmployeeSnapshot.id);
+      if (freshEmployee.roleScopes.includes("admin")) {
+        throw new AdminPermissionError("관리자 계정은 PIN 대신 Google 로그인을 사용합니다.");
+      }
+      if (
+        freshEmployee.sessionVersion !== employee.sessionVersion
+        || freshEmployee.firebaseUid !== employee.firebaseUid
+        || freshCredential.get("pinVersion") !== credentialSnapshot.get("pinVersion")
+        || freshCredential.get("pinHash") !== credentialSnapshot.get("pinHash")
+      ) {
+        throw new AdminConflictError("직원 PIN 또는 로그인 상태가 변경되었습니다. 다시 확인해주세요.");
+      }
+      const oldLookupKey = freshCredential.get("lookupKey") as string;
+      const oldIndexRef = this.dependencies.db.doc(`pinIndexes/${oldLookupKey}`);
+      const oldIndex = await transaction.get(oldIndexRef);
       const duplicate = await transaction.get(this.dependencies.db.doc(`pinIndexes/${generated.lookupKey}`));
-      if (duplicate.exists) throw new AdminConflictError("PIN이 중복되었습니다. 다시 시도해주세요.");
-      transaction.delete(this.dependencies.db.doc(`pinIndexes/${oldLookupKey}`));
+      const reserved = await hasActivePinReservation(this.dependencies.db, transaction, generated.lookupKey, now);
+      if (duplicate.exists || reserved) throw new AdminConflictError("PIN이 중복되었습니다. 다시 시도해주세요.");
+      if (oldIndex.get("employeeId") !== freshEmployee.employeeId) {
+        throw new AdminConflictError("기존 PIN 인덱스를 확인할 수 없습니다.");
+      }
+      const nextSessionVersion = freshEmployee.sessionVersion + (input.revokeSessions ? 1 : 0);
+      const pinVersion = (freshCredential.get("pinVersion") as number | undefined ?? 0) + 1;
+      transaction.delete(oldIndexRef);
       transaction.create(this.dependencies.db.doc(`pinIndexes/${generated.lookupKey}`), {
         employeeId: employee.employeeId,
         createdAt: now,
@@ -575,6 +519,10 @@ export class AdminService {
         });
       }
       transaction.create(this.dependencies.db.doc(rotatedAudit.path), rotatedAudit.data);
+      transaction.create(receiptRef, {
+        operation: "rotateEmployeePin", actorUid: actor.uid, fingerprint, employeeId: freshEmployee.employeeId,
+        pinVersion, sessionRevoked: input.revokeSessions, createdAt: now,
+      });
     });
     if (input.revokeSessions) await this.dependencies.auth.revokeRefreshTokens(employee.firebaseUid);
     return { employeeId: employee.employeeId, pin: generated.pin, sessionRevoked: input.revokeSessions };
