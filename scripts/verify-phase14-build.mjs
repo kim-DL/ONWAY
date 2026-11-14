@@ -23,6 +23,11 @@ for (const required of [
   "customer-ceramic-register-v1.webp",
   "delivery-invoice-stack.svg",
   "delivery-smart-route.svg",
+  "sales-search.svg",
+  "sales-route.svg",
+  "sales-add.svg",
+  "sales-organize.svg",
+  "sales-done.svg",
   "SKIP_WAITING",
 ]) {
   if (!serviceWorker.includes(required)) {

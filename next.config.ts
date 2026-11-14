@@ -31,6 +31,9 @@ const withSerwist = withSerwistInit({
     { url: "/ui/mode-glass-four-v2.webp", revision: pwaBuildRevision },
     { url: "/ui/delivery-invoice-stack.svg", revision: pwaBuildRevision },
     { url: "/ui/delivery-smart-route.svg", revision: pwaBuildRevision },
+    ...["search", "route", "add", "organize", "done"].map((name) => ({
+      url: `/ui/sales-${name}.svg`, revision: pwaBuildRevision,
+    })),
     ...["search", "directory", "camera", "register"].map((name) => ({
       url: `/ui/customer-ceramic-${name}-v1.webp`, revision: pwaBuildRevision,
     })),
