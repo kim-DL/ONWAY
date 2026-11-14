@@ -37,6 +37,12 @@ Aside에서 합성 데이터로 실제 AppShell을 열어 기존 화면을 살�
 
 ## 배포 결과
 
-최종 운영 빌드 검증 후 Hosting만 배포하고 두 운영 주소와 배포 정적 파일을 확인한다. 최종 결과는 배포 직후 갱신한다.
+- 소스 커밋 `62ce93563413b3e38bd3815410cc7d1dd06b5275`, 브랜치 `codex/school-unslop-polish`를 원격에 푸시했다.
+- 2026-11-14 14:31:58 KST에 Hosting `6f5c702fbed9f9f0` 배포 완료. `--project onnuriway --only hosting:onnuriway --non-interactive`만 실행했다. Functions·규칙·MCP는 배포하지 않았다.
+- 최종 운영 빌드 및 성능·PWA·Hosting 검사가 모두 통과했다. legacy CSS gzip 45,211B, 학교/공유 CSS 합산 47,182B/47,232B, 영업 묶음 14,333B/14,336B이다. 용량 제한을 완화하지 않았으며 남은 여유가 작으므로 후속 UI 변경에서도 실제 빌드 크기를 확인한다.
+- 학교 전용 하단 작업·수정 버튼 스타일은 공통 학교 모드 영역으로 옮겨 공유 상세 모듈의 영업 묶음 한도도 유지했다.
+- 두 주소 `https://onnuriway.com`, `https://onnuriway.web.app`의 공개 Hosting 검사가 통과했다. 각 주소에서 JS/CSS 109개와 새 학교 아이콘 1개, 총 110개 파일의 SHA-256이 로컬 `out`과 일치했다.
+- Git 소스와 배포 후 증거를 구분했다. 로컬 증거는 `output/school-unslop/` 및 `output/school-unslop-*.log`에 있으며 운영 업무 데이터를 담지 않는다.
+- 전체 원격 CI·인증된 운영 화면 조작·실물폰/설치 PWA 검증은 수행하지 않았다. 공개 배포 검증과 합성 브라우저 검증의 범위를 넘어서 완료를 주장하지 않는다.
 
 점검 방법은 Damir Sokolovsky의 [Unslop](https://github.com/heydamir/unslop)과 로컬 `unslop-ui`의 급식길 적용 지침을 따랐다. 원본 스킬은 CC BY 4.0이다.
