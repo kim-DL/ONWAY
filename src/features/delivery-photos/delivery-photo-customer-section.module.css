@@ -1,0 +1,17 @@
+.section{min-width:0;overflow:hidden;border:1px solid #dce5ed;border-radius:16px;background:#fff}
+.history,.record{display:grid;grid-template-columns:40px minmax(0,1fr) 18px;align-items:center;gap:12px;width:100%;min-height:64px;padding:16px;border:0;background:transparent;color:#191f28;font:inherit;text-align:left;cursor:pointer}
+.copy{display:grid;gap:5px;min-width:0;line-height:1.5;overflow-wrap:anywhere;word-break:keep-all}
+.copy strong{font-size:1rem;font-weight:750;line-height:1.4}
+.copy small{color:#435568;font-size:.875rem;font-weight:500;line-height:1.5}
+.copy time{font-variant-numeric:tabular-nums}
+.latest{display:grid;gap:2px;color:#53616b;font-size:.875rem;line-height:1.5}
+.history>svg:last-child,.record>svg:last-child{color:#526b8c}
+.record{border-top:1px solid #dce5ed;background:#f3f6fc}
+.record .copy strong{color:#254b87}
+.record:disabled{cursor:default;background:#f5f6f7}
+.record:disabled .copy strong,.record:disabled .copy small{color:#626c77}
+.record:disabled>svg{opacity:.55}
+.history:focus-visible,.record:focus-visible{outline:3px solid #2c56b9;outline-offset:-4px}
+@media(hover:hover){.history:hover{background:#f8fafc}.record:hover:not(:disabled){background:#eaf0fb}}
+@media(max-width:360px){.history,.record{gap:9px;padding:14px 12px}}
+@media(forced-colors:active){.section,.record{border-color:CanvasText}.history,.record,.record .copy strong,.copy small{color:ButtonText}.record:disabled .copy strong,.record:disabled .copy small{color:GrayText}}

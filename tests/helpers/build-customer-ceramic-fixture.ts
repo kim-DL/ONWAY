@@ -4,9 +4,9 @@ import tailwindcss from "@tailwindcss/postcss";
 import { buildInventoryPhotoFixture } from "./build-inventory-photo-fixture";
 
 /** Real UI, isolated data boundaries. Shared by browser regression and local preview. */
-export async function buildCustomerCeramicFixture(photosEnabled = true) {
+export async function buildCustomerCeramicFixture(photosEnabled = true, photoEntry = false) {
   const root = fileURLToPath(new URL("../../", import.meta.url));
-  const data = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/customer-ceramic-data.ts", import.meta.url)));
+  const data = JSON.stringify(fileURLToPath(new URL(photoEntry ? "../e2e/fixtures/customer-photo-entry-data.ts" : "../e2e/fixtures/customer-ceramic-data.ts", import.meta.url)));
   const inventoryData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/inventory-settings-data.ts", import.meta.url)));
   const mocks: Record<string, string> = {
     "use-customers": `export {useCustomers} from ${data}`,
@@ -20,11 +20,12 @@ export async function buildCustomerCeramicFixture(photosEnabled = true) {
     "pwa-provider": `export function usePwa(){return {installState:'installed',isOnline:true,install:async()=>{}}}`,
     "customer-map": `export function CustomerMap(){return <div role="status" style={{padding:24,background:'#eef2f5'}}>로컬 미리보기 · 지도 연결 없음</div>} export default CustomerMap;`,
     "delivery-photo-repository": `import {blockedWrite} from ${data};export const deliveryPhotoRepository=new Proxy({},{get:()=>blockedWrite});export const deliveryPhotoErrorKind=()=> 'unknown';`,
+    "delivery-photo-history-repository": `export {deliveryPhotoHistoryRepository,deliveryPhotoHistoryErrorMessage} from ${data};import {blockedWrite} from ${data};export const verifyDeliveryPhotoSession=blockedWrite;export const verifySameDeliveryPhotoSession=blockedWrite;export const invalidDeliveryPhotoResponse=()=>Error('Synthetic photo response rejected');`,
     "firebase-client": `export function getFirebaseClientServices(){throw Error('Network services are disabled in the local preview')} export function getFirebaseAuthIfInitialized(){return null}`,
   };
   const fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-ceramic.tsx", [{ name: "customer-ceramic-isolation", setup(builder) {
     builder.initialOptions.define = { ...builder.initialOptions.define, "process.env": "{}", "process.env.NEXT_PUBLIC_ENABLE_INVENTORY": '"true"', "process.env.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS": JSON.stringify(String(photosEnabled)) };
-    builder.onResolve({ filter: /use-customers$|use-recent-customers$|customer-repository$|inventory-repository$|use-delivery-photo-data$|use-delivery-photo-catalog$|use-delivery-photo-uploads$|auth-context$|pwa-provider$|customer-map$|delivery-photo-repository$|firebase\/client$/ }, args => ({
+    builder.onResolve({ filter: /use-customers$|use-recent-customers$|customer-repository$|inventory-repository$|use-delivery-photo-data$|use-delivery-photo-catalog$|use-delivery-photo-uploads$|auth-context$|pwa-provider$|customer-map$|delivery-photo-repository$|delivery-photo-history-repository$|firebase\/client$/ }, args => args.path.endsWith("delivery-photo-history-repository") && !photoEntry ? undefined : ({
       path: args.path.endsWith("firebase/client") ? "firebase-client" : args.path.split("/").at(-1)!, namespace: "customer-ceramic",
     }));
     builder.onLoad({ filter: /.*/, namespace: "customer-ceramic" }, ({ path }) => ({ loader: "tsx", resolveDir: root, contents: mocks[path]! }));

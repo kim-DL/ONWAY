@@ -24,6 +24,7 @@ import { searchCustomers } from "./customer-search";
 import { readCustomerWorkspaceSnapshot, updateCustomerWorkspaceUi } from "./customer-workspace-snapshot";
 import { useRecentCustomers } from "./use-recent-customers";
 import { customerHomeRecents } from "./recent-customer-history";
+import type { DeliveryPhotoEntry } from "@/features/app-shell/customer-photo-entry";
 import { useCustomers } from "./use-customers";
 import styles from "./customer.module.css";
 
@@ -33,7 +34,7 @@ const CustomerEditor = dynamic(() => import("./customer-editor"), {
 
 export function CustomerWorkspace({ session, requestedCustomerId, onOpenDeliveryPhotos }: {
   session: AuthenticatedSession; requestedCustomerId: string | null;
-  onOpenDeliveryPhotos?: (() => void) | undefined;
+  onOpenDeliveryPhotos?: ((entry?: DeliveryPhotoEntry) => void) | undefined;
 }) {
   const sessionKey = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`;
   const initialSnapshot = readCustomerWorkspaceSnapshot(sessionKey);
@@ -87,7 +88,7 @@ export function CustomerWorkspace({ session, requestedCustomerId, onOpenDelivery
   };
   return <section ref={workspaceRef} className={`shell-page ${styles.workspace}`} aria-labelledby="customer-heading" data-customer-workspace data-search-open={searchOpen || undefined}>
     <CustomerHome greeting={`${session.displayName}님, ${greeting}.`} searchTriggerRef={searchTriggerRef} onOpenSearch={() => setSearchOpen(true)} onOpenDirectory={() => setDirectoryOpen(true)} onRegister={() => setEditing("new")} registerDisabled={catalog.status !== "ready"}
-      onOpenDeliveryPhotos={onOpenDeliveryPhotos}
+      onOpenDeliveryPhotos={onOpenDeliveryPhotos ? () => onOpenDeliveryPhotos() : undefined}
       searchContent={searchOpen ? <div className={styles.searchPanel}>
         <label className={styles.search}><Icon name="search" size={22} /><input {...searchInputProps} name="customer-query" ref={searchRef} value={query} onChange={(event) => changeQuery(event.target.value)} onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
@@ -110,7 +111,8 @@ export function CustomerWorkspace({ session, requestedCustomerId, onOpenDelivery
         </section>
           : <><div className={styles.resultsHeading}><p className={styles.resultCount} role="status">검색 결과 <strong>{results.length}</strong>곳</p><button type="button" className={styles.textButton} onClick={() => changeQuery("")}>최근 거래처</button></div>{results.length ? <ul className={`${fieldList.list} ${styles.results}`}>{results.slice(0, limit).map((customer) => <li key={customer.customerId}><CustomerCard customer={customer} onSelect={() => openCustomer(customer.customerId)} /></li>)}</ul> : <div className={styles.empty}><Icon name="search" size={25} /><h2>등록된 거래처를 찾을 수 없습니다.</h2><p>거래처명의 일부나 초성으로 다시 찾아보세요.</p></div>}{results.length > limit ? <GlassButton onClick={() => setLimit((value) => value + 32)}>거래처 더 보기</GlassButton> : null}</>}</>}
     {directoryOpen ? <CustomerDirectory customers={catalog.customers} status={catalog.status} message={catalog.message} onRetry={catalog.retry} onSelect={openCustomer} onClose={() => setDirectoryOpen(false)} /> : null}
-    {selected && !editing ? <CustomerDetail key={selected.customerId} customer={selected} session={session} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected)} /> : null}
+    {selected && !editing ? <CustomerDetail key={selected.customerId} customer={selected} session={session} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected)}
+      onRecordPhoto={onOpenDeliveryPhotos ? () => onOpenDeliveryPhotos({ customerId: selected.customerId }) : undefined} /> : null}
     {editing && catalog.canRetainDraft ? <CustomerEditor key={editing === "new" ? "new" : `${editing.customerId}:${editing.revision}`} customer={editing === "new" ? null : editing} refreshMessage={catalog.status === "error" ? "목록 갱신이 지연되고 있어요. 작성 중인 내용은 유지됩니다." : ""} onClose={() => setEditing(null)} onSaved={(customer) => { catalog.accept(customer); setEditing(null); setSelectedId(customer.customerId); rememberCustomer(customer.customerId); catalog.retry(); showToast("거래처 정보를 저장했어요.", "success"); }} /> : null}
   </section>;
 }

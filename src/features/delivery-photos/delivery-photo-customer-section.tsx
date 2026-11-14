@@ -7,15 +7,16 @@ import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
 import { DeliveryPhotoHistoryLoader } from "./delivery-photo-history-loader";
+import { DeliveryPhotoActionIcon } from "./delivery-photo-action-icon";
+import { deliveryPhotoRegisteredAt } from "./delivery-photo-history-model";
 import { acceptDeliveryPhotoWrite, deliveryPhotoDateKey } from "./delivery-photo-memory";
 import { deliveryPhotoHistoryRepository, type DeliveryPhotoHistoryResult } from "./delivery-photo-history-repository";
+import styles from "./delivery-photo-customer-section.module.css";
 
-const timeFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false });
-
-export function DeliveryPhotoCustomerSection({ customer, session, className }: {
-  customer: Pick<Customer, "customerId" | "name">;
+export function DeliveryPhotoCustomerSection({ customer, session, onRecord }: {
+  customer: Pick<Customer, "customerId" | "name" | "status">;
   session: AuthenticatedSession;
-  className: string;
+  onRecord?: (() => void) | undefined;
 }) {
   const [result, setResult] = useState<DeliveryPhotoHistoryResult | null>(null);
   const [error, setError] = useState(false);
@@ -39,14 +40,23 @@ export function DeliveryPhotoCustomerSection({ customer, session, className }: {
     : !photos ? "최근 기록 확인 중"
       : photos.length === 0 ? "최근 7일 · 등록된 납품사진 없음"
         : `최근 7일 · 사진 ${photos.length >= 30 ? "30장 이상" : `${photos.length}장`}`;
-  const latestText = latest ? `마지막 기록 ${timeFormat.format(new Date(latest.createdAt))} · ${latest.createdByName}` : "";
+  const latestText = latest ? `최근 등록 ${deliveryPhotoRegisteredAt(latest.createdAt)} · ${latest.createdByName}` : "";
   return <>
-    <section className={className} aria-label="납품사진 기록">
-      <button type="button" onClick={() => { setHistorySeed(result); setOpen(true); }}
+    <section className={styles.section} aria-label="납품사진 기록">
+      <button type="button" className={styles.history} onClick={() => { setHistorySeed(result); setOpen(true); }}
         aria-label={`${customer.name} 납품사진 기록, ${description}${latestText ? `, ${latestText}` : ""}`}>
-        <span><strong>납품사진 기록</strong><small>{description}</small>{latestText ? <small>{latestText}</small> : null}</span>
+        <DeliveryPhotoActionIcon variant="history" />
+        <span className={styles.copy}><strong>납품사진 기록</strong><small>{description}</small>{latest ? <span className={styles.latest}>
+          <time dateTime={latest.createdAt}>최근 등록 {deliveryPhotoRegisteredAt(latest.createdAt)}</time><span>{latest.createdByName}</span>
+        </span> : null}</span>
         <Icon name="chevron-right" size={18} />
       </button>
+      {onRecord ? <button type="button" className={styles.record} onClick={onRecord} disabled={customer.status !== "active"}
+        aria-label={`${customer.name} 납품사진 기록하기`}>
+        <DeliveryPhotoActionIcon variant="camera" />
+        <span className={styles.copy}><strong>납품사진 기록하기</strong><small>{customer.status === "active" ? "촬영하거나 앨범에서 선택해요" : "폐업 처리된 거래처는 새 사진을 기록할 수 없어요"}</small></span>
+        <Icon name="chevron-right" size={18} />
+      </button> : null}
     </section>
     {open ? <DeliveryPhotoHistoryLoader key={key} customer={customer} session={session} initialResult={historySeed ?? undefined}
       onResult={acceptResult} onClose={() => setOpen(false)}

@@ -40,9 +40,10 @@ function ContactList({ customer, contacts }: { customer: Customer; contacts: rea
   </li>)}</ul>;
 }
 
-export function CustomerDetail({ customer, session, onClose, onEdit }: {
+export function CustomerDetail({ customer, session, onClose, onEdit, onRecordPhoto }: {
   customer: Customer; session: AuthenticatedSession; onClose: () => void;
   onEdit: () => void;
+  onRecordPhoto?: (() => void) | undefined;
 }) {
   const [markerInfo, setMarkerInfo] = useState(false);
   const markerInfoRef = useRef<HTMLElement>(null);
@@ -67,7 +68,7 @@ export function CustomerDetail({ customer, session, onClose, onEdit }: {
         <div className={styles.passwordRow}><span>출입 비밀번호</span><strong data-registered={customer.accessPasswordState === "registered" || undefined}>{customerPasswordLabel(customer)}</strong></div>
       </section>
 
-      {DELIVERY_PHOTOS_ENABLED && <DeliveryPhotoCustomerSection customer={customer} session={session} className={styles.metadata!} />}
+      {DELIVERY_PHOTOS_ENABLED && <DeliveryPhotoCustomerSection customer={customer} session={session} onRecord={onRecordPhoto} />}
 
       <section className={styles.contacts} aria-label="전체 연락처">
         <div className={styles.sectionTitle}><h3>연락처</h3><span>{customer.contacts.length}명</span></div>

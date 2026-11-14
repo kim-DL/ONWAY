@@ -46,6 +46,7 @@ import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-pho
 import { readShellResume, shellResumeKey, writeShellResume } from "./shell-resume";
 import { WorkspaceFeatureLoading } from "./workspace-feature-loading";
 import { InitialWorkspaceTiming } from "./initial-workspace-timing";
+import { readCustomerNavigationContext, type CustomerNavigationContext, type DeliveryPhotoEntry } from "./customer-photo-entry";
 
 const subscribeToStoredMode = () => () => undefined;
 
@@ -302,7 +303,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     : getInitialMode(session.claims.roleScopes, storedMode);
   const [view, setView] = useState<ShellView>(resumedLocation?.view ?? "schools");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
-  const [customerDetailRequest, setCustomerDetailRequest] = useState<string | null>(null);
+  const [customerContext, setCustomerContext] = useState<CustomerNavigationContext | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
@@ -332,13 +333,14 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   }, [mode]);
 
   const writeHistory = useCallback((
-    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean; customerHomeReturn?: boolean },
+    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean; customerHomeReturn?: boolean; customerContext?: CustomerNavigationContext },
     replace = false,
   ) => {
-    const state = {
+    const state: Record<string, unknown> = {
       ...customHistoryState(window.history.state),
       onnuriwayShell: { version: 1, ...next },
     };
+    if (next.customerContext?.kind === "photo-record") delete state.onnuriwaySheet;
     // Workspace modes share one URL; do not request a Next route restoration.
     if (replace) window.history.replaceState(state, "");
     else window.history.pushState(state, "");
@@ -357,6 +359,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         view?: unknown;
         school?: unknown;
         searchOpen?: unknown;
+        customerContext?: unknown;
       } | undefined;
       if (!snapshot || snapshot.version !== 1) return;
       const restoredMode = isWorkMode(snapshot.mode)
@@ -374,7 +377,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
       setChosenMode(restoredMode);
       setView(restoredView);
       setSelectedSchool(restoredSchool);
-      setCustomerDetailRequest(null);
+      setCustomerContext(readCustomerNavigationContext(snapshot.customerContext, restoredMode, restoredView));
       const nextSearchOpen = isSchoolWorkMode(restoredMode) && snapshot.searchOpen === true && restoredSchool === null;
       if (nextSearchOpen) setSearchMounted(true);
       setSearchOpen(nextSearchOpen);
@@ -420,6 +423,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     setView((current) => normalizeView(nextMode, current));
     setSelectedSchool(null);
     setSearchOpen(false);
+    setCustomerContext(null);
     const nextView = normalizeView(nextMode, view);
     writeHistory({ mode: nextMode, view: nextView, school: null, searchOpen: false });
     try {
@@ -434,7 +438,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     setSelectedSchool(null);
     setView(nextView);
     setSearchOpen(false);
-    setCustomerDetailRequest(null);
+    setCustomerContext(null);
     writeHistory({ mode, view: nextView, school: null, searchOpen: false,
       ...(mode === "inventory" && nextView === "settings" ? { inventorySettingsReturn: true } : {}),
       ...(mode === "customer" && view === "schools" && nextView !== "schools" ? { customerHomeReturn: true } : {}),
@@ -452,9 +456,23 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   };
 
   const openCustomerDetailFromPhoto = (customerId: string) => {
-    setCustomerDetailRequest(customerId);
+    const context: CustomerNavigationContext = { kind: "detail", customerId };
+    setCustomerContext(context);
     setView("schools");
     writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false });
+  };
+
+  const openDeliveryPhotos = (entry?: DeliveryPhotoEntry) => {
+    if (!entry) { navigate("activity"); return; }
+    writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false,
+      customerContext: { kind: "detail", customerId: entry.customerId } }, true);
+    const context: CustomerNavigationContext = { kind: "photo-record", customerId: entry.customerId };
+    setCustomerContext(context);
+    setSelectedSchool(null);
+    setSearchOpen(false);
+    setView("activity");
+    writeHistory({ mode: "customer", view: "activity", school: null, searchOpen: false,
+      customerContext: context, customerHomeReturn: true });
   };
 
   const closeCustomerPage = () => {
@@ -463,7 +481,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     } else {
       // A restored subpage still needs a way home without a prior history entry.
       setView("schools");
-      setCustomerDetailRequest(null);
+      setCustomerContext(null);
       writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false }, true);
     }
   };
@@ -474,11 +492,13 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   } else if (view === "settings") {
     content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : mode === "customer" ? { onBack: closeCustomerPage, backLabel: "거래처로 돌아가기" } : {})} />;
   } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
-    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto} />;
+    content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${customerContext?.kind === "photo-record" ? customerContext.customerId : "all"}`}
+      session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto}
+      requestedCustomerId={customerContext?.kind === "photo-record" ? customerContext.customerId : undefined} onReturnToCustomer={closeCustomerPage} />;
   } else if (mode === "customer") {
-    content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session}
-      requestedCustomerId={customerDetailRequest}
-      onOpenDeliveryPhotos={DELIVERY_PHOTOS_ENABLED ? () => navigate("activity") : undefined} />;
+    content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${customerContext?.kind === "detail" ? customerContext.customerId : "home"}`} session={session}
+      requestedCustomerId={customerContext?.kind === "detail" ? customerContext.customerId : null}
+      onOpenDeliveryPhotos={DELIVERY_PHOTOS_ENABLED ? openDeliveryPhotos : undefined} />;
   } else if (mode === "inventory") {
     content = <InventoryWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`} session={session} onOpenAppSettings={() => navigate("settings")} />;
   } else if (view === "activity" && mode === "sales") {
