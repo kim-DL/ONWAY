@@ -75,8 +75,22 @@ Aside에서는 가상 데이터의 직원·Google 탭과 등록 입력, PIN 변�
 
 ## 운영 반영 전 범위
 
-운영 배포는 이번 요청에서 수행하지 않았다. 프로젝트 AGENTS.md는 명시적으로 승인한 범위의 배포만 허용한다. 실제 계정 등록도 운영자가 새 화면에서 직접 수행하는 별도 업무이다.
+초기 구현 요청에서는 운영 배포를 수행하지 않았다. 이후 사용자가 커밋·main 병합·인증 서버와 Hosting 운영 배포를 명시적으로 승인하여 아래 기록대로 반영했다. 실제 계정 등록은 운영자가 새 화면에서 직접 수행하는 별도 업무이다.
 
 향후 반영에는 Hosting만으로 충분하지 않다. 새 함수 `changeEmployeePin`, `listGoogleAdminAccess`, `registerGoogleAdminAccess`, `disableGoogleAdminAccess`와 `admin/callables.ts`의 기존 운영 함수 10개를 함께 검토해야 한다. 기존 직원·PIN·authz의 일괄 변경이나 비밀키 변경은 필요하지 않다. Firestore·Storage 규칙도 이번에 변경하지 않았다.
 
 Hosting은 프로젝트 지침대로 `--project onnuriway --only hosting:onnuriway` 범위를 지킨다. 인증 서버 변경과 Hosting은 승인 후 관련 함수부터 배포하고 앱을 반영해야 한다. 운영자 화면을 되돌리더라도 기존 UID 고정과 해제 보호가 느슨해지는 서버 롤백은 별도 검토한다.
+
+## 운영 배포 결과 — 2026-11-14
+
+- 구현 커밋: `3926686`. main 병합: `d93614e1249ecba2c50771d259d05a9e3672161d`. 원격 main까지 반영했다.
+- 사용자가 이미 통과한 검사 반복을 금지했으므로 단위·브라우저·에뮬레이터·전체 CI와 Hosting 빌드를 반복하지 않았다. 커밋 메시지의 `[skip ci]`로 중복 CI를 막았다. 앞 절의 검증 결과와 앱 소스 변경 후 생성된 최종 산출물을 재사용했다. 배포 직전 소스/산출물 시간 순서, 운영 플래그, Git 상태와 배포 대상을 확인하고 145개 산출물의 SHA-256을 고정했다.
+- 인증 서버는 `--project onnuriway --only functions:<각 함수명> --non-interactive`로 새 함수4개와 기존 운영 함수10개만 배포했다. 새 함수는 `changeEmployeePin`, `listGoogleAdminAccess`, `registerGoogleAdminAccess`, `disableGoogleAdminAccess`이다. 기존 함수는 `activateAdminSession`, `createEmployee`, `getAdminWorkspace`, `listAdminAuditLogs`, `reserveEmployeePin`, `revokeEmployeeSessions`, `rotateEmployeePin`, `updateEmployee`, `updateActivityTags`, `updatePublicAppSettings`이다.
+- 배포 predeploy에서 필요한 Functions TypeScript 컴파일이 통과했다. 14개 함수 모두 `asia-northeast3`, Node.js22, `ACTIVE`를 확인했다. SDK 버전 업데이트 안내는 있었으나 배포 오류는 없었다. 의존성은 변경하지 않았다.
+- `employeeLogin`, `employeeLogout`은 배포 대상에서 제외했고 배포 전후 함수 메타데이터 전체가 동일했다. 직원/authz 일괄 변경, 토큰 취소, 비밀키 변경, PIN 데이터 이전 작업을 실행하지 않았다. 서버 배포가 기존 직원 세션을 종료시키는 별도 작업은 없다.
+- 새 함수4개에 인증·App Check 없는 빈 요청을 보내 모두 HTTP401 / `UNAUTHENTICATED`로 거절됨을 확인했다. 실제 PIN·직원 계정·운영자 허용목록을 시험 목적으로 변경하지 않았다.
+- 인증 서버 성공 후 `node node_modules/firebase-tools/lib/bin/firebase.js deploy --project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting을 배포했다.
+- Hosting 버전: **`a496fe2b76589e2c`**, 공개 시각 **2026-11-14 21:13:59 KST**. 이전 버전은 `645108293059dda2`이다.
+- `https://onnuriway.com`, `https://onnuriway.web.app` 각각 공개 Hosting 검사 통과, 각145개 파일이 고정한 로컬 산출물과 SHA-256 일치했다. 공개 검사는 배포 후 확인이며 기존 회귀 검사 재실행이 아니다.
+- 기록과 산출물 목록은 ignored `output/ops-renewal-20261114/`의 `functions-deploy.log`, `functions-before.json`, `functions-after.json`, `function-boundary.json`, `hosting-deploy.log`, `hosting-before.json`, `hosting-after.json`, `release-artifacts.json`, `public-domain.json`, `public-firebase.json`, `public-artifact-hashes.json`에 보관했다. 배포 계정·서버 설정이 포함될 수 있는 원본 메타데이터는 커밋하지 않는다.
+- 실제 직원 기기의 로그인 유지, 인증된 Google 최초 연결, 실제 PIN 변경, 설치 PWA 업데이트는 직접 확인하지 않았다. 기존 로그인 유지 계약은 앞선 에뮬레이터 검사와 이번 배포 범위로 확인했으며 실기기 결과와 구분한다.
