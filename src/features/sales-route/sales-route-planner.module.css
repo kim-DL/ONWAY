@@ -15,7 +15,7 @@
   line-height: 1.4;
 }
 .planner .quick button span { color: inherit; font-size: .75rem; font-weight: 650; }
-.planner .quick button[aria-pressed="true"] { border-color: #a7c8f8; background: #edf5ff; color: #1b64da; }
+.planner .quick button[aria-pressed="true"] { border-color: #ae9cbd; background: #e8dfed; color: #625174; }
 .planner .quick button:disabled { opacity: .5; cursor: not-allowed; }
 .selectionSummary { display: grid; gap: 3px; color: #4e5968; font-size: .8125rem; line-height: 1.45; }
 .selectionSummary strong { color: #191f28; font-size: .875rem; }
@@ -44,11 +44,11 @@
   transition: background 140ms ease, border-color 140ms ease;
 }
 .planner .startButton svg { flex: none; }
-.planner .startButton[aria-pressed="true"] { border-color: #a7c8f8; color: #1b64da; background: #edf5ff; }
+.planner .startButton[aria-pressed="true"] { border-color: #ae9cbd; color: #625174; background: #e8dfed; }
 .planner .startButton:disabled { opacity: .45; cursor: not-allowed; }
 .planner .startButton:focus-visible,
 .planner .quick button:focus-visible,
-.planner .schoolSelect:has(input:focus-visible) { outline: 3px solid #1b64da; outline-offset: 2px; }
+.planner .schoolSelect:has(input:focus-visible) { outline: 3px solid #625174; outline-offset: 2px; }
 @media (max-width: 360px) {
   .planner .startButton { flex-direction: column; gap: 2px; padding: 6px 8px; }
 }

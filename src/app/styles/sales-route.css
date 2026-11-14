@@ -10,9 +10,9 @@
   gap: .65rem;
   margin: -.1rem 0 .8rem;
   padding: .65rem .72rem;
-  border: 1px solid rgba(49, 130, 246, .14);
+  border: 1px solid var(--toss-grey-200);
   border-radius: 13px;
-  background: rgba(240, 247, 255, .9);
+  background: var(--toss-blue-weak);
   box-shadow: 0 5px 16px rgba(25, 31, 40, .04);
 }
 .sales-route-active__mark {
@@ -107,7 +107,7 @@
   background: #fff;
   transition: border-color 150ms ease, background 150ms ease;
 }
-.sales-route-candidates > li[data-selected="true"] { border-color: rgba(49, 130, 246, .3); background: #f8fbff; }
+.sales-route-candidates > li[data-selected="true"] { border-color: var(--toss-blue); background: var(--toss-blue-weak); }
 .sales-route-candidates > li[data-disabled="true"] { background: var(--toss-grey-50); opacity: .68; }
 .sales-route-candidate__select { min-width: 0; display: flex; align-items: center; gap: .62rem; cursor: pointer; }
 .sales-route-candidate__select > input,
@@ -125,7 +125,7 @@
 }
 .sales-route-candidate__select > input:checked + .sales-route-candidate__check { color: #fff; border-color: var(--toss-blue-deep); background: var(--toss-blue-deep); }
 .sales-route-candidate__select:has(input:focus-visible),
-.sales-route-candidate__start:has(input:focus-visible) { outline: 3px solid rgba(49, 130, 246, .28); outline-offset: 3px; }
+.sales-route-candidate__start:has(input:focus-visible) { outline: 3px solid var(--toss-blue-deep); outline-offset: 3px; }
 .sales-route-candidate__select > span:last-child { min-width: 0; display: grid; gap: .1rem; }
 .sales-route-candidate__select strong { overflow: hidden; color: var(--toss-ink); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
 .sales-route-candidate__select small { color: var(--toss-grey-600); font-size: .58rem; }
@@ -160,7 +160,7 @@
 .sales-route-recovery__actions button:disabled { opacity: .5; cursor: not-allowed; }
 .sales-route-recovery:focus-visible,
 .sales-route-recovery button:focus-visible,
-.sales-route-recovery select:focus-visible { outline: 3px solid rgba(49, 130, 246, .4); outline-offset: 3px; }
+.sales-route-recovery select:focus-visible { outline: 3px solid var(--toss-blue-deep); outline-offset: 3px; }
 .sales-route-planner__footer { display: flex; align-items: center; justify-content: space-between; gap: .65rem; padding-top: .15rem; }
 .sales-route-planner__footer > span { color: var(--toss-grey-600); font-size: .61rem; }
 .sales-route-planner__footer .glass-button { min-width: 11rem; justify-content: center; }
@@ -181,7 +181,7 @@
 .sales-route-summary > div { min-width: 0; display: grid; gap: .14rem; }
 .sales-route-summary strong { color: var(--toss-ink); font-size: .85rem; }
 .sales-route-summary span { color: var(--toss-grey-700); font-size: .62rem; }
-.sales-route-summary__mode { padding: .35rem .5rem; border-radius: 8px; color: var(--toss-blue-deep) !important; background: #fff; font-weight: 850; white-space: nowrap; }
+.sales-route-summary__mode { padding: .35rem .5rem; border-radius: 8px; color: var(--toss-blue-deep) !important; background: var(--toss-grey-50); font-weight: 850; white-space: nowrap; }
 .sales-route-order > li {
   min-height: 4.1rem;
   display: grid;
