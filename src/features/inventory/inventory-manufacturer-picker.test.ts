@@ -34,7 +34,7 @@ function textOf(node: ReactNode): string {
   return isValidElement<Props>(node) ? textOf(node.props.children) : "";
 }
 const props = (overrides: Partial<Parameters<typeof InventoryManufacturerPicker>[0]> = {}) => ({
-  current: { name: "" }, sessionNamespace: "session-a", allowCreate: true, canAdmin: false,
+  current: { kind: "draft" as const, name: "" }, sessionNamespace: "session-a", allowCreate: true, canAdmin: false,
   onSelect: harness.selected, onClear: harness.cleared, onClose: harness.closed, ...overrides,
 });
 function render(overrides: Partial<Parameters<typeof InventoryManufacturerPicker>[0]> = {}) {
@@ -102,7 +102,7 @@ describe("inventory manufacturer picker", () => {
 
   it("does not hold back the list for a slow existing-product reference read", async () => {
     harness.reference.mockReturnValue(new Promise(() => undefined));
-    const tree = await load({ productId: "product-1" });
+    const tree = await load({ current: { kind: "persisted", productId: "product-1", name: "" } });
     expect(findAll(tree, (_type, item) => item.role === "option").map(textOf)).toContain("사옹원");
     expect(textOf(tree)).not.toContain("제조사 목록 불러오는 중");
   });
@@ -145,15 +145,15 @@ describe("inventory manufacturer picker", () => {
 
   it("renames with the current revision and a stable request id while leaving the draft selection untouched", async () => {
     harness.list.mockReset().mockResolvedValueOnce(manufacturers);
-    let tree = await load({ canAdmin: true, current: { manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
-    clickText(tree, "⋯"); tree = render({ canAdmin: true, current: { manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
-    clickText(tree, "이름 수정"); tree = render({ canAdmin: true, current: { manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
+    let tree = await load({ canAdmin: true, current: { kind: "draft" as const, manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
+    clickText(tree, "⋯"); tree = render({ canAdmin: true, current: { kind: "draft" as const, manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
+    clickText(tree, "이름 수정"); tree = render({ canAdmin: true, current: { kind: "draft" as const, manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
     const input = findAll(tree, (type, item) => type === "input" && item.maxLength === 200)[0]!;
     (input.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "사옹원 푸드" } });
     const renamed = { ...manufacturers[0]!, name: "사옹원 푸드", normalizedName: "사옹원푸드", revision: 2 };
     harness.update.mockRejectedValueOnce({ code: "functions/already-exists", details: { reason: "inventory-manufacturer-duplicate" } }).mockResolvedValueOnce(renamed);
-    tree = render({ canAdmin: true, current: { manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } }); submitRename(tree); await settle();
-    tree = render({ canAdmin: true, current: { manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
+    tree = render({ canAdmin: true, current: { kind: "draft" as const, manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } }); submitRename(tree); await settle();
+    tree = render({ canAdmin: true, current: { kind: "draft" as const, manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } });
     expect(textOf(tree)).toContain("같은 이름의 제조사가 이미 있어요");
     expect(findAll(tree, (type, item) => type === "input" && item.maxLength === 200)[0]!.props.value).toBe("사옹원 푸드");
     submitRename(tree); await settle();
@@ -181,7 +181,7 @@ describe("inventory manufacturer picker", () => {
   it("deactivates and removes the active option without changing the current draft", async () => {
     harness.list.mockReset().mockResolvedValueOnce(manufacturers).mockResolvedValueOnce([manufacturers[1]!]);
     harness.update.mockResolvedValueOnce({ ...manufacturers[0]!, active: false, revision: 2 });
-    const overrides = { canAdmin: true, current: { manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } };
+    const overrides = { canAdmin: true, current: { kind: "draft" as const, manufacturerId: "m-one", name: "저장된 사옹원 snapshot" } };
     let tree = await load(overrides); clickText(tree, "⋯"); tree = render(overrides);
     clickText(tree, "비활성화"); tree = render(overrides);
     expect(textOf(tree)).toContain("기존 품목의 제조사명과 연결은 유지됩니다");
@@ -228,7 +228,7 @@ describe("inventory manufacturer picker", () => {
 
   it("preserves an inactive current reference but excludes it from selectable active options and hides create for viewers", async () => {
     harness.reference.mockResolvedValueOnce({ product: { manufacturer: "비활성 제조사 snapshot", manufacturerId: "m-old" }, lots: [] });
-    const tree = await load({ productId: "product-1", current: { name: "비활성 제조사 snapshot" }, allowCreate: false });
+    const tree = await load({ current: { kind: "persisted", productId: "product-1", name: "비활성 제조사 snapshot" }, allowCreate: false });
     expect(harness.reference).toHaveBeenCalledWith("product-1");
     expect(textOf(tree)).toContain("비활성 또는 현재 선택 목록에 없는 연결");
     expect(findAll(tree, (_type, item) => item.role === "option").map((item) => textOf(item))).not.toContain("비활성 제조사");

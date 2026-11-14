@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Customer } from "@/domain/customer";
 
 type Effect = { deps: readonly unknown[]; cleanup?: () => void };
@@ -32,6 +32,9 @@ vi.mock("./customer-repository", () => ({ customerRepository: { reverseLocation:
 
 import { customerDirectoryEntry } from "./customer-directory-filter";
 import { useCustomerDirectoryRegions } from "./use-customer-directory-regions";
+import { clearCustomerDirectoryRegionCache } from "./customer-directory-region-cache";
+import { discardCustomerWorkspaceCatalog, readCustomerWorkspaceSnapshot, clearCustomerWorkspaceSnapshot } from "./customer-workspace-snapshot";
+import { runRegisteredPrivateClientCleanups } from "@/features/auth/private-client-cleanup-registry";
 
 function customer(id: string, overrides: Partial<Customer> = {}): Customer {
   return { customerId: id, companyId: "onnuri", name: `거래처 ${id}`, normalizedName: id, choseongName: id,
@@ -39,9 +42,9 @@ function customer(id: string, overrides: Partial<Customer> = {}): Customer {
     deliveryPoint: { latitude: 36.35, longitude: 127.38 }, deliveryLocationDescription: "후문", accessPassword: "", accessPasswordState: "none", contacts: [],
     status: "active", noticeType: "none", changeNote: "", revision: 1, createdAt: "2026-09-06T00:00:00.000Z", createdBy: "EMP", updatedAt: "2026-09-06T00:00:00.000Z", updatedBy: "EMP", ...overrides };
 }
-function DirectoryRegionsHarness(customers: readonly Customer[], enabled = true) {
+function DirectoryRegionsHarness(customers: readonly Customer[], enabled = true, namespace = "EMP:1:1") {
   harness.stateCursor = 0; harness.refCursor = 0; harness.effectCursor = 0;
-  const value = useCustomerDirectoryRegions(customers, enabled);
+  const value = useCustomerDirectoryRegions(namespace, customers, enabled);
   harness.pending.splice(0).forEach((effect) => effect());
   return value;
 }
@@ -56,10 +59,18 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 beforeEach(() => {
+  clearCustomerWorkspaceSnapshot();
+  clearCustomerDirectoryRegionCache();
   harness.states = []; harness.refs = []; harness.effects = []; harness.pending = [];
   harness.stateCursor = 0; harness.refCursor = 0; harness.effectCursor = 0; harness.writes = 0;
   harness.reverse.mockReset().mockResolvedValue(resolved);
 });
+afterEach(() => { unmount(); clearCustomerDirectoryRegionCache(); });
+
+function remount() {
+  unmount();
+  harness.states = []; harness.refs = []; harness.effects = []; harness.pending = [];
+}
 
 describe("read-only customer directory region enrichment", () => {
   it("enriches only region fields, never mutates customers or replaces saved addresses", async () => {
@@ -108,6 +119,59 @@ describe("read-only customer directory region enrichment", () => {
     render(source); await flush();
     expect(harness.reverse).toHaveBeenCalledTimes(1);
     expect(render(source).customers[0]!.administrativeDong).toBe("둔산2동");
+  });
+
+  it("reuses a completed lookup after closing and reopening the directory", async () => {
+    const source = [customer("A")]; render(source); await flush();
+    remount();
+    expect(render(structuredClone(source))).toMatchObject({ pendingCount: 0, failedCount: 0 });
+    await flush();
+    expect(harness.reverse).toHaveBeenCalledTimes(1);
+    expect(render(source).customers[0]!.administrativeDong).toBe("둔산2동");
+  });
+
+  it("joins the same in-flight lookup after reopening and preserves its result", async () => {
+    const request = deferred<typeof resolved>(); harness.reverse.mockReturnValueOnce(request.promise);
+    const source = [customer("A")]; render(source); await flush();
+    remount(); render(source); await flush();
+    expect(harness.reverse).toHaveBeenCalledTimes(1);
+    request.resolve(resolved); await flush();
+    expect(render(source)).toMatchObject({ pendingCount: 0, failedCount: 0 });
+    expect(render(source).customers[0]!.administrativeDong).toBe("둔산2동");
+  });
+
+  it.each(["OTHER:1:1", "EMP:2:1", "EMP:1:2"])("isolates %s and rejects a late old-session result", async (namespace) => {
+    const request = deferred<typeof resolved>(); harness.reverse.mockReturnValueOnce(request.promise);
+    const source = [customer("A")]; render(source); await flush();
+    render(source, true, namespace); await flush();
+    request.resolve({ ...resolved, administrativeDong: "이전 세션 지역" }); await flush();
+    expect(harness.reverse).toHaveBeenCalledTimes(2);
+    expect(render(source, true, namespace).customers[0]!.administrativeDong).toBe("둔산2동");
+  });
+
+  it.each(["private cleanup", "catalog permission failure", "workspace session change"])("clears cached regions on %s", async (event) => {
+    readCustomerWorkspaceSnapshot("EMP:1:1");
+    const source = [customer("A")]; render(source); await flush(); remount();
+    if (event === "private cleanup") await runRegisteredPrivateClientCleanups();
+    else if (event === "catalog permission failure") discardCustomerWorkspaceCatalog("EMP:1:1");
+    else readCustomerWorkspaceSnapshot("EMP:2:1");
+    render(source); await flush();
+    expect(harness.reverse).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops retained regions on authorization failure and rejects older concurrent responses after retry", async () => {
+    const source = [customer("A"), customer("B"), customer("C")];
+    const denied = deferred<typeof resolved>(), late = deferred<typeof resolved>();
+    harness.reverse.mockResolvedValueOnce(resolved).mockReturnValueOnce(denied.promise).mockReturnValueOnce(late.promise);
+    render(source); await flush();
+    denied.reject({ code: "functions/permission-denied" }); await flush();
+    const failed = render(source);
+    expect(failed).toMatchObject({ pendingCount: 0, failedCount: 3 });
+    expect(failed.customers.every((row) => row.administrativeDong === "")).toBe(true);
+    failed.retry(); await flush();
+    late.resolve({ ...resolved, administrativeDong: "권한 실패 전 지역" }); await flush(); await flush();
+    expect(render(source).customers.every((row) => row.administrativeDong === "둔산2동")).toBe(true);
+    expect(harness.reverse).toHaveBeenCalledTimes(6);
   });
 
   it("discards stale coordinate responses and never exceeds three calls across canceled generations", async () => {

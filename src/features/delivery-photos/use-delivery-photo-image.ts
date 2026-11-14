@@ -37,6 +37,7 @@ export function useDeliveryPhotoImage(photoId: string, variant: DeliveryPhotoDow
       active = false;
       controller.abort();
       if (ownedUrl) forgetPrivateBlobUrl(ownedUrl);
+      setState((current) => current?.key === key ? null : current);
     };
   }, [enabled, key, photoId, session, variant]);
 

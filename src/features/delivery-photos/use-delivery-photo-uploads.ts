@@ -47,23 +47,20 @@ export function useDeliveryPhotoUploads(session: AuthenticatedSession, onConfirm
     }
   }, [coordinator, jobs, onConfirmed, canMerge]);
 
-  const byCustomer = useMemo(() => {
-    const map = new Map<string, DeliveryPhotoUploadProjection>();
-    for (const job of jobs) if (!map.has(job.customerId)) map.set(job.customerId, job);
-    return map;
-  }, [jobs]);
-  const pendingByCustomer = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const job of jobs) if (job.status !== "completed" && job.errorCategory !== "auth"
-      && !(job.status === "failed" && job.errorCategory === "preparation" && job.durable === false)) {
-      map.set(job.customerId, (map.get(job.customerId) ?? 0) + 1);
+  const grouped = useMemo(() => {
+    const byCustomer = new Map<string, DeliveryPhotoUploadProjection>();
+    const pendingByCustomer = new Map<string, number>();
+    const retryByCustomer = new Map<string, DeliveryPhotoUploadProjection>();
+    for (const job of jobs) {
+      const { customerId } = job;
+      if (!byCustomer.has(customerId)) byCustomer.set(customerId, job);
+      if (job.status !== "completed" && job.errorCategory !== "auth"
+        && !(job.status === "failed" && job.errorCategory === "preparation" && job.durable === false)) {
+        pendingByCustomer.set(customerId, (pendingByCustomer.get(customerId) ?? 0) + 1);
+      }
+      if (job.status === "failed" && job.errorCategory === "retryable" && !retryByCustomer.has(customerId)) retryByCustomer.set(customerId, job);
     }
-    return map;
+    return { byCustomer, pendingByCustomer, retryByCustomer };
   }, [jobs]);
-  const retryByCustomer = useMemo(() => {
-    const map = new Map<string, DeliveryPhotoUploadProjection>();
-    for (const job of jobs) if (job.status === "failed" && job.errorCategory === "retryable" && !map.has(job.customerId)) map.set(job.customerId, job);
-    return map;
-  }, [jobs]);
-  return { coordinator, jobs, byCustomer, pendingByCustomer, retryByCustomer, ready: coordinator !== null, storageError };
+  return { coordinator, jobs, ...grouped, ready: coordinator !== null, storageError };
 }

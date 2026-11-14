@@ -168,7 +168,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
           });
           const listPromise = inventoryRepository.list((nextProducts, progress) => {
             progressiveProducts = nextProducts; progressiveComplete = progress.complete; publishProgress();
-          });
+          }, () => acceptingProgress && requestIsCurrent());
           const [nextContext, nextProducts] = await Promise.all([contextPromise, listPromise]);
           const mergedProducts = reconciler.reconcile(nextProducts);
           if (!mergedProducts) throw new Error("Inventory revalidation disposed");

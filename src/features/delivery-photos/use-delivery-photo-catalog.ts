@@ -6,6 +6,7 @@ import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { customerRepository } from "@/features/customers/customer-repository";
 import { readCustomerWorkspaceSnapshot } from "@/features/customers/customer-workspace-snapshot";
+import { deliveryPhotoErrorKind } from "./delivery-photo-repository";
 
 /** Uses the existing customer Memory catalog and its revalidation coordinator. */
 export function useDeliveryPhotoCatalog(session: AuthenticatedSession, onSensitiveStateCleared: () => void) {
@@ -22,8 +23,7 @@ export function useDeliveryPhotoCatalog(session: AuthenticatedSession, onSensiti
       (customers) => { if (active) setState({ key, customers, status: "ready" }); },
       (error, hadData) => {
         if (!active) return;
-        const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-        const sensitive = ["permission-denied", "unauthenticated", "failed-precondition"].some((reason) => code.endsWith(reason));
+        const sensitive = deliveryPhotoErrorKind(error) === "auth";
         if (sensitive) onSensitiveStateCleared();
         const retained = !sensitive && hadData ? readCustomerWorkspaceSnapshot(key).catalog?.customers ?? [] : [];
         setState({ key, customers: retained, status: retained.length ? "ready" : "error" });

@@ -8,7 +8,7 @@ import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { searchCustomers } from "@/features/customers/customer-search";
 
-import { addDeliveryPhotoCustomer, moveDeliveryPhotoCustomer, removeDeliveryPhotoCustomer } from "./delivery-photo-domain";
+import { addDeliveryPhotoCustomer, moveDeliveryPhotoCustomer, removeDeliveryPhotoCustomer } from "./delivery-photo-editor-model";
 import { useDeliveryPhotoRecents } from "./use-delivery-photo-recents";
 import styles from "./photo.module.css";
 

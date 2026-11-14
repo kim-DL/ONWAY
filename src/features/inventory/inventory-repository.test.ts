@@ -6,7 +6,8 @@ vi.mock("client-only", () => ({}));
 vi.mock("@/lib/firebase/client", () => ({ getFirebaseClientServices: () => mock.services }));
 vi.mock("firebase/functions", () => ({ httpsCallable: (_functions: unknown, name: string) => (input: unknown) => mock.invoke(name, input) }));
 import { inventoryErrorMessage, inventoryRepository } from "./inventory-repository";
-import { reportInventoryAccessFailure, subscribeInventoryAccessFailure } from "./inventory-access-boundary";
+import { isInventoryAccessFailure, reportInventoryAccessFailure, subscribeInventoryAccessFailure } from "./inventory-access-boundary";
+import { runRegisteredPrivateClientCleanups } from "@/features/auth/private-client-cleanup-registry";
 
 function product(productId = "product-1"): InventoryProduct {
   return inventoryProductSchema.parse({ productId, companyId: "onnuri", name: "검증용 닭가슴살", manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 10, defaultLocationId: "refrigerated", note: "", urgent: false, status: "active", revision: 0, stockRevision: 0, hasHistory: false, quantityByLocation: inventoryLocationMap(0), nearestExpiryByLocation: inventoryLocationMap(null), lastCountByLocation: inventoryLocationMap(null), photo: null, createdAt: "2026-09-10T01:00:00.000Z", updatedAt: "2026-09-10T01:00:00.000Z", createdBy: "employee-1", updatedBy: "employee-1" });
@@ -107,7 +108,45 @@ describe("inventory callable boundary", () => {
   });
   it("does not return private data after the signed-in account changes", async () => {
     mock.invoke.mockImplementation(async () => { mock.services.auth.currentUser = { uid: "different-employee" }; return { data: { products: [product()], nextCursor: null } }; });
-    await expect(inventoryRepository.list()).rejects.toMatchObject({ code: "unauthenticated" });
+    await expect(inventoryRepository.list()).rejects.toMatchObject({ code: "cancelled" });
+  });
+  it.each([null, "product-1"])("does not finish or start another page after same-account cleanup, cursor %s", async (nextCursor) => {
+    mock.invoke.mockResolvedValue({ data: { products: [product()], nextCursor } });
+    const listener = vi.fn(); const unsubscribe = subscribeInventoryAccessFailure(listener);
+    let cleanup: Promise<void> | undefined;
+    try {
+      const loading = inventoryRepository.list(() => { cleanup = runRegisteredPrivateClientCleanups(); });
+      await expect(loading).rejects.toMatchObject({ code: "cancelled" });
+      await cleanup;
+      expect(mock.invoke).toHaveBeenCalledOnce();
+      expect(listener).not.toHaveBeenCalled();
+    } finally { unsubscribe(); }
+  });
+  it.each(["success", "access-denial"])("discards a cancelled owner's late %s without revoking a newer read", async (outcome) => {
+    let finish!: (result: unknown) => void;
+    let fail!: (cause: unknown) => void;
+    let current = true;
+    const listener = vi.fn(); const unsubscribe = subscribeInventoryAccessFailure(listener);
+    const progress = vi.fn();
+    mock.invoke.mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject; }));
+    try {
+      const loading = inventoryRepository.list(progress, () => current);
+      current = false;
+      mock.invoke.mockResolvedValueOnce({ data: { products: [product("new-product")], nextCursor: null } });
+      await expect(inventoryRepository.list()).resolves.toMatchObject([{ productId: "new-product" }]);
+      if (outcome === "success") finish({ data: { products: [product()], nextCursor: "product-1" } });
+      else fail({ code: "functions/permission-denied" });
+      const cause: unknown = await loading.catch((error: unknown) => error);
+      expect(cause).toMatchObject({ code: "cancelled" });
+      expect(isInventoryAccessFailure(cause)).toBe(false);
+      expect(progress).not.toHaveBeenCalled();
+      expect(mock.invoke).toHaveBeenCalledTimes(2);
+      expect(listener).not.toHaveBeenCalled();
+    } finally { unsubscribe(); }
+  });
+  it("does not start a page for an already cancelled owner", async () => {
+    await expect(inventoryRepository.list(undefined, () => false)).rejects.toMatchObject({ code: "cancelled" });
+    expect(mock.invoke).not.toHaveBeenCalled();
   });
   it("never calls a backend without an authenticated account", async () => {
     mock.services.auth.currentUser = null;

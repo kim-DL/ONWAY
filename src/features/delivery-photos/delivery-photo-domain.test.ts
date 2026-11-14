@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  addDeliveryPhotoCustomer,
-  moveDeliveryPhotoCustomer,
   projectDeliveryPhotoCompletion,
-  removeDeliveryPhotoCustomer,
   resolveDeliveryPhotoDayCustomerIds,
 } from "./delivery-photo-domain";
+import { addDeliveryPhotoCustomer, moveDeliveryPhotoCustomer, removeDeliveryPhotoCustomer } from "./delivery-photo-editor-model";
 
 const known = new Set(["a", "b", "c", "d"]);
 

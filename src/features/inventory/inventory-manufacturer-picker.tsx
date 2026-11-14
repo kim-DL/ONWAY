@@ -15,6 +15,11 @@ import type { InventoryProduct, SaveInventoryProductInput } from "@/domain/inven
 import styles from "./inventory-manufacturer-picker.module.css";
 
 export type InventoryManufacturerSelection = Pick<InventoryManufacturer, "manufacturerId" | "name">;
+type InventoryManufacturerValue = { manufacturerId?: string | undefined; name: string };
+export type InventoryManufacturerCurrent = InventoryManufacturerValue & (
+  | { kind: "persisted"; productId: string }
+  | { kind: "draft" }
+);
 
 export function filterInventoryManufacturers(items: InventoryManufacturer[], query: string) {
   const canonical = canonicalInventoryManufacturerName(query).toLocaleLowerCase("ko-KR");
@@ -46,9 +51,8 @@ type ManufacturerManagement = {
   mode: "menu" | "rename" | "deactivate";
 };
 
-export function InventoryManufacturerPicker({ current, productId, sessionNamespace, allowCreate, canAdmin, onSelect, onClear, onClose }: {
-  current: { manufacturerId?: string | undefined; name: string };
-  productId?: string | undefined;
+export function InventoryManufacturerPicker({ current, sessionNamespace, allowCreate, canAdmin, onSelect, onClear, onClose }: {
+  current: InventoryManufacturerCurrent;
   sessionNamespace: string;
   allowCreate: boolean;
   canAdmin: boolean;
@@ -56,6 +60,7 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
   onClear: (saveProduct: (input: SaveInventoryProductInput) => Promise<InventoryProduct>) => void;
   onClose: () => void;
 }) {
+  const productId = current.kind === "persisted" ? current.productId : undefined;
   const listId = useId();
   const addInput = useRef<HTMLInputElement>(null);
   const renameInput = useRef<HTMLInputElement>(null);
@@ -64,7 +69,7 @@ export function InventoryManufacturerPicker({ current, productId, sessionNamespa
   const updateRequest = useRef({ signature: "", id: "" });
   const [manufacturers, setManufacturers] = useState<InventoryManufacturer[]>(() => inventoryManufacturerRepository.cached(sessionNamespace)?.filter((item) => item.active) ?? []);
   const [hasList, setHasList] = useState(() => inventoryManufacturerRepository.cached(sessionNamespace) !== null);
-  const [resolvedCurrent, setResolvedCurrent] = useState(current);
+  const [resolvedCurrent, setResolvedCurrent] = useState<InventoryManufacturerValue>(current);
   const [loading, setLoading] = useState(!hasList);
   const [checking, setChecking] = useState(true);
   const [loadError, setLoadError] = useState("");

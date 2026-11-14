@@ -1,5 +1,6 @@
 import type { Customer } from "@/domain/customer";
 import { RevalidationCoordinator, type RevalidationFreshness } from "@/lib/revalidation-coordinator";
+import { clearCustomerDirectoryRegionCache } from "./customer-directory-region-cache";
 
 export type CustomerWorkspaceSnapshot = {
   catalog: null | {
@@ -22,6 +23,7 @@ let entry: CustomerSessionEntry | null = null;
 function sessionEntry(namespace: string) {
   if (entry?.namespace !== namespace) {
     entry?.coordinator.invalidate();
+    clearCustomerDirectoryRegionCache();
     entry = {
       namespace,
       coordinator: new RevalidationCoordinator(namespace),
@@ -77,12 +79,14 @@ export function acceptCustomerWorkspaceWrite(namespace: string, customer: Custom
 }
 
 export function clearCustomerWorkspaceSnapshot(namespace?: string) {
+  clearCustomerDirectoryRegionCache(namespace);
   if (!entry || namespace && entry.namespace !== namespace) return;
   entry.coordinator.invalidate();
   entry = null;
 }
 
 export function discardCustomerWorkspaceCatalog(namespace: string) {
+  clearCustomerDirectoryRegionCache(namespace);
   if (!entry || entry.namespace !== namespace) return;
   entry.coordinator.invalidate();
   entry.snapshot = { catalog: null, ui: { query: "", searchOpen: false, scrollTop: 0, limit: 32 } };

@@ -42,6 +42,19 @@ function setup(overrides: Partial<DeliveryPhotoUploadDependencies> = {}) {
 function source(value: string) { return new File([value], `${value}.webp`, { type: "image/webp" }); }
 
 describe("delivery photo memory upload coordinator", () => {
+  it("publishes capture availability when a native source read finishes without another job change", async () => {
+    const { coordinator } = setup();
+    await coordinator.ready;
+    const job = coordinator.begin("customer", "camera")!;
+    const observed: Array<{ canBegin: boolean; snapshot: ReturnType<typeof coordinator.getSnapshot> }> = [];
+    const unsubscribe = coordinator.subscribe(() => observed.push({ canBegin: coordinator.canBegin("customer"), snapshot: coordinator.getSnapshot() }));
+    await coordinator.acceptNativeSource(job.jobId, new File(["not an image"], "invalid.txt", { type: "text/plain" }));
+    expect(observed.map((state) => state.canBegin)).toEqual([false, true]);
+    expect(observed[1]!.snapshot).not.toBe(observed[0]!.snapshot);
+    expect(observed[1]!.snapshot).toEqual(observed[0]!.snapshot);
+    unsubscribe(); await coordinator.clear();
+  });
+
   it("allows consecutive photos per customer, serializes preparation and caps relay concurrency at two", async () => {
     const preparations = [deferred<ReturnType<typeof prepared>>(), deferred<ReturnType<typeof prepared>>(), deferred<ReturnType<typeof prepared>>()];
     const relays = { a: deferred<ReturnType<typeof metadata>>(), b: deferred<ReturnType<typeof metadata>>(), c: deferred<ReturnType<typeof metadata>>() };

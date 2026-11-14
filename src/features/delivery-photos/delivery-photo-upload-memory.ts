@@ -55,6 +55,7 @@ export class DeliveryPhotoUploadCoordinator {
   private readonly controllers = new Map<string, AbortController>();
   private readonly sourceReads = new Set<string>();
   private snapshot: readonly DeliveryPhotoUploadProjection[] = Object.freeze([]);
+  private snapshotKey = "[]";
   private activePreparation: string | null = null;
   private preparingPump = false;
   private relayPump = false;
@@ -105,14 +106,19 @@ export class DeliveryPhotoUploadCoordinator {
   private async restore() {
     if (!this.outboxWorker) return;
     const epoch = this.epoch;
+    let detailsChanged = false;
     const active = new Set(this.activeRelays); if (this.activePreparation) active.add(this.activePreparation);
     const restored = await this.outboxWorker.restore({ jobs: this.jobs, active, today: this.today(), now: this.dependencies.now(),
       live: () => this.live(epoch), remove: (id) => this.removeLocal(id), accept: (record) => {
         const id = record.job.jobId;
-        if (record.job.status === "completed" && record.confirmed) this.confirmed.set(id, record.confirmed);
-        this.records.set(id, record); this.jobs.set(id, record.job); this.makePreview(record);
+        if (record.job.status === "completed" && record.confirmed) {
+          detailsChanged ||= !this.confirmed.has(id);
+          this.confirmed.set(id, record.confirmed);
+        }
+        this.records.set(id, record); this.jobs.set(id, record.job);
+        detailsChanged = this.makePreview(record) || detailsChanged;
       } });
-    if (restored) this.publish();
+    if (restored) this.publish(detailsChanged);
   }
   getPendingCount(customerId: string) { return this.snapshot.filter((job) => job.customerId === customerId && isActiveDeliveryPhotoUpload(job)).length; }
   canBegin(customerId: string) {
@@ -166,9 +172,9 @@ export class DeliveryPhotoUploadCoordinator {
       if (this.live(epoch, jobId)) this.failPreparation(jobId, message);
       return true;
     } finally {
-      this.sourceReads.delete(jobId);
+      const sourceReadFinished = this.sourceReads.delete(jobId);
       if (this.controllers.get(jobId) === controller) this.controllers.delete(jobId);
-      this.publish();
+      this.publish(sourceReadFinished);
     }
   }
   canRetry(jobId: string) {
@@ -236,8 +242,12 @@ export class DeliveryPhotoUploadCoordinator {
     this.confirmed.clear(); this.activePreparation = null; this.publish();
     return this.scope ? this.dependencies.store?.clear(this.scope) ?? Promise.resolve() : Promise.resolve();
   }
-  private publish() {
-    this.snapshot = Object.freeze([...this.jobs.values()].sort((a, b) => b.startedAt - a.startedAt || b.jobId.localeCompare(a.jobId)));
+  private publish(detailsChanged = false) {
+    const next = [...this.jobs.values()].sort((a, b) => b.startedAt - a.startedAt || b.jobId.localeCompare(a.jobId));
+    const key = JSON.stringify(next);
+    if (!detailsChanged && key === this.snapshotKey) return;
+    this.snapshotKey = key;
+    this.snapshot = Object.freeze(next);
     for (const listener of this.listeners) listener();
   }
   private update(id: string, update: Partial<DeliveryPhotoUploadProjection>) {
@@ -246,10 +256,11 @@ export class DeliveryPhotoUploadCoordinator {
     this.jobs.set(id, next); const record = this.records.get(id); if (record) record.job = next; this.publish();
   }
   private makePreview(record: PhotoOutboxRecord) {
-    if (!record.prepared || this.previews.has(record.job.jobId) || typeof URL.createObjectURL !== "function") return;
+    if (!record.prepared || this.previews.has(record.job.jobId) || typeof URL.createObjectURL !== "function") return false;
     const full = registerPrivateBlobUrl(URL.createObjectURL(record.prepared.blob));
     const thumbnail = record.prepared.preview ? registerPrivateBlobUrl(URL.createObjectURL(record.prepared.preview)) : full;
     this.previews.set(record.job.jobId, { thumbnail, full });
+    return true;
   }
   private removeLocal(id: string) {
     this.controllers.get(id)?.abort(); this.controllers.delete(id);

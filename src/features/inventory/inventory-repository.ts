@@ -18,16 +18,19 @@ export function inventoryErrorMessage(error: unknown): string {
   return "재고 정보를 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
 }
 
-async function call<T>(name: string, input: unknown, schema: z.ZodType<T>): Promise<T> {
+async function call<T>(name: string, input: unknown, schema: z.ZodType<T>, assertCurrent?: () => void): Promise<T> {
   const services = getFirebaseClientServices();
   const uid = services?.auth.currentUser?.uid;
   const generation = inventoryAccessGeneration();
   try {
+    assertCurrent?.();
     if (!services || !uid) throw inventoryAuthenticationError();
     const result = await httpsCallable<unknown, unknown>(services.functions, name)(input);
+    assertCurrent?.();
     if (services.auth.currentUser?.uid !== uid || inventoryAccessGeneration() !== generation) throw inventoryAuthenticationError();
     return schema.parse(result.data);
   } catch (cause) {
+    assertCurrent?.();
     // A superseded account/session request cannot clear the next session's UI.
     if (inventoryAccessGeneration() === generation && services?.auth.currentUser?.uid === uid) reportInventoryAccessFailure(cause, uid ?? null);
     throw cause;
@@ -35,22 +38,28 @@ async function call<T>(name: string, input: unknown, schema: z.ZodType<T>): Prom
 }
 
 export type InventoryListProgress = { pageCount: number; complete: boolean };
-async function list(onProgress?: (products: contract.InventoryProduct[], progress: InventoryListProgress) => void): Promise<contract.InventoryProduct[]> {
+async function list(onProgress?: (products: contract.InventoryProduct[], progress: InventoryListProgress) => void, isCurrent: () => boolean = () => true): Promise<contract.InventoryProduct[]> {
   const initialUid = getFirebaseClientServices()?.auth.currentUser?.uid;
+  const initialGeneration = inventoryAccessGeneration();
   if (!initialUid) throw inventoryAuthenticationError();
+  const assertCurrent = () => {
+    if (!isCurrent() || inventoryAccessGeneration() !== initialGeneration || getFirebaseClientServices()?.auth.currentUser?.uid !== initialUid) {
+      throw Object.assign(new Error("Inventory list superseded"), { code: "cancelled" });
+    }
+  };
   const products = new Map<string, contract.InventoryProduct>();
   const cursors = new Set<string>();
   let afterId: string | null = null;
   let pageCount = 0;
   do {
-    const page: z.infer<typeof contract.inventoryListPageSchema> = await call("listInventoryProducts", { afterId, includeSummary: true, includePackaging: true }, contract.inventoryListPageSchema);
-    if (getFirebaseClientServices()?.auth.currentUser?.uid !== initialUid) throw inventoryAuthenticationError();
+    const page: z.infer<typeof contract.inventoryListPageSchema> = await call("listInventoryProducts", { afterId, includeSummary: true, includePackaging: true }, contract.inventoryListPageSchema, assertCurrent);
     page.products.forEach((product) => products.set(product.productId, product));
     afterId = page.nextCursor;
     if (afterId && (cursors.has(afterId) || products.size >= 5_000)) throw new Error("Inventory pagination limit");
     if (afterId) cursors.add(afterId);
     pageCount += 1;
     onProgress?.(Array.from(products.values()), { pageCount, complete: afterId === null });
+    assertCurrent();
   } while (afterId);
   return Array.from(products.values());
 }

@@ -7,7 +7,9 @@ import { Icon } from "@/components/ui/icon";
 import { LoadingStatus } from "@/components/ui/loading-status";
 import { searchInputProps } from "@/components/ui/search-input-props";
 import type { Customer } from "@/domain/customer";
+import type { RevalidationFreshness } from "@/lib/revalidation-coordinator";
 import { CustomerCard } from "./customer-card";
+import { CustomerCatalogFreshness } from "./customer-catalog-freshness";
 import { customerDirectoryEntry, customerRegionOptions, filterCustomerDirectory } from "./customer-directory-filter";
 import { useCustomerDirectoryRegions } from "./use-customer-directory-regions";
 import shared from "./customer.module.css";
@@ -15,9 +17,10 @@ import styles from "./customer-directory.module.css";
 
 const PAGE_SIZE = 32;
 
-export function CustomerDirectory({ customers, onSelect, onClose, status = "ready", message = "", onRetry }: {
-  customers: readonly Customer[]; onSelect: (customerId: string) => void; onClose: () => void;
+export function CustomerDirectory({ sessionKey, customers, onSelect, onClose, status = "ready", message = "", freshness = "idle", lastSuccessAt = null, onRetry }: {
+  sessionKey: string; customers: readonly Customer[]; onSelect: (customerId: string) => void; onClose: () => void;
   status?: "ready" | "loading" | "error"; message?: string; onRetry?: () => void;
+  freshness?: RevalidationFreshness; lastSuccessAt?: number | null;
 }) {
   const id = useId();
   const [district, setDistrict] = useState("");
@@ -26,28 +29,32 @@ export function CustomerDirectory({ customers, onSelect, onClose, status = "read
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchRef = useRef<HTMLInputElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
-  const regions = useCustomerDirectoryRegions(customers, status === "ready");
+  const regions = useCustomerDirectoryRegions(sessionKey, customers, status === "ready");
   const entries = useMemo(() => regions.customers.map(customerDirectoryEntry), [regions.customers]);
   const districts = useMemo(() => customerRegionOptions(entries, "district"), [entries]);
-  const districtEntries = useMemo(() => entries.filter((entry) => !district || entry.district === district), [entries, district]);
+  const selectedDistrict = districts.some((region) => region.value === district) ? district : "";
+  const districtEntries = useMemo(() => entries.filter((entry) => !selectedDistrict || entry.district === selectedDistrict), [entries, selectedDistrict]);
   const dongs = useMemo(() => customerRegionOptions(districtEntries, "dong"), [districtEntries]);
-  const results = useMemo(() => filterCustomerDirectory(entries, district, dong, query), [entries, district, dong, query]);
+  const selectedDong = dongs.some((region) => region.value === dong) ? dong : "";
+  const filtered = Boolean(selectedDistrict || selectedDong || query);
+  const results = useMemo(() => filterCustomerDirectory(entries, selectedDistrict, selectedDong, query), [entries, selectedDistrict, selectedDong, query]);
   const reset = () => { setDistrict(""); setDong(""); setQuery(""); setVisibleCount(PAGE_SIZE); };
   return <BottomSheet open title="거래처 전체보기" onClose={onClose}>
     <div className={`${shared.workspace} ${styles.directory}`} data-customer-directory>
+      {status === "ready" ? <CustomerCatalogFreshness freshness={freshness} lastSuccessAt={lastSuccessAt} onRetry={onRetry} /> : null}
       <div ref={filtersRef} className={styles.filters} hidden={status !== "ready"}>
         <div className={styles.summary}><span><Icon name="building" size={18} />등록 거래처 <strong>{customers.length}곳</strong></span>
-          {district || dong || query ? <button type="button" onClick={reset}>선택 초기화</button> : null}
+          {filtered ? <button type="button" onClick={reset}>선택 초기화</button> : null}
         </div>
         <fieldset className={styles.districts}><legend>자치구·지역</legend>
           <div className={styles.districtGrid}>
-            <button type="button" aria-pressed={!district} onClick={() => { setDistrict(""); setDong(""); setVisibleCount(PAGE_SIZE); }}>전체<span>{customers.length}</span></button>
-            {districts.map((region) => <button key={region.value} type="button" aria-pressed={district === region.value}
+            <button type="button" aria-pressed={!selectedDistrict} onClick={() => { setDistrict(""); setDong(""); setVisibleCount(PAGE_SIZE); }}>전체<span>{customers.length}</span></button>
+            {districts.map((region) => <button key={region.value} type="button" aria-pressed={selectedDistrict === region.value}
               onClick={() => { setDistrict(region.value); setDong(""); setVisibleCount(PAGE_SIZE); }}>{region.value}<span>{region.count}</span></button>)}
           </div>
         </fieldset>
         <div className={styles.refineRow}>
-          <label className={styles.dong}><span>행정동</span><select aria-label="행정동" value={dong} onChange={(event) => { setDong(event.target.value); setVisibleCount(PAGE_SIZE); }}>
+          <label className={styles.dong}><span>행정동</span><select aria-label="행정동" value={selectedDong} onChange={(event) => { setDong(event.target.value); setVisibleCount(PAGE_SIZE); }}>
             <option value="">전체 행정동 ({districtEntries.length})</option>
             {dongs.map((region) => <option key={region.value} value={region.value}>{region.value} ({region.count})</option>)}
           </select></label>
@@ -62,16 +69,16 @@ export function CustomerDirectory({ customers, onSelect, onClose, status = "read
         <Icon name="wifi-off" size={26} /><p>{message}</p>
         {onRetry ? <button type="button" className={shared.textButton} onClick={onRetry}>다시 불러오기</button> : null}
       </div> : status === "loading" ? <LoadingStatus className={shared.empty} label="거래처 불러오는 중" detail="전체 거래처 목록을 확인하고 있습니다." /> : <section aria-labelledby={`${id}-results`}>
-        <header className={styles.resultHeading}><h3 id={`${id}-results`}>{dong || district || "전체 거래처"}</h3><span role="status" aria-live="polite">{results.length}곳</span></header>
+        <header className={styles.resultHeading}><h3 id={`${id}-results`}>{selectedDong || selectedDistrict || "전체 거래처"}</h3><span role="status" aria-live="polite">{results.length}곳</span></header>
         {results.length ? <ul className={`${fieldList.list} ${styles.list}`}>{results.slice(0, visibleCount).map((customer) => <li key={customer.customerId}>
           <CustomerCard customer={customer} compact onSelect={() => onSelect(customer.customerId)} />
         </li>)}</ul> : <div className={shared.empty}><Icon name="search" size={28} /><h3>{customers.length ? "조건에 맞는 거래처가 없어요." : "등록된 거래처가 아직 없어요."}</h3>
-          {district || dong || query ? <button type="button" className={shared.textButton} onClick={reset}>전체 거래처 보기</button> : null}
+          {filtered ? <button type="button" className={shared.textButton} onClick={reset}>전체 거래처 보기</button> : null}
         </div>}
         {results.length > visibleCount ? <button className={styles.more} type="button" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>거래처 더 보기 <span>{visibleCount} / {results.length}</span><Icon name="arrow-down" size={17} /></button> : null}
       </section>}
       {status === "ready" ? <BottomSheetActions className={styles.footer ?? ""}>
-        <span>{district || dong || query ? "선택한 거래처" : "전체 거래처"} <strong>{results.length}곳</strong></span>
+        <span>{filtered ? "선택한 거래처" : "전체 거래처"} <strong>{results.length}곳</strong></span>
         <button type="button" onClick={() => { filtersRef.current?.scrollIntoView({ block: "start" }); filtersRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true }); }}><Icon name="location" size={18} />지역·행정동 선택</button>
       </BottomSheetActions> : null}
     </div>

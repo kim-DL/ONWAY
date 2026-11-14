@@ -74,7 +74,7 @@ function DirectoryFixture() {
   const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState<Customer | null>(null);
   return <main className={styles.workspace}><h1>거래처 전체보기 검증</h1><button type="button" onClick={() => setOpen(true)}>전체보기 열기</button>
-    {open ? <CustomerDirectory customers={directoryCustomers} onSelect={(id) => setSelected(directoryCustomers.find((customer) => customer.customerId === id) ?? null)} onClose={() => setOpen(false)} /> : null}
+    {open ? <CustomerDirectory sessionKey="FIXTURE:1:1" customers={directoryCustomers} onSelect={(id) => setSelected(directoryCustomers.find((customer) => customer.customerId === id) ?? null)} onClose={() => setOpen(false)} /> : null}
     {selected ? <CustomerDetail customer={selected} session={fixtureSession} onClose={() => setSelected(null)} onEdit={() => undefined} /> : null}
   </main>;
 }
