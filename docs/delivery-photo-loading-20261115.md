@@ -47,8 +47,26 @@ demo 전용 Firestore/Storage 게이트도 통과했다. 실제 SDK로 생성·�
 
 ## 반영 상태와 증거
 
-사용자가2026-11-15에 검증된 변경의 커밋·main 병합과 `getDeliveryPhoto` 함수1개/Hosting 운영 배포를 승인했다. 운영 반영 대상은 이전 확대 개선을 포함한 Hosting `onnuriway`와 `getDeliveryPhoto` 함수1개다. 계약이 호환되며 다른 인증·직원·업로드 함수의 배포는 필요하지 않다. 제품8개·Hosting145개·컴파일된 Storage 구현의 해시가 검증 당시와 일치함을 확인했다. 통과한 검사와 앱 빌드는 반복하지 않고, Firebase의 필수 Functions predeploy 컴파일과 배포·공개 확인을 진행한다. 배포 식별자와 결과는 완료 후 기록한다.
+사용자가2026-11-15에 검증된 변경의 커밋·main 병합과 `getDeliveryPhoto` 함수1개/Hosting 운영 배포를 승인했다. 제품8개·Hosting145개·컴파일된 Storage 구현의 해시가 검증 당시와 일치함을 확인한 뒤 `18dfabb0abcb0330c7897962040020f01dac2959`로 커밋했다. main에 `cf899a3a7e27a919e96a3e0752e5361b384a1e88`로 병합하고 원격 동기화했다. 두 커밋의 `[skip ci]`로 통과한 전체 검사가 자동 반복되지 않도록 했다.
+
+통과한 단위·브라우저·에뮬레이터 검사와 앱 빌드는 반복하지 않았다. Firebase가 요구하는 Functions predeploy TypeScript 컴파일, 고정 산출물 확인과 배포 후 공개 확인만 수행했다. 함수 필수 컴파일 후에도 컴파일된 Storage 구현의 해시가 고정 후보와 일치했다.
+
+| 대상 | 운영 반영 결과 |
+| --- | --- |
+| `getDeliveryPhoto` | 2026-11-15 01:17:11 KST, `getdeliveryphoto-00002-xal`, ACTIVE·트래픽100% |
+| Hosting `onnuriway` | 2026-11-15 01:23:01 KST, `e1ccf66dbdbcfc1d`, 파일145개 |
+| 공개 주소 | `https://onnuriway.com`, `https://onnuriway.web.app` 각각 공개 응답36항목 통과·145개 파일 SHA-256 일치 |
+| 함수 보호 | 인증/App Check 없는 합성 요청은 HTTP401·`UNAUTHENTICATED`, 실제 사진 읽기/쓰기 없음 |
+| 다른 함수 | 배포 전후86개 중 `getDeliveryPhoto`만 변경, 나머지85개 전체 메타데이터 해시 동일 |
+
+배포 명령은 각각 `--project onnuriway --only functions:getDeliveryPhoto --non-interactive`, `--project onnuriway --only hosting:onnuriway --non-interactive`로 범위를 고정했다. 다른 Functions·Rules·MCP Hosting은 배포하지 않았다. 직원 로그인·세션을 변경하는 함수나 데이터 작업도 수행하지 않았다.
+
+대상 함수의 환경변수 전체 해시는 달라 별도 리비전 비교로 확인했다. 양쪽에 있는 환경변수의 값은 모두 동일하며 `FIREBASE_CONFIG`는 JSON 키 순서를 정규화해 비교했다. 현재 배포 구성의 `OPENAI_PROJECT_ID` 키가 추가되고 이전 런타임의 `FUNCTION_SIGNATURE_TYPE` 키가 제거됐다. 값은 출력하거나 증거 파일에 저장하지 않았다. 비밀 정보 연결과 실행 계정 해시는 동일하다. 환경변수를 포함하는 runtimeConfig 전체 해시는 다르므로 전체 설정이 동일하다고 표현하지 않는다. 사진 읽기의 인증·보관·권한 계약은 기존 검증 범위를 유지한다.
+
+이전 Hosting은 `457477f2acda01ef`, 대상 함수 리비전은 `getdeliveryphoto-00001-mit`이다. 서버 구현을 되돌릴 경우 이전 소스를 같은 함수 하나에만 다시 배포한다. Hosting 이전 버전만 되돌려도 이전 클라이언트와 현재 함수 응답 계약은 호환된다.
 
 세부 자료는 ignored `output/delivery-photo-loading-20261115/`에 있다. `client-benchmark-final.json`과 `measurement-notes.json`, `storage-benchmark.json`이 최종 측정 근거다. `zoom-before.log`는800%의 실패 재현이며, `unit.log`, `browser-mobile.log`, `browser-desktop.log`, `browser-webkit-confirmed.log`, `browser-mobile-final.log`, `browser-shared-final.log`, `emulator.log`에 관련 검증을 남겼다. `build-final.log`·`performance-final.log`·`pwa-final.log`·`hosting-final.log`는 최종 산출물 검사다. `review.md`는 실패 이력을 포함한 독립 검토다.
 
-실물 휴대폰·설치 PWA·실제 운영 사진의 판독성과 운영 Firebase 지연은 미측정이다. 저장 해상도/화질, 보관 기한과 no-store는 바꾸지 않았다. 서버·Hosting 운영 배포가 완료되기 전에는 직원 화면이 갱신됐다고 표현하지 않는다.
+배포 근거는 같은 폴더의 `deploy-function.log`, `deploy-hosting.log`, `function-release-verification.json`, `function-revision-verification.json`, `hosting-release-verification.json`, `release-smoke.json`, `public-domain.json`, `public-firebase.json`, `public-artifact-hashes.json`에 있다. 함수 전체 메타데이터는 값 대신 해시만 보관하며 환경변수·비밀 값은 포함하지 않는다. 원시 Hosting 응답의 계정 메타데이터는 ignored 폴더에만 있고 커밋하지 않았다.
+
+실물 휴대폰·설치 PWA·인증된 실제 운영 사진 조회의 판독성과 운영 Firebase 지연은 미측정이다. 저장 해상도/화질, 보관 기한과 no-store는 바꾸지 않았다. 두 공개 주소의 운영 반영은 확인했으며 기존 실행 중 탭/설치 PWA에 새 코드가 적용되는 시점은 별도 실기기 증거가 없다.
