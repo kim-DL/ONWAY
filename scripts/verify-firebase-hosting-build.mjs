@@ -19,7 +19,7 @@ const expectedIcons = new Map([
 const launchLogo = "/brand/onnuri-food-logo-auth.webp";
 const glassAssets = ["/ui/mode-glass-three-v2.webp", "/ui/mode-glass-four-v2.webp"];
 const ceramicAssets = ["search", "directory", "camera", "register"].map((name) => `/ui/customer-ceramic-${name}-v1.webp`);
-const panelAssets = [...glassAssets, ...ceramicAssets, ...["search", "route", "add", "organize"].map((name) => `/ui/sales-ceramic-${name}-v1.webp`)];
+const panelAssets = [...glassAssets, ...ceramicAssets, "/ui/sales-ceramic-route-v1.webp", "/ui/school-ceramic-building-v1.webp"];
 const actionIcons = ["/ui/delivery-invoice-stack.svg", "/ui/delivery-smart-route.svg"];
 const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...panelAssets, ...actionIcons, ...expectedIcons.keys()]);
 
@@ -48,13 +48,17 @@ function assertMime(headers, expression, pathname) {
   check(expression.test(headers.get("content-type") ?? ""), `${pathname} has an unexpected or missing Content-Type.`);
 }
 
-function parsePrecache(source) {
+function precacheEntries(source) {
   // Parse only the generated data literal, never execute the service worker.
   const literal = source.match(/\bprecacheEntries\s*:\s*(\[[\s\S]*?\])\s*(?:\?\?|,)/u)?.[1];
   check(literal, "Generated service worker has no readable precache manifest.");
-  const paths = [...literal.matchAll(/(?:^|[,{])\s*['"]?url['"]?\s*:\s*(['"])(.*?)\1/gu)].map((match) => match[2]);
-  check(paths.length > 0, "Generated precache manifest is empty.");
-  return [...new Set(paths)];
+  const entries = JSON.parse(literal.replaceAll("'", '"'));
+  check(Array.isArray(entries) && entries.length > 0 && entries.every((entry) => typeof entry.url === "string"), "Generated precache manifest is invalid or empty.");
+  return entries;
+}
+
+function parsePrecache(source) {
+  return [...new Set(precacheEntries(source).map((entry) => entry.url))];
 }
 
 function outputFile(pathname) {
@@ -146,6 +150,9 @@ async function verifyLocal() {
   }
   for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...panelAssets, ...actionIcons, ...manifest.icons.map((icon) => icon.src)])
     check(precached.includes(pathname), `PWA installation asset is not precached: ${pathname}.`);
+  for (const entry of precacheEntries(worker).filter((entry) => entry.url !== "/" && entry.url !== "/manifest.webmanifest" && !entry.url.startsWith("/_next/"))) {
+    check(entry.revision === sha256(await readFile(outputFile(entry.url))), `Static public asset revision must follow its bytes: ${entry.url}.`);
+  }
   check(!precached.some((pathname) => pathname.startsWith("/api/") || pathname.startsWith("/__/")), "Connectivity and private/server responses must never be precached.");
 
   for (const [pathname, [width, height]] of expectedIcons) {
@@ -232,6 +239,8 @@ function selfTest() {
   assertFresh(effectiveHeaders(config, `${probePath}/`), probePath, true);
   assert.throws(() => assertFresh(new Map([["cache-control", "public, max-age=31536000, immutable"]]), "/sw.js", true));
   assert.deepEqual(parsePrecache("precacheEntries:[{'revision':null,'url':'/'},{\"url\":\"/a.js\"}]??[]"), ["/", "/a.js"]);
+  assert.deepEqual(precacheEntries("precacheEntries:[{'revision':'abc','url':'/a.webp'}],"), [{ revision: "abc", url: "/a.webp" }]);
+  assert.throws(() => parsePrecache("precacheEntries:[{url:runCode()}],"));
   assert.throws(() => outputFile("/../secret"));
   assert.throws(() => outputFile("/%2e%2e/secret"));
   assert.throws(() => parseBaseUrl("https://user:password@example.com/"));

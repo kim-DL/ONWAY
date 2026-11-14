@@ -21,6 +21,7 @@ const PUBLIC_ASSET_PATHS = new Set([
   "/ui/customer-ceramic-directory-v1.webp",
   "/ui/customer-ceramic-camera-v1.webp",
   "/ui/customer-ceramic-register-v1.webp",
+  "/ui/school-ceramic-building-v1.webp",
 ]);
 
 export function isAppShellPath(pathname: string) {

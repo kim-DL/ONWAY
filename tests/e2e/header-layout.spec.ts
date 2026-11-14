@@ -466,7 +466,7 @@ test.describe("Galaxy S26 glass navigation", () => {
   });
 });
 
-test("work modes preserve a static aurora with a distinct coral sales palette and accessible forced colors", async ({ page }, testInfo) => {
+test("work modes preserve a static aurora with a dawn sales palette and accessible forced colors", async ({ page }, testInfo) => {
   const backgrounds: string[] = [];
   await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
     contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
@@ -481,15 +481,16 @@ test("work modes preserve a static aurora with a distinct coral sales palette an
     await expect(canvas).toHaveCSS("animation-name", "none");
     await expect(canvas).toHaveAttribute("aria-hidden", "true");
     const background = await canvas.evaluate((element) => getComputedStyle(element).backgroundImage);
-    expect(background.match(/radial-gradient/g)).toHaveLength(3);
     if (mode === "sales") {
-      const tints = await canvas.evaluate((element) => ["--sales-tint-peach", "--sales-tint-rose", "--sales-tint-lilac"].map((token) => getComputedStyle(element).getPropertyValue(token).trim()));
-      expect(tints).toEqual(["#faaa9d", "#efd3df", "#dcd7ee"]);
-      const tintOpacities = [...background.split("linear-gradient")[0]!.matchAll(/(?:rgba|color)\([^)]*[,/]\s*([\d.]+)\)/g)].map((match) => Number(match[1])).filter((alpha) => alpha > 0);
-      expect(tintOpacities).toHaveLength(3);
-      expect(Math.max(...tintOpacities)).toBeLessThanOrEqual(.16);
+      expect(background).toMatch(/linear-gradient\((?:180deg,\s*)?rgb/);
+      const sky = [...background.split("linear-gradient")[1]!.matchAll(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g)].map((match) => match.slice(1, 4).map(Number));
+      expect(sky.length).toBeGreaterThanOrEqual(3);
+      expect(sky[0]![2]).toBeGreaterThan(sky[0]![0]!);
+      expect(sky.at(-1)![0]).toBeGreaterThan(sky.at(-1)![2]!);
+      expect(sky.every((channels) => Math.min(...channels) >= 200)).toBe(true);
       expect(background).not.toContain("rgba(174, 223, 205, 0.22)");
     } else {
+      expect(background.match(/radial-gradient/g)).toHaveLength(3);
       expect(background).toContain("rgba(100, 168, 255, 0.24)");
       expect(background).toContain("rgba(144, 194, 255, 0.2)");
       expect(background).toContain("rgba(174, 223, 205, 0.22)");

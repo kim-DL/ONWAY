@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
@@ -31,14 +33,16 @@ const withSerwist = withSerwistInit({
     { url: "/ui/mode-glass-four-v2.webp", revision: pwaBuildRevision },
     { url: "/ui/delivery-invoice-stack.svg", revision: pwaBuildRevision },
     { url: "/ui/delivery-smart-route.svg", revision: pwaBuildRevision },
-    ...["search", "route", "add", "organize"].map((name) => ({
-      url: `/ui/sales-ceramic-${name}-v1.webp`, revision: pwaBuildRevision,
-    })),
+    { url: "/ui/sales-ceramic-route-v1.webp", revision: pwaBuildRevision },
+    { url: "/ui/school-ceramic-building-v1.webp", revision: pwaBuildRevision },
     ...["search", "directory", "camera", "register"].map((name) => ({
       url: `/ui/customer-ceramic-${name}-v1.webp`, revision: pwaBuildRevision,
     })),
     { url: "/favicon.ico", revision: pwaBuildRevision },
-  ],
+  ].map((entry) => entry.url === "/" || entry.url === "/manifest.webmanifest" ? entry : {
+    url: entry.url,
+    revision: createHash("sha256").update(readFileSync(join(process.cwd(), "public", entry.url))).digest("hex"),
+  }),
   cacheOnNavigation: false,
   disable: process.env.NODE_ENV === "development",
   register: false,

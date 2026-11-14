@@ -2,14 +2,6 @@
 .assignment-card--selectable { user-select: none; }
 .assignment-card--selectable > input {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  margin: -1px;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-}
-.assignment-card--selectable > input {
   z-index: 4;
   top: .36rem;
   right: .36rem;

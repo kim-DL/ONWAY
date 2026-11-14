@@ -101,10 +101,10 @@
 .sales-school-command > span:last-child { min-width: 0; display: grid; gap: .08rem; }
 .sales-school-command strong { font-size: .875rem; letter-spacing: normal; }
 .sales-school-command small { font-size: .875rem; font-weight: 500; }
-[data-sales-icon="search"] { background-image: url("/ui/sales-ceramic-search-v1.webp"); }
+[data-sales-icon="search"] { background-image: url("/ui/customer-ceramic-search-v1.webp"); }
 [data-sales-icon="route"] { background-image: url("/ui/sales-ceramic-route-v1.webp"); }
-[data-sales-icon="add"] { background-image: url("/ui/sales-ceramic-add-v1.webp"); }
-[data-sales-icon="organize"], [data-sales-icon="done"] { background-image: url("/ui/sales-ceramic-organize-v1.webp"); }
+[data-sales-icon="add"] { background-image: url("/ui/customer-ceramic-register-v1.webp"); }
+[data-sales-icon="organize"], [data-sales-icon="done"] { background-image: url("/ui/customer-ceramic-directory-v1.webp"); }
 
 .assignment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
 .assignment-card {

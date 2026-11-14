@@ -40,10 +40,11 @@ for (const context of ["delivery", "sales", "admin"] as const) {
     await expect(primary).toBeFocused();
     await expect(primary).toHaveCSS("outline-style", "solid");
     await expect(primary).toHaveCSS("outline-width", "3px");
-    await expect(primary).toHaveCSS("outline-color", "rgb(27, 100, 218)");
+    const focusColor = context === "sales" ? "rgb(98, 81, 116)" : "rgb(27, 100, 218)";
+    await expect(primary).toHaveCSS("outline-color", focusColor);
     await page.keyboard.press("Tab");
     await expect(chip).toBeFocused();
-    await expect(chip).toHaveCSS("outline-color", "rgb(27, 100, 218)");
+    await expect(chip).toHaveCSS("outline-color", focusColor);
     await expect(chip).toHaveAttribute("aria-pressed", "true");
     for (const control of [primary, chip]) {
       const bounds = await control.boundingBox();

@@ -14,7 +14,10 @@ export function useSchoolPhoto(
   variant: PhotoVariant,
   enabled = true,
 ) {
-  const requestKey = photo ? `${photo.schoolId}:${photo.slotId}:${photo.currentVersionId}:${variant}` : null;
+  const schoolId = photo?.schoolId;
+  const slotId = photo?.slotId;
+  const versionId = photo?.currentVersionId;
+  const requestKey = photo ? `${sessionNamespace}:${schoolId}:${slotId}:${versionId}:${variant}` : null;
   const [state, setState] = useState<
     | { key: string; status: "ready"; url: string }
     | { key: string; status: "error"; url: null }
@@ -22,15 +25,15 @@ export function useSchoolPhoto(
   >(null);
 
   useEffect(() => {
-    if (!enabled || !photo || !requestKey) return;
+    if (!enabled || !schoolId || !slotId || !versionId || !requestKey) return;
     let active = true;
     let objectUrl: string | null = null;
     const startedAt = performance.now();
     void schoolPhotoRepository.getVariant({
       sessionNamespace,
-      schoolId: photo.schoolId,
-      slotId: photo.slotId,
-      versionId: photo.currentVersionId,
+      schoolId,
+      slotId,
+      versionId,
       variant,
     }).then(({ blob, source }) => {
       if (!active) return;
@@ -45,8 +48,9 @@ export function useSchoolPhoto(
     return () => {
       active = false;
       if (objectUrl) forgetPrivateBlobUrl(objectUrl);
+      setState((current) => current?.key === requestKey ? null : current);
     };
-  }, [enabled, photo, requestKey, sessionNamespace, variant]);
+  }, [enabled, schoolId, slotId, versionId, requestKey, sessionNamespace, variant]);
   if (!enabled || !photo || !requestKey) return { status: "idle" as const, url: null };
   if (!state || state.key !== requestKey) return { status: "loading" as const, url: null };
   return state;

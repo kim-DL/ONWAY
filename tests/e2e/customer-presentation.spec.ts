@@ -697,9 +697,9 @@ test("sales detail has a warm layered palette and shared cafeteria location with
       expect(background).toContain("gradient(");
       const colors = [...new Set(background.match(/(?:rgba?|color)\([^)]*\)/g) ?? [])].filter((color) => !/255[, ]+255[, ]+255|srgb 1 1 1(?:[ /)]|$)/.test(color));
       expect(colors.length, `at least two non-white tints at ${width}px: ${background}`).toBeGreaterThanOrEqual(2);
-      const tintOpacities = [...background.split("linear-gradient")[0]!.matchAll(/(?:rgba|color)\([^)]*[,/]\s*([\d.]+)\)/g)].map((match) => Number(match[1])).filter((alpha) => alpha > 0);
-      expect(tintOpacities.length).toBeGreaterThanOrEqual(2);
-      expect(Math.max(...tintOpacities), "quiet radial tints keep attention on the content").toBeLessThanOrEqual(await target.evaluate((element) => element.classList.contains("aurora-background") ? .16 : .1));
+      const tones = [...background.matchAll(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/g)].filter((match) => match[4] !== "0").map((match) => match.slice(1, 4).map(Number));
+      expect(tones.length).toBeGreaterThanOrEqual(2);
+      expect(tones.every((channels) => Math.min(...channels) >= 200), "pale dawn and pearl surfaces keep attention on readable content").toBe(true);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
