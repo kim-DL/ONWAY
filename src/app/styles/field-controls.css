@@ -194,7 +194,7 @@
 .workspace-shell[data-mode="sales"] .sales-activity-score i { background: var(--toss-blue); }
 .workspace-shell[data-mode="sales"] .sales-cycle-progress p,
 .workspace-shell[data-mode="sales"] .sales-activity-score > strong small { color: var(--toss-grey-700); }
-.workspace-shell[data-mode="sales"] .sales-cycle-metrics { gap: .4rem; }
+.workspace-shell[data-mode="sales"] .sales-cycle-metrics { gap: 0; }
 .workspace-shell[data-mode="sales"] .sales-cycle-metrics > div,
 .workspace-shell[data-mode="sales"] .sales-cycle-metrics > div:nth-child(2),
 .workspace-shell[data-mode="sales"] .sales-cycle-metrics > div:nth-child(3) {
@@ -202,12 +202,15 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  border: 1px solid #d8c9bf66;
-  border-radius: 11px;
-  background: var(--toss-grey-50);
+  border: 0;
+  border-right: 1px solid #d8c9bf66;
+  border-radius: 0;
+  background: transparent;
 }
+.workspace-shell[data-mode="sales"] .sales-cycle-metrics > div:last-child { border-right: 0; }
 .workspace-shell[data-mode="sales"] .sales-cycle-metrics span,
-.workspace-shell[data-mode="sales"] .sales-cycle-metrics small { color: var(--toss-grey-700); }
+.workspace-shell[data-mode="sales"] .sales-cycle-metrics small { color: var(--toss-grey-700); font-size: .875rem; line-height: 1.5; }
+.workspace-shell[data-mode="sales"] .sales-cycle-metrics span { font-size: 1rem; }
 .workspace-shell[data-mode="sales"] .sales-cycle-metrics strong { color: var(--toss-ink); }
 
 .workspace-shell[data-mode="sales"] :is(.sales-scope-control, .sales-activity-tabs) {
@@ -230,7 +233,7 @@
   padding-inline: 8px;
   border-radius: 0;
   color: var(--toss-grey-700);
-  font-size: .875rem;
+  font-size: 1rem;
 }
 .workspace-shell[data-mode="sales"] :is(.sales-scope-control, .sales-activity-tabs) button[aria-pressed="true"] {
   color: var(--toss-blue-deep);
@@ -328,14 +331,6 @@
   text-wrap: pretty;
 }
 
-.workspace-shell[data-mode="sales"] .assignment-card {
-  border-color: #d8c9bf77;
-  border-radius: 16px;
-  background: var(--sales-card-surface);
-  box-shadow: 0 5px 18px #655b560d;
-}
-.workspace-shell[data-mode="sales"] .assignment-card:hover { border-color: rgba(49, 130, 246, .22); box-shadow: 0 12px 28px rgba(25, 31, 40, .08); }
-.workspace-shell[data-mode="sales"] .assignment-card--selectable[data-selected="true"] { border-color: var(--toss-blue); background: var(--toss-blue-weak); box-shadow: inset 0 0 0 1px var(--toss-blue); }
 .workspace-shell[data-mode="sales"] .assignment-card--selectable[data-selected="true"] .assignment-card__check { color: #fff; border-color: var(--toss-blue-deep); background: var(--toss-blue-deep); }
 
 /* School detail: one calm card, semantic status only, and one primary CTA. */
@@ -363,10 +358,13 @@
 .workspace-shell[data-mode="sales"] .sales-school-interest,
 .workspace-shell[data-mode="sales"] .sales-school-next,
 .workspace-shell[data-mode="sales"] .sales-school-signals {
-  border-color: rgba(25, 31, 40, .06);
-  border-radius: 13px;
-  background: var(--toss-grey-50);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
+.workspace-shell[data-mode="sales"] .sales-school-next > strong { display: block; overflow: visible; -webkit-line-clamp: unset; font-size: 1rem; line-height: 1.6; overflow-wrap: anywhere; }
+.workspace-shell[data-mode="sales"] .sales-school-signals strong { font-size: 1rem; }
 .workspace-shell[data-mode="sales"] .sales-school-brief .status-badge[data-tone="neutral"],
 .workspace-shell[data-mode="sales"] .sales-school-brief .status-badge[data-tone="info"] { color: var(--toss-grey-700); background: var(--toss-grey-100); }
 .workspace-shell[data-mode="sales"] .sales-school-brief .status-badge[data-tone="success"] { color: #137052; background: #e9f7f1; }
@@ -412,13 +410,14 @@
   padding-bottom: .7rem;
 }
 .workspace-shell[data-mode="sales"] .sales-contact-brief__list {
-  gap: .5rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 }
 .workspace-shell[data-mode="sales"] .sales-contact-brief__list > a,
 .workspace-shell[data-mode="sales"] .sales-contact-brief__list > div {
   min-height: 58px;
-  padding: .58rem .65rem;
-  border-radius: 11px;
+  padding: 12px 0;
+  border-radius: 0;
 }
 .workspace-shell[data-mode="sales"] .sales-history__heading h2 { color: var(--toss-ink); }
 .workspace-shell[data-mode="sales"] .sales-history__heading p,
@@ -439,7 +438,57 @@
   background: #fff;
 }
 .workspace-shell[data-mode="sales"] .sales-contact-brief__list > a,
-.workspace-shell[data-mode="sales"] .sales-contact-brief__list > div { border-color: rgba(25, 31, 40, .06); background: var(--toss-grey-50); }
+.workspace-shell[data-mode="sales"] .sales-contact-brief__list > div { border: 0; border-top: 1px solid rgba(25, 31, 40, .08); background: transparent; }
+.workspace-shell[data-mode="sales"] .sales-contact-brief__list strong { font-size: 1rem; font-weight: 650; }
+.workspace-shell[data-mode="sales"] .sales-contact-brief__list small { overflow: visible; font-size: 1rem; white-space: normal; overflow-wrap: anywhere; }
+.workspace-shell[data-mode="sales"] :is(.sales-next-action, .communication-reference) { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.workspace-shell[data-mode="sales"] :is(.sales-next-action, .communication-reference) > strong { font-size: 1rem; line-height: 1.6; overflow-wrap: anywhere; }
+.visit-timeline-item__content > header, .sales-history__heading { flex-wrap: wrap; }
+.visit-timeline-item__actions > button { min-height: 44px; }
+.visit-timeline-item__actions > small { white-space: normal; }
+
+:is(.sales-visit-form, .communication-editor) :is(label, legend, input, select, textarea),
+.sales-visit-form :is(.visit-binary-choice button, .visit-follow-up strong, .visit-campaign-products > button, .smart-chip),
+.communication-editor .smart-chip,
+.sales-visit-form__submit button { min-width: 0; font-size: 1rem; line-height: 1.5; white-space: normal; }
+.sales-visit-form :is(input, select, textarea) { min-width: 0; }
+.sales-visit-form input[type="date"] { padding-inline: 8px; }
+.sales-visit-form .visit-binary-choice button { flex-wrap: wrap; white-space: normal; }
+.sales-visit-form__submit { min-width: 0; }
+.sales-visit-form__submit p { font-size: .875rem; }
+.sales-claim-composer :is(.assignment-picker__filters label, .assignment-picker__school small, .assignment-picker__meta em) { font-size: .875rem; }
+.sales-claim-composer :is(.assignment-picker__filters select, .assignment-picker__search input, .assignment-picker__school strong, .assignment-picker__selection-bar strong) { font-size: 1rem; }
+.sales-claim-composer :is(.assignment-picker__school strong, .assignment-picker__school small) { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.bottom-sheet__body .sales-claim-composer :is(.assignment-picker__selection-bar p, .assignment-picker__note, .assignment-picker__empty span) { font-size: .875rem; }
+.sales-claim-empty p,
+.sales-visit-form__submit .sheet-action-error,
+.communication-editor__error.sheet-action-error,
+.bottom-sheet:has(.sales-claim-composer) .assignment-picker__submit-error { font-size: .875rem; }
+.bottom-sheet:has(.sales-claim-composer) .bottom-sheet__footer :is(button, .assignment-picker__selected-count) { font-size: .875rem; }
+.workspace-shell[data-mode="sales"] .sales-cycle-metrics :is(span, small) { overflow-wrap: anywhere; }
+.workspace-shell[data-mode="sales"] .status-badge { font-size: .875rem; }
+.workspace-shell[data-mode="sales"] :is(.detail-network-state strong, .detail-network-state small, .workspace-navigation__items button, .field-editor-section-title small, .photo-caption-field, .photo-source-actions small, .school-photo-gallery p, .school-photo-gallery button, .school-photo-gallery .photo-card__image > span, [data-sales-location-brief] button) { font-size: .875rem; }
+.workspace-shell[data-mode="sales"] .field-form-grid label { font-size: 1rem; }
+.school-search-layer[data-role-scope="sales"] { word-break: keep-all; overflow-wrap: anywhere; }
+.school-search-layer[data-role-scope="sales"] :is(.school-search-header p, .school-search-summary small, .school-search-result__name small, .school-search-result__meta, .school-search-result__signals span, .school-search-state p, .school-search-field kbd) { font-size: .875rem; letter-spacing: normal; }
+.school-search-layer[data-role-scope="sales"] .school-search-result__name strong { font-size: 1rem; letter-spacing: normal; }
+.school-search-layer[data-role-scope="sales"] .school-search-result__meta { white-space: normal; }
+.school-search-layer[data-role-scope="sales"] .school-search-result__mark { background: transparent; box-shadow: none; }
+.school-search-layer[data-role-scope="sales"] .school-search-result__mark [data-school-type] { width: 40px; height: 40px; }
+.school-search-layer[data-role-scope="sales"] .school-search-result__mark svg { width: 24px; height: 24px; }
+.school-search-layer[data-role-scope="sales"] .school-search-footer { font-size: .875rem; flex-wrap: wrap; gap: 8px; }
+.school-search-layer[data-role-scope="sales"] .school-search-results { grid-auto-rows: max-content; }
+
+@media (max-width: 760px) {
+  .workspace-shell[data-mode="sales"] .floating-context-bar :is(button, a) { flex-direction: column; gap: 4px; min-height: 64px; min-width: 0; padding: 8px 4px; font-size: .875rem; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+  .workspace-shell[data-mode="sales"] .sales-school-brief__grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .workspace-shell[data-mode="sales"] .sales-school-brief__grid > div { min-height: 0; padding: 12px 0; }
+  .workspace-shell[data-mode="sales"] .sales-school-signals { grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--shell-line); }
+  .workspace-shell[data-mode="sales"] .sales-school-signals > span { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 4px 0; }
+  .workspace-shell[data-mode="sales"] .sales-school-signals strong { margin: 0 0 0 auto; }
+  .sales-visit-form .sales-visit-form__identity, .sales-visit-form .sales-visit-form__delivery-grid, .sales-visit-form .visit-follow-up > div { grid-template-columns: minmax(0, 1fr); }
+  .sales-visit-form .visit-summary-field textarea { padding-bottom: 2rem; }
+}
 
 /* Choice controls use a selected state, not another full-colour button. */
 .workspace-shell[data-mode="sales"] .visit-binary-choice button[data-selected="true"],
@@ -472,19 +521,10 @@
   .workspace-shell[data-mode="sales"] .sales-cycle-hero,
   .workspace-shell[data-mode="sales"] .sales-activity-hero,
   .workspace-shell[data-mode="sales"] .sales-school-brief { border-radius: 16px; }
-  .workspace-shell[data-mode="sales"] .assignment-card { border-radius: 14px; }
   .workspace-shell[data-mode="sales"] .sales-activity-hero .shell-greeting { margin-top: .55rem; }
   .workspace-shell[data-mode="sales"] .sales-activity-hero__cycle { margin-top: .65rem; }
   .workspace-shell[data-mode="sales"] .sales-contact-brief { margin-inline: 0; margin-bottom: 0; }
   .workspace-shell .floating-context-bar { width: calc(100% - 1.25rem); border-radius: 15px; }
-}
-
-@media (max-width: 360px) {
-  .workspace-shell[data-mode="sales"] .floating-context-bar :is(button, a) {
-    gap: .25rem;
-    padding-inline: .25rem;
-    white-space: nowrap;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -590,7 +630,7 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
 .bottom-sheet__body .sales-claim-composer { overflow: visible; }
 .bottom-sheet__body .sales-route-planner { gap: 12px; }
 .bottom-sheet__footer .sales-route-planner__footer { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
-.bottom-sheet__footer .sales-route-planner__footer > span { flex: 1 1 100%; font-size: 13px; }
+.bottom-sheet__footer .sales-route-planner__footer > span { flex: 1 1 100%; font-size: .875rem; }
 .bottom-sheet__footer .sales-route-planner__footer > .glass-button { flex: 1; width: auto; min-width: 0; }
 .bottom-sheet__footer .sales-route-text-action { flex: 0 0 auto; align-self: center; font-size: 14px; }
 .assignment-picker__selected-count { color: #4e5968; font-size: 14px; white-space: nowrap; }
@@ -629,7 +669,7 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
 @media (max-width: 440px) {
   .workspace-shell .sales-cycle-metrics > div { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .workspace-shell .sales-cycle-metrics strong { grid-column: auto; grid-row: auto; margin-top: 4px; }
-  .workspace-shell .sales-cycle-metrics small { font-size: 12px; line-height: 1.4; word-break: keep-all; }
+  .workspace-shell .sales-cycle-metrics small { font-size: .875rem; line-height: 1.5; word-break: keep-all; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bottom-sheet-layer > .bottom-sheet { animation: none; }
@@ -659,21 +699,39 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
   :is(.glass-button, .smart-chip):focus-visible, :is(.workspace-shell, .admin-shell) :is(.glass-button, .smart-chip):focus-visible { outline-color: Highlight; }
 }
 
-/* School lists: compact information rows, with school-level color confined to the mark. */
+.workspace-shell[data-mode="sales"] .sales-school-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #d8c9bf77;
+  border-radius: 16px;
+  background: var(--sales-card-surface);
+}
 .workspace-shell[data-mode="sales"] .school-assignment-card {
   width: 100%;
   min-height: 0;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 14px;
+  gap: 8px;
+  padding: 16px;
+  border: 0;
+  border-bottom: 1px solid #d8c9bf66;
+  border-radius: 0;
+  background: transparent;
   content-visibility: visible;
   contain-intrinsic-size: none;
-  box-shadow: 0 2px 8px rgba(25, 31, 40, .035);
+  box-shadow: none;
+  transform: none;
+  transition: background-color 160ms ease;
 }
+.workspace-shell[data-mode="sales"] .school-assignment-card:last-child { border-bottom: 0; }
+.workspace-shell[data-mode="sales"] .school-assignment-card:hover { background: #ffffff88; box-shadow: none; transform: none; }
+.workspace-shell[data-mode="sales"] .school-assignment-card[data-selected="true"] { background: var(--toss-blue-weak); box-shadow: inset 3px 0 var(--toss-blue); }
+.workspace-shell[data-mode="sales"] [data-school-type] { width: 40px; height: 40px; flex-basis: 40px; background: linear-gradient(145deg, #fffffff2, var(--school-type-surface)); box-shadow: inset 0 1px 1px #fff, 0 1px 2px #302d3a0a; }
+.workspace-shell[data-mode="sales"] [data-school-type] > svg { width: 24px; height: 24px; }
 .school-assignment-heading {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 .school-assignment-heading__body { flex: 1; min-width: 0; }
@@ -681,10 +739,10 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
 .school-activity-row__body > strong {
   display: block;
   color: #191f28;
-  font-size: 1rem;
-  font-weight: 750;
-  line-height: 1.4;
-  letter-spacing: -.025em;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: normal;
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
@@ -693,26 +751,26 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 2px 10px;
+  gap: 4px 12px;
   margin-top: 4px;
   color: #596573;
-  font-size: .875rem;
+  font-size: 1rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .school-assignment-meta__route { color: #1b64da; font-weight: 700; }
-.school-assignment-state { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
-.school-assignment-delivery { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.school-assignment-delivery > span { display: inline-flex; align-items: center; gap: 4px; color: #596573; font-size: .875rem; line-height: 1.5; }
+.school-assignment-state { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding-left: 52px; }
+.school-assignment-delivery { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.school-assignment-delivery > span { display: inline-flex; align-items: center; gap: 4px; color: #596573; font-size: 1rem; line-height: 1.5; }
 .school-assignment-delivery > span[data-state="delivered"] { color: #356554; }
 .school-assignment-delivery svg { flex: none; }
-.school-assignment-note { color: #596573; font-size: .875rem; line-height: 1.5; }
+.school-assignment-note { padding-left: 52px; color: #596573; font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
 .workspace-shell .school-assignment-card .status-badge,
 .workspace-shell .school-activity-row .status-badge {
   min-height: 24px;
   padding: 3px 7px;
   border-radius: 6px;
-  font-size: .875rem;
+  font-size: 1rem;
   line-height: 1.45;
   white-space: nowrap;
 }
@@ -726,15 +784,16 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  min-height: 78px;
-  padding: 8px 14px;
+  gap: 12px;
+  min-height: 88px;
+  padding: 16px;
   color: #191f28;
   border-color: #edf0f3;
+  background: transparent;
 }
 .school-activity-row__body { flex: 1; min-width: 0; }
 .school-activity-row__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
-.school-activity-row__meta > small { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; color: #596573; font-size: .875rem; line-height: 1.5; }
+.school-activity-row__meta > small { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; color: #596573; font-size: 1rem; line-height: 1.5; }
 .school-activity-row > svg { flex: none; }
 .workspace-shell[data-mode="sales"] .school-activity-row:hover { background: #f7f9fc; box-shadow: none; }
 .workspace-shell[data-mode="sales"] :is(.school-assignment-card, .school-activity-row):focus-visible, .workspace-shell[data-mode="sales"] .school-assignment-card:has(input:focus-visible) {

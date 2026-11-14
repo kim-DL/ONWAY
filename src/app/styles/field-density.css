@@ -31,13 +31,6 @@
 .sales-cycle-toolbar { margin-bottom: .7rem; }
 .sales-cycle-toolbar__controls { gap: .4rem; }
 .sales-school-command { min-height: 3.15rem; }
-.assignment-grid { gap: .65rem; }
-.assignment-card {
-  min-height: 15rem;
-  padding: .85rem .9rem .75rem;
-  border-radius: 19px;
-  contain-intrinsic-size: auto 15rem;
-}
 .sales-cycle-empty { min-height: 11rem; padding: 1.25rem; }
 
 .sales-activity-hero {
@@ -110,8 +103,6 @@
   .sales-cycle-toolbar__controls { gap: .35rem; }
   .sales-school-commands { gap: .35rem; }
   .sales-school-command { min-height: 3rem; }
-  .assignment-grid { gap: .55rem; }
-  .assignment-card { min-height: auto; contain-intrinsic-size: auto 13rem; }
 
   .sales-activity-hero {
     min-height: auto;

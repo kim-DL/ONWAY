@@ -26,6 +26,14 @@ test("sales home keeps readable actions and school metadata across widths", asyn
   for (const width of [320, 390, 430, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.locator(".school-assignment-card")).toHaveCount(2);
+    await expect(page.locator(".sales-school-list")).toHaveCSS("grid-template-columns", /^(?!.* ).+$/);
+    for (const row of await page.locator(".school-assignment-card").all()) {
+      await expect(row).toHaveCSS("border-radius", "0px");
+      await expect(row).toHaveCSS("box-shadow", "none");
+      await expect(row.locator("strong").first()).toHaveCSS("font-size", "18px");
+      await expect(row.locator(".school-assignment-meta")).toHaveCSS("font-size", "16px");
+      await expect(row.locator(".status-badge")).toHaveCSS("font-size", "16px");
+    }
     expect(await page.locator(".sales-cycle-metrics > div").evaluateAll(tiles => tiles.every(tile => {
       const center = tile.getBoundingClientRect().x + tile.getBoundingClientRect().width / 2;
       return getComputedStyle(tile).textAlign === "center" && [...tile.children].every(child => {
@@ -125,6 +133,45 @@ test("empty and stale sales states retain context and recovery", async ({ page }
   await expect(page.getByRole("button", { name: /학교 추가/ })).toBeVisible();
 });
 
+test("claim school list keeps readable labels and selected action within the sheet", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await open(page, "empty");
+  await page.getByRole("button", { name: "학교 추가", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "담당 학교 가져오기" });
+  await expect(dialog.locator(".assignment-picker__row")).toHaveCount(3);
+  await expect(dialog.locator(".assignment-picker__school strong").first()).toHaveCSS("font-size", "16px");
+  await expect(dialog.locator(".assignment-picker__selection-bar p")).toHaveCSS("font-size", "14px");
+  await dialog.locator(".assignment-picker__row").last().click();
+  await expect(dialog.locator(".assignment-picker__row").last().getByRole("checkbox")).toBeChecked();
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await expect(dialog.locator(".assignment-picker__school strong").first()).toHaveCSS("font-size", "32px");
+  const submit = dialog.getByRole("button", { name: "1곳 내 담당으로 가져오기", exact: true });
+  await expect(submit).toBeInViewport({ ratio: 1 });
+  expect(await dialog.locator(".bottom-sheet__body").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await submit.focus();
+  await expect(submit).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
+test("sales school search keeps names and metadata readable without truncation", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await open(page);
+  await page.getByRole("button", { name: "학교 찾기", exact: true }).click();
+  const search = page.locator('.school-search-layer[data-role-scope="sales"]');
+  await expect(search.locator(".school-search-result")).toHaveCount(3);
+  expect(new Set(await search.locator("[data-school-type] svg").evaluateAll(items => items.map(item => item.innerHTML))).size).toBe(3);
+  for (const label of ["초등학교", "중학교", "고등학교"]) await expect(search.getByRole("img", { name: label, exact: true })).toBeVisible();
+  await expect(search.locator(".school-search-result__name strong").first()).toHaveCSS("font-size", "16px");
+  await expect(search.locator(".school-search-result__meta").first()).toHaveCSS("font-size", "14px");
+  await expect(search.locator(".school-search-result__meta").first()).toHaveCSS("white-space", "normal");
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  expect(await search.locator(".school-search-result").evaluateAll(items => items.every(item => item.scrollWidth <= item.clientWidth + 1))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(search).toHaveCount(0);
+});
+
 test("activity queues keep next, follow-up and completed work distinct", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await open(page);
@@ -149,7 +196,7 @@ test("activity queues keep next, follow-up and completed work distinct", async (
   await expect(page.locator(".school-activity-row")).toContainText("대전예시교육대학교부설중학교");
   await expect(page.getByRole("heading", { name: "후속 관리 학교" })).toBeVisible();
   await expect(page.locator(".sales-activity-heading > span")).toHaveCSS("white-space", "nowrap");
-  await expect(page.locator(".school-activity-row__meta small")).toHaveCSS("font-size", "14px");
+  await expect(page.locator(".school-activity-row__meta small")).toHaveCSS("font-size", "16px");
   expect((await new AxeBuilder({ page }).include(".sales-activity-page").analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "완료", exact: true }).click();
   await checkUnderline();
@@ -157,7 +204,8 @@ test("activity queues keep next, follow-up and completed work distinct", async (
   await expect(page.locator(".sales-activity-empty")).toBeVisible();
   await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
   await checkUnderline();
-  expect((await tabs.getByRole("button", { name: "후속 관리" }).boundingBox())!.height).toBeLessThanOrEqual(112);
+  await expect(tabs.getByRole("button", { name: "후속 관리" })).toHaveCSS("font-size", "32px");
+  expect(await tabs.getByRole("button").evaluateAll(items => items.every(item => item.scrollWidth <= item.clientWidth + 1))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await page.getByRole("button", { name: "방문 전", exact: true }).focus();
