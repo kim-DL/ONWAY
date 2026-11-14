@@ -52,7 +52,14 @@ Aside에서 실제 합성 미리보기의 학교 범위 전환과 초중고 표�
 
 ## 기록과 운영 반영
 
-세부 후보, 독립 설계 판정, 구현과 코드 검토, 체크리스트, `decisions.tsv`, 명령 로그와 캡처는 ignored `output/sales-readability-20261114/`에 있다. 최종 커밋과 배포 결과는 확인 후 이 절에 기록한다.
+세부 후보, 독립 설계 판정, 구현과 코드 검토, 체크리스트, `decisions.tsv`, 명령 로그와 캡처는 ignored `output/sales-readability-20261114/`에 있다.
+
+- 구현 커밋은 `f7240bb`, main 병합은 `60b69aa96348bcaa1b55d7fa280c73e4231856ca`이다. 원격 main에 반영했다. 문서의 마지막 줄 개행 형식은 후속 배포 기록 커밋에서 정규화했다.
+- 중복 CI를 피하려고 커밋 메시지에 `[skip ci]`를 사용했다. 기존 회귀 검사와 구분해 새 소스의 관련 검증 및 최종 산출물 검사만 진행했다.
+- 고정한 최종 산출물145개의 SHA-256을 `release-artifacts.json`에 기록했다. `node node_modules/firebase-tools/lib/bin/firebase.js deploy --project onnuriway --only hosting:onnuriway --non-interactive`로 배포했다.
+- Hosting 버전은 **`73771763e2a38057`**, 공개 시각은 **2026-11-14 22:23:37 KST**이다. 이전 버전은 `a496fe2b76589e2c`이다.
+- `https://onnuriway.com`과 `https://onnuriway.web.app`의 공개 Hosting 검사를 통과했다. 각각145개 파일이 고정한 로컬 산출물과 SHA-256까지 일치했다.
+- 배포와 공개 확인은 `deploy.log`, `hosting-before.json`, `hosting-after.json`, `public-domain.json`, `public-firebase.json`, `public-artifact-hashes.json`에 기록했다. 배포 계정 정보가 있을 수 있는 원본 서버 메타데이터는 커밋하지 않는다.
 
 사용자는 커밋, main 병합과 운영 배포를 승인했다. 이번 변경은 Hosting 범위이다. 인증 서버와 직원 세션, 운영 PIN과 Google 계정은 변경하지 않는다. 실제 휴대폰과 설치된 운영 PWA에서의 표시, 인증된 운영 저장은 직접 검증하지 않았다.
 
