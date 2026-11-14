@@ -89,4 +89,3 @@ export async function blockedWrite() {
   throw new Error("Production writes are disabled in the photo entry fixture");
 }
 export const customerRepository = { save: blockedWrite, reverseLocation: blockedWrite, searchLocation: blockedWrite };
-
