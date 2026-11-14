@@ -129,9 +129,22 @@ test("activity queues keep next, follow-up and completed work distinct", async (
   await page.setViewportSize({ width: 320, height: 844 });
   await open(page);
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "활동", exact: true }).click();
+  const tabs = page.getByRole("group", { name: "업무 상태" });
+  const checkUnderline = async () => {
+    expect(await tabs.evaluate(element => {
+      const selected = element.querySelector<HTMLElement>('[aria-pressed="true"]')!;
+      const line = getComputedStyle(element, "::after");
+      return Math.abs(parseFloat(line.left) + parseFloat(line.width) / 2 - selected.offsetLeft - selected.offsetWidth / 2);
+    })).toBeLessThanOrEqual(1);
+    await expect(tabs).toHaveCSS("background-color", /rgba\([^)]*, 0\)/);
+    await expect(tabs.locator('[aria-pressed="true"]')).toHaveCSS("background-color", /rgba\([^)]*, 0\)/);
+    await expect(tabs).toHaveCSS("border-top-width", "0px");
+  };
+  await checkUnderline();
   await expect(page.locator(".school-activity-row")).toHaveCount(1);
   await expect(page.locator(".school-activity-row")).toContainText("대전예시초등학교");
   await page.getByRole("button", { name: "후속 관리", exact: true }).click();
+  await checkUnderline();
   await expect(page.locator(".school-activity-row")).toHaveCount(1);
   await expect(page.locator(".school-activity-row")).toContainText("대전예시교육대학교부설중학교");
   await expect(page.getByRole("heading", { name: "후속 관리 학교" })).toBeVisible();
@@ -139,8 +152,34 @@ test("activity queues keep next, follow-up and completed work distinct", async (
   await expect(page.locator(".school-activity-row__meta small")).toHaveCSS("font-size", "14px");
   expect((await new AxeBuilder({ page }).include(".sales-activity-page").analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "완료", exact: true }).click();
+  await checkUnderline();
   await expect(page.locator(".school-activity-row")).toHaveCount(0);
   await expect(page.locator(".sales-activity-empty")).toBeVisible();
   await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await checkUnderline();
+  expect((await tabs.getByRole("button", { name: "후속 관리" }).boundingBox())!.height).toBeLessThanOrEqual(112);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "방문 전", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".school-activity-row")).toHaveCount(1);
+  await checkUnderline();
+});
+
+test("empty activity offers a pearl school action and preserves school navigation", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 1050 });
+  await open(page, "empty");
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "활동", exact: true }).click();
+  const empty = page.locator(".sales-activity-empty");
+  await expect(empty).toBeVisible();
+  const action = page.getByRole("button", { name: "담당 학교 추가", exact: true });
+  expect(await action.locator("img").evaluate(async (img: HTMLImageElement) => { await img.decode(); return img.naturalWidth; })).toBe(192);
+  const bounds = (await action.boundingBox())!;
+  expect(bounds.height).toBeGreaterThanOrEqual(44);
+  expect((await new AxeBuilder({ page }).include(".sales-activity-page").analyze()).violations).toEqual([]);
+  await page.screenshot({ path: `output/sales-activity/empty-${info.project.name}.png`, fullPage: true });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await action.focus(); await page.keyboard.press("Enter");
+  await expect(page.getByRole("group", { name: "학교 범위" })).toBeVisible();
 });
