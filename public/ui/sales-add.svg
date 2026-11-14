@@ -1,17 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
-  <defs>
-    <linearGradient id="ceramic" x1="10" y1="9" x2="34" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".6" stop-color="#edf3fa"/><stop offset="1" stop-color="#abbfd8"/></linearGradient>
-    <linearGradient id="blue" x1="29" y1="25" x2="42" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#79adee"/><stop offset="1" stop-color="#245397"/></linearGradient>
-  </defs>
-  <ellipse cx="24" cy="43" rx="18" ry="3" fill="#1c385b" opacity=".12"/>
-  <path d="M7 17 22 7l15 10v22H7Z" fill="url(#ceramic)" stroke="#96abc6" stroke-linejoin="round"/>
-  <path d="M5 18 22 6l17 12" stroke="#416fa9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m8 17 14-9 13 9" stroke="#d2e4fa" stroke-linecap="round"/>
-  <path d="M12 23h4v4h-4zm16 0h4v4h-4zM12 31h4v4h-4z" fill="#7095c0"/>
-  <path d="M20 39V28h5v11" fill="#557cac"/>
-  <circle cx="22" cy="19" r="3.5" fill="#fafcff" stroke="#9bafc8"/>
-  <path d="M22 17v2h1.5" stroke="#5077a7" stroke-linecap="round"/>
-  <circle cx="35" cy="35" r="10" fill="url(#blue)" stroke="#3a649b"/>
-  <path d="M29 30a8 8 0 0 1 10-1" stroke="#bcdcff" stroke-linecap="round"/>
-  <path d="M35 30v10m-5-5h10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="#35516f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m6 18 15-10 15 10M9 17v22h15M33 17v7M18 39V28h6v11"/>
+  <circle cx="21" cy="19" r="3"/>
+  <path d="M13 25v3M29 25v3M13 33v2M36 30v12M30 36h12"/>
 </svg>

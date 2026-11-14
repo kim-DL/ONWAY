@@ -26,6 +26,13 @@ test("sales home keeps readable actions and school metadata across widths", asyn
   for (const width of [320, 390, 430, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.locator(".school-assignment-card")).toHaveCount(2);
+    expect(await page.locator(".sales-cycle-metrics > div").evaluateAll(tiles => tiles.every(tile => {
+      const center = tile.getBoundingClientRect().x + tile.getBoundingClientRect().width / 2;
+      return getComputedStyle(tile).textAlign === "center" && [...tile.children].every(child => {
+        const bounds = child.getBoundingClientRect();
+        return Math.abs(bounds.x + bounds.width / 2 - center) <= 1;
+      });
+    }))).toBe(true);
     for (const selector of [".sales-school-command strong", ".cycle-selector small", ".school-assignment-meta", ".school-assignment-card .status-badge"]) {
       expect(await page.locator(selector).evaluateAll(elements => elements.every(el => parseFloat(getComputedStyle(el).fontSize) >= 14))).toBe(true);
     }
@@ -45,7 +52,7 @@ test("sales home keeps readable actions and school metadata across widths", asyn
   expect(errors).toEqual([]);
 });
 
-test("ceramic SVGs load and the active route keeps its icon", async ({ page }) => {
+test("action SVGs load and the active route keeps its icon", async ({ page }) => {
   await open(page);
   await page.locator('[data-sales-icon="route"]').evaluate(element => element.parentElement!.setAttribute("data-route-active", "true"));
   const checkIcons = async () => expect(await page.locator("[data-sales-icon]").evaluateAll(async elements => {

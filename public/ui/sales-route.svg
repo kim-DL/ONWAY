@@ -1,15 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
-  <defs>
-    <linearGradient id="ceramic" x1="9" y1="8" x2="35" y2="41" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".55" stop-color="#f1f6fc"/><stop offset="1" stop-color="#b5c5da"/></linearGradient>
-    <linearGradient id="blue" x1="28" y1="4" x2="37" y2="21" gradientUnits="userSpaceOnUse"><stop stop-color="#79adee"/><stop offset="1" stop-color="#245397"/></linearGradient>
-  </defs>
-  <ellipse cx="24" cy="43" rx="18" ry="3" fill="#1c385b" opacity=".12"/>
-  <path d="m5 14 12-5 14 5 12-4v28l-12 5-14-5-12 4Z" fill="url(#ceramic)" stroke="#9bafc8" stroke-linejoin="round"/>
-  <path d="M17 11v25M31 16v25" stroke="#b6c7da"/>
-  <path d="m7 15 10-4 12 4" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-  <path d="M12 31c0-7 14 0 14-8 0-5 7-2 7-8" stroke="#245b9d" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 4"/>
-  <circle cx="12" cy="31" r="3" fill="#e9f4ff" stroke="#396ca8" stroke-width="2"/>
-  <path d="M33 4a7 7 0 0 1 7 7c0 5-7 10-7 10s-7-5-7-10a7 7 0 0 1 7-7Z" fill="url(#blue)" stroke="#365f93"/>
-  <circle cx="33" cy="11" r="2.4" fill="#f5faff"/>
-  <path d="M29 8a5 5 0 0 1 5-2" stroke="#cfe5ff" stroke-width="1.4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="#35516f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="11" cy="36" r="4"/>
+  <path d="M15 36h15a7 7 0 0 0 0-14H18a6 6 0 0 1 0-12h11"/>
+  <path d="M41 11c0 5-6 10-6 10s-6-5-6-10a6 6 0 1 1 12 0Z"/>
+  <circle cx="35" cy="11" r="1" fill="#35516f" stroke="none"/>
 </svg>
