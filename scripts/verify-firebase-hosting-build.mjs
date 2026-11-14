@@ -19,8 +19,8 @@ const expectedIcons = new Map([
 const launchLogo = "/brand/onnuri-food-logo-auth.webp";
 const glassAssets = ["/ui/mode-glass-three-v2.webp", "/ui/mode-glass-four-v2.webp"];
 const ceramicAssets = ["search", "directory", "camera", "register"].map((name) => `/ui/customer-ceramic-${name}-v1.webp`);
-const panelAssets = [...glassAssets, ...ceramicAssets];
-const actionIcons = ["/ui/delivery-invoice-stack.svg", "/ui/delivery-smart-route.svg", ...["search", "route", "add", "organize", "done"].map((name) => `/ui/sales-${name}.svg`)];
+const panelAssets = [...glassAssets, ...ceramicAssets, ...["search", "route", "add", "organize"].map((name) => `/ui/sales-ceramic-${name}-v1.webp`)];
+const actionIcons = ["/ui/delivery-invoice-stack.svg", "/ui/delivery-smart-route.svg"];
 const publicFiles = new Set(["/", "/manifest.webmanifest", "/favicon.ico", launchLogo, ...panelAssets, ...actionIcons, ...expectedIcons.keys()]);
 
 function check(condition, message) {

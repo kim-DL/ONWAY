@@ -97,17 +97,14 @@
   cursor: pointer;
   transition: transform 150ms cubic-bezier(.2,.8,.2,1), box-shadow 150ms ease, border-color 150ms ease;
 }
-.sales-school-command:hover { transform: translateY(-2px); }
-.sales-school-command:active { transform: translateY(2px); }
 .sales-school-command > span:first-child { width: 2.5rem; aspect-ratio: 1; flex: none; background-size: contain; background-repeat: no-repeat; }
 .sales-school-command > span:last-child { min-width: 0; display: grid; gap: .08rem; }
 .sales-school-command strong { font-size: .875rem; letter-spacing: normal; }
 .sales-school-command small { font-size: .875rem; font-weight: 500; }
-[data-sales-icon="search"] { background-image: url("/ui/sales-search.svg"); }
-[data-sales-icon="route"] { background-image: url("/ui/sales-route.svg"); }
-[data-sales-icon="add"] { background-image: url("/ui/sales-add.svg"); }
-[data-sales-icon="organize"] { background-image: url("/ui/sales-organize.svg"); }
-[data-sales-icon="done"] { background-image: url("/ui/sales-done.svg"); }
+[data-sales-icon="search"] { background-image: url("/ui/sales-ceramic-search-v1.webp"); }
+[data-sales-icon="route"] { background-image: url("/ui/sales-ceramic-route-v1.webp"); }
+[data-sales-icon="add"] { background-image: url("/ui/sales-ceramic-add-v1.webp"); }
+[data-sales-icon="organize"], [data-sales-icon="done"] { background-image: url("/ui/sales-ceramic-organize-v1.webp"); }
 
 .assignment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
 .assignment-card {

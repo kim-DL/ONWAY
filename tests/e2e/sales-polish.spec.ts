@@ -40,10 +40,8 @@ test("sales home keeps readable actions and school metadata across widths", asyn
       const bounds = (await button.boundingBox())!;
       expect(bounds.height).toBeGreaterThanOrEqual(44); expect(bounds.width).toBeGreaterThanOrEqual(44);
     }
-    if (width <= 480) {
-      const rows = await page.locator(".sales-school-command").evaluateAll(elements => elements.map(el => el.getBoundingClientRect().top));
-      expect(rows[0]).toBe(rows[1]); expect(rows[2]).toBe(rows[3]); expect(rows[2]).toBeGreaterThan(rows[0]!);
-    }
+    const rows = await page.locator(".sales-school-command").evaluateAll(elements => elements.map(el => el.getBoundingClientRect().top));
+    expect(rows[0]).toBe(rows[1]); expect(rows[2]).toBe(rows[3]); expect(rows[2]).toBeGreaterThan(rows[0]!);
     expect(await page.locator(".sales-school-command, .school-assignment-card").evaluateAll(elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1))).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `output/sales-unslop/home-${width}-${info.project.name}.png`, fullPage: true });
@@ -52,7 +50,7 @@ test("sales home keeps readable actions and school metadata across widths", asyn
   expect(errors).toEqual([]);
 });
 
-test("action SVGs load and the active route keeps its icon", async ({ page }) => {
+test("ceramic action images load and the active route keeps its icon", async ({ page }) => {
   await open(page);
   await page.locator('[data-sales-icon="route"]').evaluate(element => element.parentElement!.setAttribute("data-route-active", "true"));
   const checkIcons = async () => expect(await page.locator("[data-sales-icon]").evaluateAll(async elements => {
@@ -72,6 +70,7 @@ test("scope and past month preserve management restrictions", async ({ page }) =
   await open(page);
   await page.getByRole("button", { name: "전체 보기", exact: true }).click();
   await expect(page.locator(".school-assignment-card")).toHaveCount(3);
+  await expect(page.locator(".sales-school-command")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "내 학교 정리" })).toHaveCount(0);
   await page.getByRole("button", { name: "내 학교", exact: true }).click();
   await page.getByRole("button", { name: "내 학교 정리" }).click();
@@ -85,6 +84,10 @@ test("scope and past month preserve management restrictions", async ({ page }) =
   await expect(page.getByRole("button", { name: "내 학교 정리" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /학교 추가/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /방문 동선/ })).toHaveCount(0);
+  await expect(page.locator(".sales-school-command")).toHaveCount(1);
+  const command = (await page.locator(".sales-school-command").boundingBox())!;
+  const panel = (await page.locator(".sales-school-commands").boundingBox())!;
+  expect(Math.abs(command.width - panel.width)).toBeLessThanOrEqual(2);
   await expect(page.getByText("과거 월 · 읽기 전용", { exact: false })).toBeVisible();
 });
 
