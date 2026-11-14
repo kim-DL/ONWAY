@@ -27,9 +27,9 @@
 .optionToggle:has(input:disabled) { cursor: not-allowed; opacity: .55; }
 .optionToggle input { flex: 0 0 auto; width: 22px; height: 22px; margin: 0; accent-color: #3182f6; }
 .optionToggle > span { min-width: 0; }
-.optionToggle small { display: block; margin-top: 3px; color: #657386; font-size: 11px; font-weight: 550; }
-.resultCount { margin: 0; color: #4e5968; font-size: 13px; }
-.catalogMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; min-height: 26px; }
+.optionToggle small { display: block; margin-top: 4px; color: #58687c; font-size: 14px; font-weight: 500; line-height: 1.5; }
+.resultCount { margin: 0; color: #4e5968; font-size: 14px; line-height: 1.5; }
+.catalogMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 26px; }
 .countToggle { display: grid; position: relative; grid-template-columns: minmax(0, 1fr) minmax(150px, 46%); align-items: center; gap: 12px; min-height: 64px; padding: 8px 10px; border: 1px solid #d8e1e8; border-radius: 8px; background: #f8fafb; cursor: pointer; }
 .countToggleLabel { color: #2b3b4c; font-size: 16px; font-weight: 720; line-height: 1.3; }
 .countToggle > input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -44,10 +44,10 @@
 .list { composes: list from "../../components/ui/field-list.module.css?inventory"; }
 .list .productButton:focus-visible { outline-offset: -3px; }
 .list .productButton { scroll-margin-block-end: calc(var(--inventory-action-inset) + 90px); }
-.productBody { min-width: 0; flex: 1; display: grid; gap: 2px; }
-.cardTitle { font-size: 16px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
-.cardMeta, .cardDetails { color: #58687c; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
-.cardDetails { display: flex; flex-wrap: wrap; gap: 1px 8px; }
+.productBody { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.cardTitle { font-size: 16px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; word-break: keep-all; }
+.cardMeta, .cardDetails { color: #58687c; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; word-break: keep-all; }
+.cardDetails { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .rowUrgent { color: #b83244; font-weight: 700; }
 .rowStatus[data-state="done"] { color: #217750; }
 .rowStatus[data-state="changed"] { color: #97641d; }
@@ -56,7 +56,7 @@
 .countIndicator[data-state="done"] { border-color: #23865d; background: #23865d; }
 .countIndicator[data-state="changed"] { border-color: #a36c26; color: #8a571b; }
 .countIndicator[data-state="none"] { border-color: transparent; }
-.expiryBadge { display: inline-flex; align-items: center; gap: 3px; color: #677486; font-size: 10px; line-height: 1.4; font-weight: 600; }
+.expiryBadge { display: inline-flex; align-items: center; gap: 4px; color: #677486; font-size: 14px; line-height: 1.4; font-weight: 600; }
 .expiryBadge[data-urgent] { color: #b83244; background: #fff0f2; border-radius: 5px; padding: 3px 5px; }
 .cardStock { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 3px; flex: 0 1 auto; max-width: 84px; color: #215fac; }
 .cardStock strong { font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
@@ -75,18 +75,18 @@
 :global(.bottom-sheet__footer) > .detailActions:global(.bottom-sheet__actions) { display: grid; gap: 6px; }
 .detailSecondaryActions, .detailStockActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .detailSecondaryActions > :only-child { grid-column: 1 / -1; }
-.detailActions :global(.glass-button) { min-width: 0; min-height: 44px; padding: 6px 3px; border-radius: 7px; font-size: 12px; font-weight: 700; gap: 5px; box-shadow: none; }
+.detailActions :global(.glass-button) { min-width: 0; min-height: 44px; padding: 8px 4px; border-radius: 8px; font-size: 14px; font-weight: 700; gap: 6px; box-shadow: none; white-space: normal; }
 .detailSecondaryActions :global(.glass-button) { background: #f2f5f8; color: #4c6076; border-color: #d4dfe8; }
 .detailEditAction:global(.glass-button) { background: #e5eff1; color: #365e69; border-color: #c5d9dd; }
 .detailStockActions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.detailStockActions :global(.glass-button) { min-height: 48px; flex-direction: column; gap: 2px; line-height: 1.2; }
+.detailStockActions :global(.glass-button) { min-height: 56px; flex-direction: column; gap: 4px; line-height: 1.4; }
 .detailActionIssue:global(.glass-button) { background: #ffeadc; color: #914522; border-color: #eec8af; }
 .detailActionReceive:global(.glass-button) { background: #deedff; color: #225b9b; border-color: #b8d0ed; }
 .detailActionAdjust:global(.glass-button) { background: #ece4f7; color: #694699; border-color: #d2c3e9; }
 .detailActionCount:global(.glass-button) { background: #d9f1e6; color: #216e50; border-color: #aad7c4; }
 .detailActionCount:global(.glass-button):disabled { opacity: 1; background: #edf1f4; color: #607184; border-color: #d4dfe8; }
 .detailActionLabel { display: grid; gap: 2px; line-height: 1.25; }
-.detailActionLabel small { font-size: 10px; font-weight: 400; }
+.detailActionLabel small { font-size: 14px; font-weight: 400; }
 .detailMoreIcon { font-size: 23px; line-height: .7; letter-spacing: 1px; }
 .field { display: flex; flex-direction: column; gap: 6px; color: #4e5968; font-size: 13px; font-weight: 650; min-width: 0; position: relative; }
 .field :is(input, select, textarea) { box-sizing: border-box; min-width: 0; width: 100%; min-height: 48px; border: 1px solid #d1d6db; border-radius: 10px; padding: 12px; color: #191f28; background: #fff; font: inherit; font-size: 16px; font-weight: 450; }
@@ -99,16 +99,16 @@
 .notice { margin: 0; padding: 14px; border-radius: 10px; background: #f2f4f6; color: #4e5968; line-height: 1.7; font-size: 14px; }
 .note { display: flex; gap: 8px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 10px 12px; border-radius: 8px; background: #f3f5f7; font-size: 13px; line-height: 1.7; color: #4e5968; }
 .note > svg { flex-shrink: 0; margin-top: 3px; }
-.detailSurface :global(.bottom-sheet__header) h2 { font-weight: 700; text-align: center; padding-inline: 32px; font-size: 20px; }
+.detailSurface :global(.bottom-sheet__header) h2 { font-weight: 700; text-align: center; padding-inline: 32px; font-size: 20px; word-break: keep-all; overflow-wrap: anywhere; }
 .detailBody { gap: 9px; }
 .detailBody .note { justify-content: center; text-align: center; background: #eff3f780; padding: 8px 10px; }
 .detailSummary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; align-items: center; }
 .detailPhoto { overflow: hidden; border-radius: 8px; aspect-ratio: 1; background: #f1f4f6; }
 .detailPhoto .photo { height: 100%; min-height: 0; margin: 0; border-radius: 0; }
 .detailPhoto .photo img { width: 100%; height: 100%; max-height: none; object-fit: cover; }
-.detailPhotoEmpty { display: grid; place-content: center; justify-items: center; gap: 8px; height: 100%; color: #7e8b9a; font-size: 12px; }
+.detailPhotoEmpty { display: grid; place-content: center; justify-items: center; gap: 8px; height: 100%; color: #58687c; font-size: 14px; }
 .detailStock { display: grid; justify-items: center; text-align: center; gap: 5px; }
-.detailStock > span { font-size: 12px; color: #657386; }
+.detailStock > span { font-size: 14px; color: #58687c; }
 .detailLocation { display: flex; align-items: center; gap: 4px; color: #657386; font-size: 12px; }
 .detailLocationControl { position: relative; display: inline-flex; align-items: center; }
 .detailLocation select { appearance: none; min-height: 44px; padding: 6px 24px 6px 10px; background: #edf3f7; border: 1px solid #d4e0e9; border-radius: 6px; color: #365773; font: inherit; font-size: 13px; font-weight: 400; cursor: pointer; }
@@ -116,18 +116,18 @@
 .detailStock > strong { color: #215fac; font-size: clamp(30px, 7vw, 44px); line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.04em; overflow-wrap: anywhere; max-width: 100%; }
 .detailStock small { margin-left: 5px; font-size: 14px; color: #617084; }
 .productFacts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; text-align: center; border-block: 1px solid #c6d2dd80; }
-.productFacts > div { padding: 7px 4px; min-width: 0; }
-.productFacts dt { color: #657386; font-size: 11px; margin-bottom: 3px; }
-.productFacts dd { font-size: 14px; font-weight: 400; margin: 0; overflow-wrap: anywhere; }
+.productFacts > div { padding: 8px; min-width: 0; }
+.productFacts dt { color: #58687c; font-size: 14px; margin-bottom: 4px; }
+.productFacts dd { font-size: 14px; font-weight: 500; line-height: 1.5; margin: 0; overflow-wrap: anywhere; word-break: keep-all; }
 .dateStockList { border: 1px solid #d3dde780; border-radius: 6px; overflow: hidden; }
-.dateStockRow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #ffffffad; }
+.dateStockRow { display: flex; align-items: center; gap: 8px; padding: 12px 8px; background: #ffffffad; }
 .dateStockRow + .dateStockRow { border-top: 1px solid #d3dde770; }
 .dateStockRow > div { flex: 1; display: grid; gap: 2px; justify-items: start; min-width: 0; }
 .dateStockRow > div > strong { font-size: 14px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.dateStockRow .muted { font-size: 11px; margin: 0; line-height: 1.4; }
+.dateStockRow .muted { font-size: 14px; margin: 0; line-height: 1.5; }
 .dateStockQuantity { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; color: #285b8f; text-align: right; overflow-wrap: anywhere; max-width: 38%; }
-.dateStockRow small { color: #657386; font-size: 11px; font-weight: 500; }
-.dateStockRow .dateStockEdit { min-width: 52px; padding: 4px 6px; font-size: 11px; background: #e8eef9; color: #3e6198; border-color: #cbd8ec; border-radius: 5px; box-shadow: none; }
+.dateStockRow small { color: #58687c; font-size: 14px; font-weight: 500; }
+.dateStockRow .dateStockEdit { min-width: 52px; padding: 6px 8px; font-size: 14px; background: #e8eef9; color: #3e6198; border-color: #cbd8ec; border-radius: 8px; box-shadow: none; }
 .detailMoreActions { display: grid; gap: 8px; padding-block: 2px 8px; }
 .detailMoreActions :global(.glass-button) { justify-content: flex-start; min-width: 0; min-height: 52px; font-size: 14px; padding: 10px 12px; border-radius: 8px; box-shadow: none; background: #f1f5f8; color: #465d76; border-color: #d5dfe8; }
 .detailMoreActions :global(.glass-button) > span { flex: 1; text-align: left; }

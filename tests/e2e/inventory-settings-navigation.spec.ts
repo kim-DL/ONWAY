@@ -82,6 +82,34 @@ test("settings return preserves inventory filters, search and scroll without a r
   expect(await page.evaluate(() => window.history.state.onnuriwaySheet)).toBeUndefined();
 });
 
+test("expiry filter stays explained after closing options and returning from settings", async ({ page }) => {
+  await open(page);
+  const status = page.getByText("임박·기한 경과만 표시", { exact: true });
+  const options = page.getByRole("dialog", { name: "목록 옵션", exact: true });
+  await page.getByRole("button", { name: "목록 옵션", exact: true }).click();
+  await expect(options.getByText("7일 이내 · 기한 지난 품목 포함", { exact: true })).toBeVisible();
+  await options.getByRole("checkbox", { name: /^임박 상품만 보기/ }).check();
+  await options.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(status).toBeVisible();
+  await expect(page.getByText("0개 품목", { exact: true })).toBeVisible();
+  await settings(page);
+  await page.getByRole("button", { name: "재고로 돌아가기", exact: true }).click();
+  await expect(status).toBeVisible();
+  await page.getByRole("button", { name: "목록 옵션", exact: true }).click();
+  await options.getByRole("checkbox", { name: "비활성 품목 보기", exact: true }).check();
+  await options.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(status).toHaveCount(0);
+  await page.getByRole("button", { name: "목록 옵션", exact: true }).click();
+  await options.getByRole("checkbox", { name: "비활성 품목 보기", exact: true }).uncheck();
+  await options.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(status).toBeVisible();
+  await page.getByRole("button", { name: "목록 옵션", exact: true }).click();
+  await options.getByRole("checkbox", { name: /^임박 상품만 보기/ }).uncheck();
+  await options.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(status).toHaveCount(0);
+  await expect(page.getByText("80개 품목", { exact: true })).toBeVisible();
+});
+
 test("settings survive reload and provide a return route", async ({ page }) => {
   await open(page, "?readonly"); await settings(page); await page.reload();
   await expect(page.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
