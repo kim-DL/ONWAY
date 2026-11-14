@@ -771,7 +771,7 @@
 .workspace-shell[data-mode="sales"] .sales-cycle-hero .cycle-selector strong { color: var(--shell-ink); }
 .workspace-shell[data-mode="sales"] .sales-cycle-hero .cycle-selector small { color: #526079; }
 
-.workspace-shell[data-mode="sales"] .sales-activity-hero > div:first-child > span { color: #6c7083; }
+.workspace-shell[data-mode="sales"] .sales-activity-hero > div:first-child > span { color: var(--shell-ink-soft); }
 .workspace-shell[data-mode="sales"] .sales-activity-hero > div:first-child > p:last-child { color: #59647a; }
 .workspace-shell[data-mode="sales"] .sales-activity-score {
   color: var(--shell-ink);

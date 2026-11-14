@@ -25,22 +25,19 @@
   --shell-shadow: 0 12px 32px rgba(25, 31, 40, .07);
 }
 
-/* Sales atmosphere stays behind the content: a trace of coral, rose and lilac. */
+/* Warm pearl surfaces with peach, rose and lilac light behind the content. */
 .workspace-shell[data-mode="sales"] {
-  --sales-tint-peach: #faaa9d;
-  --sales-tint-rose: #efd3df;
-  --sales-tint-lilac: #dcd7ee;
-  --sales-card-surface:
-    radial-gradient(ellipse 80% 130px at 100% 0%, color-mix(in srgb, var(--sales-tint-peach) 3%, transparent), transparent 76%),
-    radial-gradient(ellipse 65% 110px at 18% -10%, color-mix(in srgb, var(--sales-tint-rose) 2%, transparent), transparent 76%),
-    linear-gradient(150deg, #fffffff7, #fffffff7 64%, #fdfdfef5);
+  --shell-canvas: #f5eee8;
+  --toss-grey-50: #f3ece6;
+  --toss-grey-100: #f3ece6;
+  --sales-card-surface: linear-gradient(145deg, #fffcf8f5, #fffcf8eb 70%, #f5eee8ee);
   --shell-aurora-surface:
-    radial-gradient(ellipse 85% 60% at 100% -8%, color-mix(in srgb, var(--sales-tint-peach) 5%, transparent), transparent 74%),
-    radial-gradient(ellipse 76% 56% at -8% 30%, color-mix(in srgb, var(--sales-tint-rose) 4%, transparent), transparent 76%),
-    radial-gradient(ellipse 82% 62% at 88% 104%, color-mix(in srgb, var(--sales-tint-lilac) 6%, transparent), transparent 74%),
-    linear-gradient(158deg, #fafbfc, #f9fafb 52%, #fafbfc);
-  --aurora-veil-one: color-mix(in srgb, var(--sales-tint-peach) 12%, transparent);
-  --aurora-veil-two: color-mix(in srgb, var(--sales-tint-lilac) 12%, transparent);
+    radial-gradient(ellipse 70% 55% at 100% 24%, #f1e4eb80, transparent 75%),
+    radial-gradient(ellipse 85% 65% at 0 0, #f0e6df, transparent 76%),
+    radial-gradient(ellipse 85% 65% at 100% 100%, #eee7f4, transparent 76%),
+    linear-gradient(155deg, #f5eee8, #f5eee8);
+  --aurora-veil-one: #f0e6df;
+  --aurora-veil-two: #eee7f4;
 }
 
 .workspace-shell .aurora-background {
@@ -130,10 +127,10 @@
 .workspace-shell[data-mode="sales"] .sales-activity-hero {
   --mode-sales-text: var(--toss-blue-deep);
   color: var(--toss-ink);
-  border-color: rgba(25, 31, 40, .08);
+  border-color: #d8c9bf77;
   border-radius: 18px;
   background: var(--sales-card-surface);
-  box-shadow: 0 10px 30px rgba(25, 31, 40, .065);
+  box-shadow: 0 5px 18px #655b560d;
 }
 .workspace-shell[data-mode="sales"] .sales-cycle-hero::before,
 .workspace-shell[data-mode="sales"] .sales-activity-hero::before { display: none; }
@@ -179,10 +176,10 @@
 .workspace-shell[data-mode="sales"] .sales-cycle-overview,
 .workspace-shell[data-mode="sales"] .sales-activity-score,
 .workspace-shell[data-mode="sales"] .sales-task-list {
-  border-color: rgba(25, 31, 40, .08);
+  border-color: #d8c9bf77;
   border-radius: 16px;
   background: var(--sales-card-surface);
-  box-shadow: 0 8px 24px rgba(25, 31, 40, .055);
+  box-shadow: 0 3px 12px #655b5609;
 }
 .workspace-shell[data-mode="sales"] .sales-cycle-progress > span,
 .workspace-shell[data-mode="sales"] .sales-activity-score > span { color: var(--toss-blue-deep); font-size: .875rem; }
@@ -200,7 +197,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  border: 1px solid rgba(25, 31, 40, .06);
+  border: 1px solid #d8c9bf66;
   border-radius: 11px;
   background: var(--toss-grey-50);
 }
@@ -235,10 +232,10 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border: 1px solid #c1c5ca;
+  border: 1px solid #d8c9bf;
   border-radius: 10px;
-  background: linear-gradient(135deg, #fafafa, #f0f1f2 55%, #e7e9eb);
-  box-shadow: 0 1px 0 #c3c7cc, 0 3px 4px #33383e18, 0 7px 14px #33383e0b;
+  background: linear-gradient(145deg, #fffcf8, #f5eee8 50%, #f2e8ee);
+  box-shadow: 0 1px 0 #d8c9bf, 0 4px 10px #655b5612;
 }
 .workspace-shell[data-mode="sales"] .sales-school-command,
 .workspace-shell[data-mode="sales"] .sales-school-command--primary {
@@ -254,12 +251,12 @@
   color: #223d63;
   text-align: center;
   background: linear-gradient(160deg, #ffffff8c, #ffffff05 48%, #73798009);
-  box-shadow: inset 1px 0 1px #ffffffb3, inset -1px -1px 0 #a6acb330, inset 0 -3px 5px #7f858c0a;
+  box-shadow: inset 1px 0 1px #ffffffb3, inset -1px -1px 0 #d8c9bf44;
 }
 .workspace-shell[data-mode="sales"] .sales-school-command::after { display: none; }
-.workspace-shell[data-mode="sales"] .sales-school-command:nth-child(odd) { border-right: 1px solid #9298a266; }
+.workspace-shell[data-mode="sales"] .sales-school-command:nth-child(odd) { border-right: 1px solid #d8c9bf; }
 .workspace-shell[data-mode="sales"] .sales-school-command:nth-child(even) { border-left: 1px solid #fff; }
-.workspace-shell[data-mode="sales"] .sales-school-command:nth-child(n+3) { border-top: 1px solid #858b9452; }
+.workspace-shell[data-mode="sales"] .sales-school-command:nth-child(n+3) { border-top: 1px solid #d8c9bf; }
 .workspace-shell[data-mode="sales"] .sales-school-command:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: 0; }
 .workspace-shell[data-mode="sales"] .sales-school-command > span:first-child { width: 48px; }
 .workspace-shell[data-mode="sales"] .sales-school-command small,
@@ -267,7 +264,7 @@
 .workspace-shell[data-mode="sales"] .sales-school-command:active,
 .workspace-shell[data-mode="sales"] .sales-school-command[data-active="true"] {
   color: var(--toss-blue-deep);
-  background: #e3e5e8;
+  background: var(--toss-grey-50);
   box-shadow: inset 0 3px 6px #434a532b;
 }
 .workspace-shell[data-mode="sales"] .sales-school-command:focus-visible { outline: 3px solid var(--toss-blue-deep); outline-offset: -3px; }
@@ -275,10 +272,10 @@
 .sales-activity-heading > span { flex: none; white-space: nowrap; }
 
 .workspace-shell[data-mode="sales"] .assignment-card {
-  border-color: rgba(25, 31, 40, .08);
+  border-color: #d8c9bf77;
   border-radius: 16px;
   background: var(--sales-card-surface);
-  box-shadow: 0 8px 24px rgba(25, 31, 40, .055);
+  box-shadow: 0 5px 18px #655b560d;
 }
 .workspace-shell[data-mode="sales"] .assignment-card:hover { border-color: rgba(49, 130, 246, .22); box-shadow: 0 12px 28px rgba(25, 31, 40, .08); }
 .workspace-shell[data-mode="sales"] .assignment-card--selectable[data-selected="true"] { border-color: var(--toss-blue); background: #f7fbff; box-shadow: inset 0 0 0 1px var(--toss-blue); }
@@ -287,13 +284,13 @@
 /* School detail: one calm card, semantic status only, and one primary CTA. */
 .workspace-shell[data-mode="sales"] .sales-school-brief {
   color: var(--toss-ink);
-  border-color: rgba(25, 31, 40, .08);
+  border-color: #d8c9bf77;
   border-radius: 18px;
   background: var(--sales-card-surface);
-  box-shadow: 0 10px 30px rgba(25, 31, 40, .065);
+  box-shadow: 0 5px 18px #655b560d;
 }
 .workspace-shell[data-mode="sales"] .sales-school-brief::after { display: none; }
-.workspace-shell[data-mode="sales"] .sales-school-brief__heading p { color: var(--toss-grey-500); }
+.workspace-shell[data-mode="sales"] .sales-school-brief__heading p { color: var(--toss-grey-700); }
 .workspace-shell[data-mode="sales"] .sales-school-brief__heading h2,
 .workspace-shell[data-mode="sales"] .sales-school-next > strong,
 .workspace-shell[data-mode="sales"] .sales-school-signals strong { color: var(--toss-ink); }
