@@ -36,7 +36,15 @@ Model the Domain에 따라 학교와 현장정보의 기존 입력과 구획을 
 
 앱 빌드는2회였다. 첫 용량 실패를 해결한 뒤 산출물이 달라져 최종 산출물 검사를 다시 진행했다. 이미 통과한 전체 회귀와 전체 원격 CI는 반복하지 않았다. CSS 변경과 직접 관련된 사진 검사만 추가 확인했다. 인증·데이터 처리 코드를 바꾸지 않아 별도 백엔드·에뮬레이터 검사는 실행하지 않았다.
 
-배포 식별자는 공개 확인 후 아래에 기록한다.
+구현 커밋은 `cb30343`, main 병합은 `3dc6d04fa3b9dd98fdd48aafb8f6bb55aa4196dd`이다. main을 원격에 동기화한 뒤 다음 명령으로 Hosting만 운영 배포했다. 사용자 요청에 따라 커밋의 `[skip ci]`로 전체 원격 CI 반복을 생략했다.
+
+```text
+node node_modules/firebase-tools/lib/bin/firebase.js deploy --project onnuriway --only hosting:onnuriway --non-interactive
+```
+
+운영 Hosting은 `457477f2acda01ef`, 공개 시각은 2026-11-14 23:12:10 KST이다. 이전 Hosting은 `73771763e2a38057`이다. 인증 서버와 계정·세션은 변경하지 않았다.
+
+[회사 도메인](https://onnuriway.com)과 [Firebase 도메인](https://onnuriway.web.app)에서 공개 Hosting 검사가 통과했다. 배포 전에 고정한 main 소스와 산출물 목록을 기준으로 두 주소 각각 정적 파일145개의 SHA-256이 전부 일치했다. 배포 로그는 `deploy.log`, 공개 검사 결과는 `public-domain.json`·`public-firebase.json`, 고정 목록과 해시 대조 결과는 `release-artifacts.json`·`public-artifact-hashes.json`에 남겼다. 마지막 기록 정리는 문서 전용 변경이며 앱을 다시 빌드하거나 재배포하지 않는다.
 
 합성 화면과 로그, 두 감사, 독립 검토, 체크리스트와 `decisions.tsv`는 ignored `output/school-readability-20261114/`에 남긴다. 실제 운영 데이터는 시험용으로 생성하거나 수정하지 않는다. 실물폰, 설치된 PWA와 인증된 실제 운영 저장은 별도 증거가 없으면 검증했다고 표현하지 않는다.
 
