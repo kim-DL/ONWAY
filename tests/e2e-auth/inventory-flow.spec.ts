@@ -436,7 +436,7 @@ test("360px list options keep readable row toggles and a persistent count-mode s
 
   let sheet = await openListOptions(page);
   let inactive = sheet.getByRole("checkbox", { name: "비활성 품목 보기", exact: true });
-  let urgent = sheet.getByRole("checkbox", { name: "임박 상품만 보기 D-100일", exact: true });
+  let urgent = sheet.getByRole("checkbox", { name: "임박 상품만 보기 100일 이내 · 기한 지난 품목 포함", exact: true });
   let countMode = sheet.getByRole("switch", { name: "재고조사 모드", exact: true });
   const geometry = await sheet.evaluate((dialog) => {
     const inputs = [...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
@@ -474,7 +474,7 @@ test("360px list options keep readable row toggles and a persistent count-mode s
 
   sheet = await openListOptions(page);
   inactive = sheet.getByRole("checkbox", { name: "비활성 품목 보기", exact: true });
-  urgent = sheet.getByRole("checkbox", { name: "임박 상품만 보기 D-100일", exact: true });
+  urgent = sheet.getByRole("checkbox", { name: "임박 상품만 보기 100일 이내 · 기한 지난 품목 포함", exact: true });
   countMode = sheet.getByRole("switch", { name: "재고조사 모드", exact: true });
   await expect(inactive).not.toBeChecked();
   await expect(urgent).toBeChecked();
@@ -856,9 +856,10 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await detail.getByRole("button", { name: "닫기", exact: true }).click();
   listOptions = await openListOptions(page);
   const urgentToggle = listOptions.getByRole("checkbox", { name: /임박 상품만/ });
-  await expect(urgentToggle).toHaveAccessibleName("임박 상품만 보기 D-100일");
+  await expect(urgentToggle).toHaveAccessibleName("임박 상품만 보기 100일 이내 · 기한 지난 품목 포함");
   await urgentToggle.check();
   await closeListOptions(listOptions);
+  await expect(page.getByText("임박·기한 경과만 표시", { exact: true })).toBeVisible();
   const registeredCard = page.getByRole("button", { name: new RegExp(`${productName}, .*상세 보기`) });
   await expect(registeredCard).toBeVisible();
   await expect(registeredCard.getByText(/유통기한별 수량/)).toHaveCount(0);
