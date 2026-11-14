@@ -47,6 +47,10 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
     setZoomed(false);
     setIndex((current) => Math.max(0, Math.min(photos.length - 1, current + direction)));
   }, [photos.length]);
+  useEffect(() => {
+    // Prepare controls alongside the evidence request to avoid a second loading waterfall.
+    void import("@/components/ui/photo-pan-zoom").catch(() => undefined);
+  }, []);
   useEffect(() => () => {
     // Image changes dispose their controls; restore the trigger only when the
     // complete viewer closes, rather than during previous/next navigation.
@@ -55,14 +59,7 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
 
   if (!photo) return null;
 
-  return createPortal(<div onKeyDown={(event) => {
-    event.stopPropagation();
-    if (event.defaultPrevented) return;
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      navigate(event.key === "ArrowLeft" ? -1 : 1);
-    }
-  }}><BottomSheet open title={`${customerName} 납품사진 보기`} onClose={requestClose} beforeClose={beforeClose}>
+  return createPortal(<div className={styles.viewer} onKeyDown={(event) => event.stopPropagation()}><BottomSheet open title={`${customerName} 납품사진 보기`} onClose={requestClose} beforeClose={beforeClose}>
     <div ref={stageRef} className={`${morphStyles.stage} ${styles.stage}`} data-photo-morph-stage data-photo-morph-state="open"
       role="region" aria-label={`${customerName} 납품사진 크게 보기`} tabIndex={0} data-zoomed={zoomed}>
       {image.status === "ready" ? <img src={image.url} alt={`${customerName} 납품사진, 등록자 ${photo.createdByName}`} decoding="async" draggable={false} onError={image.fail} />
@@ -76,7 +73,6 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
       <button type="button" disabled={index === 0} onClick={() => navigate(-1)}><Icon name="arrow-left" />이전</button>
       <button type="button" disabled={index === photos.length - 1} onClick={() => navigate(1)}>다음<Icon name="chevron-right" /></button>
       <DeliveryPhotoDeleteAction key={photo.photoId} photo={photo} session={session} onDeleted={onDeleted} />
-      <button type="button" onClick={requestClose}><Icon name="close" />닫기</button>
     </BottomSheetActions>
   </BottomSheet></div>, document.body);
 }

@@ -10,7 +10,7 @@ export function PhotoPanZoom({ stageRef, origin, onZoomedChange, onSwipe }: {
   onSwipe?: (direction: -1 | 1) => void;
 }) {
   const api = useRef<ReturnType<typeof attachPhotoGestures> | null>(null);
-  const [status, setStatus] = useState({ percent: 100, max: 2.5, ready: false, zoomed: false, atMax: false });
+  const [status, setStatus] = useState<{ percent: number; zoomed: boolean; atMax: boolean } | null>(null);
   const hint = useId();
   useEffect(() => {
     const stage = stageRef.current;
@@ -18,11 +18,11 @@ export function PhotoPanZoom({ stageRef, origin, onZoomedChange, onSwipe }: {
     const description = stage.getAttribute("aria-describedby");
     stage.classList.add(styles.viewport!); stage.setAttribute("aria-describedby", hint);
     let zoomed = false;
-    api.current = attachPhotoGestures(stage, (view, max, nextZoomed) => {
+    api.current = attachPhotoGestures(stage, (view, geometry, nextZoomed) => {
       if (zoomed !== nextZoomed) { zoomed = nextZoomed; onZoomedChange(zoomed); }
-      const percent = Math.round(view.scale * 100);
-      const atMax = view.scale >= max - .0001;
-      setStatus((previous) => previous.ready && previous.percent === percent && previous.max === max && previous.zoomed === nextZoomed && previous.atMax === atMax ? previous : { percent, max, ready: true, zoomed: nextZoomed, atMax });
+      const percent = Math.round(view.scale / geometry.nativeScale * 100);
+      const atMax = view.scale >= geometry.max - .0001;
+      setStatus((previous) => previous?.percent === percent && previous.zoomed === nextZoomed && previous.atMax === atMax ? previous : { percent, zoomed: nextZoomed, atMax });
     }, onSwipe);
     return () => {
       api.current?.dispose(); api.current = null; stage.classList.remove(styles.viewport!);
@@ -36,12 +36,12 @@ export function PhotoPanZoom({ stageRef, origin, onZoomedChange, onSwipe }: {
     };
   }, [stageRef, origin, onZoomedChange, hint, onSwipe]);
   return <>
-    <p className={styles.help} id={hint}><output aria-label="사진 배율" aria-live="off">{status.percent}%</output><span>휠 또는 두 손가락으로 확대 · 끌어서 이동 · 두 번 눌러 확대/복원</span></p>
+    <p className={styles.help} id={hint}><output aria-label="사진 배율" aria-live="off">{status ? `${status.percent}%` : "준비 중"}</output><span>저장된 사진 기준 · 휠·두 손가락 확대 · 끌어서 이동 · 두 번 눌러 확대/복원</span></p>
     <BottomSheetActions className={styles.actions ?? ""}>
-      <GlassButton aria-label="사진 축소" disabled={!status.ready || !status.zoomed} onClick={() => api.current?.zoomOut()}>−</GlassButton>
-      <GlassButton aria-label="사진 확대" disabled={!status.ready || status.atMax} onClick={() => api.current?.zoomIn()}>＋</GlassButton>
-      <GlassButton aria-label="사진 1.8배 빠른 확대" disabled={!status.ready} onClick={() => api.current?.quick()}>1.8배</GlassButton>
-      <GlassButton disabled={!status.ready || !status.zoomed} onClick={() => api.current?.reset()}>화면 맞춤</GlassButton>
+      <GlassButton aria-label="사진 축소" disabled={!status?.zoomed} onClick={() => api.current?.zoomOut()}>−</GlassButton>
+      <GlassButton aria-label="사진 확대" disabled={!status || status.atMax} onClick={() => api.current?.zoomIn()}>＋</GlassButton>
+      <GlassButton disabled={!status} onClick={() => api.current?.nativeSize()}>원본 크기</GlassButton>
+      <GlassButton disabled={!status?.zoomed} onClick={() => api.current?.reset()}>화면 맞춤</GlassButton>
     </BottomSheetActions>
   </>;
 }

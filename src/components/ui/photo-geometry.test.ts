@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { containPhoto, fittedPhoto, photoGeometry, zoomPhoto } from "./photo-geometry";
+import { containPhoto, fittedPhoto, photoGeometry, reframePhoto, zoomPhoto } from "./photo-geometry";
 
-describe("inventory photograph viewport geometry", () => {
+describe("photograph inspection geometry", () => {
   it("fits landscape and portrait without cropping or stretching", () => {
     expect(photoGeometry(400, 300, 1600, 800)).toMatchObject({ imageWidth: 400, imageHeight: 200 });
     expect(photoGeometry(400, 300, 800, 1600)).toMatchObject({ imageWidth: 150, imageHeight: 300 });
   });
-  it("reserves 3x for enough native pixels at the current device pixel ratio", () => {
-    expect(photoGeometry(400, 300, 1600, 1200, 1)?.max).toBe(3);
-    expect(photoGeometry(400, 300, 1600, 1200, 2)?.max).toBe(2.5);
-    expect(photoGeometry(400, 300, 320, 240, 1)?.max).toBe(2.5);
+  it("reaches stored pixels and at least eight times fit without a device pixel ratio ceiling", () => {
+    expect(photoGeometry(400, 300, 1600, 1200)).toMatchObject({ nativeScale: 4, max: 32 });
+    const mobile = photoGeometry(378, 503, 2560, 1920)!;
+    expect(mobile.nativeScale).toBeCloseTo(2560 / 378);
+    expect(mobile.max).toBeCloseTo(8 * mobile.nativeScale);
+    expect(mobile.imageWidth * mobile.nativeScale).toBeCloseTo(2560);
+    expect(mobile.imageHeight * mobile.nativeScale).toBeCloseTo(1920);
+  });
+  it("centres a small stored photo without upscaling its fitted view", () => {
+    expect(photoGeometry(400, 300, 320, 240)).toMatchObject({ imageWidth: 320, imageHeight: 240, nativeScale: 1, max: 8 });
+  });
+  it("allows 800 percent stored-pixel magnification for mobile label inspection", () => {
+    const geometry = photoGeometry(378, 565, 2400, 1800)!;
+    expect(geometry.max / geometry.nativeScale).toBeGreaterThanOrEqual(8);
   });
   it.each([0, -1, Infinity, NaN])("waits for valid image and viewport dimensions (%s)", (value) => {
     expect(photoGeometry(value, 300, 1600, 1200)).toBeNull();
@@ -30,14 +40,14 @@ describe("inventory photograph viewport geometry", () => {
   it("reaches a centred fit after extreme panning and zooming out", () => {
     const geometry = photoGeometry(400, 300, 1600, 1200)!;
     const edge = containPhoto({ scale: 300, x: -1e6, y: 1e6 }, geometry);
-    expect(edge).toEqual({ scale: 3, x: -400, y: 300 });
+    expect(edge).toEqual({ scale: 32, x: -6200, y: 4650 });
     expect(zoomPhoto(edge, .01, { x: 120, y: -90 }, geometry)).toEqual(fittedPhoto);
   });
   it("never leaves an empty edge on an overflowing axis across shapes and fractional scales", () => {
     for (const [width, height] of [[1600, 1200], [1200, 1600], [4000, 300], [300, 4000]]) {
       const geometry = photoGeometry(328, 416, width!, height!)!;
       for (let step = 0; step < 100; step++) {
-        const view = containPhoto({ scale: 1 + step / 37, x: Math.sin(step) * 10000, y: Math.cos(step) * 10000 }, geometry);
+        const view = containPhoto({ scale: 1 + step / 4, x: Math.sin(step) * 10000, y: Math.cos(step) * 10000 }, geometry);
         expect(view.scale).toBeGreaterThanOrEqual(1); expect(view.scale).toBeLessThanOrEqual(geometry.max);
         for (const [size, viewport, offset] of [[geometry.imageWidth, geometry.width, view.x], [geometry.imageHeight, geometry.height, view.y]]) {
           const rendered = size! * view.scale;
@@ -46,5 +56,20 @@ describe("inventory photograph viewport geometry", () => {
         }
       }
     }
+  });
+  it("keeps the inspected source centre and rendered size when the viewport changes", () => {
+    const previous = photoGeometry(400, 300, 1600, 1200)!;
+    const next = photoGeometry(800, 600, 1600, 1200)!;
+    const view = { scale: 4, x: -100, y: 75 };
+    const reframed = reframePhoto(view, previous, next);
+    expect(reframed).toEqual({ scale: 2, x: -100, y: 75 });
+    expect(next.imageWidth * reframed.scale).toBe(previous.imageWidth * view.scale);
+    expect(reframed.x / (next.imageWidth * reframed.scale)).toBe(view.x / (previous.imageWidth * view.scale));
+    expect(reframePhoto(fittedPhoto, previous, next)).toEqual(fittedPhoto);
+  });
+  it("prioritizes fit and bounds when a larger viewport exposes the whole inspected image", () => {
+    const previous = photoGeometry(400, 300, 1600, 1200)!;
+    const next = photoGeometry(1800, 1400, 1600, 1200)!;
+    expect(reframePhoto({ scale: 3, x: 100, y: -75 }, previous, next)).toEqual(fittedPhoto);
   });
 });

@@ -1,11 +1,11 @@
 export type PhotoView = { scale: number; x: number; y: number };
-export type PhotoGeometry = { width: number; height: number; imageWidth: number; imageHeight: number; max: number };
+export type PhotoGeometry = { width: number; height: number; imageWidth: number; imageHeight: number; nativeScale: number; max: number };
 export const fittedPhoto: PhotoView = { scale: 1, x: 0, y: 0 };
-export function photoGeometry(width: number, height: number, naturalWidth: number, naturalHeight: number, pixelRatio = 1): PhotoGeometry | null {
-  if (![width, height, naturalWidth, naturalHeight, pixelRatio].every((n) => Number.isFinite(n) && n > 0)) return null;
-  const fit = Math.min(width / naturalWidth, height / naturalHeight);
+export function photoGeometry(width: number, height: number, naturalWidth: number, naturalHeight: number): PhotoGeometry | null {
+  if (![width, height, naturalWidth, naturalHeight].every((n) => Number.isFinite(n) && n > 0)) return null;
+  const fit = Math.min(1, width / naturalWidth, height / naturalHeight), nativeScale = 1 / fit;
   return { width, height, imageWidth: naturalWidth * fit, imageHeight: naturalHeight * fit,
-    max: 1 / (fit * pixelRatio) >= 3 ? 3 : 2.5 };
+    nativeScale, max: 8 * nativeScale };
 }
 export function containPhoto(view: PhotoView, geometry: PhotoGeometry): PhotoView {
   const scale = Math.max(1, Math.min(geometry.max, view.scale));
@@ -18,4 +18,8 @@ export function zoomPhoto(view: PhotoView, scale: number, point: { x: number; y:
   const next = Math.max(1, Math.min(geometry.max, scale));
   return containPhoto({ scale: next, x: point.x - (point.x - view.x) * next / view.scale,
     y: point.y - (point.y - view.y) * next / view.scale }, geometry);
+}
+export function reframePhoto(view: PhotoView, previous: PhotoGeometry, next: PhotoGeometry): PhotoView {
+  return containPhoto(view.scale <= 1.001 ? fittedPhoto
+    : { ...view, scale: view.scale * previous.imageWidth / next.imageWidth }, next);
 }

@@ -47,14 +47,12 @@ describe("delivery photo recent history and viewer", () => {
     expect(thumbnail).not.toContain("evidence");
   });
 
-  it("retains keyboard, Back/Escape foundation, position announcements and explicit controls", () => {
+  it("retains the shared sheet, position announcements and explicit photo controls", () => {
     const viewer = readFileSync(fileURLToPath(new URL("./delivery-photo-viewer.tsx", import.meta.url)), "utf8");
     expect(readFileSync(fileURLToPath(new URL("./delivery-photo-history-dates.tsx", import.meta.url)), "utf8")).toContain("최근 기록");
-    expect(viewer).toContain('event.key === "ArrowLeft"');
-    expect(viewer).toContain('event.key === "ArrowRight"');
     expect(viewer).toContain('aria-live="polite"');
     expect(viewer).toContain("<BottomSheet");
-    expect(viewer).toContain("이전"); expect(viewer).toContain("다음"); expect(viewer).toContain("닫기");
+    expect(viewer).toContain("이전"); expect(viewer).toContain("다음");
   });
 
   it("shows delete only for a same-Seoul-day owner or a verified admin before expiry", () => {
