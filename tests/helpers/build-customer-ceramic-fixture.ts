@@ -21,7 +21,7 @@ export async function buildCustomerCeramicFixture(photosEnabled = true, photoEnt
     "customer-map": `export function CustomerMap(){return <div role="status" style={{padding:24,background:'#eef2f5'}}>로컬 미리보기 · 지도 연결 없음</div>} export default CustomerMap;`,
     "delivery-photo-repository": `import {blockedWrite} from ${data};export const deliveryPhotoRepository=new Proxy({},{get:()=>blockedWrite});export const deliveryPhotoErrorKind=()=> 'unknown';`,
     "delivery-photo-history-repository": `export {deliveryPhotoHistoryRepository,deliveryPhotoHistoryErrorMessage} from ${data};import {blockedWrite} from ${data};export const verifyDeliveryPhotoSession=blockedWrite;export const verifySameDeliveryPhotoSession=blockedWrite;export const invalidDeliveryPhotoResponse=()=>Error('Synthetic photo response rejected');`,
-    "firebase-client": `export function getFirebaseClientServices(){throw Error('Network services are disabled in the local preview')} export function getFirebaseAuthIfInitialized(){return null}`,
+    "firebase-client": `export function getFirebaseClientServices(){throw Error('Network services are disabled in the local preview')} export function getFirebaseAuthIfInitialized(){return null} export async function ensureFirebaseAppCheckReady(){throw Error('Network services are disabled in the local preview')}`,
   };
   const schoolData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/school-polish-data.ts", import.meta.url)));
   const salesData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/sales-polish-data.ts", import.meta.url)));

@@ -47,7 +47,7 @@ function VisitTimelineItem({
         <header>
           <div>
             <time dateTime={visit.visitedAt.toISOString()}>{DATE_FORMATTER.format(visit.visitedAt)}</time>
-            <span>{visit.cycleId.replace("-", "년 ")}월</span>
+            <span>{visit.cycleId.replace("-", "년 ")}월 배정</span>
           </div>
           <div className="visit-timeline-item__actions">
             <small>{teamReadOnly ? "팀 기록 · 읽기 전용" : editable ? "최신 기록" : "원본 기록"}</small>
@@ -141,7 +141,7 @@ export function SalesHistoryTimeline({
   return (
     <section className="sales-history" aria-labelledby="sales-history-title">
       <div className="sales-history__heading">
-        <div><h2 id="sales-history-title">이전 대화가, 다음 방문의 맥락이 됩니다.</h2></div>
+        <div><h2 id="sales-history-title">방문 기록</h2></div>
         <span><Icon name="clock" size={16} />최근 기록부터</span>
       </div>
       {history.status === "loading" ? <div className="sales-history__loading"><LoadingStatus label="방문 기록 불러오는 중" detail="학교의 이전 방문 기록을 확인하고 있습니다." /><LoadingSkeleton kind="row" /><LoadingSkeleton kind="row" /></div> : null}

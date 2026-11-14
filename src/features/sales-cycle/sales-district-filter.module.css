@@ -42,7 +42,7 @@
   border-radius: 0;
   color: #605869;
   background: transparent;
-  font-size: .8125rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1.35;
   white-space: nowrap;
@@ -53,7 +53,7 @@
 .count {
   min-width: 1.4em;
   color: #605869;
-  font-size: .75rem;
+  font-size: .875rem;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }

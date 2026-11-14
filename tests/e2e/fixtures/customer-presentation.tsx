@@ -113,7 +113,7 @@ const syntheticProfile: SchoolFieldProfile = {
 };
 declare global {
   interface Window {
-    schoolDetailFixture: { profile: SchoolFieldProfile | null; photos: SchoolPhoto[]; salesData?: CachedSchoolDetail["salesData"]; saves: { schoolId: string; expectedRevision: number; patch: SchoolFieldProfilePatch }[]; holdSave?: boolean; rejectSave?: boolean; releaseSave?: () => void };
+    schoolDetailFixture: { profile: SchoolFieldProfile | null; photos: SchoolPhoto[]; salesData?: CachedSchoolDetail["salesData"]; visits?: import("../../../src/domain/sales").SalesVisit[]; saves: { schoolId: string; expectedRevision: number; patch: SchoolFieldProfilePatch }[]; holdSave?: boolean; rejectSave?: boolean; releaseSave?: () => void };
   }
 }
 const syntheticSalesData: NonNullable<CachedSchoolDetail["salesData"]> = {

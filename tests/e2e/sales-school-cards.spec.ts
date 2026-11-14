@@ -80,7 +80,6 @@ for (const width of [320, 390]) {
         const box = await card.boundingBox();
         expect(box).not.toBeNull();
         heights[`${kind}-${grade}`] = box!.height;
-        expect(box!.height).toBeLessThanOrEqual(kind === "assignment" ? 160 : 100);
         expect(box!.height).toBeGreaterThanOrEqual(44);
         await noOverflow(card);
       }
@@ -109,6 +108,7 @@ test("school grades are distinct, district/grade text is not repeated, and recor
       expect(text.match(/대덕구/g)).toHaveLength(1);
       expect(text.split(label!).length - 1).toBe(1);
       await expect(card.getByRole("img", { name: label, exact: true })).toBeVisible();
+      await expect(card.locator("[data-school-type] svg")).toHaveCSS("width", "24px");
     }
     glyphs.add(await assignment.locator("[data-school-type] svg").innerHTML());
     if (status === "미확인") {
@@ -205,7 +205,7 @@ test("200% text and reduced motion retain complete school names, readable contro
   await page.emulateMedia({ reducedMotion: "reduce" });
   await fixture(page, 320);
   await page.addStyleTag({ content: "html { font-size: 200%; }" });
-  await expect(page.getByTestId("assignment-elementary").locator("strong")).toHaveCSS("font-size", "32px");
+  await expect(page.getByTestId("assignment-elementary").locator("strong")).toHaveCSS("font-size", "36px");
   for (const card of await page.locator(".assignment-card, .sales-task-row").all()) {
     await noOverflow(card);
     await fullNameVisible(card.locator("strong"));

@@ -7,8 +7,9 @@ import { build } from "esbuild";
 import sharp from "sharp";
 import type { SchoolFieldProfile, SchoolFieldProfilePatch, SchoolPhoto } from "../../src/domain/school";
 import type { CachedSchoolDetail } from "../../src/features/school-detail/school-detail-cache";
+import type { SalesVisit } from "../../src/domain/sales";
 
-type SchoolDetailFixtureState = { profile: SchoolFieldProfile | null; photos: SchoolPhoto[]; salesData?: CachedSchoolDetail["salesData"]; saves: { schoolId: string; expectedRevision: number; patch: SchoolFieldProfilePatch }[]; holdSave?: boolean; rejectSave?: boolean; releaseSave?: () => void };
+type SchoolDetailFixtureState = { profile: SchoolFieldProfile | null; photos: SchoolPhoto[]; salesData?: CachedSchoolDetail["salesData"]; visits?: SalesVisit[]; saves: { schoolId: string; expectedRevision: number; patch: SchoolFieldProfilePatch }[]; holdSave?: boolean; rejectSave?: boolean; releaseSave?: () => void };
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const globals = readApplicationStylesheet();
@@ -25,7 +26,7 @@ test.beforeAll(async () => {
   const mocks: Record<string, string> = {
     dynamic: `import React,{lazy,Suspense} from 'react'; export default function dynamic(load,options={}){const Component=lazy(()=>load().then(value=>({default:value.default??value})));return function FixtureDynamic(props){const Loading=options.loading;return <Suspense fallback={Loading?<Loading/>:null}><Component {...props}/></Suspense>}}`,
     schoolDetail: `import {useCallback,useEffect,useReducer} from 'react';export function useSchoolDetail(school,session,mode){const[,rerender]=useReducer(x=>x+1,0);const refresh=useCallback(()=>rerender(),[]);useEffect(()=>{window.addEventListener('fixture:detail-changed',refresh);return()=>window.removeEventListener('fixture:detail-changed',refresh)},[refresh]);const fixture=window.schoolDetailFixture;return {status:'ready',refreshing:false,stale:false,source:'memory',sessionNamespace:'SYNTHETIC-DELIVERY',refresh,initialSchool:school,detail:{school,fieldProfile:fixture.profile,photos:fixture.photos,salesData:mode==='sales'?fixture.salesData??null:null}}}`,
-    salesHistory: `export function useSalesHistory(){return {status:'ready',visits:[],hasMore:false,loadingMore:false,refresh:()=>{},loadMore:async()=>{}}}`,
+    salesHistory: `export function useSalesHistory(){return {status:'ready',visits:window.schoolDetailFixture.visits??[],hasMore:false,loadingMore:false,refresh:()=>{},loadMore:async()=>{}}}`,
     salesHistoryRepository: `export const salesHistoryRepository={updateProfile:async()=>{throw new Error('Unexpected fixture sales write')}}`,
     schoolDetailRepository: `export const schoolDetailRepository={updateFieldProfile:async(input)=>{const fixture=window.schoolDetailFixture;fixture.saves.push(structuredClone(input));await new Promise((resolve,reject)=>{fixture.releaseSave=()=>fixture.rejectSave?reject(new Error('Synthetic save failure')):resolve();if(!fixture.holdSave)setTimeout(fixture.releaseSave,80)});fixture.profile={...fixture.profile,...input.patch,revision:(fixture.profile?.revision??0)+1};window.dispatchEvent(new Event('fixture:detail-changed'));return{revision:fixture.profile.revision}}}`,
     auth: `export function useAuth(){return {state:{status:'authenticated',session:{uid:'FIXTURE',claims:{sessionVersion:1,permissionsVersion:1}}}}}`,
@@ -684,7 +685,6 @@ test("sales detail has a warm layered palette and shared cafeteria location with
     await page.setViewportSize({ width, height: 840 });
     const quickBar = detail.getByRole("complementary", { name: "학교 빠른 작업", exact: true });
     const visitLabel = quickBar.getByRole("button", { name: "방문기록", exact: true }).locator("span");
-    if (width === 320) await expect(visitLabel).toHaveCSS("white-space", "nowrap");
     expect(await visitLabel.evaluate((element) => { const range = document.createRange(); range.selectNodeContents(element); return range.getClientRects().length; })).toBe(1);
     const quickTargets = await quickBar.locator("a,button").evaluateAll((elements) => elements.map((element) => { const rect = element.getBoundingClientRect(); return { width: rect.width, height: rect.height, fits: element.scrollWidth <= element.clientWidth }; }));
     for (const target of quickTargets) {
@@ -746,6 +746,85 @@ test("sales detail has a warm layered palette and shared cafeteria location with
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test("sales detail and portaled visit fields keep readable text and reachable actions", async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await fixture(page, 320, "sales-detail");
+  await expect(page.locator(".sales-collaboration")).toBeVisible();
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const selector of [".sales-school-next > strong", ".sales-contact-brief__list strong", ".sales-next-action > strong", ".communication-reference > strong"]) {
+      const elements = page.locator(selector);
+      expect(await elements.count()).toBeGreaterThan(0);
+      expect(await elements.evaluateAll(items => items.every(item => parseFloat(getComputedStyle(item).fontSize) >= 16))).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.getByRole("button", { name: "방문기록", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".sales-visit-form")).toBeVisible();
+  for (const selector of [".visit-binary-choice legend", ".visit-binary-choice button", ".visit-summary-field", ".visit-summary-field textarea"]) {
+    expect(await dialog.locator(selector).evaluateAll(items => items.length > 0 && items.every(item => parseFloat(getComputedStyle(item).fontSize) >= 16))).toBe(true);
+  }
+  await dialog.getByRole("radiogroup", { name: "홍보지 전달 여부" }).getByRole("radio", { name: "미전달", exact: true }).click();
+  await expect(dialog.getByRole("radiogroup", { name: "홍보지 전달 여부" }).getByRole("radio", { name: "미전달", exact: true })).toBeChecked();
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await expect(dialog.locator(".visit-summary-field textarea")).toHaveCSS("font-size", "32px");
+  const submit = dialog.getByRole("button", { name: "방문 기록 저장", exact: true });
+  await expect(submit).toBeInViewport({ ratio: 1 });
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await dialog.locator(".bottom-sheet__body").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: `output/sales-readability-20261114/visit-zoom-${info.project.name}.png` });
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("sales visit history keeps full facts and summary readable at enlarged text", async ({ page }, info) => {
+  await fixture(page, 320, "sales-detail");
+  await expect(page.locator(".sales-history")).toBeVisible();
+  await page.evaluate(() => {
+    const state = (window as typeof window & { schoolDetailFixture: SchoolDetailFixtureState }).schoolDetailFixture;
+    const date = new Date("2026-09-08T02:00:00Z");
+    const visit: SalesVisit = {
+      visitId: "VISIT-READABILITY", schoolId: "SYNTHETIC-SCHOOL", cycleId: "2026-09",
+      assignmentSnapshot: { zoneId: null, primaryAssigneeId: "FIXTURE", assigneeIds: ["FIXTURE"] },
+      visitedAt: date, visitedBy: "FIXTURE", recordedBy: "FIXTURE",
+      brochure: { status: "delivered" }, sample: { status: "delivered", items: [{ productName: "온누리 검증용 긴 이름의 신제품 샘플" }] },
+      interest: { score: 60, explicitlySelected: true }, activityTagIds: [],
+      summary: "샘플 사용 결과를 확인한 뒤 다음 주 영양사 선생님과 납품 일정과 제품 구성을 다시 논의하기로 했습니다.",
+      followUp: { required: true, dueDate: "2026-09-15", summary: "샘플 반응 확인 후 다음 방문 일정 조율" },
+      deleted: false, deletedAt: null, deletedBy: null, deleteReason: null, revision: 1, createdAt: date, updatedAt: date,
+    };
+    state.visits = [visit, { ...visit, visitId: "VISIT-READABILITY-2", summary: "다음 달 신제품 자료 전달을 요청받았습니다.", interest: { score: 0, explicitlySelected: true }, sample: { status: "notDelivered", items: [] }, followUp: { required: false, dueDate: null, summary: null } }, { ...visit, visitId: "VISIT-READABILITY-3", visitedAt: new Date("2026-09-07T02:00:00Z"), summary: "신제품 사용 후 단가 확인 요청", followUp: { required: false, dueDate: null, summary: null } }];
+    window.dispatchEvent(new Event("fixture:detail-changed"));
+  });
+  await expect(page.locator(".visit-timeline-item__content")).toHaveCount(3);
+  const record = page.locator(".visit-timeline-item__content").first();
+  await expect(record).toContainText("샘플 사용 결과를 확인한 뒤");
+  await expect(record.locator("time")).toHaveCSS("font-size", "18px");
+  await expect(record.locator(".visit-timeline-item__people")).toHaveCSS("font-size", "16px");
+  await expect(record.locator(".visit-timeline-item__signal-row > span").first()).toHaveCSS("font-size", "16px");
+  await expect(record).toHaveCSS("border-radius", "0px");
+  for (const selector of ["time", ".visit-timeline-item__people", ".visit-timeline-item__signal-row > span", ".visit-timeline-item__follow-up small"]) {
+    expect(await record.locator(selector).evaluateAll(items => items.length > 0 && items.every(item => parseFloat(getComputedStyle(item).fontSize) >= 14))).toBe(true);
+  }
+  await expect(record.locator(":scope > p")).toHaveCSS("font-size", "16px");
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await record.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `output/sales-readability-20261114/history-readable-${info.project.name}.png` });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await expect(record.locator(":scope > p")).toHaveCSS("font-size", "32px");
+  expect(await record.evaluate(element => [element, ...element.querySelectorAll("*")].filter(item => item.scrollWidth > item.clientWidth + 1).map(item => ({ tag: item.tagName, className: item.className, width: item.clientWidth, scroll: item.scrollWidth, text: item.textContent?.slice(0, 60) })))).toEqual([]);
+  await expect(record.getByText("샘플 반응 확인 후 다음 방문 일정 조율", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.locator(".floating-context-bar :is(button, a)").evaluateAll(items => items.every(item => item.scrollWidth <= item.clientWidth + 1))).toBe(true);
+  await page.screenshot({ path: `output/sales-readability-20261114/history-zoom-${info.project.name}.png`, fullPage: true });
 });
 
 test("sales location edits update shared information while preserving cart stairs inspection and delivery styling", async ({ page }) => {

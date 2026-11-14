@@ -11,22 +11,22 @@
   border-radius: 10px;
   background: #fff;
   color: #4e5968;
-  font-size: .8125rem;
+  font-size: 1rem;
   line-height: 1.4;
 }
-.planner .quick button span { color: inherit; font-size: .75rem; font-weight: 650; }
+.planner .quick button span { color: inherit; font-size: .875rem; font-weight: 650; }
 .planner .quick button[aria-pressed="true"] { border-color: #ae9cbd; background: #e8dfed; color: #625174; }
 .planner .quick button:disabled { opacity: .5; cursor: not-allowed; }
-.selectionSummary { display: grid; gap: 3px; color: #4e5968; font-size: .8125rem; line-height: 1.45; }
-.selectionSummary strong { color: #191f28; font-size: .875rem; }
+.selectionSummary { display: grid; gap: 3px; color: #4e5968; font-size: .875rem; line-height: 1.45; }
+.selectionSummary strong { color: #191f28; font-size: 1rem; }
 .selectionSummary span { overflow-wrap: anywhere; word-break: keep-all; }
-.limitNote { margin: 0; padding: 10px; border-radius: 8px; color: #785717; background: #fff8e8; font-size: .75rem; line-height: 1.5; }
+.limitNote { margin: 0; padding: 10px; border-radius: 8px; color: #785717; background: #fff8e8; font-size: .875rem; line-height: 1.5; }
 .planner .schoolSelect { position: relative; min-height: 44px; }
 /* Bind native checkbox focus to its visible control. An unanchored absolute
    input can scroll overflow:hidden dialog ancestors completely past their UI. */
 .planner .schoolSelect > input { inset: 0 auto 0 0; width: 26px; height: 100%; margin: 0; }
-.planner .schoolSelect strong { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; word-break: keep-all; font-size: .8125rem; line-height: 1.4; }
-.planner .schoolSelect small { font-size: .6875rem; line-height: 1.4; }
+.planner .schoolSelect strong { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; word-break: keep-all; font-size: 1rem; line-height: 1.5; }
+.planner .schoolSelect small { font-size: .875rem; line-height: 1.4; }
 .planner .startButton {
   display: inline-flex;
   justify-content: center;
@@ -39,7 +39,7 @@
   border-radius: 9px;
   color: #4e5968;
   background: #fff;
-  font-size: .75rem;
+  font-size: .875rem;
   line-height: 1.4;
   transition: background 140ms ease, border-color 140ms ease;
 }

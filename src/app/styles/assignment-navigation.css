@@ -30,10 +30,7 @@
   background: #fff;
   pointer-events: none;
 }
-.assignment-card--selectable[data-selected="true"] { border-color: #1b725e; background: #eff8f3; box-shadow: inset 0 0 0 2px #1b725e, 0 18px 44px rgba(22,83,68,.12); }
-.assignment-card--selectable[data-selected="true"] .assignment-card__check { color: #fff; border-color: #176353; background: #176353; }
-.assignment-card--selectable[data-disabled="true"] { cursor: not-allowed; filter: saturate(.72); opacity: .68; }
-.assignment-card--selectable:has(input:focus-visible) { outline: 3px solid rgba(23,99,83,.25); outline-offset: 3px; }
+.assignment-card--selectable[data-disabled="true"] { cursor: not-allowed; }
 
 .sales-assignment-batch {
   position: fixed;
@@ -86,7 +83,6 @@
 .sales-task-list { overflow: hidden; border: 1px solid rgba(23,55,47,.12); border-radius: 18px 18px 18px 6px; background: #fff; box-shadow: 0 14px 38px rgba(23,55,47,.055); }
 .sales-task-row { width: 100%; min-height: 5.6rem; display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; align-items: center; gap: .8rem; padding: .75rem 1rem; border: 0; border-bottom: 1px solid rgba(23,55,47,.085); color: #17372f; text-align: left; background: #fff; cursor: pointer; transition: background 140ms ease, box-shadow 140ms ease; }
 .sales-task-row:last-child { border-bottom: 0; }
-.sales-task-row:hover { background: #f4f8f5; box-shadow: inset 3px 0 #e86836; }
 .sales-task-row > svg { color: #71827c; }
 .sales-activity-empty, .sales-activity-error { min-height: 17rem; display: grid; place-items: center; align-content: center; gap: .5rem; padding: 2rem; text-align: center; }
 .sales-activity-error > span { width: 3.3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 15px; color: #176353; background: #e5f0eb; }

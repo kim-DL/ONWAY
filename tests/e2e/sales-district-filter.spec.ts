@@ -148,7 +148,7 @@ test("200% text, reduced motion, forced colors and accessible radio semantics re
   await page.keyboard.press("End");
   const selected = radios(page).getByRole("radio", { name: "유성구, 8곳" });
   await expect(selected).toBeFocused();
-  await expect(selected).toHaveCSS("font-size", "26px");
+  await expect(selected).toHaveCSS("font-size", "32px");
   await expect.poll(() => selected.evaluate((element) => {
     const box = element.getBoundingClientRect();
     const parent = element.parentElement!.getBoundingClientRect();

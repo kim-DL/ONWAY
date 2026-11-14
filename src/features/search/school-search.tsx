@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassButton } from "@/components/ui/glass-button";
+import { SchoolTypeMark } from "@/components/school/school-type-mark";
 import { Icon } from "@/components/ui/icon";
 import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import { LoadingStatus } from "@/components/ui/loading-status";
@@ -87,8 +88,8 @@ function ResultButton({
           {/* Pre-sized static asset, shared with the school home. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ui/school-ceramic-building-v1.webp" width={48} height={48} alt="" />
-        </> : null}
-        <Icon name="building" />
+          <Icon name="building" />
+        </> : <SchoolTypeMark schoolType={item.schoolType} />}
       </span>
       <span className="school-search-result__body">
         <span className="school-search-result__name">

@@ -371,7 +371,7 @@ export function SalesWorkspace({
       ) : null}
 
       {model.visibleAssignments.length > 0 ? (
-        <div className="assignment-grid">
+        <div className="sales-school-list">
           {model.visibleAssignments.map(({ assignment, school }) => (
             <AssignmentCard
               key={assignment.schoolId}
