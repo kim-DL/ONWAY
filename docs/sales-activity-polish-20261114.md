@@ -16,4 +16,6 @@ Aside에서 활동 빈 목록과 컨트롤 구성을 확인했다. 화면 캡처
 
 ## 배포
 
-배포 전 Hosting 버전은 `94d5e1ad58311a1a`다. 최종 소스·운영 버전과 공개 검사 결과는 배포 후 기록한다.
+소스 `d39a40822ef58212df95f4808c7a1e7d24a1852e`를 커밋·푸시하고 143개 산출물의 해시를 고정했다. `--project onnuriway --only hosting:onnuriway`로 2026-11-14 18:05:03 KST에 Hosting `bb98c803d7af7133`를 배포했다. 두 공개 주소 `https://onnuriway.com`과 `https://onnuriway.web.app`에서 Hosting 검사가 통과했고, 각각 JS/CSS 109개와 아이콘 4개의 SHA-256 일치를 18:05:23에 확인했다.
+
+이전 Hosting `94d5e1ad58311a1a`를 롤백 기준으로 보존한다. Functions·Rules·MCP Hosting 및 운영 데이터는 변경하지 않았다. 인수인계 문서 후속 커밋은 앱을 다시 빌드하거나 배포하지 않는다.
