@@ -31,10 +31,16 @@ async function assertBounds(stage: Locator) {
     } else expect(image[start] + image[length] / 2).toBeCloseTo(frame[start] + frame[length] / 2, 0);
   }
 }
+async function originalSize(dialog: Locator, stage: Locator) {
+  await dialog.getByRole("button", { name: "원본 크기", exact: true }).click();
+  const width = await stage.locator("img").evaluate((image) => (image as HTMLImageElement).naturalWidth);
+  await expect.poll(async () => (await stage.locator("img").boundingBox())!.width).toBeCloseTo(width, 0);
+  await expect(dialog.getByLabel("사진 배율")).toHaveText("100%");
+}
 test("PC cursor-centred fractional wheel zoom, captured drag, bounds, double click and keyboard", async ({ page, isMobile }) => {
   test.skip(isMobile, "Desktop pointer interaction");
   const { dialog, stage } = await open(page);
-  await dialog.getByRole("button", { name: "사진 1.8배 빠른 확대" }).click();
+  await stage.dblclick();
   await expect.poll(() => scale(stage)).toBeCloseTo(1.8, 4);
   const box = (await stage.boundingBox())!;
   const cursor = { x: box.x + box.width / 2 + 30, y: box.y + box.height / 2 + 20 };
@@ -79,20 +85,19 @@ test("mobile native pinch, remaining-finger pan, double tap and pointer cancella
   expect(await page.evaluate(() => window.visualViewport!.scale)).toBe(1);
   await cdp.detach();
 });
-test("buttons, low-resolution ceiling, aspect ratios, resize, fit and Back preserve the modal", async ({ page }) => {
+test("buttons, source-aware ceiling, aspect ratios, resize, fit and Back preserve the modal", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const shape of ["small", "portrait", "panorama"]) {
     await page.getByLabel("사진 비율").selectOption(shape);
     const { dialog, stage } = await open(page);
     await expect(dialog.getByRole("button", { name: "사진 축소", exact: true })).toBeDisabled();
-    await dialog.getByRole("button", { name: "사진 1.8배 빠른 확대" }).click();
-    await expect.poll(() => scale(stage)).toBe(1.8);
+    await originalSize(dialog, stage);
     await dialog.getByRole("button", { name: "사진 확대", exact: true }).click();
-    await expect.poll(() => scale(stage)).toBeGreaterThan(2.15);
-    await stage.focus(); for (let i = 0; i < 8; i++) await page.keyboard.press("+");
+    await expect.poll(() => scale(stage)).toBeGreaterThan(1);
+    await stage.focus(); for (let i = 0; i < 24; i++) await page.keyboard.press("+");
     await expect(dialog.getByRole("button", { name: "사진 확대", exact: true })).toBeDisabled();
-    if (shape === "small") expect(await scale(stage)).toBe(2.5);
-    expect(await scale(stage)).toBeLessThanOrEqual(3);
+    if (shape === "small") expect(await scale(stage)).toBe(8);
+    expect(await scale(stage)).toBeGreaterThanOrEqual(8);
     await assertBounds(stage);
     await page.setViewportSize({ width: 320, height: 568 });
     await expect(async () => { await assertBounds(stage); }).toPass({ timeout: 5000 });
@@ -108,7 +113,7 @@ test("accessible controls and large text remain usable at 320px; reopening reset
   let { dialog, stage } = await open(page);
   const scan = await new AxeBuilder({ page }).include("dialog[open]").analyze(); expect(scan.violations).toEqual([]);
   expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  await dialog.getByRole("button", { name: "사진 1.8배 빠른 확대" }).click(); await expect.poll(() => scale(stage)).toBe(1.8);
+  await originalSize(dialog, stage);
   await dialog.getByRole("button", { name: "닫기", exact: true }).click(); await expect(dialog).toHaveCount(0);
   ({ dialog, stage } = await open(page)); await expect.poll(() => scale(stage)).toBe(1);
   await page.screenshot({ path: `output/playwright/inventory-pan-zoom-${test.info().project.name}.png` });
@@ -120,8 +125,8 @@ test("requested zoom survives compositor frame suspension and closes cleanly", a
     (window as unknown as { restorePhotoFrames: () => void }).restorePhotoFrames = () => { window.requestAnimationFrame = original; };
     window.requestAnimationFrame = () => -1;
   });
-  await dialog.getByRole("button", { name: "사진 1.8배 빠른 확대" }).click();
-  await expect.poll(() => scale(stage)).toBe(1.8);
+  await dialog.getByRole("button", { name: "원본 크기", exact: true }).click();
+  await expect(dialog.getByLabel("사진 배율")).toHaveText("100%");
   await page.evaluate(() => (window as unknown as { restorePhotoFrames: () => void }).restorePhotoFrames());
   await dialog.getByRole("button", { name: "닫기", exact: true }).click(); await expect(dialog).toHaveCount(0);
   await open(page); await expect.poll(() => scale(stage)).toBe(1);

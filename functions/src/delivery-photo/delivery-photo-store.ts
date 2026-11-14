@@ -142,12 +142,18 @@ export class GoogleDeliveryPhotoStorage implements DeliveryPhotoStorage {
 
   async download(object: DeliveryPhotoObject) {
     const file = this.bucket.file(object.objectPath);
-    const [before] = await file.getMetadata();
-    if (String(before.generation ?? "") !== object.generation || before.contentType !== "image/webp"
-      || before.metadata?.deliveryPhotoUploadAttempt !== object.uploadAttemptToken) {
-      throw new Error("Delivery photo generation or content type changed.");
-    }
-    const [buffer] = await file.download({ start: 0, end: object.byteSize });
+    const metadataPromise = file.getMetadata().then(([before]) => {
+      if (String(before.generation ?? "") !== object.generation || before.contentType !== "image/webp"
+        || before.metadata?.deliveryPhotoUploadAttempt !== object.uploadAttemptToken) {
+        throw new Error("Delivery photo generation or content type changed.");
+      }
+    });
+    const generation = Number(object.generation);
+    // The SDK converts generations to Number; unsafe values retain the serial read.
+    const downloadPromise = Number.isSafeInteger(generation) && generation > 0 && String(generation) === object.generation
+      ? this.bucket.file(object.objectPath, { generation: object.generation }).download({ start: 0, end: object.byteSize })
+      : metadataPromise.then(() => file.download({ start: 0, end: object.byteSize }));
+    const [, [buffer]] = await Promise.all([metadataPromise, downloadPromise]);
     const [after] = await file.getMetadata();
     if (String(after.generation ?? "") !== object.generation || after.contentType !== "image/webp"
       || after.metadata?.deliveryPhotoUploadAttempt !== object.uploadAttemptToken) {

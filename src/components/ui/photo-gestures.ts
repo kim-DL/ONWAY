@@ -1,9 +1,9 @@
 import { getMotionAllowed } from "@/components/ui/use-motion-permission";
-import { containPhoto, fittedPhoto, photoGeometry, zoomPhoto, type PhotoGeometry, type PhotoView } from "./photo-geometry";
+import { containPhoto, fittedPhoto, photoGeometry, reframePhoto, zoomPhoto, type PhotoGeometry, type PhotoView } from "./photo-geometry";
 
 type Point = { x: number; y: number };
 type Gesture = { view: PhotoView; centre: Point; distance: number };
-export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView, max: number, zoomed: boolean) => void, onSwipe?: (direction: -1 | 1) => void) {
+export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView, geometry: PhotoGeometry, zoomed: boolean) => void, onSwipe?: (direction: -1 | 1) => void) {
   const image = stage.querySelector("img")!;
   const pointers = new Map<number, Point>();
   const savedStyle = image.getAttribute("style");
@@ -22,7 +22,7 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
   const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
   const centre = (a: Point, b = a): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   const reportView = () => {
-    if (geometry && !disposed) report(current, geometry.max, Math.max(current.scale, target.scale) > 1.001);
+    if (geometry && !disposed) report(current, geometry, Math.max(current.scale, target.scale) > 1.001);
   };
   const paint = () => {
     if (!geometry) return;
@@ -81,11 +81,10 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
     // opening morph transform. clientWidth/Height round and can expose an edge.
     const size = getComputedStyle(stage);
     const next = photoGeometry(parseFloat(size.width) || stage.clientWidth, parseFloat(size.height) || stage.clientHeight,
-      image.naturalWidth, image.naturalHeight, window.devicePixelRatio || 1);
+      image.naturalWidth, image.naturalHeight);
     if (!next) return;
     stopMotion(); clearPointers();
-    current = containPhoto({ ...current, x: geometry ? current.x * next.imageWidth / geometry.imageWidth : 0,
-      y: geometry ? current.y * next.imageHeight / geometry.imageHeight : 0 }, next);
+    current = geometry ? reframePhoto(current, geometry, next) : { ...fittedPhoto };
     target = current; geometry = next;
     image.style.width = `${next.imageWidth}px`; image.style.height = `${next.imageHeight}px`;
     paint();
@@ -166,7 +165,7 @@ export function attachPhotoGestures(stage: HTMLElement, report: (view: PhotoView
   const observer = new ResizeObserver(resize); observer.observe(stage); resize();
   return {
     zoomIn: () => zoom(target.scale * 1.2), zoomOut: () => zoom(target.scale / 1.2),
-    quick: () => zoom(1.8), reset: () => move(fittedPhoto, true),
+    nativeSize: () => { if (geometry) zoom(geometry.nativeScale); }, reset: () => move(fittedPhoto, true),
     dispose: () => {
       disposed = true; stopMotion(); clearPointers(); observer.disconnect();
       stage.removeEventListener("wheel", wheel); stage.removeEventListener("pointerdown", down); stage.removeEventListener("pointermove", drag);

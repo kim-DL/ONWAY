@@ -58,7 +58,8 @@ export function deliveryPhotoDownloadBlob(input: unknown, expectedPhotoId: strin
     throw invalidDeliveryPhotoResponse();
   }
   if (binary.length !== parsed.data.byteSize) throw invalidDeliveryPhotoResponse();
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
   if (bytes.length < 12
     || String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF"
     || String.fromCharCode(...bytes.subarray(8, 12)) !== "WEBP") throw invalidDeliveryPhotoResponse();

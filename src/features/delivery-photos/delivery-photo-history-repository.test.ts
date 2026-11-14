@@ -56,6 +56,14 @@ describe("delivery photo private history repository", () => {
     expect(() => deliveryPhotoDownloadBlob({ ...download, variant: "evidence" }, photoId, "thumbnail")).toThrow();
   });
 
+  it("preserves all bytes of a large relay payload", async () => {
+    const large = Buffer.alloc(1_000_000);
+    for (let index = 0; index < large.length; index += 1) large[index] = index % 256;
+    bytes.copy(large);
+    const blob = deliveryPhotoDownloadBlob({ ...download, byteSize: large.length, fileBase64: large.toString("base64") }, photoId, "thumbnail");
+    expect(Buffer.from(await blob.arrayBuffer()).equals(large)).toBe(true);
+  });
+
   it("discards a late response after the authenticated session changes", async () => {
     mock.call.mockImplementationOnce(async () => {
       auth.currentUser!.getIdTokenResult = async () => ({ claims: { ...session.claims, permissionsVersion: 2 } });
