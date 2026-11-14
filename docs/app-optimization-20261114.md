@@ -67,8 +67,12 @@
 
 최초 JavaScript 크기는 같고 전체 CSS 압축 결과는 4B 늘었다. 이번 성능 개선은 사진 재조회·중복 페이지 요청과 정적 파일 재다운로드를 줄이는 데 있다.
 
-## 배포 준비
+## 최종 배포
 
-2026-11-14 18:42 KST 조회 시 기존 운영은 Hosting `5c5f53b65533bab5`였다. 검증한 소스 커밋과 143개 산출물의 해시를 고정한 뒤 Hosting만 배포하고, 두 공개 주소의 상태·헤더·파일 해시와 최종 버전은 후속 기록에 남긴다.
+2026-11-14 18:47:09 KST에 소스 `e3ad8a1294f1a67d3e8e8fd48561dc2f5f7090ad`를 Hosting `f7eb1d1d954ddaa1`로 배포했다. 브랜치는 `codex/app-optimization-20261114`이며 원격에 푸시했다. 배포 직전 작업 트리가 깨끗하고 고정한 143개 산출물의 SHA-256이 일치함을 확인했다.
+
+명령은 `firebase deploy --project onnuriway --only hosting:onnuriway --non-interactive`였다. Functions·Rules·Auth·MCP Hosting과 운영 데이터는 변경하지 않았다. 기존 운영은 `5c5f53b65533bab5`이며 18:42 KST에 조회한 결과를 보존했다.
+
+`https://onnuriway.com`과 `https://onnuriway.web.app`의 Hosting 응답·캐시 헤더 검사가 모두 통과했다. 각 주소에서 JavaScript·CSS·공개 이미지 130개를 내려받아 최종 로컬 산출물과 해시가 모두 일치함을 확인했다. Firebase의 현재 릴리스도 위 버전과 일치했다. 사용자 지시대로 전체 CI를 반복하지 않았으며, 배포 결과를 기록하는 문서 커밋 때문에 앱을 다시 빌드하거나 배포하지 않는다.
 
 로컬 증거는 `output/optimization-20261114/`에 있다. 실물 휴대폰, 설치된 운영 PWA와 인증된 운영 저장을 대신하는 검증은 아니다.
