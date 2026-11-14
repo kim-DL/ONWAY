@@ -67,3 +67,9 @@ Aside의 데스크톱 320px 창에서는 기존 공용 `html` 최소 폭 320px�
 생성 프롬프트 공통 조건: “Premium small app icon, transparent background, isolated object without tile or text; glazed ivory-white ceramic with pale ice-blue inset details; rounded bevels, restrained soft shadow, frontal slight depth, legible at 48px.” 개별 대상은 search=돋보기, route=곡선으로 연결된 두 위치 핀, add=학교 건물과 더하기, organize=체크 표시와 세 줄이 있는 체크리스트다. 정리 아이콘의 배경 제거 프롬프트는 물체의 형태·색을 유지하면서 전체 주변 배경·바닥·안개를 지우고 실제 투명 alpha를 유지하도록 지정했다.
 
 실물 휴대폰, 설치된 PWA, 인증된 운영 방문 저장은 이번 검증에 포함하지 않는다. 초기 후보 실패와 취소, 통과한 이전 전체 CI, 최종 변경 범위 검증을 각각 별도로 기록한다.
+
+## 운영 배포 완료
+
+최종 소스 `0cd160e695991a568b86cb9a9231382abd75b815`를 커밋·푸시하고, 파일 143개의 해시를 고정한 뒤 `--project onnuriway --only hosting:onnuriway`로 배포했다. 2026-11-14 16:32:27 KST의 Hosting 버전은 `5d1089b7c770c369`다. 두 운영 주소 `https://onnuriway.com`과 `https://onnuriway.web.app`의 공개 Hosting 검사가 통과했고, 각각 JS/CSS 109개와 생성 아이콘 4개가 로컬 배포본 SHA-256과 일치했다. 확인 시각은 16:32:51 KST다.
+
+배포 전 운영 버전 `6f5c702fbed9f9f0`을 롤백 기준으로 기록했다. Functions·Rules·MCP Hosting은 배포하지 않았고 운영 데이터를 시험 작성하지 않았다. 이전 전체 CI와 최종 범위 검사 구분은 위 기록을 따른다. 릴리스 뒤 인수인계 문서만 추가 커밋하며 앱을 다시 빌드하거나 재배포하지 않는다.
