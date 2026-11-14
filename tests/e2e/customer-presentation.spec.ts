@@ -631,6 +631,52 @@ test("delivery school details use one compact briefing with distinct school leve
   expect(errors).toEqual([]);
 });
 
+test("delivery school facts, editor and photo guidance stay readable with enlarged text", async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await fixture(page, 320, "school-detail");
+  const brief = page.locator("[data-delivery-brief]");
+  await expect(brief).toBeVisible();
+  await page.evaluate(() => {
+    const state = (window as typeof window & { schoolDetailFixture: SchoolDetailFixtureState }).schoolDetailFixture;
+    state.profile = { ...state.profile!, cafeteria: { ...state.profile!.cafeteria, locationDescription: "급식동 뒤편 경사로를 따라 이동한 뒤 오른쪽 출입구 이용\n정문 공사 중에는 운동장 바깥 통로를 이용합니다.", routeDescription: "납품 차량은 서행하고 학생 이동이 끝난 후 급식실 출입구로 이동해주세요." }, fieldNotes: "검수 담당자가 자리에 없으면 급식실로 먼저 연락해주세요.\n검수 완료 후 출입문을 닫습니다." };
+    window.dispatchEvent(new Event("fixture:detail-changed"));
+  });
+  for (const selector of ["p", "dd", "a strong"]) {
+    expect(await brief.locator(selector).evaluateAll(items => items.length > 0 && items.every(item => parseFloat(getComputedStyle(item).fontSize) >= 16))).toBe(true);
+  }
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await brief.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `output/school-readability-20261114/detail-readable-${info.project.name}.png` });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await expect(brief.locator("p").first()).toHaveCSS("font-size", "32px");
+  expect(await brief.evaluate(element => [element, ...element.querySelectorAll("p,dd,strong")].every(item => item.scrollWidth <= item.clientWidth + 1))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await brief.getByRole("button", { name: "정보 수정", exact: true }).click();
+  const editor = page.getByRole("dialog");
+  await expect(editor.locator(".field-form-grid label").first()).toHaveCSS("font-size", "32px");
+  await expect(editor.locator(".field-editor-section-title small").first()).toHaveCSS("font-size", "28px");
+  await expect(editor.getByRole("button", { name: "변경사항 저장", exact: true })).toBeInViewport({ ratio: 1 });
+  expect(await editor.locator(".bottom-sheet__body").evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await page.screenshot({ path: `output/school-readability-20261114/editor-zoom-${info.project.name}.png` });
+  await page.keyboard.press("Escape");
+  await expect(editor).toHaveCount(0);
+  await page.evaluate(() => { document.documentElement.style.fontSize = "100%"; });
+  await page.getByRole("button", { name: "급식실 출입구 사진 추가", exact: true }).click();
+  const uploader = page.getByRole("dialog");
+  for (const selector of [".photo-dropzone small", ".photo-privacy-note strong", ".photo-privacy-note small", ".photo-source-actions small"]) {
+    expect(await uploader.locator(selector).evaluateAll(items => items.length > 0 && items.every(item => parseFloat(getComputedStyle(item).fontSize) >= 14))).toBe(true);
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  expect(await uploader.locator(".bottom-sheet__body").evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await expect(uploader.getByRole("button", { name: "현장 사진 등록", exact: true })).toBeInViewport({ ratio: 1 });
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(uploader).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test("delivery profile editing saves visible information, retains retired data and preserves a failed draft", async ({ page }) => {
   await fixture(page, 320, "school-detail");
   const detail = page.locator(".school-detail");

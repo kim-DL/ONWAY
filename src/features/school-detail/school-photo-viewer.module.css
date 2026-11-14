@@ -7,11 +7,11 @@
 .schoolNavigation[data-direction="previous"] { left: 10px; }
 .schoolNavigation[data-direction="next"] { right: 10px; }
 .schoolNavigation:focus-visible, .schoolActions button:focus-visible { outline: 3px solid #23857a; outline-offset: 3px; }
-.schoolCaption { display: grid; gap: 5px; margin: 12px 0 0; color: #354f56; font-size: .875rem; line-height: 1.5; }
-.schoolCaption > small { color: #637980; font-size: .75rem; }
-.schoolActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.schoolActions > span { color: #526970; font-size: .8125rem; font-variant-numeric: tabular-nums; }
-.schoolActions > button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border: 1px solid #d1dfdb; border-radius: 12px; background: #f0f6f4; color: #285e53; font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; }
-.schoolLoading { display: grid; justify-items: center; gap: 12px; color: #e4eeef; font-size: .8125rem; }
+.schoolCaption { display: grid; gap: 5px; margin: 12px 0 0; color: #354f56; font-size: 1rem; line-height: 1.5; }
+.schoolCaption > small { color: #637980; font-size: .875rem; }
+.schoolActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.schoolActions > span { color: #526970; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.schoolActions > button { display: flex; min-width: 0; max-width: 100%; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border: 1px solid #d1dfdb; border-radius: 12px; background: #f0f6f4; color: #285e53; font-size: 1rem; font-weight: 650; cursor: pointer; }
+.schoolLoading { display: grid; justify-items: center; gap: 12px; color: #e4eeef; font-size: .875rem; }
 .schoolLoadingStatus { align-items: center; max-width: calc(100% - 112px); padding: 16px; border-radius: 12px; background: #fff; text-align: center; }
 @media (forced-colors: active) { .schoolStage, .schoolNavigation, .schoolActions > button { border-color: CanvasText; } }

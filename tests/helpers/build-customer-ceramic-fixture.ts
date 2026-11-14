@@ -34,7 +34,7 @@ export async function buildCustomerCeramicFixture(photosEnabled = true, photoEnt
   const schoolMocks: Record<string, string> = {
     "search-catalog-repository": `import {catalog} from ${schoolData};export const createSearchSessionNamespace=()=> 'school-preview';export const searchCatalogRepository={readCached:async()=>catalog,getSchool:async()=>{throw Error('Preview navigation blocked')}};`,
     "search-catalog-cache": `import {items} from ${schoolData};export const readRecentSchoolEntries=async()=>new URLSearchParams(location.search).has('empty')?[]:items.map((item,index)=>({item,viewedAt:Date.now()-(index+1)*3600000}));export const clearSearchClientState=async()=>{};`,
-    "use-school-search-catalog": `import {catalog,items} from ${schoolData};export const useSchoolSearchCatalog=()=>({status:'ready',catalog,recentSchools:items,refreshing:false,stale:false,retry(){},addRecentSchool(){}});`,
+    "use-school-search-catalog": `import {catalog,items} from ${schoolData};export const useSchoolSearchCatalog=()=>({status:'ready',catalog,recentSchools:items,refreshing:false,stale:new URLSearchParams(location.search).has('stale-catalog'),retry(){},addRecentSchool(){}});`,
   };
   const fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-ceramic.tsx", [{ name: "customer-ceramic-isolation", setup(builder) {
     if (salesPreview) {
