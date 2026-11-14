@@ -42,6 +42,12 @@ Poteto의 Model the Domain에 따라 저장 연결/편집값, 요청 소유권, 
 
 ## 배포
 
-배포 전 운영 Hosting은 `f7eb1d1d954ddaa1`이며 2026-11-14 19:20 KST에 기존 릴리스와 일치함을 확인했다. 최종 소스·배포·공개 검증 결과는 완료 후 기록한다.
+2026-11-14 **19:47:19 KST**에 소스 `b1be6c223a096d65182d63eeba5862a2e46e7e16`를 Hosting **`645108293059dda2`**로 배포했다. 작업 브랜치 `codex/inventory-customer-fixes-20261114`를 main에 fast-forward하고 원격 main에 푸시했다. 기존 운영 `f7eb1d1d954ddaa1`은 복구 기준으로 기록했다.
+
+배포 명령은 `firebase deploy --project onnuriway --only hosting:onnuriway --non-interactive`였다. 143개 산출물의 SHA-256을 소스 커밋과 함께 고정했고, 배포 직전 clean tree와 동일 산출물을 확인했다. Functions·Rules·Auth·MCP Hosting과 운영 데이터는 변경하지 않았다.
+
+`https://onnuriway.com`과 `https://onnuriway.web.app`의 공개 Hosting 검사를 통과했다. 각 주소의 JavaScript·CSS·공개 이미지 130개가 최종 로컬 산출물과 모두 일치했다. 19:48 KST에 조회한 Firebase 현재 릴리스도 위 버전과 일치했다. 결과는 `output/mode-fixes-20261114/release-verification.json`과 공개 주소별 로그에 있다.
+
+사용자의 중복 검사 생략 요청에 따라 원격 커밋에는 `[skip ci]`를 사용했다. 전체 CI 성공을 주장하지 않으며, 위 관련 검사와 최종 산출물 검사를 배포 근거로 삼았다. 결과를 기록하는 문서 커밋 때문에 앱을 다시 빌드하거나 배포하지 않는다.
 
 실물 휴대폰·설치된 운영 PWA·인증된 운영 저장은 이번 합성 검증 및 공개 Hosting 확인과 구분한다.
