@@ -1,0 +1,13 @@
+.entry{display:grid;gap:12px;min-width:0;margin:.8rem 0 1.2rem;padding:16px;border:1px solid #cfdbed;border-radius:16px;background:#f4f7fd;color:#233b60}
+.entryTitle{display:flex;align-items:center;gap:12px;min-width:0}
+.entryTitle>svg{flex-shrink:0}
+.entryTitle>div{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
+.entryTitle h2{margin:0;font-size:1rem;line-height:1.4;font-weight:750}
+.entryTitle strong{font-size:.9375rem;line-height:1.5}
+.hint{margin:0;color:var(--shell-ink-soft);font-size:.86rem}
+.entrySources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.entry .entrySources button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:50px;border:1px solid #bccce3;border-radius:11px;background:#fff;color:#294c82;font:inherit;font-size:.875rem;font-weight:700;line-height:1.4}
+.entrySources svg{flex-shrink:0}
+.entry .entryReturn{display:flex;align-items:center;justify-content:center;gap:6px;justify-self:center;min-height:44px;color:#3f587b;font-size:.8125rem}
+@media(max-width:360px){.entry{padding:12px}.entrySources{grid-template-columns:1fr}}
+@media(forced-colors:active){.entry,.entry .entrySources button{border-color:CanvasText;color:ButtonText}.entry .entryReturn{color:LinkText}}

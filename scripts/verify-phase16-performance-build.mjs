@@ -142,6 +142,8 @@ const deliveryPhotoPreparationJavascriptGzipBytes = [...deliveryPhotoPreparation
 // Give these capabilities explicit small envelopes and account for all assets.
 // Workspace and legacy ceilings remain unchanged; capture and durability share 9KiB.
 const deliveryPhotoFieldLayers = [
+  { name: "customer-entry", boundaries: ["delivery-photo-customer-section"], javascript: 6 * 1024, cssRaw: 3 * 1024, cssGzip: 1024 },
+  { name: "capture-entry", boundaries: ["delivery-photo-capture-entry"], javascript: 4 * 1024, cssRaw: 3 * 1024, cssGzip: 1024 },
   { name: "row", boundaries: ["delivery-photo-row"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
   { name: "preview", boundaries: ["delivery-photo-upload-panel"], javascript: 2 * 1024, cssRaw: 2 * 1024, cssGzip: 1024 },
   { name: "inspection", boundaries: ["delivery-photo-local-preview"], javascript: 2 * 1024, cssRaw: 1024, cssGzip: 512 },

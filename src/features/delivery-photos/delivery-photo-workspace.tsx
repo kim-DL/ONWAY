@@ -4,14 +4,13 @@ import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { LoadingStatus } from "@/components/ui/loading-status";
-import { Icon } from "@/components/ui/icon";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { searchCustomers } from "@/features/customers/customer-search";
 
 import { projectDeliveryPhotoCompletion, resolveDeliveryPhotoDayCustomerIds } from "./delivery-photo-domain";
 import { DeliveryPhotoHistoryLoader } from "./delivery-photo-history-loader";
-import { DeliveryPhotoActionIcon } from "./delivery-photo-action-icon";
+import type { DeliveryPhotoCaptureEntryState } from "./delivery-photo-capture-entry";
 import { DeliveryPhotoInputController, type DeliveryPhotoInputControllerHandle } from "./delivery-photo-input-controller";
 import { mergeConfirmedDeliveryPhoto, deliveryPhotoDateKey } from "./delivery-photo-memory";
 import { deliveryPhotoErrorKind, deliveryPhotoRepository } from "./delivery-photo-repository";
@@ -22,6 +21,7 @@ import type { DeliveryPhotoEditorMode } from "./delivery-photo-editor";
 import styles from "./photo.module.css";
 
 const DeliveryPhotoToolbar = dynamic(() => import("./delivery-photo-toolbar"), { ssr: false });
+const DeliveryPhotoCaptureEntry = dynamic(() => import("./delivery-photo-capture-entry"), { ssr: false });
 const DeliveryPhotoRow = dynamic(() => import("./delivery-photo-row"), { ssr: false });
 const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor"), { ssr: false });
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
@@ -69,6 +69,9 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
   const album = (customer: Customer) => { if (inputs.current?.openAlbum(customer.customerId)) setCaptureId(customer.customerId); };
   const retry = (jobId: string) => { void uploads.coordinator?.retry(jobId); };
   const captureAvailable = (customerId: string) => uploads.coordinator?.canBegin(customerId) ?? false;
+  const captureEntry: DeliveryPhotoCaptureEntryState = requestedCustomer
+    ? { status: "ready", customer: requestedCustomer, disabled: !ready || !uploads.ready || !captureAvailable(requestedCustomer.customerId), preparing: !uploads.ready && !uploads.storageError }
+    : { status: catalog.status === "ready" ? "unavailable" : "loading" };
   const renderRow = (id: string, search = false) => {
     const customer = byId.get(id); if (!customer) return null;
     const summary = summaries.get(id);
@@ -108,17 +111,9 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
         customers={activeCustomers} snapshot={snapshot} accept={data.accept} refresh={data.refresh}
         onEditToday={(onDone) => setEditor({ mode: "day", onDone })} /> : null}
     </DeliveryPhotoToolbar>
-    {requestedCustomerId ? <section className={styles.entry} aria-label="납품사진 기록 대상" data-delivery-photo-entry>
-      <div className={styles.entryTitle}><DeliveryPhotoActionIcon variant="camera" /><div><h2>납품사진 기록하기</h2>
-        {requestedCustomer ? <strong>{requestedCustomer.name}</strong> : null}</div></div>
-      {catalog.status === "ready" && !requestedCustomer ? <p role="alert">이 거래처에는 새 납품사진을 기록할 수 없어요. 거래처 정보를 다시 확인해주세요.</p>
-        : !requestedCustomer ? <LoadingStatus label="선택한 거래처 불러오는 중" />
-          : <><p className={styles.hint}>촬영하거나 앨범에서 선택해요</p><div className={styles.entrySources}>
-            <button type="button" aria-label={`${requestedCustomer.name} 사진 촬영`} disabled={!ready || !uploads.ready || !captureAvailable(requestedCustomer.customerId)} onClick={() => capture(requestedCustomer)}><Icon name="camera" size={20} />사진 촬영</button>
-            <button type="button" aria-label={`${requestedCustomer.name} 앨범에서 선택`} disabled={!ready || !uploads.ready || !captureAvailable(requestedCustomer.customerId)} onClick={() => album(requestedCustomer)}><Icon name="upload" size={20} />앨범에서 선택</button>
-          </div>{!uploads.ready && !uploads.storageError ? <p role="status" className={styles.hint}>사진 기록을 준비하고 있어요.</p> : null}</>}
-      {onReturnToCustomer ? <button type="button" className={styles.entryReturn} onClick={onReturnToCustomer}><Icon name="arrow-left" size={17} />거래처 상세로 돌아가기</button> : null}
-    </section> : null}
+    {requestedCustomerId ? <DeliveryPhotoCaptureEntry state={captureEntry}
+      onCamera={() => { if (requestedCustomer) capture(requestedCustomer); }}
+      onAlbum={() => { if (requestedCustomer) album(requestedCustomer); }} onReturn={onReturnToCustomer} /> : null}
     {uploads.storageError ? <p className={styles.notice} role="alert">사진 보관을 준비하지 못했어요. 기기 저장 공간과 브라우저의 저장소 허용을 확인한 뒤 앱을 다시 열어주세요.</p> : null}
     {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
       if (data.error) data.refresh();
