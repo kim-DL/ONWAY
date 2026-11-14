@@ -22,17 +22,24 @@ export function SalesDistrictFilter({ options, value, onChange }: SalesDistrictF
     const root = rootRef.current;
     const track = trackRef.current;
     if (!root || !track) return;
+    const selected = buttonRefs.current.get(value);
+    if (selected) {
+      track.style.setProperty("--underline-left", `${selected.offsetLeft + 11}px`);
+      track.style.setProperty("--underline-width", `${selected.offsetWidth - 22}px`);
+    }
     const rootStyle = getComputedStyle(root);
     const availableWidth = root.clientWidth - parseFloat(rootStyle.paddingLeft) - parseFloat(rootStyle.paddingRight);
-    // Compare with the full rail, excluding optional arrows, so resize can remove them.
-    const overflow = track.scrollWidth > availableWidth + 1;
+    // Moving decoration must not keep overflow arrows after the options shrink.
+    const last = track.lastElementChild as HTMLElement | null;
+    const contentWidth = last ? last.offsetLeft + last.offsetWidth + 2 : 0;
+    const overflow = contentWidth > availableWidth + 1;
     const nextEdges = {
       overflow,
       previous: overflow && track.scrollLeft > 1,
-      next: overflow && track.scrollWidth - track.clientWidth - track.scrollLeft > 1,
+      next: overflow && contentWidth - track.clientWidth - track.scrollLeft > 1,
     };
     setEdges((previous) => previous.overflow === nextEdges.overflow && previous.previous === nextEdges.previous && previous.next === nextEdges.next ? previous : nextEdges);
-  }, []);
+  }, [value]);
 
   const reveal = useCallback((button: HTMLButtonElement | undefined) => {
     const track = trackRef.current;
@@ -56,6 +63,8 @@ export function SalesDistrictFilter({ options, value, onChange }: SalesDistrictF
     });
     observer.observe(root);
     observer.observe(track);
+    const selected = buttonRefs.current.get(value);
+    if (selected) observer.observe(selected);
     track.addEventListener("scroll", measure, { passive: true });
     const frame = requestAnimationFrame(measure);
     return () => {
@@ -81,7 +90,7 @@ export function SalesDistrictFilter({ options, value, onChange }: SalesDistrictF
   return (
     <div ref={rootRef} className={styles.filter} data-overflow={edges.overflow}>
       {edges.overflow ? <button type="button" className={styles.scrollButton} disabled={!edges.previous} aria-label="이전 지역 보기" onClick={() => scroll(-1)}><Icon name="chevron-right" className={styles.previousIcon} size={18} /></button> : null}
-      <div className={styles.viewport} data-previous={edges.previous} data-next={edges.next}>
+      <div className={styles.viewport}>
         <div ref={trackRef} className={styles.track} role="radiogroup" aria-label="행정구 필터">
           {options.map((option, index) => (
             <button

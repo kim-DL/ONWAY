@@ -68,11 +68,25 @@ test("ceramic action images load and the active route keeps its icon", async ({ 
 
 test("scope and past month preserve management restrictions", async ({ page }) => {
   await open(page);
+  const scope = page.getByRole("group", { name: "학교 범위" });
+  const expectScopeUnderline = async () => {
+    expect(await scope.evaluate(element => {
+      const selected = element.querySelector<HTMLElement>('[aria-pressed="true"]')!;
+      const line = getComputedStyle(element, "::after");
+      return Math.abs(parseFloat(line.left) + parseFloat(line.width) / 2 - selected.offsetLeft - selected.offsetWidth / 2);
+    })).toBeLessThanOrEqual(1);
+    await expect(scope).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(scope.locator('[aria-pressed="true"]')).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(scope).toHaveCSS("border-top-width", "0px");
+  };
+  await expectScopeUnderline();
   await page.getByRole("button", { name: "전체 보기", exact: true }).click();
+  await expectScopeUnderline();
   await expect(page.locator(".school-assignment-card")).toHaveCount(3);
   await expect(page.locator(".sales-school-command")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "내 학교 정리" })).toHaveCount(0);
   await page.getByRole("button", { name: "내 학교", exact: true }).click();
+  await expectScopeUnderline();
   await page.getByRole("button", { name: "내 학교 정리" }).click();
   await expect(page.getByRole("checkbox").first()).toBeEnabled();
   await expect(page.getByRole("checkbox").last()).toBeDisabled();

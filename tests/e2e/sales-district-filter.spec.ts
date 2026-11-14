@@ -40,11 +40,21 @@ async function fixture(page: Page, width = 390) {
 
 const radios = (page: Page) => page.getByRole("radiogroup", { name: "행정구 필터" });
 const rail = (page: Page) => page.locator("[data-overflow]");
+async function expectUnderline(page: Page) {
+  await expect.poll(() => radios(page).evaluate(track => {
+    const selected = track.querySelector<HTMLElement>('[aria-checked="true"]')!;
+    const line = getComputedStyle(track, "::after");
+    return Math.abs(parseFloat(line.left) + parseFloat(line.width) / 2 - selected.offsetLeft - selected.offsetWidth / 2);
+  })).toBeLessThanOrEqual(1);
+  await expect(radios(page).getByRole("radio").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(radios(page).getByRole("radio").first()).toHaveCSS("border-top-width", "0px");
+}
 
 for (const width of [320, 390]) {
   test(`compact district counts, selected state, and real filtering at ${width}px`, async ({ page }, testInfo) => {
     await fixture(page, width);
     await expect(radios(page).getByRole("radio", { name: "전체 지역, 40곳" })).toBeChecked();
+    await expectUnderline(page);
     await expect(rail(page)).toHaveAttribute("data-overflow", "true");
     const box = await rail(page).boundingBox();
     expect(box!.height).toBeLessThanOrEqual(64);
@@ -56,6 +66,7 @@ for (const width of [320, 390]) {
     await radios(page).getByRole("radio", { name: "서구, 8곳" }).click();
     await expect(page.getByTestId("selection")).toHaveText("seo:8");
     await expect(radios(page).getByRole("radio", { name: "서구, 8곳" })).toBeChecked();
+    await expectUnderline(page);
     await expect(radios(page).getByRole("radio", { name: "전체 지역, 40곳" })).not.toBeChecked();
     await expect(page.locator(".fixture-results small")).toHaveText(["seo", "seo", "seo"]);
     await radios(page).getByRole("radio", { name: "전체 지역, 40곳" }).click();
@@ -80,6 +91,7 @@ test("keyboard single-selection moves focus with arrows and Home/End, while Tab 
   const last = radios(page).getByRole("radio", { name: "유성구, 8곳" });
   await expect(last).toBeFocused();
   await expect(last).toBeChecked();
+  await expectUnderline(page);
   await expect(page.getByRole("button", { name: "다음 지역 보기" })).toBeDisabled();
   await page.keyboard.press("ArrowRight");
   await expect(all).toBeFocused();
@@ -111,6 +123,7 @@ test("overflow arrows reveal options without changing selection and disappear wh
   await expect(next).toHaveCount(0);
   await expect(previous).toHaveCount(0);
   await expect(radios(page).getByRole("radio", { name: "전체 지역, 40곳" })).toBeChecked();
+  await expectUnderline(page);
 });
 
 test("a removed active district stays visible with zero schools until the user returns to all", async ({ page }) => {
@@ -123,6 +136,7 @@ test("a removed active district stays visible with zero schools until the user r
   await expect(page.getByTestId("selection")).toHaveText("all:8");
   await expect(radios(page).getByRole("radio")).toHaveCount(2);
   await expect(rail(page)).toHaveAttribute("data-overflow", "false");
+  await expectUnderline(page);
 });
 
 test("200% text, reduced motion, forced colors and accessible radio semantics remain usable", async ({ page }, testInfo) => {
@@ -152,12 +166,18 @@ test("200% text, reduced motion, forced colors and accessible radio semantics re
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
   expect(dimensions.height).toBeGreaterThanOrEqual(44);
   expect(dimensions.duration.split(",").every((value) => Number.parseFloat(value) <= .00001)).toBe(true);
+  await expectUnderline(page);
+  expect(await radios(page).evaluate(element => Number.parseFloat(getComputedStyle(element, "::after").transitionDuration))).toBeLessThanOrEqual(.00001);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   const audit = await new AxeBuilder({ page }).include("#district-fixture").withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(audit.violations).toEqual([]);
   await page.screenshot({ path: `output/playwright/sales-district-filter/large-text-${testInfo.project.name}.png`, fullPage: true });
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
-  await expect(selected).toHaveCSS("border-top-style", "solid");
+  await expect(selected).toHaveCSS("border-top-width", "0px");
+  expect(await radios(page).evaluate(element => {
+    const line = getComputedStyle(element, "::after");
+    return line.height === "2px" && line.backgroundColor !== "rgba(0, 0, 0, 0)";
+  })).toBe(true);
   await expect(selected).toHaveCSS("outline-width", "3px");
   await page.keyboard.press("Home");
   await expect(all).toBeChecked();

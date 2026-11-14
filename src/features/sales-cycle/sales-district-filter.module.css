@@ -4,28 +4,12 @@
   gap: 2px;
   min-width: 0;
   width: 100%;
-  padding: 4px;
   margin-bottom: 10px;
-  border: 1px solid #ddd3e4;
-  border-radius: 13px;
-  background: #f0ebf3;
 }
 
 .viewport { position: relative; flex: 1; min-width: 0; }
-.viewport::before, .viewport::after {
-  position: absolute;
-  z-index: 1;
-  top: 2px;
-  bottom: 2px;
-  width: 12px;
-  content: "";
-  pointer-events: none;
-  opacity: 0;
-}
-.viewport::before { left: 0; background: linear-gradient(90deg, #f0ebf3, transparent); }
-.viewport::after { right: 0; background: linear-gradient(-90deg, #f0ebf3, transparent); }
-.viewport[data-previous="true"]::before, .viewport[data-next="true"]::after { opacity: 1; }
 .track {
+  position: relative;
   display: flex;
   gap: 3px;
   overflow-x: auto;
@@ -34,8 +18,19 @@
   padding: 2px;
 }
 .track::-webkit-scrollbar { display: none; }
+.track::after {
+  position: absolute;
+  bottom: 2px;
+  left: var(--underline-left, 0);
+  width: var(--underline-width, 0);
+  height: 2px;
+  content: "";
+  border-radius: 1px;
+  background: #8a759f;
+  pointer-events: none;
+  transition: left 180ms ease, width 180ms ease;
+}
 .option {
-  position: relative;
   display: flex;
   flex: 1 0 auto;
   align-items: center;
@@ -43,8 +38,8 @@
   gap: 7px;
   min-height: 44px;
   padding: 9px 11px 11px;
-  border: 1px solid transparent;
-  border-radius: 9px;
+  border: 0;
+  border-radius: 0;
   color: #605869;
   background: transparent;
   font-size: .8125rem;
@@ -52,39 +47,17 @@
   line-height: 1.35;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 150ms, color 150ms, box-shadow 150ms;
+  transition: color 150ms;
 }
-.option::after {
-  position: absolute;
-  bottom: 3px;
-  left: 14px;
-  right: 14px;
-  height: 2px;
-  content: "";
-  border-radius: 1px;
-  background: #8a759f;
-  opacity: 0;
-  transform: scaleX(.7);
-  transition: opacity 150ms, transform 150ms;
-}
-.option[aria-checked="true"] {
-  color: #625174;
-  border-color: #ae9cbd;
-  background: #e8dfed;
-  box-shadow: none;
-}
-.option[aria-checked="true"]::after { opacity: 1; transform: scaleX(1); }
+.option[aria-checked="true"] { color: #625174; }
 .count {
   min-width: 1.4em;
-  padding: 2px 4px;
-  border-radius: 5px;
   color: #605869;
-  background: #e6dfe9;
   font-size: .75rem;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
-.option[aria-checked="true"] .count { color: #625174; background: #ddd1e5; }
+.option[aria-checked="true"] .count { color: #625174; }
 .scrollButton {
   display: grid;
   place-items: center;
@@ -95,25 +68,20 @@
   border: 0;
   border-radius: 9px;
   color: #605869;
-  background: #e8dfed;
+  background: transparent;
   cursor: pointer;
 }
 .scrollButton:disabled { color: #aab2bd; background: transparent; cursor: default; }
 .previousIcon { transform: rotate(180deg); }
 .option:focus-visible, .scrollButton:focus-visible { outline: 3px solid #625174; outline-offset: -3px; }
 @media (hover: hover) {
-  .option:hover { background: #e8dfed; }
-  .scrollButton:not(:disabled):hover { color: #625174; background: #e8dfed; }
+  .option:hover, .scrollButton:not(:disabled):hover { color: #625174; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .option, .option::after { transition: none; }
+  .option, .track::after { transition: none; }
 }
 @media (forced-colors: active) {
-  .filter { color: CanvasText; border-color: CanvasText; background: Canvas; }
-  .viewport::before, .viewport::after { display: none; }
-  .option, .scrollButton, .count { color: ButtonText; background: ButtonFace; }
-  .option[aria-checked="true"] { color: ButtonText; border-color: Highlight; background: ButtonFace; }
-  .option[aria-checked="true"]::after { background: Highlight; forced-color-adjust: none; }
-  .option[aria-checked="true"] .count { color: ButtonText; background: ButtonFace; }
+  .option, .scrollButton, .count, .option[aria-checked="true"], .option[aria-checked="true"] .count { color: ButtonText; }
+  .track::after { background: Highlight; forced-color-adjust: none; }
   .option:focus-visible, .scrollButton:focus-visible { outline-color: Highlight; }
 }
