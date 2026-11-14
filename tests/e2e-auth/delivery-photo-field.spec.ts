@@ -277,7 +277,8 @@ test("field action layout audit and customer detail history use one customer sco
   await menu.getByRole("button", { name: "거래처 상세정보" }).click();
   const detail = page.getByRole("dialog", { name, exact: true });
   await expect(detail).toBeVisible();
-  const summary = detail.getByRole("button", { name: /납품사진 기록/u });
+  const summary = detail.getByRole("button", { name: /납품사진 기록,/u });
+  await expect(detail.getByRole("button", { name: `${name} 납품사진 기록하기`, exact: true })).toBeEnabled();
   await expect(summary).toContainText("최근 7일");
   await page.screenshot({ path: `${output}/customer-detail-history-390.png` });
   await summary.click();
