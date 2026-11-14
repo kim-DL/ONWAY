@@ -26,4 +26,6 @@
 
 Aside의 390px 합성 화면에서 새 아이콘과 내 학교 밑줄을 확인했다. 전체 보기 및 서구 선택 후 필터 결과는 접근성 트리로 확인했다. 추가 캡처는 Aside CDP 시간 초과로 저장하지 못했다. 실제 앱 오류나 검사 성공으로 해석하지 않는다. 합성 미리보기 탭과 서버는 종료했다. 실물 휴대폰·설치 PWA·인증된 운영 저장은 이번 검증에 포함하지 않았다.
 
-배포 전 운영 Hosting 버전은 `c493804ce74ce2b9`다. 최종 소스와 새 운영 버전, 공개 파일 확인 결과는 배포 후 기록한다.
+소스 `ab49dfa18b81dbbd7aa5faa0cb1807ab60686b17`를 커밋·푸시하고 배포 파일 143개의 해시를 고정했다. `--project onnuriway --only hosting:onnuriway`로 2026-11-14 17:54:07 KST에 Hosting `94d5e1ad58311a1a`를 배포했다. 두 공개 주소 `https://onnuriway.com`과 `https://onnuriway.web.app`의 Hosting 검사와 각각 JS/CSS 109개·아이콘 4개의 SHA-256 일치를 17:54:29에 확인했다.
+
+배포 전 운영 버전 `c493804ce74ce2b9`을 롤백 기준으로 기록했다. Functions·Rules·MCP Hosting과 운영 데이터는 변경하지 않았다. 후속 인수인계 문서 커밋은 앱 재빌드나 재배포를 하지 않는다.
