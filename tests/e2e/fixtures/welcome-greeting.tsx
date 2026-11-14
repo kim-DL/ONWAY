@@ -21,9 +21,9 @@ function Fixture({ placement, longName, greetingText, realClock }: { placement: 
     : placement === "sales" || placement === "team" ? "sales-cycle-hero" : "sales-activity-hero";
   const headings = {
     delivery: { title: "학교를 찾고", accent: "현장으로.", titleId: "delivery-home-title" },
-    sales: { title: "오늘 움직일", accent: "학교의 흐름.", titleId: "sales-cycle-title" },
-    activity: { title: "좋은 대화가", accent: "기다리고 있어요.", titleId: "sales-activity-title" },
-    team: { title: "함께 이어가는", accent: "팀의 흐름.", titleId: "sales-team-title" },
+    sales: { title: "내 담당 학교", accent: "월별 방문 현황", titleId: "sales-cycle-title" },
+    activity: { title: "담당 학교", accent: "방문 업무", titleId: "sales-activity-title" },
+    team: { title: "팀 전체 학교", accent: "월별 방문 현황", titleId: "sales-team-title" },
   };
   const salesHome = placement === "sales" || placement === "team";
   return <main id="welcome-fixture" className="workspace-shell" data-mode={placement === "delivery" ? "delivery" : "sales"}>

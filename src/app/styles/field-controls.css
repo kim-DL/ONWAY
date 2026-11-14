@@ -148,7 +148,7 @@
 .workspace-shell[data-mode="sales"] .sales-cycle-hero__greeting,
 .workspace-shell[data-mode="sales"] .cycle-selector small { color: var(--toss-grey-700); font-size: .875rem; }
 .workspace-shell[data-mode="sales"] .sales-activity-hero .shell-greeting {
-  margin: .7rem 0 .2rem;
+  margin: .7rem 0 1rem;
   color: var(--toss-grey-700);
   font-size: .875rem;
   font-weight: 700;

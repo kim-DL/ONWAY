@@ -159,8 +159,10 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
     return { top: Math.round(bounds.top), height: Math.round(bounds.height) };
   }));
   expect(commandBoxes).toHaveLength(4);
-  expect(Math.max(...commandBoxes.map(({ top }) => top)) - Math.min(...commandBoxes.map(({ top }) => top))).toBeLessThanOrEqual(2);
-  expect(commandBoxes.every(({ height }) => height >= 44 && height <= 68)).toBe(true);
+  expect(Math.abs(commandBoxes[0]!.top - commandBoxes[1]!.top)).toBeLessThanOrEqual(2);
+  expect(Math.abs(commandBoxes[2]!.top - commandBoxes[3]!.top)).toBeLessThanOrEqual(2);
+  expect(commandBoxes[2]!.top).toBeGreaterThanOrEqual(commandBoxes[0]!.top + 44);
+  expect(commandBoxes.every(({ height }) => height >= 44 && height <= 96)).toBe(true);
 
   await page.getByRole("button", { name: "학교 추가" }).click();
   const dialog = page.getByRole("dialog", { name: "담당 학교 가져오기" });

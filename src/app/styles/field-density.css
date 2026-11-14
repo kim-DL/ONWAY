@@ -20,7 +20,7 @@
   padding: clamp(1.15rem, 2.5vw, 2rem);
   border-radius: 28px 28px 28px 10px;
 }
-.sales-cycle-hero__greeting { margin-bottom: .55rem; }
+.sales-cycle-hero__greeting { margin-bottom: 1rem; }
 .sales-cycle-hero h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.25; letter-spacing: -.035em; }
 .cycle-selector { min-height: 3.25rem; margin-top: 1rem; }
 .sales-cycle-overview { padding: .45rem; border-radius: 21px; }
@@ -170,7 +170,7 @@
 .school-search-layer[data-role-scope="delivery"] .school-search-footer { font-size: .875rem; flex-wrap: wrap; gap: 8px; }
 .school-search-layer[data-role-scope="delivery"] .school-search-results { grid-auto-rows: max-content; }
 
-.workspace-shell[data-mode="delivery"] .floating-context-bar :is(button, a) { flex-direction: column; gap: 4px; padding: 8px 4px; min-height: 64px; font-size: .875rem; line-height: 1.4; word-break: keep-all; }
+.workspace-shell[data-mode="delivery"] .floating-context-bar :is(button, a) { flex-direction: column; gap: 4px; padding: 8px 4px; min-width: 44px; min-height: 64px; font-size: .875rem; line-height: 1.4; word-break: keep-all; }
 
 .workspace-shell[data-mode="delivery"] .school-detail { word-break: keep-all; overflow-wrap: anywhere; }
 [data-delivery-brief] > header { flex-wrap: wrap; }

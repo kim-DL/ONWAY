@@ -18,7 +18,7 @@ test("delivery shell exposes role navigation and opens a real school detail shel
   await expect(page.locator(".school-card")).toHaveCount(0);
   await expect(page.getByText("8곳", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "최근 본 학교" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /첫 학교를 열어보세요/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "학교를 찾아 현장정보 확인" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "학교" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("button", { name: "활동" })).toHaveCount(0);
 

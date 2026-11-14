@@ -574,13 +574,14 @@ test("delivery school details use one compact briefing with distinct school leve
   }
   expect(new Set(icons).size).toBe(3);
   await page.getByRole("combobox", { name: "검증 학교급", exact: true }).selectOption("elementary");
-  for (const width of [320, 390, 768]) {
+  for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 840 });
     const brief = detail.locator("[data-delivery-brief]");
     await expect(brief).toHaveCount(1);
     await expect(brief.locator("a small").first()).toHaveCSS("font-size", "14px");
     for (const action of await detail.getByRole("complementary", { name: "학교 빠른 작업" }).locator("button, a").all()) {
       await expect(action).toHaveCSS("font-size", "14px");
+      expect((await action.boundingBox())!.width).toBeGreaterThanOrEqual(44);
       expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(64);
       expect(await action.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     }
