@@ -5,6 +5,7 @@ import { z } from "zod";
 import { pinLookupSecret, pinPepper } from "../auth/callables.js";
 import { getAdminAuth, getAdminFirestore } from "../shared/firebase-admin.js";
 import { requireGoogleIdentity, requireVerifiedAdmin } from "./admin-authorization.js";
+import { GoogleAdminAccessError } from "./google-admin-access-service.js";
 import {
   activateAdminSessionInputSchema,
   createEmployeeInputSchema,
@@ -39,6 +40,7 @@ function service() {
 }
 
 function mapError(error: unknown) {
+  if (error instanceof GoogleAdminAccessError) return new HttpsError(error.code, error.message);
   if (error instanceof AdminPermissionError) return new HttpsError("permission-denied", error.message);
   if (error instanceof AdminNotFoundError) return new HttpsError("not-found", error.message);
   if (error instanceof AdminConflictError) return new HttpsError("failed-precondition", error.message);

@@ -10,6 +10,8 @@ export {
 import { setGlobalOptions } from "firebase-functions/v2/options";
 
 export { employeeLogin, employeeLogout } from "./auth/callables.js";
+export { changeEmployeePin } from "./auth/employee-pin-callables.js";
+export { listGoogleAdminAccess, registerGoogleAdminAccess, disableGoogleAdminAccess } from "./admin/google-admin-access-callables.js";
 export { listCustomers, saveCustomer, searchCustomerLocations, reverseCustomerLocation } from "./customer/callables.js";
 export { uploadCustomerPhoto, getCustomerPhoto, expireCustomerPhotos } from "./customer/customer-photo-callables.js";
 export {

@@ -44,6 +44,7 @@
     "test:pwa": "vitest run src/features/pwa src/lib/app-metadata.test.ts",
     "test:admin": "vitest run src/features/admin functions/tests/pin-crypto.test.ts functions/tests/login-service.test.ts",
     "test:admin:emulator": "node scripts/firebase-emulators.mjs phase15",
+    "test:operations:emulator": "node scripts/firebase-emulators.mjs operations-access",
     "test:performance": "vitest run src/lib/performance src/features/search && tsx scripts/run-phase16-performance-gate.ts",
     "verify:pwa:build": "node scripts/verify-phase14-build.mjs",
     "verify:hosting:build": "node scripts/verify-firebase-hosting-build.mjs",

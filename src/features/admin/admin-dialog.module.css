@@ -32,14 +32,14 @@
   color: #191f28;
   font-size: 22px;
   line-height: 1.35;
-  font-weight: 750;
+  font-weight: 650;
   letter-spacing: -.035em;
 }
 :global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__header) p {
   color: #6b7684;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
-  letter-spacing: .04em;
+  letter-spacing: 0;
 }
 :global(.bottom-sheet-layer):has(.content) :global(.bottom-sheet__close) {
   top: 18px;

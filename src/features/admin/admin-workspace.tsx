@@ -148,7 +148,7 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
     content = <SettingsPage data={data} session={session} onReload={reload} />;
 
   return (
-    <main className={`admin-shell ${navigationStyles.layout} ${styles.workspace}`}>
+    <main className={`admin-shell ${navigationStyles.layout} ${styles.root}`}>
       <AdminNavigation view={view} onNavigate={navigate} displayName={session.displayName}
         needsSyncReview={data?.schools.some(schoolNeedsReview) ?? false} />
       <div className="admin-main">

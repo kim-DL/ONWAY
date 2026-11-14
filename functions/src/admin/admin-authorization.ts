@@ -8,6 +8,8 @@ export interface VerifiedAdminActor {
   uid: string;
   employeeId: string;
   email: string | null;
+  sessionVersion?: number;
+  permissionsVersion?: number;
 }
 
 function signInProvider(request: CallableRequest<unknown>) {
@@ -39,6 +41,7 @@ export async function requireVerifiedAdmin(
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요합니다.");
   }
+  const identity = requireGoogleIdentity(request);
 
   const repository = new LoginRepository();
   const authz = await repository.getAuthz(request.auth.uid);
@@ -67,8 +70,8 @@ export async function requireVerifiedAdmin(
   return {
     uid: request.auth.uid,
     employeeId: authz.employeeId,
-    email: typeof request.auth.token.email === "string"
-      ? request.auth.token.email.trim().toLowerCase()
-      : null,
+    email: identity.email,
+    sessionVersion: authz.sessionVersion,
+    permissionsVersion: authz.permissionsVersion,
   };
 }

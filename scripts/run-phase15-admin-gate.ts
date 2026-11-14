@@ -35,7 +35,7 @@ const lookupSecret = "phase15-emulator-pin-lookup-secret-2026";
 const pinPepper = "phase15-emulator-pin-pepper-secret-2026";
 const now = new Date("2026-08-24T10:00:00.000Z");
 const admin = new AdminService({ db: database, auth, lookupSecret, pinPepper, now: () => now });
-const actor = { uid: "uid-admin", employeeId: "EMP-ADMIN", email: "admin@onnuriway.test" };
+const actor = { uid: "uid-admin", employeeId: "EMP-ADMIN", email: "admin@onnuriway.test", sessionVersion: 1, permissionsVersion: 1 };
 
 const reservation = await admin.reservePin(crypto.randomUUID(), actor);
 if (isForbiddenPin(reservation.pin)) throw new Error("Admin generated a forbidden PIN.");
@@ -110,13 +110,13 @@ if (!workspace.employees.some((employee) => employee.employeeId === created.empl
 }
 
 const activated = await admin.activateGoogleAdmin({
-  uid: "uid-google-admin",
+  uid: "uid-admin",
   email: "admin@onnuriway.test",
   appVersion: "phase15-gate",
 });
-const activatedUser = await auth.getUser("uid-google-admin");
+const activatedUser = await auth.getUser("uid-admin");
 const reboundEmployee = await database.doc("employees/EMP-ADMIN").get();
-if (!activated.ok || activatedUser.customClaims?.adminApproved !== true || reboundEmployee.get("firebaseUid") !== "uid-google-admin") {
+if (!activated.ok || activatedUser.customClaims?.adminApproved !== true || reboundEmployee.get("firebaseUid") !== "uid-admin") {
   throw new Error("Google allowlist activation did not bind the verified administrator.");
 }
 

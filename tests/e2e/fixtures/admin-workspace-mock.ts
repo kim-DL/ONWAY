@@ -59,7 +59,7 @@ export const adminRepository = {
   async reservePin() { await operation("reservePin"); if (adminFixtureControl.failPin) throw new Error("PIN 생성에 실패했어요. 다시 시도해주세요."); return { reservationId: "SYNTHETIC-RESERVATION", pin: "123456", expiresAt: "2099-09-08T06:10:00.000Z" }; },
   async createEmployee(input: unknown) { await operation("createEmployee", input); return adminFixtureData.employees[1]; },
   async updateEmployee(input: unknown) { await operation("updateEmployee", input); return adminFixtureData.employees[1]; },
-  async rotatePin(input: unknown) { await operation("rotatePin", input); return { employeeId: "FIXTURE", pin: "654321", sessionRevoked: true }; },
+  async rotatePin(input: { revokeSessions: boolean }) { await operation("rotatePin", input); return { employeeId: "FIXTURE", pin: "654321", sessionRevoked: input.revokeSessions }; },
   async revokeSessions(input: unknown) { await operation("revokeSessions", input); return { employeeId: "FIXTURE", sessionVersion: 3 }; },
   async previewNeis() { await operation("previewNeis"); if (adminFixtureControl.failPreview) throw new Error("NEIS 미리보기를 불러오지 못했어요."); return preview(); },
   async applyNeis(input: unknown) { await operation("applyNeis", input); return {}; },

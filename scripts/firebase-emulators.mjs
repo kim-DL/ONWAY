@@ -297,8 +297,14 @@ if (mode === "start") {
     ...commonArgs,
     phase13Command,
   ];
-} else if (mode === "phase15") {
+} else if (mode === "phase15" || mode === "operations-access") {
   environment.CI = "true";
+  if (mode === "operations-access") {
+    delete environment.GOOGLE_APPLICATION_CREDENTIALS;
+    delete environment.FIREBASE_TOKEN;
+    environment.GCLOUD_PROJECT = "demo-onnuriway";
+    environment.GOOGLE_CLOUD_PROJECT = "demo-onnuriway";
+  }
   const tscCli = join(projectRoot, "node_modules", "typescript", "bin", "tsc");
   const buildResult = spawnSync(process.execPath, [tscCli], {
     cwd: join(projectRoot, "functions"),
@@ -308,7 +314,7 @@ if (mode === "start") {
   if (buildResult.error) console.error(buildResult.error.message);
   if (buildResult.status !== 0) process.exit(buildResult.status ?? 1);
   const tsxCli = join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
-  const phase15Command = `"${process.execPath}" "${tsxCli}" "${join(projectRoot, "scripts", "run-phase15-admin-gate.ts")}"`;
+  const phase15Command = `"${process.execPath}" "${tsxCli}" "${join(projectRoot, "scripts", mode === "operations-access" ? "run-operations-access-gate.mjs" : "run-phase15-admin-gate.ts")}"${mode === "operations-access" && commandParts.includes("--race-only") ? " --race-only" : ""}`;
   firebaseArgs = [
     "emulators:exec",
     "--only",

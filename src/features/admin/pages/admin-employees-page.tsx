@@ -12,6 +12,7 @@ import { initials, ROLE_LABELS } from "../admin-display";
 import { EmployeeDetail, NewEmployeeDialog } from "../admin-employee-dialogs";
 import { useAdminInteraction } from "../admin-interaction";
 import { EmptyState, PageHeading } from "../admin-page-parts";
+import { GoogleAdminAccess } from "../google-admin-access";
 
 export function EmployeesPage({
   data,
@@ -28,6 +29,7 @@ export function EmployeesPage({
     data.employees[0]?.employeeId ?? "",
   );
   const [creating, setCreating] = useState(false);
+  const [tab, setTab] = useState<"employees" | "google">("employees");
   const employees = useMemo(
     () =>
       data.employees.filter((employee) =>
@@ -45,17 +47,29 @@ export function EmployeesPage({
     <section className="admin-page" aria-labelledby="employees-title">
       <PageHeading
         title="직원 관리"
-        description="직원 역할, 일회성 PIN, 계정 상태와 세션을 한곳에서 관리합니다."
+        description="직원 로그인과 업무 권한, Google 운영자 계정을 관리합니다."
         action={
-          <GlassButton
+          tab === "employees" ? <GlassButton
             variant="primary"
             compact
             onClick={() => { if (interaction.canNavigate()) setCreating(true); }}
           >
             <Icon name="user" size={17} /> 새 직원
-          </GlassButton>
+          </GlassButton> : null
         }
       />
+      <div className="admin-account-tabs" role="tablist" aria-label="계정 관리 구분" onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) || !interaction.canNavigate()) return;
+        event.preventDefault();
+        const next = event.key === "Home" ? "employees" : event.key === "End" ? "google" : tab === "employees" ? "google" : "employees";
+        setTab(next);
+        document.getElementById(`account-tab-${next}`)?.focus();
+      }}>
+        {([ ["employees", "직원 계정"], ["google", "Google 운영자"] ] as const).map(([id, label]) => <button type="button" role="tab" id={`account-tab-${id}`} aria-controls={`account-panel-${id}`} aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} key={id} onClick={() => { if (interaction.canNavigate()) setTab(id); }}>{label}</button>)}
+      </div>
+      <div role="tabpanel" id={`account-panel-${tab}`} aria-labelledby={`account-tab-${tab}`}>
+      {tab === "google" ? <GoogleAdminAccess currentEmployeeId={currentEmployeeId} onReload={onReload} refreshToken={data.generatedAt} /> : <>
+      <p className="admin-account-help">처음에는 임시 PIN을 전달해주세요. 직원은 로그인 후 <strong>설정 → PIN 변경</strong>에서 원하는 번호로 바꿀 수 있습니다.</p>
       <div className="employee-master-detail">
         <div className="employee-master">
           <div className="admin-toolbar">
@@ -101,7 +115,9 @@ export function EmployeesPage({
             ))}
           </div>
         </div>
-        {selected ? (
+        {selected?.roleScopes.includes("admin") && selected.permissionsVersion === 0 ? (
+          <div className="admin-panel admin-pending-account"><h2>{selected.displayName}</h2><p>Google 첫 로그인을 기다리는 운영자입니다. 계정 연결과 접근 권한은 Google 운영자 탭에서 확인해주세요.</p><GlassButton variant="quiet" onClick={() => setTab("google")}>Google 운영자 보기</GlassButton></div>
+        ) : selected ? (
           <EmployeeDetail
             key={selected.employeeId}
             employee={selected}
@@ -115,6 +131,8 @@ export function EmployeesPage({
             description="목록에서 직원을 선택하면 상세 권한을 확인할 수 있습니다."
           />
         )}
+      </div>
+      </>}
       </div>
       {creating ? (
         <NewEmployeeDialog

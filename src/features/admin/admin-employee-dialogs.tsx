@@ -53,15 +53,19 @@ function RoleChecks({
 
 function PinReveal({
   pin,
-  title = "발급된 PIN",
+  title = "임시 PIN",
 }: {
   pin: string;
   title?: string;
 }) {
   const { showToast } = useToast();
   const copy = async () => {
-    await navigator.clipboard.writeText(pin);
-    showToast("PIN을 클립보드에 복사했습니다.");
+    try {
+      await navigator.clipboard.writeText(pin);
+      showToast("PIN을 클립보드에 복사했습니다.");
+    } catch {
+      showToast("복사하지 못했습니다. 화면의 PIN을 확인해 전달해주세요.");
+    }
   };
   return (
     <div className="admin-pin-reveal" role="status">
@@ -73,8 +77,8 @@ function PinReveal({
         <Icon name="copy" size={17} /> 복사
       </button>
       <p>
-        안전한 경로로 직원에게 전달하고 이 창을 닫아주세요. 서버에는 PIN 원문을
-        저장하지 않습니다.
+        직원에게 직접 전달한 뒤 이 창을 닫아주세요. 직원은 로그인 후 설정에서
+        원하는 PIN으로 변경할 수 있습니다.
       </p>
     </div>
   );
@@ -186,8 +190,8 @@ export function NewEmployeeDialog({
           </label>
           <div className="admin-pin-step">
             <div>
-              <span>로그인 PIN</span>
-              <small>암호학적 난수로 만들고 10분간 등록을 예약합니다.</small>
+              <span>처음 로그인할 임시 PIN</span>
+              <small>다른 직원과 겹치지 않는 번호를 준비합니다. 10분 안에 등록해주세요.</small>
             </div>
             {reservation ? (
               <PinReveal pin={reservation.pin} title="사용 가능한 PIN" />
@@ -197,8 +201,8 @@ export function NewEmployeeDialog({
                 disabled={status === "pin"}
                 onClick={() => void reserve()}
               >
-                <Icon name="sparkles" size={17} />
-                {status === "pin" ? "안전한 PIN 생성 중…" : "무작위 PIN 생성"}
+                <Icon name="plus" size={17} />
+                {status === "pin" ? "PIN 준비 중…" : "임시 PIN 만들기"}
               </button>
             )}
           </div>
@@ -244,6 +248,8 @@ export function EmployeeDetail({
   const [revokeOnSave, setRevokeOnSave] = useState(false);
   const [working, setWorking] = useState(false);
   const [rotatedPin, setRotatedPin] = useState<string | null>(null);
+  const [revokeOnReset, setRevokeOnReset] = useState(false);
+  const [resetRequestId, setResetRequestId] = useState<string | null>(null);
   const pinRelease = useRef<(() => void) | null>(null);
   const employeePending = useRef(false);
   const [securityAction, setSecurityAction] = useState<"pin" | "sessions" | null>(null);
@@ -325,18 +331,21 @@ export function EmployeeDetail({
     employeePending.current = true;
     setWorking(true);
     try {
+      const requestId = resetRequestId ?? crypto.randomUUID();
+      setResetRequestId(requestId);
       const result = await adminRepository.rotatePin({
         employeeId: employee.employeeId,
-        revokeSessions: true,
+        revokeSessions: revokeOnReset,
         reason: reason || "관리자 PIN 재발급",
+        requestId,
       });
       if (!mounted.current) return;
       setRotatedPin(result.pin);
-      showToast("새 PIN을 발급하고 기존 세션을 종료했습니다.");
+      showToast(result.sessionRevoked ? "임시 PIN을 발급하고 기존 로그인을 종료했습니다." : "임시 PIN을 발급했습니다. 기존 로그인은 유지됩니다.");
     } catch (error) {
       release();
       pinRelease.current = null;
-      if (mounted.current) showToast(adminErrorMessage(error));
+      if (mounted.current) showToast(error && typeof error === "object" && "code" in error && error.code === "functions/already-exists" && "message" in error ? String(error.message) : adminErrorMessage(error));
     } finally {
       if (mounted.current) setWorking(false);
       employeePending.current = false;
@@ -366,10 +375,12 @@ export function EmployeeDetail({
         </div>
       </header>
       {securityAction ? (
-        <AdminDialog title={securityAction === "pin" ? (rotatedPin ? "새 PIN을 확인해주세요." : "PIN을 재발급할까요?") : "기존 로그인을 종료할까요?"} eyebrow="" busy={working} onClose={() => void closeSecurity()}>
+        <AdminDialog title={securityAction === "pin" ? (rotatedPin ? "임시 PIN을 확인해주세요." : "임시 PIN을 발급할까요?") : "기존 로그인을 종료할까요?"} eyebrow="" busy={working} onClose={() => void closeSecurity()}>
           <div className="admin-dialog-body">
             {rotatedPin ? <PinReveal pin={rotatedPin} title={`${employee.displayName} 직원 PIN`} /> :
-              <p>{employee.displayName} 직원의 {securityAction === "pin" ? "기존 PIN과 모든 로그인 세션이 종료됩니다. 새 PIN은 이 창에서 한 번만 표시됩니다." : "모든 기존 로그인 세션을 종료합니다. 다시 로그인하면 업무를 이어갈 수 있습니다."}</p>}
+              <p>{employee.displayName} 직원의 {securityAction === "pin" ? `기존 PIN을 임시 번호로 바꿉니다. ${revokeOnReset ? "기존 로그인도 모두 종료됩니다." : "로그인된 기기는 그대로 사용할 수 있습니다."}` : "모든 기존 로그인 세션을 종료합니다. 다시 로그인하면 업무를 이어갈 수 있습니다."}</p>}
+            {securityAction === "pin" && !rotatedPin ? <label className="admin-check-row"><input type="checkbox" checked={revokeOnReset} disabled={working || resetRequestId !== null} onChange={(event) => setRevokeOnReset(event.target.checked)} /><span aria-hidden="true"><Icon name="check" size={14} /></span><strong>기존 로그인도 종료하기</strong></label> : null}
+            {securityAction === "pin" && !rotatedPin ? <p className="admin-field-help">기기를 잃어버렸거나 다른 사람의 사용이 의심될 때 선택해주세요.</p> : null}
             <footer>
               <GlassButton variant="quiet" disabled={working} onClick={() => void closeSecurity()}>{rotatedPin ? "확인하고 닫기" : "취소"}</GlassButton>
               {!rotatedPin ? <GlassButton variant="primary" disabled={working} onClick={() => {
@@ -378,7 +389,7 @@ export function EmployeeDetail({
                   employeeId: employee.employeeId,
                   reason: reason || "관리자 세션 종료",
                 }), "모든 기존 세션을 종료했습니다.").then(() => setSecurityAction(null));
-              }}>{working ? "처리 중…" : securityAction === "pin" ? "PIN 재발급" : "세션 종료"}</GlassButton> : null}
+              }}>{working ? "처리 중…" : securityAction === "pin" ? "임시 PIN 발급" : "세션 종료"}</GlassButton> : null}
             </footer>
           </div>
         </AdminDialog>
@@ -393,7 +404,7 @@ export function EmployeeDetail({
         </label>
         <RoleChecks roles={roles} disabledAdmin onChange={setRoles} />
         <p className="admin-field-help">
-          관리자 역할은 Google 서버 허용목록 절차로만 부여하거나 해제합니다.
+          운영 권한은 Google 운영자 탭에서 등록하거나 해제합니다.
         </p>
         <label className="admin-switch-row">
           <span>
@@ -414,7 +425,7 @@ export function EmployeeDetail({
           <input
             type="checkbox"
             checked={status === "active"}
-            disabled={isSelf}
+            disabled={isSelf || isAdmin}
             onChange={(event) =>
               setStatus(event.target.checked ? "active" : "disabled")
             }
@@ -460,15 +471,15 @@ export function EmployeeDetail({
         <button
           type="button"
           disabled={working || isAdmin}
-          onClick={() => { if (interaction.canNavigate()) setSecurityAction("pin"); }}
+          onClick={() => { if (interaction.canNavigate()) { setResetRequestId(null); setRevokeOnReset(false); setSecurityAction("pin"); } }}
         >
           <Icon name="refresh" size={17} />
           <span>
-            <strong>PIN 재발급</strong>
+            <strong>임시 PIN 발급</strong>
             <small>
               {isAdmin
                 ? "관리자는 Google 로그인 사용"
-                : "기존 세션도 함께 종료"}
+                : "PIN을 잊은 직원을 위한 새 번호"}
             </small>
           </span>
           <Icon name="chevron-right" size={17} />

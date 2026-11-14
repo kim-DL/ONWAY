@@ -33,6 +33,8 @@ test.beforeAll(async () => {
 async function fixture(page: Page, width = 320, kind = "navigation") {
   await page.setViewportSize({ width, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("http://127.0.0.1:3102/admin-fixture", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>관리자 검증</title>" }));
+  await page.goto("http://127.0.0.1:3102/admin-fixture");
   await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
     contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
   }));
@@ -252,9 +254,9 @@ test("actual employee modal traps focus and restores its trigger; a PIN generati
   await page.keyboard.press("Space");
   await expect(salesRole).not.toBeChecked();
   await page.evaluate(() => { window.adminFixture.failPin = true; });
-  await dialog.getByRole("button", { name: "무작위 PIN 생성", exact: true }).click();
+  await dialog.getByRole("button", { name: "임시 PIN 만들기", exact: true }).click();
   await expect(page.getByText("PIN 생성에 실패했어요. 다시 시도해주세요.", { exact: true })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "무작위 PIN 생성", exact: true })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "임시 PIN 만들기", exact: true })).toBeEnabled();
   await expect(dialog.getByRole("button", { name: "직원 등록", exact: true })).toBeDisabled();
   expect((await new AxeBuilder({ page }).include(".bottom-sheet-layer:modal").analyze()).violations).toEqual([]);
   await page.keyboard.press("Escape");
@@ -268,7 +270,7 @@ test("actual employee save cannot be dismissed by Escape or PWA Back and shows i
   await page.getByRole("button", { name: "새 직원", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "새 직원 등록", exact: true });
   await dialog.getByRole("textbox", { name: "직원 이름", exact: true }).fill("검증 신규직원");
-  await dialog.getByRole("button", { name: "무작위 PIN 생성", exact: true }).click();
+  await dialog.getByRole("button", { name: "임시 PIN 만들기", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "직원 등록", exact: true })).toBeEnabled();
   await page.evaluate(() => window.adminFixture.held.push("createEmployee"));
   await dialog.getByRole("button", { name: "직원 등록", exact: true }).click();
@@ -304,14 +306,14 @@ test("searched employee PIN stays available until acknowledgement when a reload 
       displayName: "김변경 영업부장",
     };
   });
-  await detail.getByRole("button", { name: /^PIN 재발급/ }).click();
-  const confirmation = page.getByRole("dialog", { name: "PIN을 재발급할까요?", exact: true });
-  await confirmation.getByRole("button", { name: "PIN 재발급", exact: true }).click();
+  await detail.getByRole("button", { name: /^임시 PIN 발급/ }).click();
+  const confirmation = page.getByRole("dialog", { name: "임시 PIN을 발급할까요?", exact: true });
+  await confirmation.getByRole("button", { name: "임시 PIN 발급", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.adminFixture.pending)).toContain("rotatePin");
   await page.keyboard.press("Escape");
   await expect(confirmation).toBeVisible();
   await page.evaluate(() => window.adminFixture.resolve("rotatePin"));
-  const result = page.getByRole("dialog", { name: "새 PIN을 확인해주세요.", exact: true });
+  const result = page.getByRole("dialog", { name: "임시 PIN을 확인해주세요.", exact: true });
   await expect(result).toBeVisible();
   await expect(result.getByText("654321", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.adminFixture.calls.load?.length ?? 0)).toBe(loadCount);

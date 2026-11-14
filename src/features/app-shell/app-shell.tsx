@@ -50,6 +50,8 @@ import { readCustomerNavigationContext, type CustomerNavigationContext, type Del
 
 const subscribeToStoredMode = () => () => undefined;
 
+const PinChangeDialog = dynamic(() => import("@/features/auth/pin-change-dialog").then((module) => module.PinChangeDialog));
+
 function AdminWorkspaceLoading() {
   const { startedAt } = useLaunchTiming();
   return <LoadingStatus className="admin-loading" label="관리자 화면 여는 중" detail="관리자 화면을 준비하고 있습니다." startedAt={startedAt} />;
@@ -185,6 +187,7 @@ function SettingsPage({ session, onBack, backLabel = "재고로 돌아가기" }:
   const { install, installState, isOnline } = usePwa();
   const { showToast } = useToast();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [changingPin, setChangingPin] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [exportingDiagnostics, setExportingDiagnostics] = useState(false);
   const { paused: headerMotionPaused, setPaused: setHeaderMotionPaused } = useHeaderMotionPreference();
@@ -248,6 +251,7 @@ function SettingsPage({ session, onBack, backLabel = "재고로 돌아가기" }:
         </SoftCard>
 
         <SoftCard className="settings-list">
+          {!session.claims.roleScopes.includes("admin") ? <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>로그인 PIN</strong><small>원하는 숫자 6자리로 바꿀 수 있습니다. 현재 로그인은 유지됩니다.</small></span><button className="pwa-install-action" type="button" onClick={() => setChangingPin(true)}>PIN 변경</button></div> : null}
           <div><span className="settings-list__icon"><Icon name="check" /></span><span><strong>세션 보호</strong><small>권한 변경을 실시간으로 확인합니다.</small></span><StatusBadge tone="success">안전하게 연결됨</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="download" /></span><span><strong>기기 앱</strong><small>{installState === "installed" ? "홈 화면에서 독립 실행됩니다." : "설치하면 오프라인에서도 빠르게 시작합니다."}</small></span>{installState === "available" ? <button className="pwa-install-action" type="button" onClick={() => void install()}>앱 설치</button> : <StatusBadge tone={installState === "installed" ? "success" : "neutral"}>{installState === "installed" ? "설치됨" : "브라우저에서 사용 중"}</StatusBadge>}</div>
           <div><span className="settings-list__icon"><Icon name={isOnline ? "refresh" : "wifi-off"} /></span><span><strong>네트워크</strong><small>{isOnline ? "최신 정보와 권한을 확인할 수 있습니다." : "저장된 학교 정보만 표시합니다."}</small></span><StatusBadge tone={isOnline ? "success" : "attention"}>{isOnline ? "온라인" : "오프라인"}</StatusBadge></div>
@@ -261,6 +265,7 @@ function SettingsPage({ session, onBack, backLabel = "재고로 돌아가기" }:
         </GlassButton>
       </div>
 
+      {changingPin ? <PinChangeDialog isOnline={isOnline} onClose={() => setChangingPin(false)} /> : null}
       <BottomSheet
         open={confirmingLogout}
         dismissible={!loggingOut}

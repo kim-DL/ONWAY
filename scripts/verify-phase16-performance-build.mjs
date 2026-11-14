@@ -176,6 +176,12 @@ const adminInterfaceStylesheets = stylesheets.filter((asset) =>
 const adminInterfaceAssets = new Set(adminInterfaceStylesheets.map((asset) => asset.asset));
 const adminInterfaceRawBytes = adminInterfaceStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const adminInterfaceGzipBytes = adminInterfaceStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const pinChangeEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/pin-change-dialog"));
+const pinChangeAssets = new Set(pinChangeEntries.flatMap((entry) => entry.files));
+const pinChangeStylesheets = stylesheets.filter((asset) => pinChangeAssets.has(asset.asset));
+const pinChangeCssRawBytes = pinChangeStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
+const pinChangeCssGzipBytes = pinChangeStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const pinChangeJavascriptGzipBytes = [...pinChangeAssets].filter((asset) => asset.endsWith(".js")).map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 // Phase 45: inventory has a separate lazy boundary shared by staff and admin.
 // Account for its new UI separately, never by relaxing existing app budgets.
 const inventoryWorkspaceEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-workspace"));
@@ -231,7 +237,7 @@ const loginStylesheets = stylesheets.filter((asset) => loginEntry?.files.include
 const loginStylesheetAssets = new Set(loginStylesheets.map((asset) => asset.asset));
 const loginCssRawBytes = loginStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const loginCssGzipBytes = loginStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !loginStylesheetAssets.has(asset.asset) && !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !loginStylesheetAssets.has(asset.asset) && !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !pinChangeAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -345,7 +351,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 4 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the four approved photo viewers");
 }
-const stylesheetPartitions = [...loginStylesheets, ...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets];
+const stylesheetPartitions = [...loginStylesheets, ...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...pinChangeStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -390,6 +396,13 @@ for (const boundary of requiredBoundaries) {
   );
 }
 const serviceWorker = readFileSync(join(projectRoot, "public/sw.js"), "utf8");
+assertBudget(pinChangeEntries.length === 1 && pinChangeStylesheets.length === 1, "PIN change must retain one event-loaded boundary and stylesheet");
+assertBudget(pinChangeCssRawBytes <= 1280 && pinChangeCssGzipBytes <= 640 && pinChangeJavascriptGzipBytes <= 2304, "PIN change exceeds its isolated account-settings budget");
+for (const asset of pinChangeAssets) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), "PIN change must not load on app entry");
+  assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => pinChangeEntries.includes(entry)), "PIN change assets must load only when its form opens");
+  assertBudget(serviceWorker.includes(asset), "PIN change assets must remain precached");
+}
 for (const layer of deliveryPhotoFieldLayers) {
   assertBudget(layer.assets.length > 0 && layer.boundaries.every((name) => dynamicEntries.some((entry) => entry.boundary.endsWith(`/${name}`))), `missing delivery photo ${layer.name} boundary`);
   assertBudget(layer.measuredJavascript <= layer.javascript, `delivery photo ${layer.name} JavaScript gzip ${layer.measuredJavascript}B exceeds ${layer.javascript}B`);
@@ -514,6 +527,9 @@ const report = {
     legacyStylesheetGzipBytes: 44.5 * 1024,
     adminInterfaceRawBytes: 64 * 1024,
     adminInterfaceGzipBytes: 10 * 1024,
+    pinChangeCssRawBytes: 1280,
+    pinChangeCssGzipBytes: 640,
+    pinChangeJavascriptGzipBytes: 2304,
     photoMorphRawBytes: 6.75 * 1024,
     photoMorphGzipBytes: 1.9375 * 1024,
     combinedSchoolStylesheetRawBytes: (235 + 3.5) * 1024,
@@ -557,6 +573,9 @@ const report = {
     legacyStylesheetGzipBytes,
     adminInterfaceRawBytes,
     adminInterfaceGzipBytes,
+    pinChangeCssRawBytes,
+    pinChangeCssGzipBytes,
+    pinChangeJavascriptGzipBytes,
     photoMorphRawBytes,
     photoMorphGzipBytes,
     customerStylesheetRawBytes,
