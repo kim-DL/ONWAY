@@ -466,18 +466,10 @@
 .bottom-sheet:has(.sales-claim-composer) .assignment-picker__submit-error { font-size: .875rem; }
 .bottom-sheet:has(.sales-claim-composer) .bottom-sheet__footer :is(button, .assignment-picker__selected-count) { font-size: .875rem; }
 .workspace-shell[data-mode="sales"] .sales-cycle-metrics :is(span, small) { overflow-wrap: anywhere; }
-.workspace-shell[data-mode="sales"] .status-badge { font-size: .875rem; }
-.workspace-shell[data-mode="sales"] :is(.detail-network-state strong, .detail-network-state small, .workspace-navigation__items button, .field-editor-section-title small, .photo-caption-field, .photo-source-actions small, .school-photo-gallery p, .school-photo-gallery button, .school-photo-gallery .photo-card__image > span, [data-sales-location-brief] button) { font-size: .875rem; }
-.workspace-shell[data-mode="sales"] .field-form-grid label { font-size: 1rem; }
-.school-search-layer[data-role-scope="sales"] { word-break: keep-all; overflow-wrap: anywhere; }
-.school-search-layer[data-role-scope="sales"] :is(.school-search-header p, .school-search-summary small, .school-search-result__name small, .school-search-result__meta, .school-search-result__signals span, .school-search-state p, .school-search-field kbd) { font-size: .875rem; letter-spacing: normal; }
-.school-search-layer[data-role-scope="sales"] .school-search-result__name strong { font-size: 1rem; letter-spacing: normal; }
-.school-search-layer[data-role-scope="sales"] .school-search-result__meta { white-space: normal; }
-.school-search-layer[data-role-scope="sales"] .school-search-result__mark { background: transparent; box-shadow: none; }
+.workspace-shell:is([data-mode="sales"], [data-mode="delivery"]) .status-badge { font-size: .875rem; }
+.workspace-shell:is([data-mode="sales"], [data-mode="delivery"]) .workspace-navigation__items button { font-size: .875rem; }
 .school-search-layer[data-role-scope="sales"] .school-search-result__mark [data-school-type] { width: 40px; height: 40px; }
 .school-search-layer[data-role-scope="sales"] .school-search-result__mark svg { width: 24px; height: 24px; }
-.school-search-layer[data-role-scope="sales"] .school-search-footer { font-size: .875rem; flex-wrap: wrap; gap: 8px; }
-.school-search-layer[data-role-scope="sales"] .school-search-results { grid-auto-rows: max-content; }
 
 @media (max-width: 760px) {
   .workspace-shell[data-mode="sales"] .floating-context-bar :is(button, a) { flex-direction: column; gap: 4px; min-height: 64px; min-width: 0; padding: 8px 4px; font-size: .875rem; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
@@ -621,7 +613,7 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
 .bottom-sheet__footer .photo-uploader__actions,
 .bottom-sheet__footer .field-editor__actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .communication-editor__actions > [role="alert"] { grid-column: 1 / -1; }
-.sheet-action-error { margin: 0; padding: 8px 10px; border-radius: 8px; color: #a12b3a; background: #fff3f4; font-size: 13px; line-height: 1.45; }
+.sheet-action-error { margin: 0; padding: 8px 10px; border-radius: 8px; color: #a12b3a; background: #fff3f4; font-size: .875rem; line-height: 1.45; }
 .bottom-sheet__footer .sales-visit-form__submit button,
 .bottom-sheet__footer .photo-uploader__actions > .glass-button { width: 100%; }
 .bottom-sheet__body .sales-route-candidates,
@@ -649,9 +641,10 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
 .bottom-sheet__body .photo-dropzone:not(:has(img)) { min-height: 132px; }
 .bottom-sheet__body .photo-dropzone > span { gap: 6px; padding: 16px; }
 .bottom-sheet__body .photo-source-actions { grid-template-columns: 1fr 1fr; gap: 8px; }
-.bottom-sheet__body .photo-source-actions > label { min-height: 64px; gap: 8px; padding: 10px; border-radius: 12px; }
-.bottom-sheet__body .photo-source-actions strong { font-size: 15px; }
-.bottom-sheet__body .photo-source-actions small { font-size: 12px; }
+.bottom-sheet__body .photo-source-actions > label { min-width: 0; flex-wrap: wrap; min-height: 64px; gap: 8px; padding: 10px; border-radius: 12px; }
+.bottom-sheet__body .photo-source-actions strong { font-size: 1rem; }
+.bottom-sheet__body .photo-source-actions small { font-size: .875rem; }
+.bottom-sheet__body .photo-source-actions > label > span { min-width: 0; overflow-wrap: anywhere; }
 .visit-custom-product-list button { width: 44px; height: 44px; flex: 0 0 44px; }
 .visit-custom-product-list > span { padding-block: 0; }
 

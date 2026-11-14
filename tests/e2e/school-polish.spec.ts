@@ -5,7 +5,7 @@ import { buildCustomerCeramicFixture } from "../helpers/build-customer-ceramic-f
 
 let fixture: Awaited<ReturnType<typeof buildCustomerCeramicFixture>>;
 test.beforeAll(async () => { fixture = await buildCustomerCeramicFixture(true, false, true); });
-async function open(page: Page, empty = false) {
+async function open(page: Page, empty = false, catalogState = "") {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("http://school-polish.test/**", route => {
     const path = new URL(route.request().url()).pathname;
@@ -13,7 +13,7 @@ async function open(page: Page, empty = false) {
     if (path !== "/") return route.abort();
     return route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>학교 화면 검증</title><style>${fixture.css}</style><div id="root"></div><script>${fixture.script.replaceAll("</script>", "<\\/script>")}</script></html>` });
   });
-  await page.goto(`http://school-polish.test/${empty ? "?empty" : ""}`);
+  await page.goto(`http://school-polish.test/?${empty ? "empty&" : ""}${catalogState}`);
   await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await expect(page.getByRole("heading", { name: "최근 본 학교" })).toBeVisible();
 }
@@ -24,9 +24,11 @@ test("school home and search keep long names, readable metadata and ceramic asse
   for (const width of [320, 390, 430, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.locator(".delivery-recents__list > button")).toHaveCount(3);
-    for (const selector of [".school-search-trigger small", ".delivery-recents__school small", ".delivery-recents__time"]) {
+    for (const selector of [".school-search-trigger small", ".delivery-recents__time"]) {
       await expect(page.locator(selector).first()).toHaveCSS("font-size", "14px");
     }
+    await expect(page.locator(".delivery-recents__school strong").first()).toHaveCSS("font-size", "18px");
+    await expect(page.locator(".delivery-recents__school small").first()).toHaveCSS("font-size", "16px");
     for (const button of await page.locator(".delivery-recents button, .school-search-trigger").all()) {
       const bounds = (await button.boundingBox())!;
       expect(bounds.height).toBeGreaterThanOrEqual(44);
@@ -42,6 +44,8 @@ test("school home and search keep long names, readable metadata and ceramic asse
     const icons = page.locator(".school-search-result__mark img");
     expect(await icons.evaluateAll(async images => { await Promise.all(images.map(img => (img as HTMLImageElement).decode())); return images.every(img => (img as HTMLImageElement).naturalWidth === 192); })).toBe(true);
     await expect(page.locator(".school-search-result__meta").first()).toHaveCSS("font-size", "14px");
+    await expect(page.locator(".school-search-result__name strong").first()).toHaveCSS("font-size", "18px");
+    await expect(page.locator(".school-search-summary span").first()).toHaveCSS("font-size", "16px");
     expect(await page.locator(".school-search-result").evaluateAll(rows => rows.every(row => row.scrollWidth <= row.clientWidth + 1))).toBe(true);
     expect(await page.locator(".school-search-result__body").evaluateAll(bodies => bodies.every(body => {
       const row = body.parentElement!.getBoundingClientRect();
@@ -55,6 +59,37 @@ test("school home and search keep long names, readable metadata and ceramic asse
     await expect(page.locator(".school-search-trigger")).toBeFocused();
   }
   expect(errors).toEqual([]);
+});
+
+test("recent school names and context reflow at 200 percent without hiding information", async ({ page }, info) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await open(page);
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await expect(page.locator(".delivery-recents__school strong").first()).toHaveCSS("font-size", "36px");
+  await expect(page.locator(".delivery-recents__school small").first()).toHaveCSS("font-size", "32px");
+  expect(await page.locator(".delivery-recents__list > button").evaluateAll(rows => rows.every(row => row.scrollWidth <= row.clientWidth + 1))).toBe(true);
+  expect(await page.locator(".delivery-recents__school strong").evaluateAll(items => items.every(item => {
+    const range = document.createRange(); range.selectNodeContents(item);
+    return range.getBoundingClientRect().height <= item.clientHeight + 1;
+  }))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `output/school-readability-20261114/recent-zoom-${info.project.name}.png` });
+});
+
+test("offline catalogue status stays within the enlarged school search summary", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await open(page, false, "stale-catalog");
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await page.locator(".school-search-trigger").click();
+  const summary = page.locator(".school-search-summary");
+  await expect(summary.getByText("오프라인 카탈로그", { exact: true })).toBeVisible();
+  expect(await summary.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  expect(await summary.locator(".status-badge").evaluate(element => {
+    const badge = element.getBoundingClientRect();
+    const panel = element.parentElement!.getBoundingClientRect();
+    return badge.left >= panel.left && badge.right <= panel.right && badge.bottom <= panel.bottom;
+  })).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test("empty school entry works with keyboard and enlarged text, and search retains forced-color glyphs", async ({ page }) => {
