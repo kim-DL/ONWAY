@@ -4,7 +4,7 @@ import { resolve, sep, extname } from "node:path";
 import { buildCustomerCeramicFixture } from "../tests/helpers/build-customer-ceramic-fixture";
 import { inventoryLocationStudyCss, inventoryLocationStudyPage } from "./inventory-location-study";
 
-const fixture = await buildCustomerCeramicFixture();
+const fixture = await buildCustomerCeramicFixture(true, false, process.env.SCHOOL_PREVIEW === "true");
 const publicRoot = resolve("public");
 // The optional divider exists only in this isolated preview until the user selects it.
 const dividerCss = `html[data-preview-divider] .workspace-shell:is([data-mode="customer"],[data-mode="inventory"]) > .workspace-header{position:relative}html[data-preview-divider] .workspace-shell:is([data-mode="customer"],[data-mode="inventory"]) > .workspace-header::after{content:"";position:absolute;bottom:0;left:12px;right:12px;height:1px;pointer-events:none;background:linear-gradient(90deg,transparent,#64748b24 16%,#64748b24 84%,transparent)}`;

@@ -55,6 +55,7 @@ const MATCH_LABELS: Record<SchoolSearchResult["matchType"], string> = {
 };
 
 function ResultButton({
+  ceramic,
   item,
   matchType,
   active,
@@ -62,6 +63,7 @@ function ResultButton({
   unavailable,
   onSelect,
 }: {
+  ceramic: boolean;
   item: SchoolSearchItem;
   matchType?: SchoolSearchResult["matchType"] | undefined;
   active: boolean;
@@ -80,7 +82,14 @@ function ResultButton({
       aria-disabled={unavailable || undefined}
       onClick={onSelect}
     >
-      <span className="school-search-result__mark"><Icon name="building" /></span>
+      <span className="school-search-result__mark">
+        {ceramic ? <>
+          {/* Pre-sized static asset, shared with the school home. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ui/school-ceramic-building-v1.webp" width={48} height={48} alt="" />
+        </> : null}
+        <Icon name="building" />
+      </span>
       <span className="school-search-result__body">
         <span className="school-search-result__name">
           <strong>{item.name}</strong>
@@ -137,10 +146,12 @@ export function SchoolSearch({
   useEffect(() => {
     if (!open) return;
     const releaseScroll = lockBodyScroll();
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 20);
     return () => {
       window.clearTimeout(focusTimer);
       releaseScroll();
+      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
     };
   }, [open]);
 
@@ -225,12 +236,12 @@ export function SchoolSearch({
     : `${catalogState.recentSchools.length}개의 최근 학교`;
 
   return (
-    <div ref={layerRef} className="school-search-layer" role="dialog" aria-modal="true" aria-labelledby="school-search-title">
+    <div ref={layerRef} className="school-search-layer" data-role-scope={roleScope} role="dialog" aria-modal="true" aria-labelledby="school-search-title">
       <button className="school-search-backdrop" type="button" aria-label="학교 검색 닫기" onClick={closeSearch} />
       <section className="school-search-panel">
         <header className="school-search-header">
           <div>
-            <p>LOCAL SCHOOL INDEX</p>
+            <p>{roleScope === "delivery" ? "학교 검색" : "LOCAL SCHOOL INDEX"}</p>
             <h2 id="school-search-title">어느 학교로 갈까요?</h2>
           </div>
           <button className="school-search-close" type="button" aria-label="학교 검색 닫기" onClick={closeSearch}>
@@ -275,7 +286,7 @@ export function SchoolSearch({
           <div>
             <span>{query.trim() ? "검색 결과" : "최근 학교"}</span>
             {catalogState.status === "ready" ? (
-              <small>카탈로그 v{catalogState.catalog.version} · {catalogState.catalog.items.length}개 학교</small>
+              <small>{roleScope === "delivery" ? `${catalogState.catalog.items.length}개 학교에서 검색` : `카탈로그 v${catalogState.catalog.version} · ${catalogState.catalog.items.length}개 학교`}</small>
             ) : null}
           </div>
           {catalogState.status === "ready" ? (
@@ -301,6 +312,7 @@ export function SchoolSearch({
           ) : displayedItems.length > 0 ? displayedItems.map(({ item, matchType }, itemIndex) => (
             <ResultButton
               key={item.schoolId}
+              ceramic={roleScope === "delivery"}
               item={item}
               matchType={matchType}
               active={activeIndex === itemIndex}
@@ -314,7 +326,7 @@ export function SchoolSearch({
             <div className="school-search-state">
               <span><Icon name="search" /></span>
               <strong>검색 결과가 없습니다.</strong>
-              <p>학교명을 다시 확인해주세요. 외부 API를 자동으로 호출하지 않습니다.</p>
+              <p>{roleScope === "delivery" ? "학교명이나 초성을 다시 확인해주세요." : "학교명을 다시 확인해주세요. 외부 API를 자동으로 호출하지 않습니다."}</p>
             </div>
           ) : (
             <div className="school-search-state school-search-state--guide">
@@ -326,7 +338,7 @@ export function SchoolSearch({
         </div>
 
         <footer className="school-search-footer">
-          <span><i aria-hidden="true" />입력 중 Firestore · NEIS · Kakao 요청 0</span>
+          <span><i aria-hidden="true" />{roleScope === "delivery" ? "학교명 · 줄임말 · 초성으로 검색" : "입력 중 Firestore · NEIS · Kakao 요청 0"}</span>
           <span>↑↓ 이동 · Enter 선택 · Esc 닫기</span>
         </footer>
       </section>

@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/postcss";
 import { buildInventoryPhotoFixture } from "./build-inventory-photo-fixture";
 
 /** Real UI, isolated data boundaries. Shared by browser regression and local preview. */
-export async function buildCustomerCeramicFixture(photosEnabled = true, photoEntry = false) {
+export async function buildCustomerCeramicFixture(photosEnabled = true, photoEntry = false, schoolPreview = false) {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const data = JSON.stringify(fileURLToPath(new URL(photoEntry ? "../e2e/fixtures/customer-photo-entry-data.ts" : "../e2e/fixtures/customer-ceramic-data.ts", import.meta.url)));
   const inventoryData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/inventory-settings-data.ts", import.meta.url)));
@@ -23,7 +23,17 @@ export async function buildCustomerCeramicFixture(photosEnabled = true, photoEnt
     "delivery-photo-history-repository": `export {deliveryPhotoHistoryRepository,deliveryPhotoHistoryErrorMessage} from ${data};import {blockedWrite} from ${data};export const verifyDeliveryPhotoSession=blockedWrite;export const verifySameDeliveryPhotoSession=blockedWrite;export const invalidDeliveryPhotoResponse=()=>Error('Synthetic photo response rejected');`,
     "firebase-client": `export function getFirebaseClientServices(){throw Error('Network services are disabled in the local preview')} export function getFirebaseAuthIfInitialized(){return null}`,
   };
+  const schoolData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/school-polish-data.ts", import.meta.url)));
+  const schoolMocks: Record<string, string> = {
+    "search-catalog-repository": `import {catalog} from ${schoolData};export const createSearchSessionNamespace=()=> 'school-preview';export const searchCatalogRepository={readCached:async()=>catalog,getSchool:async()=>{throw Error('Preview navigation blocked')}};`,
+    "search-catalog-cache": `import {items} from ${schoolData};export const readRecentSchoolEntries=async()=>new URLSearchParams(location.search).has('empty')?[]:items.map((item,index)=>({item,viewedAt:Date.now()-(index+1)*3600000}));export const clearSearchClientState=async()=>{};`,
+    "use-school-search-catalog": `import {catalog,items} from ${schoolData};export const useSchoolSearchCatalog=()=>({status:'ready',catalog,recentSchools:items,refreshing:false,stale:false,retry(){},addRecentSchool(){}});`,
+  };
   const fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-ceramic.tsx", [{ name: "customer-ceramic-isolation", setup(builder) {
+    if (schoolPreview) {
+      builder.onResolve({ filter: /search-catalog-repository$|search-catalog-cache$|use-school-search-catalog$/ }, args => ({ path: args.path.split("/").at(-1)!, namespace: "school-preview" }));
+      builder.onLoad({ filter: /.*/, namespace: "school-preview" }, ({ path }) => ({ loader: "tsx", resolveDir: root, contents: schoolMocks[path]! }));
+    }
     builder.initialOptions.define = { ...builder.initialOptions.define, "process.env": "{}", "process.env.NEXT_PUBLIC_ENABLE_INVENTORY": '"true"', "process.env.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS": JSON.stringify(String(photosEnabled)) };
     builder.onResolve({ filter: /use-customers$|use-recent-customers$|customer-repository$|inventory-repository$|use-delivery-photo-data$|use-delivery-photo-catalog$|use-delivery-photo-uploads$|auth-context$|pwa-provider$|customer-map$|delivery-photo-repository$|delivery-photo-history-repository$|firebase\/client$/ }, args => args.path.endsWith("delivery-photo-history-repository") && !photoEntry ? undefined : ({
       path: args.path.endsWith("firebase/client") ? "firebase-client" : args.path.split("/").at(-1)!, namespace: "customer-ceramic",

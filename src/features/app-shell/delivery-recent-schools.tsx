@@ -142,8 +142,12 @@ export function DeliveryRecentSchools({
         </div>
       ) : (
         <button className="delivery-recents__empty" type="button" onClick={onOpenSearch}>
-          <span><Icon name="route" /></span>
-          <span><strong>첫 학교를 열어보세요.</strong></span>
+          <span>
+            {/* Pre-sized static asset shared with school search. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="school-ceramic-icon" src="/ui/school-ceramic-building-v1.webp" width={48} height={48} alt="" />
+          </span>
+          <span><strong>학교를 찾아 현장정보 확인</strong></span>
           <Icon name="chevron-right" />
         </button>
       )}

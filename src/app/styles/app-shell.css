@@ -259,14 +259,14 @@
 .shell-hero h1 em { color: var(--shell-accent); font-style: normal; }
 
 .school-search-trigger {
-  min-height: 5rem;
+  min-height: 4.35rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 1rem 0.85rem 1.15rem;
   border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 22px;
+  border-radius: 19px;
   color: var(--shell-ink);
   background: rgba(255, 255, 255, 0.68);
   box-shadow: var(--shell-shadow);
@@ -276,11 +276,10 @@
 }
 
 .school-search-trigger:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--shell-accent) 28%, white); box-shadow: 0 25px 60px rgba(42, 57, 91, 0.14); }
-.school-search-trigger > span { display: flex; align-items: center; gap: 0.9rem; text-align: left; }
-.school-search-trigger > span > svg { color: var(--shell-accent); }
+.school-search-trigger > span { display: flex; align-items: center; gap: 12px; min-width: 0; text-align: left; }
 .school-search-trigger > span span { display: grid; gap: 0.18rem; }
-.school-search-trigger strong { font-size: 0.92rem; letter-spacing: -0.02em; }
-.school-search-trigger small { color: var(--shell-ink-soft); font-size: 0.7rem; }
+.school-search-trigger strong { font-size: 1rem; letter-spacing: -0.02em; }
+.school-search-trigger small { color: var(--shell-ink-soft); font-size: .875rem; }
 .school-search-trigger > svg { color: var(--shell-ink-soft); }
 
 .soft-card {

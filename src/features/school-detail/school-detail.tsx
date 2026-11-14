@@ -374,7 +374,7 @@ export function SchoolDetail({
         <a href={directionsUrl} target="_blank" rel="noreferrer"><Icon name="route" /><span>길안내</span></a>
         {mode === "sales" ? (
           quickPhone ? <a href={phoneHref(quickPhone)}><Icon name="phone" /><span>전화</span></a> : <button type="button" disabled={!canEdit || detailState.status !== "ready"} onClick={() => openFieldEditor("contacts")}><Icon name="phone" /><span>{canEdit ? "전화 등록" : "연락처 없음"}</span></button>
-        ) : <button type="button" onClick={() => document.getElementById("school-photo-summary")?.scrollIntoView({ behavior: "smooth" })}><Icon name="building" /><span>사진</span></button>}
+        ) : <button type="button" onClick={() => document.getElementById("school-photo-summary")?.scrollIntoView({ behavior: "smooth" })}><Icon name="camera" /><span>사진</span></button>}
         {mode === "sales" ? (
           canRecordVisit ? <button className="visit-record-action" type="button" onClick={openNewVisit}><Icon name="clipboard" /><span>방문기록</span></button> : <button type="button" disabled><Icon name="clipboard" /><span>조회 전용</span></button>
         ) : canEdit ? <button type="button" onClick={() => openFieldEditor("all")}><Icon name="clipboard" /><span>정보 수정</span></button> : null}

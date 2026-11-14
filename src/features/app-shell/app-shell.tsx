@@ -153,7 +153,7 @@ function DeliveryHome({
     <section className="shell-page shell-home" aria-labelledby="delivery-home-title">
       <div className="shell-hero shell-hero--delivery">
         <div>
-          <p className="shell-kicker">DELIVERY · SCHOOL</p>
+          <p className="shell-kicker">학교 납품</p>
           <WelcomeGreeting className="shell-greeting" titleId="delivery-home-title"
             title="학교를 찾고" accent="현장으로.">
             {`${session.displayName}님, ${greeting}.`}
@@ -164,7 +164,9 @@ function DeliveryHome({
           type="button"
           onClick={onOpenSearch}
         >
-          <span><Icon name="search" /><span><strong>학교 이름으로 찾기</strong><small>학교명 · 초성 · 주소</small></span></span>
+          <span>{/* Static ceramic asset, sized before CSS loads. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="school-ceramic-icon" src="/ui/customer-ceramic-search-v1.webp" width={48} height={48} alt="" /><span><strong>학교 이름으로 찾기</strong><small>학교명 · 초성 · 주소</small></span></span>
           <Icon name="chevron-right" />
         </button>
       </div>

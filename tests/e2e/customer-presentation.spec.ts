@@ -578,6 +578,12 @@ test("delivery school details use one compact briefing with distinct school leve
     await page.setViewportSize({ width, height: 840 });
     const brief = detail.locator("[data-delivery-brief]");
     await expect(brief).toHaveCount(1);
+    await expect(brief.locator("a small").first()).toHaveCSS("font-size", "14px");
+    for (const action of await detail.getByRole("complementary", { name: "학교 빠른 작업" }).locator("button, a").all()) {
+      await expect(action).toHaveCSS("font-size", "14px");
+      expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(64);
+      expect(await action.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    }
     expect(await brief.evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopLeftRadius))).toBeLessThanOrEqual(18);
     for (const value of ["07:30", "08:00", "급식동", "파란 출입문", "출입문은 배송 후 닫아주세요."]) await expect(brief).toContainText(value);
     for (const retired of ["계단 이동", "차량과 하역", "차량 진입", "주차", "하역 위치"]) await expect(brief.getByText(retired, { exact: true })).toHaveCount(0);
