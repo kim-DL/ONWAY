@@ -126,13 +126,8 @@ export function SalesActivityWorkspace({
         <div className="sales-task-list">{model.visible.map((item) => <ActivityRow key={item.assignment.schoolId} item={item} onSelect={onSelectSchool} />)}</div>
       ) : (
         <SoftCard className="sales-activity-empty">
-          <span aria-hidden="true" />
           <h3>{queueCopy.empty}</h3>
           <p>{queue === "next" ? "학교 화면에서 미배정 학교를 추가하거나 팀 전체 현황을 확인해보세요." : "다른 업무 상태를 선택해보세요."}</p>
-          {queue === "next" ? <GlassButton compact className="sales-activity-add" onClick={onOpenSchools}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ui/sales-ceramic-add-v1.webp" width={32} height={32} alt="" />담당 학교 추가
-          </GlassButton> : null}
         </SoftCard>
       )}
     </section>

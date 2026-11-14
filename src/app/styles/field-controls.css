@@ -300,18 +300,33 @@
 .workspace-shell[data-mode="sales"] .sales-school-command:focus-visible { outline: 3px solid var(--toss-blue-deep); outline-offset: -3px; }
 .sales-activity-heading > span, .sales-activity-empty p, .sales-activity-error p { font-size: .875rem; }
 .sales-activity-heading > span { flex: none; white-space: nowrap; }
-.workspace-shell[data-mode="sales"] .sales-activity-empty { background: var(--sales-card-surface); }
-.workspace-shell[data-mode="sales"] .sales-activity-empty > span { width: 48px; border-radius: 0; background: url("/ui/sales-ceramic-organize-v1.webp") center / contain no-repeat; }
-.workspace-shell[data-mode="sales"] .sales-activity-empty p { color: var(--toss-grey-700); }
-.workspace-shell[data-mode="sales"] .sales-activity-add {
-  gap: 10px;
-  margin-top: 8px;
-  border: 1px solid #d4c9d9;
-  color: var(--toss-ink);
+.workspace-shell[data-mode="sales"] .sales-activity-empty {
+  min-height: 0;
+  gap: 8px;
+  padding: 32px 24px;
   background: var(--sales-card-surface);
-  box-shadow: 0 2px 5px #655b560d;
 }
-.sales-activity-add img { flex: none; }
+.workspace-shell[data-mode="sales"] .sales-activity-empty h3 {
+  margin: 0;
+  color: var(--toss-ink);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.5;
+  letter-spacing: -.02em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.workspace-shell[data-mode="sales"] .sales-activity-empty p {
+  max-width: 28rem;
+  margin: 0;
+  color: var(--toss-grey-700);
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
 
 .workspace-shell[data-mode="sales"] .assignment-card {
   border-color: #d8c9bf77;
@@ -488,8 +503,6 @@
 @media (forced-colors: active) {
   .workspace-shell[data-mode="sales"] :is(.sales-scope-control, .sales-activity-tabs)::after { background: Highlight; forced-color-adjust: none; }
   .workspace-shell[data-mode="sales"] :is(.sales-scope-control, .sales-activity-tabs) button:focus-visible { outline-color: Highlight; }
-  .workspace-shell[data-mode="sales"] .sales-activity-empty > span { display: none; }
-  .workspace-shell[data-mode="sales"] .sales-activity-add { border-color: ButtonText; color: ButtonText; background: ButtonFace; box-shadow: none; }
   .workspace-shell[data-mode="sales"] .sales-school-commands,
   .workspace-shell[data-mode="sales"] .sales-school-command { border-color: CanvasText; background: Canvas; color: ButtonText; box-shadow: none; }
   .workspace-shell[data-mode="sales"] .sales-school-command > span:first-child { visibility: hidden; }

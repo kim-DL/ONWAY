@@ -97,7 +97,7 @@
 .sales-task-row:hover { background: #f4f8f5; box-shadow: inset 3px 0 #e86836; }
 .sales-task-row > svg { color: #71827c; }
 .sales-activity-empty, .sales-activity-error { min-height: 17rem; display: grid; place-items: center; align-content: center; gap: .5rem; padding: 2rem; text-align: center; }
-.sales-activity-empty > span, .sales-activity-error > span { width: 3.3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 15px; color: #176353; background: #e5f0eb; }
+.sales-activity-error > span { width: 3.3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 15px; color: #176353; background: #e5f0eb; }
 .sales-activity-empty h3, .sales-activity-error h1 { margin: .25rem 0 0; font-size: 1.05rem; }
 .sales-activity-empty p, .sales-activity-error p { max-width: 32rem; margin: 0 0 .5rem; color: #687872; font-size: .8rem; line-height: 1.6; word-break: keep-all; }
 .sales-activity-error__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; margin-top: .35rem; }

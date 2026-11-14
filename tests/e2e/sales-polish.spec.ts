@@ -166,20 +166,21 @@ test("activity queues keep next, follow-up and completed work distinct", async (
   await checkUnderline();
 });
 
-test("empty activity offers a pearl school action and preserves school navigation", async ({ page }, info) => {
+test("empty activity uses readable text only and keeps school navigation available", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 1050 });
   await open(page, "empty");
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "활동", exact: true }).click();
   const empty = page.locator(".sales-activity-empty");
   await expect(empty).toBeVisible();
-  const action = page.getByRole("button", { name: "담당 학교 추가", exact: true });
-  expect(await action.locator("img").evaluate(async (img: HTMLImageElement) => { await img.decode(); return img.naturalWidth; })).toBe(192);
-  const bounds = (await action.boundingBox())!;
-  expect(bounds.height).toBeGreaterThanOrEqual(44);
+  await expect(empty.locator("button, img, svg, span")).toHaveCount(0);
+  await expect(empty.getByRole("heading")).toHaveCSS("font-size", "16px");
+  await expect(empty.locator("p")).toHaveCSS("font-size", "14px");
   expect((await new AxeBuilder({ page }).include(".sales-activity-page").analyze()).violations).toEqual([]);
-  await page.screenshot({ path: `output/sales-activity/empty-${info.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `output/sales-activity-text/empty-${info.project.name}.png`, fullPage: true });
   await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await action.focus(); await page.keyboard.press("Enter");
+  expect(await empty.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "학교", exact: true }).focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByRole("group", { name: "학교 범위" })).toBeVisible();
 });
