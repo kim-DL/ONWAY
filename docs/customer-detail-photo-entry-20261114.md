@@ -1,6 +1,6 @@
 # 거래처 상세에서 납품사진 기록하기
 
-2026-11-14 구현 완료. 브랜치는 `codex/customer-detail-photo-entry`이며 시작 커밋은 `06d9d96`이다. 후속 사용자 요청으로 재고 유통기한 임박의 붉은 표시를 함께 커밋하고 Hosting에 배포한다. 최종 후보·배포 결과는 [통합 릴리스 기록](releases/2026-11-14-customer-photo-entry-and-expiry.md)을 따른다.
+2026-11-14 구현·운영 반영 완료. 브랜치는 `codex/customer-detail-photo-entry`이며 시작 커밋은 `06d9d96`이다. 후속 사용자 요청으로 재고 유통기한 임박의 붉은 표시를 함께 커밋하고 Hosting에 배포했다. 최종 소스는 `57609a9`, Hosting version은 `82250bed5a37ee46`이다. 최종 후보·배포 결과는 [통합 릴리스 기록](releases/2026-11-14-customer-photo-entry-and-expiry.md)을 따른다.
 
 ## 사용자 동작
 
@@ -46,4 +46,4 @@ Aside에서는 합성 데이터의 실제 컴포넌트로 SVG와 320/390px 배�
 
 합성 화면 캡처와 독립 설계·검토는 Git 제외 `output/customer-detail-photo-entry/`에 있다. 미리보기 실행기는 같은 폴더의 `preview.ts`이다. 테스트는 `tests/e2e/customer-photo-entry.spec.ts`와 전용 합성 데이터로 재실행한다.
 
-실물 휴대전화의 카메라 앱 전환, 설치 PWA, 실제 운영 계정의 사진 업로드는 이번에 실행하지 않았다. 전체 운영 빌드와 릴리스 검증도 수행하지 않았다. 운영 시험 쓰기와 운영 배포는 없다.
+운영 형식 빌드와 PWA·성능·Hosting 검사, 전체 CI와 배포 후 두 주소의 공개 응답·자산 일치 검증이 통과했다. CI의 기존 공유 CSS 경고와 재실행 결과는 통합 릴리스 기록에 구분했다. 운영 시험 쓰기는 수행하지 않았다. 실물 휴대전화의 카메라 앱 전환, 설치 PWA, 실제 운영 계정의 사진 업로드는 이번에 실행하지 않았다.
