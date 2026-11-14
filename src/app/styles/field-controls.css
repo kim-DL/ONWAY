@@ -128,6 +128,7 @@
 /* Sales overview: tinted light along the card edge, with restrained geometry. */
 .workspace-shell[data-mode="sales"] .sales-cycle-hero,
 .workspace-shell[data-mode="sales"] .sales-activity-hero {
+  --mode-sales-text: var(--toss-blue-deep);
   color: var(--toss-ink);
   border-color: rgba(25, 31, 40, .08);
   border-radius: 18px;
@@ -137,7 +138,7 @@
 .workspace-shell[data-mode="sales"] .sales-cycle-hero::before,
 .workspace-shell[data-mode="sales"] .sales-activity-hero::before { display: none; }
 .workspace-shell[data-mode="sales"] .sales-cycle-hero .shell-kicker,
-.workspace-shell[data-mode="sales"] .sales-activity-hero .shell-kicker { color: var(--toss-grey-500); }
+.workspace-shell[data-mode="sales"] .sales-activity-hero .shell-kicker { color: var(--toss-grey-700); font-size: .875rem; letter-spacing: normal; }
 .workspace-shell[data-mode="sales"] .sales-cycle-hero h1 em,
 .workspace-shell[data-mode="sales"] .sales-activity-hero h1 em {
   font-family: inherit;
@@ -145,11 +146,11 @@
   font-weight: inherit;
 }
 .workspace-shell[data-mode="sales"] .sales-cycle-hero__greeting,
-.workspace-shell[data-mode="sales"] .cycle-selector small { color: var(--toss-grey-700); }
+.workspace-shell[data-mode="sales"] .cycle-selector small { color: var(--toss-grey-700); font-size: .875rem; }
 .workspace-shell[data-mode="sales"] .sales-activity-hero .shell-greeting {
   margin: .7rem 0 .2rem;
   color: var(--toss-grey-700);
-  font-size: .84rem;
+  font-size: .875rem;
   font-weight: 700;
 }
 .workspace-shell[data-mode="sales"] .sales-activity-hero__cycle {
@@ -162,9 +163,9 @@
   border-radius: 9px;
   color: var(--toss-grey-700);
   background: var(--toss-grey-50);
-  font-size: .68rem;
+  font-size: .875rem;
   font-weight: 700;
-  letter-spacing: -.02em;
+  letter-spacing: normal;
 }
 .workspace-shell[data-mode="sales"] .cycle-selector {
   border-color: var(--toss-grey-200);
@@ -184,7 +185,7 @@
   box-shadow: 0 8px 24px rgba(25, 31, 40, .055);
 }
 .workspace-shell[data-mode="sales"] .sales-cycle-progress > span,
-.workspace-shell[data-mode="sales"] .sales-activity-score > span { color: var(--toss-blue-deep); }
+.workspace-shell[data-mode="sales"] .sales-activity-score > span { color: var(--toss-blue-deep); font-size: .875rem; }
 .workspace-shell[data-mode="sales"] .sales-cycle-progress > div,
 .workspace-shell[data-mode="sales"] .sales-activity-score > div { background: var(--toss-grey-200); }
 .workspace-shell[data-mode="sales"] .sales-cycle-progress > div i,
@@ -213,7 +214,7 @@
   box-shadow: none;
 }
 .workspace-shell[data-mode="sales"] .sales-scope-control button,
-.workspace-shell[data-mode="sales"] .sales-activity-tabs button { border-radius: 10px; color: var(--toss-grey-700); }
+.workspace-shell[data-mode="sales"] .sales-activity-tabs button { min-height: 44px; border-radius: 10px; color: var(--toss-grey-700); font-size: .875rem; }
 .workspace-shell[data-mode="sales"] .sales-scope-control button[aria-pressed="true"],
 .workspace-shell[data-mode="sales"] .sales-activity-tabs button[aria-pressed="true"] {
   color: var(--toss-ink);
@@ -240,12 +241,6 @@
 }
 .workspace-shell[data-mode="sales"] .sales-school-command::after { display: none; }
 .workspace-shell[data-mode="sales"] .sales-school-command:hover { color: var(--toss-ink); background: var(--toss-grey-50); box-shadow: none; }
-.workspace-shell[data-mode="sales"] .sales-school-command > span:first-child,
-.workspace-shell[data-mode="sales"] .sales-school-command--primary > span:first-child {
-  color: var(--toss-grey-700);
-  border-radius: 9px;
-  background: var(--toss-grey-100);
-}
 .workspace-shell[data-mode="sales"] .sales-school-command small,
 .workspace-shell[data-mode="sales"] .sales-school-command--primary small { color: var(--toss-grey-700); }
 .workspace-shell[data-mode="sales"] .sales-school-command--primary,
@@ -254,8 +249,9 @@
   background: var(--toss-blue-weak);
   box-shadow: none;
 }
-.workspace-shell[data-mode="sales"] .sales-school-command--primary > span:first-child,
-.workspace-shell[data-mode="sales"] .sales-school-command[data-active="true"] > span:first-child { color: var(--toss-blue-deep); background: rgba(255, 255, 255, .66); }
+.workspace-shell[data-mode="sales"] .sales-school-command:focus-visible { outline: 3px solid var(--toss-blue-deep); outline-offset: -3px; }
+.sales-activity-heading > span, .sales-activity-empty p, .sales-activity-error p { font-size: .875rem; }
+.sales-activity-heading > span { flex: none; white-space: nowrap; }
 
 .workspace-shell[data-mode="sales"] .assignment-card {
   border-color: rgba(25, 31, 40, .08);
@@ -285,7 +281,7 @@
 .workspace-shell[data-mode="sales"] .sales-school-interest > small,
 .workspace-shell[data-mode="sales"] .sales-school-next > small,
 .workspace-shell[data-mode="sales"] .sales-school-signals > span,
-.workspace-shell[data-mode="sales"] .sales-school-brief__footer > span { color: var(--toss-grey-700); }
+.workspace-shell[data-mode="sales"] .sales-school-brief__footer > span { color: var(--toss-grey-700); font-size: .875rem; }
 .workspace-shell[data-mode="sales"] .sales-school-interest > strong { color: var(--toss-blue-deep); }
 .workspace-shell[data-mode="sales"] .sales-school-signals svg { color: var(--toss-grey-500); }
 .workspace-shell[data-mode="sales"] .sales-school-brief__grid > div,
@@ -431,6 +427,9 @@
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
   }
+}
+@media (max-width: 480px) {
+  .workspace-shell[data-mode="sales"] .sales-school-commands { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; }
 }
 
 /* Reachable actions: one content scroller, a stable heading and a reserved action row. */
@@ -621,23 +620,23 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
   gap: 2px 10px;
   margin-top: 4px;
   color: #596573;
-  font-size: .75rem;
+  font-size: .875rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .school-assignment-meta__route { color: #1b64da; font-weight: 700; }
 .school-assignment-state { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .school-assignment-delivery { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.school-assignment-delivery > span { display: inline-flex; align-items: center; gap: 4px; color: #596573; font-size: .75rem; line-height: 1.5; }
+.school-assignment-delivery > span { display: inline-flex; align-items: center; gap: 4px; color: #596573; font-size: .875rem; line-height: 1.5; }
 .school-assignment-delivery > span[data-state="delivered"] { color: #356554; }
 .school-assignment-delivery svg { flex: none; }
-.school-assignment-note { color: #596573; font-size: .75rem; line-height: 1.5; }
+.school-assignment-note { color: #596573; font-size: .875rem; line-height: 1.5; }
 .workspace-shell .school-assignment-card .status-badge,
 .workspace-shell .school-activity-row .status-badge {
   min-height: 24px;
   padding: 3px 7px;
   border-radius: 6px;
-  font-size: .6875rem;
+  font-size: .875rem;
   line-height: 1.45;
   white-space: nowrap;
 }
@@ -653,13 +652,13 @@ dialog.bottom-sheet-layer::backdrop { background: rgba(25, 31, 40, .32); backdro
   align-items: center;
   gap: 10px;
   min-height: 78px;
-  padding: 12px 14px;
+  padding: 8px 14px;
   color: #191f28;
   border-color: #edf0f3;
 }
 .school-activity-row__body { flex: 1; min-width: 0; }
-.school-activity-row__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.school-activity-row__meta > small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #596573; font-size: .75rem; line-height: 1.5; }
+.school-activity-row__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.school-activity-row__meta > small { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; color: #596573; font-size: .875rem; line-height: 1.5; }
 .school-activity-row > svg { flex: none; }
 .workspace-shell[data-mode="sales"] .school-activity-row:hover { background: #f7f9fc; box-shadow: none; }
 .workspace-shell[data-mode="sales"] :is(.school-assignment-card, .school-activity-row):focus-visible, .workspace-shell[data-mode="sales"] .school-assignment-card:has(input:focus-visible) {

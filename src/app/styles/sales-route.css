@@ -3,10 +3,6 @@
   color: var(--toss-blue-deep);
   background: var(--toss-blue-weak);
 }
-.workspace-shell[data-mode="sales"] .sales-school-command[data-route-active="true"] > span:first-child {
-  color: #fff;
-  background: var(--toss-blue-deep);
-}
 .sales-route-active {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
@@ -225,7 +221,6 @@
 }
 
 @media (max-width: 370px) {
-  .workspace-shell[data-mode="sales"] .sales-school-command strong { font-size: .61rem; }
   .sales-route-candidate__start { min-width: 3.7rem; }
 }
 

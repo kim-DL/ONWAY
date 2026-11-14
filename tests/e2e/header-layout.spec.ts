@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
   }
 });
 test.beforeAll(async () => {
-  const result = await build({ absWorkingDir: fileURLToPath(new URL("../../", import.meta.url)), entryPoints: ["tests/e2e/fixtures/header-motion.tsx"], outfile: "header-motion.js", bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent", define: { "process.env.NODE_ENV": '"development"' } });
+  const result = await build({ absWorkingDir: fileURLToPath(new URL("../../", import.meta.url)), entryPoints: ["tests/e2e/fixtures/header-motion.tsx"], outfile: "header-motion.js", bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent", external: ["/ui/*"], define: { "process.env.NODE_ENV": '"development"' } });
   motionScript = result.outputFiles.find((file) => file.path.endsWith(".js"))!.text;
   motionCss = result.outputFiles.find((file) => file.path.endsWith(".css"))!.text;
 });

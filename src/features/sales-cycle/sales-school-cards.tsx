@@ -69,7 +69,7 @@ export function AssignmentCard({
     <span className="school-assignment-state" data-has-delivery={showBrochure || showSample ? "true" : "false"}>
       {showBrochure || showSample ? <span className="school-assignment-delivery">
         {showBrochure ? <span data-state={assignment.brochureStatus}><Icon name="clipboard" size={14} />홍보지 {brochure}</span> : null}
-        {showSample ? <span data-state={assignment.sampleStatus}><Icon name="sparkles" size={14} />샘플 {sample}</span> : null}
+        {showSample ? <span data-state={assignment.sampleStatus}><Icon name="sample-box" size={14} />샘플 {sample}</span> : null}
       </span> : null}
       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
     </span>

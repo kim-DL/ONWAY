@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/postcss";
 import { buildInventoryPhotoFixture } from "./build-inventory-photo-fixture";
 
 /** Real UI, isolated data boundaries. Shared by browser regression and local preview. */
-export async function buildCustomerCeramicFixture(photosEnabled = true, photoEntry = false, schoolPreview = false) {
+export async function buildCustomerCeramicFixture(photosEnabled = true, photoEntry = false, schoolPreview = false, salesPreview = false) {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const data = JSON.stringify(fileURLToPath(new URL(photoEntry ? "../e2e/fixtures/customer-photo-entry-data.ts" : "../e2e/fixtures/customer-ceramic-data.ts", import.meta.url)));
   const inventoryData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/inventory-settings-data.ts", import.meta.url)));
@@ -24,12 +24,23 @@ export async function buildCustomerCeramicFixture(photosEnabled = true, photoEnt
     "firebase-client": `export function getFirebaseClientServices(){throw Error('Network services are disabled in the local preview')} export function getFirebaseAuthIfInitialized(){return null}`,
   };
   const schoolData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/school-polish-data.ts", import.meta.url)));
+  const salesData = JSON.stringify(fileURLToPath(new URL("../e2e/fixtures/sales-polish-data.ts", import.meta.url)));
+  const salesMocks: Record<string, string> = {
+    "use-sales-workspace": `export {useSalesWorkspace} from ${salesData}`,
+    "sales-workspace-repository": `export const createSalesSessionNamespace=()=> 'sales-preview';`,
+    "sales-assignment-repository": `import {blockedWrite} from ${data};export const claimSalesAssignments=blockedWrite,releaseSalesAssignments=blockedWrite;export const salesAssignmentErrorMessage=()=> '미리보기 저장 차단',salesAssignmentReleaseErrorMessage=salesAssignmentErrorMessage;`,
+    "sales-route-repository": `import {blockedWrite} from ${data};export const optimizeSalesRoute=blockedWrite;`,
+  };
   const schoolMocks: Record<string, string> = {
     "search-catalog-repository": `import {catalog} from ${schoolData};export const createSearchSessionNamespace=()=> 'school-preview';export const searchCatalogRepository={readCached:async()=>catalog,getSchool:async()=>{throw Error('Preview navigation blocked')}};`,
     "search-catalog-cache": `import {items} from ${schoolData};export const readRecentSchoolEntries=async()=>new URLSearchParams(location.search).has('empty')?[]:items.map((item,index)=>({item,viewedAt:Date.now()-(index+1)*3600000}));export const clearSearchClientState=async()=>{};`,
     "use-school-search-catalog": `import {catalog,items} from ${schoolData};export const useSchoolSearchCatalog=()=>({status:'ready',catalog,recentSchools:items,refreshing:false,stale:false,retry(){},addRecentSchool(){}});`,
   };
   const fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-ceramic.tsx", [{ name: "customer-ceramic-isolation", setup(builder) {
+    if (salesPreview) {
+      builder.onResolve({ filter: /use-sales-workspace$|sales-workspace-repository$|sales-assignment-repository$|sales-route-repository$/ }, args => ({ path: args.path.split("/").at(-1)!, namespace: "sales-preview" }));
+      builder.onLoad({ filter: /.*/, namespace: "sales-preview" }, ({ path }) => ({ loader: "tsx", resolveDir: root, contents: salesMocks[path]! }));
+    }
     if (schoolPreview) {
       builder.onResolve({ filter: /search-catalog-repository$|search-catalog-cache$|use-school-search-catalog$/ }, args => ({ path: args.path.split("/").at(-1)!, namespace: "school-preview" }));
       builder.onLoad({ filter: /.*/, namespace: "school-preview" }, ({ path }) => ({ loader: "tsx", resolveDir: root, contents: schoolMocks[path]! }));

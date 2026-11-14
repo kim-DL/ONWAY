@@ -37,7 +37,7 @@ async function login(page: Page, mode: "delivery" | "sales") {
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
   expect((await response).ok()).toBe(true);
   await expect(page.getByRole("heading", {
-    name: mode === "delivery" ? /학교를 찾고.*현장으로/ : /오늘 움직일.*학교의 흐름/,
+    name: mode === "delivery" ? /학교를 찾고.*현장으로/ : /내 담당 학교.*월별 방문 현황/,
   })).toBeVisible({ timeout: 30_000 });
 }
 

@@ -83,7 +83,7 @@ async function login(page: Page, pin: string) {
   }
   await pinInput.fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
-  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("2026년 8월")).toBeVisible();
 }
 
@@ -112,7 +112,7 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   expect(undersizedTargets).toEqual([]);
 
   await page.getByRole("group", { name: "학교 범위" }).getByRole("button", { name: "전체 보기" }).click();
-  await expect(page.getByRole("heading", { name: /함께 이어가는.*팀의 흐름/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /팀 전체 학교.*월별 방문 현황/ })).toBeVisible();
   await expect(page.locator(".assignment-card")).toHaveCount(5);
   await expect(page.getByText(/순위|저성과|실적 경쟁/)).toHaveCount(0);
   await page.getByRole("radiogroup", { name: "행정구 필터" }).getByRole("radio", { name: "유성구, 1곳" }).click();
@@ -120,9 +120,9 @@ test("sales A defaults to only their schools and can explicitly open the whole t
   await expect(page.getByRole("button", { name: /대전새봄초등학교, 유성구, 담당 영업 C/ })).toBeVisible();
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: /좋은 대화가.*기다리고 있어요/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /담당 학교.*방문 업무/ })).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole("heading", { name: /함께 이어가는.*팀의 흐름/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /팀 전체 학교.*월별 방문 현황/ })).toBeVisible();
 });
 
 test("sales B and C receive distinct own-school snapshots", async ({ browser }) => {
@@ -167,7 +167,7 @@ test("salesperson can search, preserve selection, and bulk-claim an unassigned s
   await expect(dialog).toBeVisible();
   await page.goBack();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible();
   await page.getByRole("button", { name: "학교 추가" }).click();
   await dialog.getByRole("searchbox", { name: "학교 검색" }).fill("미배정");
   const schoolCheckbox = dialog.getByRole("checkbox", { name: new RegExp(UI_CLAIM_SCHOOL_NAME) });

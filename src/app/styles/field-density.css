@@ -21,7 +21,7 @@
   border-radius: 28px 28px 28px 10px;
 }
 .sales-cycle-hero__greeting { margin-bottom: .55rem; }
-.sales-cycle-hero h1 { font-size: clamp(2.45rem, 4vw, 4rem); }
+.sales-cycle-hero h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.25; letter-spacing: -.035em; }
 .cycle-selector { min-height: 3.25rem; margin-top: 1rem; }
 .sales-cycle-overview { padding: .45rem; border-radius: 21px; }
 .sales-cycle-progress { padding: .7rem .75rem .65rem; }
@@ -46,7 +46,7 @@
   padding: clamp(1.15rem, 2.8vw, 2rem);
   border-radius: 26px 26px 26px 9px;
 }
-.sales-activity-hero h1 { margin: .45rem 0 0; font-size: clamp(2.65rem, 4.8vw, 4.35rem); }
+.sales-activity-hero h1 { margin: .45rem 0 0; font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.25; letter-spacing: -.035em; }
 .sales-activity-score { padding: .85rem; }
 .sales-activity-score > strong { font-size: 2.5rem; }
 .sales-activity-actions { min-height: 4.4rem; }
@@ -97,7 +97,6 @@
     padding: .9rem;
     border-radius: 22px 22px 22px 8px;
   }
-  .sales-cycle-hero h1 { font-size: clamp(2.25rem, 10vw, 3rem); }
   .cycle-selector { width: 100%; min-width: 0; min-height: 3rem; margin-top: .7rem; }
   .sales-cycle-progress { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .35rem .7rem; }
   .sales-cycle-progress > div { margin-top: 0; }
@@ -120,7 +119,6 @@
     padding: .9rem;
     border-radius: 22px 22px 22px 8px;
   }
-  .sales-activity-hero h1 { font-size: clamp(2.35rem, 10.5vw, 3.2rem); }
   .sales-activity-score { padding: .7rem; }
   .sales-activity-score > strong { font-size: 2rem; }
   .sales-activity-actions { gap: .55rem; padding: .65rem 0; }
@@ -139,10 +137,9 @@
 }
 
 @media (max-width: 480px) {
-  .sales-school-commands { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sales-school-commands { width: 100%; display: grid; }
   .sales-school-command { min-width: 0; justify-content: center; padding-inline: .4rem; }
   .sales-school-command > span:last-child small { display: none; }
-  .sales-school-command strong { font-size: .67rem; }
 }
 
 /* School mode: ceramic entry points and readable field information. */

@@ -25,6 +25,7 @@ export type IconName =
   | "refresh"
   | "return-refined"
   | "route"
+  | "sample-box"
   | "search"
   | "search-refined"
   | "settings"
@@ -44,6 +45,7 @@ interface IconProps extends SVGProps<SVGSVGElement> {
 
 // Reuse static geometry; each icon instance only creates its own SVG wrapper.
 const paths: Readonly<Record<IconName, React.ReactNode>> = {
+  "sample-box": <><path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7.5 5 17 9v4" /></>,
   "arrow-left": <><path d="m15 18-6-6 6-6" /><path d="M9 12h11" /></>,
   "arrow-down": <><path d="m7 13 5 5 5-5" /><path d="M12 18V5" /></>,
   "arrow-up": <><path d="m7 11 5-5 5 5" /><path d="M12 6v13" /></>,

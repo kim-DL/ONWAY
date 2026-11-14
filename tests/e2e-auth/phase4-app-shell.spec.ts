@@ -67,7 +67,7 @@ test("mobile delivery navigation stays compact and yields detail space to the fi
 test("sales shell provides assigned schools, team scope, and accessible touch targets", async ({ page }) => {
   await login(page, PHASE3_TEST_PINS.salesA);
 
-  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "활동" })).toBeVisible();
   await expect(page.getByRole("button", { name: "내 학교", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".assignment-card")).toHaveCount(2);
@@ -90,5 +90,5 @@ test("sales shell provides assigned schools, team scope, and accessible touch ta
   await page.getByRole("button", { name: "전체 보기" }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(5);
   await page.getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: /좋은 대화가.*기다리고 있어요/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /담당 학교.*방문 업무/ })).toBeVisible();
 });

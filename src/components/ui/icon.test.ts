@@ -30,6 +30,7 @@ const iconNames = Object.keys({
   refresh: true,
   "return-refined": true,
   route: true,
+  "sample-box": true,
   search: true,
   "search-refined": true,
   settings: true,

@@ -110,7 +110,7 @@ test("disabled employee cannot sign in", async ({ page }) => {
 test("authz revocation invalidates an active session without waiting for token expiry", async ({ page }) => {
   await page.goto("/");
   await submitPin(page, PHASE3_TEST_PINS.salesA);
-  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible({ timeout: 15_000 });
 
   await setAuthzSessionVersion("uid-sales-a", 2);
   try {

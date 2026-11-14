@@ -23,9 +23,9 @@ async function login(page: Page) {
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.salesA);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
-  await expect(page.getByRole("heading", { name: /오늘 움직일.*학교의 흐름/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "활동" }).click();
-  await expect(page.getByRole("heading", { name: /좋은 대화가.*기다리고 있어요/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /담당 학교.*방문 업무/ })).toBeVisible({ timeout: 15_000 });
 }
 
 test("sales activity is an actionable own-school queue instead of an export screen", async ({ page }) => {

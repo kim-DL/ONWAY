@@ -258,10 +258,10 @@ export function SalesWorkspace({
     <section className="shell-page sales-cycle-page" aria-labelledby="sales-cycle-title">
       <div className="sales-cycle-hero">
         <div className="sales-cycle-hero__copy">
-          <p className="shell-kicker">SALES · MONTHLY ROUTE</p>
+          <p className="shell-kicker">월별 영업 현황</p>
           <WelcomeGreeting className="sales-cycle-hero__greeting" titleId="sales-cycle-title"
-            title={scope === "mine" ? "오늘 움직일" : "함께 이어가는"}
-            accent={scope === "mine" ? "학교의 흐름." : "팀의 흐름."}>
+            title={scope === "mine" ? "내 담당 학교" : "팀 전체 학교"}
+            accent="월별 방문 현황">
             {`${session.displayName}님, ${greeting}.`}
           </WelcomeGreeting>
           <button className="cycle-selector" type="button" onClick={() => setCycleSheetOpen(true)}>
@@ -280,7 +280,7 @@ export function SalesWorkspace({
             <p>{model.totals.completed}곳 완료 · {model.totals.before}곳 방문 전</p>
           </div>
           <div className="sales-cycle-metrics">
-            <div><span>담당 학교</span><strong>{model.totals.assigned}</strong><small>이번 달</small></div>
+            <div><span>담당 학교</span><strong>{model.totals.assigned}</strong><small>조회 월 기준</small></div>
             <div><span>후속·재방문</span><strong>{model.totals.followUp}</strong><small>확인 필요</small></div>
             <div><span>샘플 전달</span><strong>{model.totals.sample}</strong><small>학교 기준</small></div>
           </div>
@@ -310,7 +310,7 @@ export function SalesWorkspace({
           />
           <div className="sales-school-commands" role="toolbar" aria-label="담당 학교 작업">
             <button type="button" className="sales-school-command" onClick={onOpenSearch}>
-              <span><Icon name="search" /></span>
+              <span data-sales-icon="search" aria-hidden="true" />
               <span><strong>학교 찾기</strong><small>전체 학교 검색</small></span>
             </button>
             {selectedCycleIsCurrent && scope === "mine" ? (
@@ -320,13 +320,13 @@ export function SalesWorkspace({
                 data-route-active={model.activeRoute ? "true" : "false"}
                 onClick={() => setRouteSheetOpen(true)}
               >
-                <span><Icon name="route" /></span>
+                <span data-sales-icon="route" aria-hidden="true" />
                 <span><strong>방문 동선</strong><small>{model.activeRoute ? "저장된 순서 보기" : "가까운 순서 만들기"}</small></span>
               </button>
             ) : null}
             {selectedCycleIsCurrent ? (
               <button type="button" className="sales-school-command sales-school-command--primary" onClick={() => { setClaimSubmitError(null); setClaimSheetOpen(true); }}>
-                <span><Icon name="building" /></span>
+                <span data-sales-icon="add" aria-hidden="true" />
                 <span><strong>학교 추가</strong><small>내 담당으로 가져오기</small></span>
               </button>
             ) : null}
@@ -339,7 +339,7 @@ export function SalesWorkspace({
                 aria-label={managing ? "정리 마침" : "내 학교 정리"}
                 onClick={() => managing ? leaveManageMode() : setManaging(true)}
               >
-                <span><Icon name={managing ? "check" : "settings"} /></span>
+                <span data-sales-icon={managing ? "done" : "organize"} aria-hidden="true" />
                 <span><strong>{managing ? "정리 마침" : "학교 정리"}</strong><small>{managing ? "목록으로 돌아가기" : "선택해서 제외하기"}</small></span>
               </button>
             ) : null}

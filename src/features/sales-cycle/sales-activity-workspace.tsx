@@ -87,18 +87,18 @@ export function SalesActivityWorkspace({
   }
 
   const queueCopy = queue === "next"
-    ? { title: "다음 방문을 준비하세요.", empty: "방문 전 학교가 없습니다." }
+    ? { title: "방문 전 학교", empty: "방문 전 학교가 없습니다." }
     : queue === "followup"
-      ? { title: "약속한 다음 행동을 이어가세요.", empty: "후속·재방문·보류 학교가 없습니다." }
-      : { title: "이번 달 완료한 학교입니다.", empty: "아직 완료한 학교가 없습니다." };
+      ? { title: "후속 관리 학교", empty: "후속·재방문·보류 학교가 없습니다." }
+      : { title: "방문 완료 학교", empty: "아직 완료한 학교가 없습니다." };
 
   return (
     <section className="shell-page sales-activity-page" aria-labelledby="sales-activity-title">
       <header className="sales-activity-hero">
         <div>
-          <p className="shell-kicker">SALES · ACTION DESK</p>
+          <p className="shell-kicker">영업 활동</p>
           <WelcomeGreeting className="shell-greeting" titleId="sales-activity-title"
-            title="좋은 대화가" accent="기다리고 있어요.">
+            title="담당 학교" accent="방문 업무">
             {`${session.displayName}님, ${greeting}.`}
           </WelcomeGreeting>
           <span className="sales-activity-hero__cycle">{model.cycleId} · 내 담당 학교 {model.total}곳</span>
