@@ -34,4 +34,8 @@
 
 앞선 재고 상세 개편의 배포 흐름으로 이어 진행한다. 최종 운영 빌드(타입 포함)와 성능·PWA·Hosting 산출물 확인이 첫 실행에 통과했다. 최초 JS gzip144050B, 재고 JS gzip25530B는 그대로다. 재고 CSS는raw31232B·gzip7007B이며 기존 raw 한도31232B에 도달했다. 예산을 높이지 않았다. 추후 재고 CSS 추가 시 기존 규칙 정리가 필요할 수 있다.
 
-제품 CSS1개와 Hosting145개 파일의 해시를 고정했고 같은 산출물을 커밋·main 병합 후 Hosting `onnuriway`에만 배포한다. 이전 Hosting은 `4d17345b15479282`다. 전체 원격 CI·기존 버튼/목록/서버 검사는 반복하지 않는다. 빌드/산출물 로그와 고정 후보는 같은 증거 폴더의 `build.log`, `performance.log`, `pwa.log`, `hosting-build.log`, `release-candidate.json`이다. 최종 식별자와 배포/공개 확인은 완료 후 기록한다.
+제품 CSS1개와 Hosting145개 파일의 해시를 고정했고 같은 산출물을 재빌드 없이 배포했다. 소스 커밋은 `c6be88675d18a350d2b1cb3fd57629a9ae62fe03`, main 병합은 `6f638bc063ecfbbcf26931677f1f576b698e7833`이며 원격 동기화했다. 병합 후 소스1개·Hosting145개 해시가 모두 일치했다.
+
+`--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting만 배포했다. 운영 버전 `bbf09c014d68644f`는2026-11-15 14:11:49 KST에 반영됐다. 두 공개 주소 `https://onnuriway.com`, `https://onnuriway.web.app` 각각36개 응답 확인과145개 파일 SHA-256 일치가 통과했다. Functions·Rules·인증·직원 세션·운영 데이터 작업은 없다. 이전 Hosting은 `4d17345b15479282`다. 전체 원격 CI·기존 버튼/목록/서버 검사는 반복하지 않았다.
+
+빌드/산출물 로그와 고정 후보는 같은 증거 폴더의 `build.log`, `performance.log`, `pwa.log`, `hosting-build.log`, `release-candidate.json`이다. 배포/공개 근거는 `deploy-hosting.log`, `release-verification.json`, `public-domain.json`, `public-firebase.json`, `public-artifact-hashes.json`에 있다. 원시 Hosting 응답의 계정 메타데이터는 ignored 폴더에만 보관하고 커밋하지 않았다.
