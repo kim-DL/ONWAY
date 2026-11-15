@@ -49,6 +49,18 @@ Unslop UI의 polish mode로 이 부분만 다듬었다. 기존 유리·세라믹
 
 운영용 Hosting 빌드와 성능·PWA·Hosting 산출물 확인이 모두 첫 실행에 통과했다. 최초 JS는gzip144050B로 그대로이며 재고 CSS는raw30377B·gzip6850B, 재고 JS는gzip25471B로 기존 예산 안에 있다. 정적 파일145개·사전 캐시129개이며 제품 파일4개와 Hosting145개 파일의 SHA-256을 `release-candidate.json`에 고정했다. 이 산출물을 다시 빌드하지 않고 배포한다.
 
-사용자의 기존 중복 검사 금지 지시에 따라 전체 원격 CI·전체 회귀를 반복하지 않는다. 승인 범위는 Hosting `onnuriway`이며 Functions·Rules·인증·직원 세션·운영 데이터 변경은 없다. 이전 Hosting은 `e1ccf66dbdbcfc1d`다. 최종 커밋·배포 식별자와 공개 확인은 완료 후 아래에 기록한다.
+사용자의 기존 중복 검사 금지 지시에 따라 전체 원격 CI·전체 회귀를 반복하지 않았다. 승인 범위인 Hosting `onnuriway`만 배포했고 Functions·Rules·인증·직원 세션·운영 데이터 변경은 없다. 버튼 글자 대비는 가장 어두운 펄 그레이 면 기준8.59:1, 수량 일치7.52:1, 완료 표시6.77:1, 미확인 아이콘3.33:1이다.
+
+| 항목 | 최종 결과 |
+| --- | --- |
+| 소스 커밋 | `78d77b843e91b74c82599e68a3e91e737a9f5ff3` |
+| main 병합 | `0c3575859c2d8ff8873d8aaeb761e3b3d84b103d`, 원격 동기화 완료 |
+| Hosting | `26b244f30104c8a2`,2026-11-15 12:27:25 KST |
+| 배포 대상 | `--project onnuriway --only hosting:onnuriway --non-interactive` |
+| 후보 확인 | 병합 후 제품4개·Hosting145개 해시 일치, 빌드/통과 검사 재실행 없음 |
+| 공개 확인 | `https://onnuriway.com`, `https://onnuriway.web.app` 각각36개 응답 확인·145개 파일 SHA-256 일치 |
+| 이전 Hosting | `e1ccf66dbdbcfc1d` |
+
+`browser-verification.json`·`browser-check.log`·`list-browser.log`·`typecheck.log`·`lint.log`는 관련 검증, `build.log`·`performance.log`·`pwa.log`·`hosting-build.log`는 최종 산출물 검증이다. `release-candidate.json`·`deploy-hosting.log`·`release-verification.json`·`public-domain.json`·`public-firebase.json`·`public-artifact-hashes.json`은 고정 후보와 최종 배포/공개 확인 근거다. 원시 Hosting 응답의 계정 메타데이터는 ignored 폴더에만 보관하며 커밋하지 않았다. 전후 캡처는 합성 데이터다.
 
 실물 휴대폰·설치 PWA·인증된 실제 재고 저장은 이번 검증 범위에 포함하지 않았다.
