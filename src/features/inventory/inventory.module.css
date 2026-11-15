@@ -56,7 +56,7 @@
 .countIndicator[data-state="done"] { color: #3e5b66; }
 .countIndicator[data-state="changed"] { color: #97641d; }
 .countIndicator[data-state="none"] { visibility: hidden; }
-.expiryBadge { display: inline-flex; align-items: center; gap: 4px; color: #677486; font-size: 14px; line-height: 1.4; font-weight: 600; }
+.expiryBadge { display: inline-flex; align-items: center; gap: 4px; color: #677486; font-size: 16px; line-height: 1.4; font-weight: 600; }
 .expiryBadge[data-urgent] { color: #b83244; background: #fff0f2; border-radius: 5px; padding: 3px 5px; }
 .cardStock { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 3px; flex: 0 1 auto; max-width: 84px; color: #215fac; }
 .cardStock strong { font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
@@ -100,37 +100,37 @@
 .error { color: #b83244; background: #fff3f4; padding: 12px; border-radius: 10px; font-size: 14px; line-height: 1.6; margin: 0; }
 .success { color: #087f5b; background: #ecfaf2; padding: 12px 16px; border-radius: 10px; font-size: 14px; margin: 0; }
 .notice { margin: 0; padding: 14px; border-radius: 10px; background: #f2f4f6; color: #4e5968; line-height: 1.7; font-size: 14px; }
-.note { display: flex; gap: 8px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 10px 12px; border-radius: 8px; background: #f3f5f7; font-size: 13px; line-height: 1.7; color: #4e5968; }
+.note { display: flex; gap: 8px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 10px 12px; border-radius: 8px; background: #f3f5f7; font-size: 16px; line-height: 1.7; color: #4e5968; }
 .note > svg { flex-shrink: 0; margin-top: 3px; }
-.detailSurface :global(.bottom-sheet__header) h2 { font-weight: 700; text-align: center; padding-inline: 32px; font-size: 20px; word-break: keep-all; overflow-wrap: anywhere; }
-.detailBody { gap: 9px; }
+.detailSurface :global(.bottom-sheet__header) h2 { font-weight: 700; text-align: center; padding-inline: 32px; font-size: 22px; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
+.detailBody { gap: 12px; & .sectionHeading h3 { font-size: 18px; } & :global(.status-badge) { font-size: 14px; font-weight: 600; white-space: normal; } }
 .detailBody .note { justify-content: center; text-align: center; background: #eff3f780; padding: 8px 10px; }
 .detailSummary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; align-items: center; }
 .detailPhoto { overflow: hidden; border-radius: 8px; aspect-ratio: 1; background: #f1f4f6; }
 .detailPhoto .photo { height: 100%; min-height: 0; margin: 0; border-radius: 0; }
 .detailPhoto .photo img { width: 100%; height: 100%; max-height: none; object-fit: cover; }
-.detailPhotoEmpty { display: grid; place-content: center; justify-items: center; gap: 8px; height: 100%; color: #58687c; font-size: 14px; }
-.detailStock { display: grid; justify-items: center; text-align: center; gap: 5px; }
-.detailStock > span { font-size: 14px; color: #58687c; }
-.detailLocation { display: flex; align-items: center; gap: 4px; color: #657386; font-size: 12px; }
+.detailPhotoEmpty { display: grid; place-content: center; justify-items: center; gap: 8px; height: 100%; color: #58687c; font-size: 16px; }
+.detailStock { display: grid; justify-items: center; text-align: center; gap: 8px; }
+.detailStock > span { font-size: 16px; color: #58687c; }
+.detailLocation { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; color: #657386; font-size: 16px; }
 .detailLocationControl { position: relative; display: inline-flex; align-items: center; }
-.detailLocation select { appearance: none; min-height: 44px; padding: 6px 24px 6px 10px; background: #edf3f7; border: 1px solid #d4e0e9; border-radius: 6px; color: #365773; font: inherit; font-size: 13px; font-weight: 400; cursor: pointer; }
+.detailLocation select { appearance: none; min-height: 44px; padding: 6px 24px 6px 10px; background: #edf3f7; border: 1px solid #d4e0e9; border-radius: 6px; color: #365773; font: inherit; font-weight: 400; cursor: pointer; }
 .detailLocationControl > svg { position: absolute; right: 7px; transform: rotate(90deg); pointer-events: none; color: #50718e; }
-.detailStock > strong { color: #215fac; font-size: clamp(30px, 7vw, 44px); line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.04em; overflow-wrap: anywhere; max-width: 100%; }
-.detailStock small { margin-left: 5px; font-size: 14px; color: #617084; }
+.detailStock > strong { color: #215fac; font-size: clamp(34px, 7vw, 44px); line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; max-width: 100%; }
+.detailStock small { margin-left: 5px; font-size: 16px; color: #617084; }
 .productFacts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; text-align: center; border-block: 1px solid #c6d2dd80; }
-.productFacts > div { padding: 8px; min-width: 0; }
-.productFacts dt { color: #58687c; font-size: 14px; margin-bottom: 4px; }
-.productFacts dd { font-size: 14px; font-weight: 500; line-height: 1.5; margin: 0; overflow-wrap: anywhere; word-break: keep-all; }
+.productFacts > div { padding: 12px 8px; min-width: 0; }
+.productFacts dt { color: #58687c; font-size: 16px; line-height: 1.4; margin-bottom: 4px; }
+.productFacts dd { font-size: 18px; font-weight: 600; line-height: 1.5; margin: 0; overflow-wrap: anywhere; word-break: keep-all; }
 .dateStockList { border: 1px solid #d3dde780; border-radius: 6px; overflow: hidden; }
-.dateStockRow { display: flex; align-items: center; gap: 8px; padding: 12px 8px; background: #ffffffad; }
+.dateStockRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 8px; background: #ffffffad; }
 .dateStockRow + .dateStockRow { border-top: 1px solid #d3dde770; }
-.dateStockRow > div { flex: 1; display: grid; gap: 2px; justify-items: start; min-width: 0; }
-.dateStockRow > div > strong { font-size: 14px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.dateStockRow .muted { font-size: 14px; margin: 0; line-height: 1.5; }
-.dateStockQuantity { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; color: #285b8f; text-align: right; overflow-wrap: anywhere; max-width: 38%; }
-.dateStockRow small { color: #58687c; font-size: 14px; font-weight: 500; }
-.dateStockRow .dateStockEdit { min-width: 52px; padding: 6px 8px; font-size: 14px; background: #e8eef9; color: #3e6198; border-color: #cbd8ec; border-radius: 8px; box-shadow: none; }
+.dateStockRow > div { flex: 1; display: grid; gap: 2px; justify-items: start; min-width: 112px; }
+.dateStockRow > div > strong { font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.dateStockRow .muted { font-size: 16px; margin: 0; line-height: 1.5; }
+.dateStockQuantity { font-size: 24px; font-variant-numeric: tabular-nums; color: #285b8f; text-align: right; overflow-wrap: anywhere; max-width: 38%; }
+.dateStockRow small { color: #58687c; font-size: 16px; font-weight: 500; }
+.dateStockRow .dateStockEdit { min-width: 56px; margin-left: auto; padding: 6px 8px; font-size: 16px; background: #e8eef9; color: #3e6198; border-color: #cbd8ec; border-radius: 8px; box-shadow: none; }
 .detailMoreActions { display: grid; gap: 8px; padding-block: 2px 8px; }
 .detailMoreActions :global(.glass-button) { justify-content: flex-start; min-width: 0; min-height: 52px; font-size: 14px; padding: 10px 12px; border-radius: 8px; box-shadow: none; background: #f1f5f8; color: #465d76; border-color: #d5dfe8; }
 .detailMoreActions :global(.glass-button) > span { flex: 1; text-align: left; }
