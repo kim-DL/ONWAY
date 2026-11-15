@@ -123,13 +123,13 @@ export function InventoryDetail({ productId, initialProduct, initialDetail, init
     </div>
     {product ? <BottomSheetActions className={styles.detailActions ?? ""}>
       {writeAllowed ? <div className={styles.detailStockActions} role="group" aria-label="재고 작업">
-        <GlassButton disabled={!canWrite || !lots.length} onClick={() => openMovement("issue")}><InventoryIcon name="issue" />출고</GlassButton>
-        <GlassButton disabled={!canWrite} onClick={() => openMovement("receive")}><InventoryIcon name="receive" />입고</GlassButton>
-        <GlassButton disabled={!canWrite || !lots.length} onClick={() => openMovement("adjust")}><InventoryIcon name="adjust" />조정</GlassButton>
+        <GlassButton disabled={!canWrite || !lots.length} onClick={() => openMovement("issue")}><InventoryIcon name="issue" /><span className={styles.detailActionText} data-kind="issue">출고</span></GlassButton>
+        <GlassButton disabled={!canWrite} onClick={() => openMovement("receive")}><InventoryIcon name="receive" /><span className={styles.detailActionText} data-kind="receive">입고</span></GlassButton>
+        <GlassButton disabled={!canWrite || !lots.length} onClick={() => openMovement("adjust")}><InventoryIcon name="adjust" /><span className={styles.detailActionText} data-kind="adjust">조정</span></GlassButton>
         <GlassButton aria-label="품목 정보 수정" disabled={!canWrite} onClick={() => setAction("edit")}><InventoryIcon name="edit" />정보 수정</GlassButton>
       </div> : null}
       <div className={styles.detailSecondaryActions}>
-        {writeAllowed ? <GlassButton className={styles.detailActionCount} aria-label="수량 일치 확인" aria-describedby={countHint ? `inventory-count-hint-${productId}` : undefined} disabled={!canCount} onClick={() => { if (canCount) setAction("count"); }}><InventoryIcon name="confirmed" /><span className={styles.detailActionLabel}>수량 일치 확인{countHint ? <small id={`inventory-count-hint-${productId}`}>{countHint}</small> : null}</span></GlassButton> : null}
+        {writeAllowed ? <GlassButton className={styles.detailActionCount} aria-label="수량 일치 확인" aria-describedby={countHint ? `inventory-count-hint-${productId}` : undefined} disabled={!canCount} onClick={() => { if (canCount) setAction("count"); }}><InventoryIcon name="confirmed" /><span className={styles.detailActionLabel}><span className={styles.detailActionText} data-kind="count">수량 일치 확인</span>{countHint ? <small id={`inventory-count-hint-${productId}`}>{countHint}</small> : null}</span></GlassButton> : null}
         <GlassButton aria-label="더보기" aria-haspopup="dialog" aria-expanded={action === "more"} onClick={() => setAction("more")}><InventoryIcon name="more" />더보기</GlassButton>
       </div>
     </BottomSheetActions> : null}

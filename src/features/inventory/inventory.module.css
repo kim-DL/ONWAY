@@ -83,7 +83,13 @@
 .detailStockActions :global(.glass-button) { min-height: 72px; flex-direction: column; justify-content: flex-start; gap: 4px; padding-block: 10px; word-break: keep-all; }
 .detailActions .detailActionCount:global(.glass-button):not(:disabled) { background: #e5edf3; color: #2e4d63; border-color: #bfced9; }
 .detailActions .detailActionCount:global(.glass-button):is(:hover, :active):not(:disabled) { background: #d8e4ed; }
-.detailActionLabel { display: grid; gap: 2px; line-height: 1.25; }
+.detailActionText { font-size: 18px; font-weight: 700; line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
+.detailActionText[data-kind="issue"] { --action-ink: #91513a; }
+.detailActionText[data-kind="receive"] { --action-ink: #245f91; }
+.detailActionText[data-kind="adjust"] { --action-ink: #4e5a70; }
+.detailActionText[data-kind="count"] { --action-ink: #24624f; }
+.detailActions :global(.glass-button):not(:disabled) .detailActionText { color: var(--action-ink); }
+.detailActionLabel { display: grid; min-width: 0; gap: 2px; line-height: 1.25; }
 .detailActionLabel small { font-size: 14px; font-weight: 400; }
 .field { display: flex; flex-direction: column; gap: 6px; color: #4e5968; font-size: 13px; font-weight: 650; min-width: 0; position: relative; }
 .field :is(input, select, textarea) { box-sizing: border-box; min-width: 0; width: 100%; min-height: 48px; border: 1px solid #d1d6db; border-radius: 10px; padding: 12px; color: #191f28; background: #fff; font: inherit; font-size: 16px; font-weight: 450; }
@@ -170,4 +176,4 @@
 @media (min-width: 900px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 359px) { .productButton { gap: 6px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 18px; } .filters { gap: 6px; } }
 @media (prefers-reduced-motion: reduce) { .indicator, .optionToggle, .countToggleControl > span { transition: none; } }
-@media (forced-colors: active) { .tabs [aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -3px; } .indicator { background: Highlight; } .countIndicator, .countIndicator[data-state="done"], .countIndicator[data-state="changed"] { color: CanvasText; } .detailActions :global(.glass-button), .detailActions .detailActionCount:global(.glass-button):not(:disabled) { background: ButtonFace; color: ButtonText; border-color: ButtonText; } .detailActions :global(.glass-button):disabled { color: GrayText; border-color: GrayText; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }
+@media (forced-colors: active) { .tabs [aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -3px; } .indicator { background: Highlight; } .countIndicator, .countIndicator[data-state="done"], .countIndicator[data-state="changed"] { color: CanvasText; } .detailActions :global(.glass-button), .detailActions .detailActionCount:global(.glass-button):not(:disabled) { background: ButtonFace; color: ButtonText; border-color: ButtonText; } .detailActions :global(.glass-button):not(:disabled) .detailActionText { color: ButtonText; } .detailActions :global(.glass-button):disabled { color: GrayText; border-color: GrayText; } .countToggle { grid-template-columns: auto 1fr; } .countToggle > input { position: static; width: 22px; height: 22px; opacity: 1; appearance: auto; } .countToggleControl { display: none; } }

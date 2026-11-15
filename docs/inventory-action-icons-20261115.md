@@ -64,3 +64,22 @@ Unslop UI의 polish mode로 이 부분만 다듬었다. 기존 유리·세라믹
 `browser-verification.json`·`browser-check.log`·`list-browser.log`·`typecheck.log`·`lint.log`는 관련 검증, `build.log`·`performance.log`·`pwa.log`·`hosting-build.log`는 최종 산출물 검증이다. `release-candidate.json`·`deploy-hosting.log`·`release-verification.json`·`public-domain.json`·`public-firebase.json`·`public-artifact-hashes.json`은 고정 후보와 최종 배포/공개 확인 근거다. 원시 Hosting 응답의 계정 메타데이터는 ignored 폴더에만 보관하며 커밋하지 않았다. 전후 캡처는 합성 데이터다.
 
 실물 휴대폰·설치 PWA·인증된 실제 재고 저장은 이번 검증 범위에 포함하지 않았다.
+
+## 후속: 작업 문구 크기·굵기·색상
+
+사용자가 배포 화면을 확인한 뒤 중립 배경은 유지하면서 입고·출고·조정·수량 일치 확인을 더 크고 굵게, 알맞은 색의 텍스트로 강조하도록 요청했다. 기준 main은 `4070919`, 브랜치는 `codex/inventory-action-type`이다. [Radix 텍스트 색상 단계](https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale)와 [팔레트 구성](https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette), [Carbon 색상과 형태의 병행](https://www.carbondesignsystem.com/building-blocks/core/patterns/status-indicators)을 확인했다. 공식 자료의 원칙을 참고한 급식길의 선택이며, 출납 색의 보편적인 표준이라고 주장하지 않는다.
+
+| 문구 | 텍스트 색 | 기본 배경 대비 | hover 배경 대비 |
+| --- | --- | --- | --- |
+| 입고 | 딥 블루 `#245f91` | 5.92:1 | 5.60:1 |
+| 출고 | 테라코타 `#91513a` | 5.37:1 | 5.08:1 |
+| 조정 | 슬레이트 `#4e5a70` | 6.12:1 | 5.79:1 |
+| 수량 일치 확인 | 딥 그린 `#24624f` | 6.04:1 | 5.53:1 |
+
+위 네 문구만16px·600에서18px·700으로 바꿨다. 기존 중립색 아이콘·배경·테두리·정보 수정/더보기의16px 문구는 유지한다. 비활성 문구는 기존 회색을 상속하고, 고대비에서는 시스템 ButtonText를 사용한다. 비활성 이유는14px·400으로 남겨 주 문구와 구분한다. 줄바꿈은 단어를 우선하며 매우 큰 글자에서도 화면 밖으로 넘치지 않게 한다.320px에서 ‘확인’이 두 줄로 갈라져 보이던 것을 단어 단위로 보완했다. 버튼 동작·상태·권한·호출은 그대로다. 제품 변경은 상세 TSX와 CSS 두 파일뿐이다.
+
+이번에는 Aside 프로필 연결이 확인돼 실제 합성 컴포넌트를 열고 출고의18px·700·텍스트만 테라코타, 중립 아이콘과 배경을 DOM으로 확인했다. 캡처는 CDP 시간 초과여서 재시도하지 않고 로컬 Playwright CLI로 시각 확인을 마쳤다. 검토용 Aside 탭만 닫았다.
+
+로컬 Chromium에서320/390/1280px의 네 문구 크기·굵기·색, 잘림/가로 넘침, 아이콘과 배경색 유지, 로딩/읽기 전용·실사 모드 해제의 비활성/안내, 키보드3px 초점, 고대비 시스템 색을 확인했다. 기본 화면 JavaScript 오류는0이다.320px에서 실제 문구를36px로 강제 확대하고 렌더 크기까지 기다린 별도 확인도 통과했다. 이는 문구 자체의 확대 확인이며 실물폰이나 브라우저/PWA 확대 배율 검증을 뜻하지 않는다. 첫 확대 시도는 viewport 변경과 겹쳐18px로 읽혀 확대 통과 근거로 사용하지 않았고, 명시적으로36px를 확인하는 결과로 대체했다. 단어 줄바꿈 보완 뒤에는 해당320px 문구와 확대 부분만 추가 확인했다.
+
+변경 TSX lint와 최종 운영용 Hosting 빌드(타입 확인 포함), 성능·PWA·Hosting 산출물 검사가 모두 첫 실행에 통과했다. 최초 JS gzip144050B는 그대로이며 재고 CSS raw31043B·gzip6966B, 재고 JS gzip25530B로 기존 예산을 유지한다. 제품 변경2개와 정적 파일145개의 해시를 고정했다. 후속 증거는 ignored `output/playwright/inventory-action-type-20261115/`의 `browser-verification.json`, `browser-check.log`, `wrap-check.log`, `text-scale-final.log`, `lint.log`, `build.log`, `performance.log`, `pwa.log`, `hosting-build.log`, `release-candidate.json`과 합성 캡처에 있다. 이전 카드·목록·동작 검사와 서버 검사·전체 원격 CI는 반복하지 않았다. Hosting 배포 결과는 완료 후 기록한다. 이전 Hosting은 `26b244f30104c8a2`다.
