@@ -3,6 +3,7 @@ import { INVENTORY_LOCATION_LABELS, type InventoryContext, type InventoryProduct
 import { INVENTORY_COUNT_LABELS, inventoryCountBadgeState, inventoryExpiryGroupCount, inventoryExpiryLabel, inventoryScopeIsUrgent, inventoryScope, inventoryUnitDisplayLabel, type InventoryLocationFilter } from "./inventory-model";
 import styles from "./inventory.module.css";
 import { inventoryProductFocusId } from "./inventory-focus";
+import { InventoryIcon } from "./inventory-icon";
 
 export const InventoryCard = memo(function InventoryCard({ product, location, context, countMode = false, onOpen }: { product: InventoryProduct; location: InventoryLocationFilter; context: InventoryContext | null; countMode?: boolean; onOpen: (product: InventoryProduct) => void }) {
   const statusId = useId();
@@ -15,7 +16,7 @@ export const InventoryCard = memo(function InventoryCard({ product, location, co
   const showIndicator = !!context && (countMode || context.today === context.cycle.startDate);
   return <article data-count-state={countState ?? undefined} data-count-indicator={showIndicator && countState ? countState : undefined}>
     <button id={inventoryProductFocusId(product.productId)} type="button" className={styles.productButton} onClick={() => onOpen(product)} aria-label={`${product.name}, ${quantity} ${unitLabel}, 상세 보기`} aria-describedby={context || product.status !== "active" ? statusId : undefined}>
-      {showIndicator ? <span className={styles.countIndicator} data-state={countState ?? "none"} aria-hidden="true">{countState === "done" ? "✓" : countState === "changed" ? "↻" : null}</span> : null}
+      {showIndicator ? <span className={styles.countIndicator} data-state={countState ?? "none"} aria-hidden="true">{countState ? <InventoryIcon name={countState === "done" ? "confirmed" : countState} /> : null}</span> : null}
       <span className={styles.productBody} id={statusId}>
         <span className={styles.cardTitle}>{product.name}</span>
         <span className={styles.cardMeta}>{metadata}</span>
