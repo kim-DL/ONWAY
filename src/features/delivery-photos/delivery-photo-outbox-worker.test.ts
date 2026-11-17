@@ -81,12 +81,27 @@ describe("photo outbox simulated document lifecycle", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("suspends on pagehide and reloads only a restored back-forward document", async () => {
+  it("keeps capture processing alive after a non-cached external-app departure and return", async () => {
+    const { worker, viewport, page } = documentLifetime();
+    const wake = vi.fn(); const suspend = vi.fn();
+    worker.start(wake, suspend, () => false, 3_000);
+    viewport.dispatchEvent(Object.assign(new Event("pagehide"), { persisted: false }));
+    page.visibilityState = "visible";
+    viewport.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: false }));
+    viewport.dispatchEvent(new Event("focus"));
+    expect(suspend).not.toHaveBeenCalled();
+    expect(wake).toHaveBeenCalledWith(true);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(wake).toHaveBeenCalledWith(false);
+    expect(viewport.location.reload).not.toHaveBeenCalled();
+  });
+
+  it("suspends on cached pagehide and reloads only a restored back-forward document", async () => {
     const { worker, viewport } = documentLifetime();
     const wake = vi.fn();
     const suspend = vi.fn();
     worker.start(wake, suspend, () => false, 3_000);
-    viewport.dispatchEvent(new Event("pagehide"));
+    viewport.dispatchEvent(Object.assign(new Event("pagehide"), { persisted: true }));
     expect(suspend).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(3_000);
     expect(wake).not.toHaveBeenCalled();

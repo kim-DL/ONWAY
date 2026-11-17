@@ -114,7 +114,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
     {requestedCustomerId ? <DeliveryPhotoCaptureEntry state={captureEntry}
       onCamera={() => { if (requestedCustomer) capture(requestedCustomer); }}
       onAlbum={() => { if (requestedCustomer) album(requestedCustomer); }} onReturn={onReturnToCustomer} /> : null}
-    {uploads.storageError ? <p className={styles.notice} role="alert">사진 보관을 준비하지 못했어요. 기기 저장 공간과 브라우저의 저장소 허용을 확인한 뒤 앱을 다시 열어주세요.</p> : null}
+    {uploads.storageError ? <p className={styles.notice} role="alert">사진 보관을 준비하지 못했어요. 기기 저장 공간과 브라우저의 저장소 허용을 확인해주세요. <button type="button" onClick={() => window.location.reload()}>화면 다시 열기</button></p> : null}
     {data.error || catalog.status === "error" ? <div className={styles.notice} role="alert">{data.error || "거래처 정보를 불러오지 못했습니다."} <button type="button" onClick={() => {
       if (data.error) data.refresh();
       if (catalog.status === "error") catalog.retry();

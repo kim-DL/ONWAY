@@ -40,7 +40,14 @@ export class PhotoOutboxWorker {
     if (typeof window === "undefined") return;
     const reconnect = () => wake(true);
     const foreground = () => { if (document.visibilityState === "visible") wake(true); };
-    const pageHide = () => { clearInterval(this.poll); this.release?.(); suspend(); };
+    const pageHide = (event: PageTransitionEvent) => {
+      // Only a cached document needs explicit suspension before its restore
+      // reload. External-app navigation can return to the same live document
+      // without a persisted pageshow. Do not revoke that document's uploads.
+      // A genuinely destroyed document releases its timers and Web Lock itself.
+      if (!event.persisted) return;
+      clearInterval(this.poll); this.release?.(); suspend();
+    };
     const pageShow = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload(); };
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (hasUnsavedSource()) { event.preventDefault(); event.returnValue = ""; }
