@@ -51,3 +51,13 @@ Callable·App Check·사진 보관·request ID·서버 확인 후 완료 계약�
 위 수정은 테스트만 변경한다. 관련 단위61개 통과. 전체 로컬 단위 재검사에서는2143개 통과·23개 조건부 skip, 변경 없는 runtime identity 테스트1개가5초 timeout으로 실패했다. 동일 파일의4개를 별도 재실행해 통과했다. timeout이나 기존 실패를 첫 실행 성공으로 기록하지 않는다. 최종 후보의 CI 결과는 별도로 확인한다.
 
 첫 CI의 전체 browser·production-build·typecheck·lint·audit·functions-build·search-performance·deferred-tools는 통과했다. unit4건, inventory-photos1건, delivery-photos1건, phase17의4건(사진 키보드1건 중복)이 위 불일치로 실패했다. 해당 실패들을 숨기거나 검사를 제외하지 않고 테스트 보완 후보에서 재확인한다.
+
+## 최종 CI와 운영 배포
+
+- 최종 후보 `32cf1be0786e85207f8ecf4ff5f41711dd549b48`, [Quality Gate 44127019292](https://github.com/kim-DL/ONWAY/actions/runs/44127019292) 필수14작업 성공. 범위 계획에 따른 ui/ci-policy/presentation 3작업 제외는 성공으로 세지 않았다.
+- 단위2144개 통과·조건부23개 제외, 전체 브라우저644개 통과·자동 재시도 후 통과1개·9개 제외, 업무83개 통과·19개 제외, 납품사진16개 통과. 브라우저 재시도는 기존 지도 버튼44px 측정이43.99993896484375로 나온 `customer-map.spec.ts:63`이며, 검사/허용오차/재시도 설정을 변경하지 않았다.
+- [PR #10](https://github.com/kim-DL/ONWAY/pull/10)을 main `f2b4a2e794fe03f0b82d0201846d3903f0968f58`에 병합했다. 로컬 main을 fast-forward 동기화했고 배포 직전 Git clean, 후보 대비 앱/테스트/설정 diff 없음,145개 산출물·비공개 환경 해시 일치를 확인했다.
+- 운영 산출물은 앱 변경 후보 `4f6ed39`에서 빌드했다. 이후 `32cf1be`는 테스트/문서만 변경했으며 앱 파일 동일성을 확인해 이미 검증한 산출물을 배포했다. 사진/재고 기능 ON, emulator OFF, 기존 환경 유지.
+- **2026-11-18 01:49:34 KST**, `--project onnuriway --only hosting:onnuriway --non-interactive`로 Hosting 배포 성공. 운영 버전 `d6459f9db1b3199a`, release `1794934174386000`. 이전 rollback 기준 버전 `bbf09c014d68644f`(release `1794719509254000`)을 보존했다.
+- `https://onnuriway.com`, `https://onnuriway.web.app` 모두 공개 Hosting 검사 통과. 각 주소의145개 파일 SHA-256이 후보 산출물과 일치했다. 로컬 증거는 ignored `output/delivery-camera-return-20261118/`에 보관한다.
+- Hosting만 배포했다. 운영 사진 시험 쓰기·실물 Android 설치 PWA의 카카오맵 왕복 확인은 수행하지 않았으며, 현장 기기에서 보고된 개별 장애 원인을 확정하지 않는다.
