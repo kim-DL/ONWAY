@@ -1,7 +1,9 @@
 import { createRoot } from "react-dom/client";
 import { useRef, useSyncExternalStore } from "react";
 import { DeliveryPhotoInputController, type DeliveryPhotoInputControllerHandle } from "../../../src/features/delivery-photos/delivery-photo-input-controller";
-import { DeliveryPhotoUploadCoordinator } from "../../../src/features/delivery-photos/delivery-photo-upload-memory";
+import { getDeliveryPhotoUploadCoordinator, type DeliveryPhotoUploadCoordinator } from "../../../src/features/delivery-photos/delivery-photo-upload-memory";
+import { useDeliveryPhotoUploads } from "../../../src/features/delivery-photos/use-delivery-photo-uploads";
+import type { AuthenticatedSession } from "../../../src/features/auth/auth-context";
 import DeliveryPhotoUploadPanel from "../../../src/features/delivery-photos/delivery-photo-upload-panel";
 import { deliveryPhotoOutbox, type PhotoOutboxRecord } from "../../../src/features/delivery-photos/delivery-photo-outbox";
 import type { DeliveryPhotoCreateInput } from "../../../src/features/delivery-photos/delivery-photo-create-repository";
@@ -12,6 +14,13 @@ const read = File.prototype.arrayBuffer;
 const reads: Array<{ size: number; bytes?: number; error?: string }> = [];
 const storageErrors: string[] = [];
 const add = deliveryPhotoOutbox.add;
+const activate = deliveryPhotoOutbox.activate;
+deliveryPhotoOutbox.activate = async (...args) => {
+  if (params.has("failOpenOnce") && !sessionStorage.getItem("fixture-open-failed")) {
+    sessionStorage.setItem("fixture-open-failed", "true"); throw new Error("Temporary fixture storage failure");
+  }
+  return activate(...args);
+};
 deliveryPhotoOutbox.add = async (...args) => {
   try {
     if (params.has("delayStore")) await new Promise((resolve) => setTimeout(resolve, 600));
@@ -25,9 +34,10 @@ File.prototype.arrayBuffer = async function () {
   try { const bytes = await read.call(this); reads.push({ size: this.size, bytes: bytes.byteLength }); return bytes; }
   catch (error) { reads.push({ size: this.size, error: String(error) }); throw error; }
 };
-const coordinator = new DeliveryPhotoUploadCoordinator({ uid: "durability-user", displayName: "합성 직원", claims: {
+const session: AuthenticatedSession = { uid: "durability-user", displayName: "합성 직원", claims: {
   employeeId: "DURABILITY", roleScopes: ["delivery"], sessionVersion: 1, permissionsVersion: 1,
-} });
+} };
+const coordinator = getDeliveryPhotoUploadCoordinator(session);
 const names = new Map([["customer", { name: "합성 납품처" }]]);
 export type PhotoDurabilityFixture = {
   coordinator: DeliveryPhotoUploadCoordinator;
@@ -49,7 +59,13 @@ function Fixture() {
     <DeliveryPhotoUploadPanel coordinator={coordinator} jobs={jobs} names={names} />
   </main>;
 }
-void coordinator.ready.then((ready) => {
+function RecoveryFixture() {
+  const uploads = useDeliveryPhotoUploads(session, () => undefined, false);
+  return <main>{uploads.storageError ? <button onClick={() => window.location.reload()}>화면 다시 열기</button> : null}
+    {uploads.ready ? <Fixture /> : <p>사진 보관 준비 중</p>}</main>;
+}
+if (params.has("failOpenOnce")) createRoot(document.getElementById("root")!).render(<RecoveryFixture />);
+else void coordinator.ready.then((ready) => {
   if (!ready) throw Error("Fixture outbox did not open");
   createRoot(document.getElementById("root")!).render(<Fixture />);
 });

@@ -60,7 +60,7 @@ async function openTeamSchool(page: Page) {
   await page.getByRole("group", { name: "학교 범위" }).getByRole("button", { name: "전체 보기" }).click();
   await page.locator(".assignment-card", { hasText: SCHOOL_NAME }).click();
   await expect(page.getByRole("heading", { name: SCHOOL_NAME })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "이전 대화가, 다음 방문의 맥락이 됩니다." })).toBeVisible();
+  await expect(page.getByRole("region", { name: "방문 기록", exact: true }).getByRole("heading", { name: "방문 기록", exact: true })).toBeVisible();
 }
 
 async function emulatorIdToken(uid: string) {

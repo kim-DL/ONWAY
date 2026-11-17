@@ -175,8 +175,8 @@ describe("single-submit inventory registration", () => {
   it("uses explicit clear intent for 제조사 없음 and removes a linked id from the draft", async () => {
     const linked = { ...product, manufacturer: "기존 제조사", manufacturerId: "manufacturer-one" };
     let tree = render(linked); const field = manufacturerField(tree);
-    expect(field.props).toMatchObject({ productId: product.productId, name: "기존 제조사" });
-    expect(field.props).not.toHaveProperty("manufacturerId");
+    expect(field.props.current).toEqual({ kind: "persisted", productId: product.productId, name: "기존 제조사" });
+    expect(field.props.current).not.toHaveProperty("manufacturerId");
     (field.props.onClear as (save: typeof harness.save) => void)(harness.save); tree = render(linked); await submit(tree);
     expect(harness.save.mock.calls[0]![0]).toMatchObject({ clearManufacturerReference: true, draft: { manufacturer: "" } });
     expect(harness.save.mock.calls[0]![0].draft).not.toHaveProperty("manufacturerId");
@@ -185,7 +185,7 @@ describe("single-submit inventory registration", () => {
   it("preserves legacy manufacturer text while the deferred field is left unchanged", async () => {
     const legacy = { ...product, manufacturer: "레거시 제조사" };
     const tree = render(legacy);
-    expect(manufacturerField(tree).props).toMatchObject({ name: "레거시 제조사" });
+    expect(manufacturerField(tree).props.current).toEqual({ kind: "persisted", productId: product.productId, name: "레거시 제조사" });
     await submit(tree);
     expect(harness.save.mock.calls[0]![0].draft).toMatchObject({ manufacturer: "레거시 제조사" });
     expect(harness.save.mock.calls[0]![0].draft).not.toHaveProperty("manufacturerId");

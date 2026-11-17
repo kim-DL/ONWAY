@@ -122,6 +122,41 @@ async function capture(page: Page, buffer = jpeg) {
   return page.evaluate(() => window.__photoDurability.coordinator.getSnapshot()[0]!.requestId);
 }
 
+test("external-app departure and return does not permanently disable capture", async ({ context }) => {
+  const evidence = await install(context);
+  const page = await context.newPage();
+  await page.goto("https://photo-durability.test/");
+  await expect(page.getByRole("button", { name: "납품사진 촬영", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(await page.evaluate(() => window.__photoDurability.coordinator.canBegin("customer"))).toBe(true);
+  await capture(page);
+  await expect.poll(() => page.evaluate(() => window.__photoDurability.coordinator.getSnapshot()[0]?.status)).toBe("completed");
+  expect(evidence.requests).toHaveLength(1);
+  expect(evidence.errors).toEqual([]); expect(evidence.external).toEqual([]);
+  await page.evaluate(async () => {
+    await window.__photoDurability.coordinator.clear();
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
+  });
+  expect(await page.evaluate(() => window.__photoDurability.coordinator.canBegin("customer"))).toBe(false);
+});
+
+test("temporary outbox startup failure recovers with an explicit reload without clearing storage", async ({ context }) => {
+  const evidence = await install(context);
+  const page = await context.newPage();
+  await page.goto("https://photo-durability.test/?failOpenOnce");
+  await page.getByRole("button", { name: "화면 다시 열기", exact: true }).click();
+  await expect(page.getByRole("button", { name: "화면 다시 열기", exact: true })).toHaveCount(0);
+  await capture(page);
+  await expect.poll(() => page.evaluate(() => window.__photoDurability.coordinator.getSnapshot()[0]?.status)).toBe("completed");
+  expect(evidence.requests).toHaveLength(1);
+  expect(evidence.errors).toEqual([]); expect(evidence.external).toEqual([]);
+});
+
 test("a photo survives closing the page during source reading and resumes with the same request", async ({ context }) => {
   const evidence = await install(context);
   const first = await context.newPage();

@@ -11,9 +11,9 @@ describe("administrator navigation contract", () => {
     const css = readApplicationStylesheet();
     const workspaceCss = readFileSync(new URL("./admin-workspace.module.css", import.meta.url), "utf8");
     expect(css).not.toMatch(/\.admin-(?:sidebar|brand|main|content|topbar|page|metric|table|session-card)(?:\b|__)/);
-    expect(workspaceCss).toContain(".workspace :global(.admin-main)");
-    expect(workspaceCss).toContain(".workspace :global(.admin-content)");
-    const avatar = workspaceCss.match(/\.workspace\s+:global\(\.admin-session-card__avatar\)\s*\{([^}]*)\}/)?.[1];
+    expect(workspaceCss).toContain(".root :global(.admin-main)");
+    expect(workspaceCss).toContain(".root :global(.admin-content)");
+    const avatar = workspaceCss.match(/\.root\s+:global\(\.admin-session-card__avatar\)\s*\{([^}]*)\}/)?.[1];
     expect(avatar).toContain("width: 36px");
     expect(avatar).toContain("height: 36px");
     expect(avatar).toContain("font-weight: 750");

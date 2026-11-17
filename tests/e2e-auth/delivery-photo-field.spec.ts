@@ -680,6 +680,8 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     expect(landscapeBox && landscapeBox.x >= 0 && landscapeBox.y >= 0
       && landscapeBox.x + landscapeBox.width <= 360 && landscapeBox.y + landscapeBox.height <= 800).toBe(true);
     await expect.poll(() => page.evaluate((url) => ((window as unknown as { __deliveryPhotoBlobAudit: { revoked: string[] } }).__deliveryPhotoBlobAudit.revoked).includes(url ?? ""), firstEvidenceUrl)).toBe(true);
+    await expect(viewer.getByRole("button", { name: "사진 확대", exact: true })).toBeEnabled();
+    await viewer.getByRole("region", { name: "대전식품 납품사진 크게 보기", exact: true }).focus();
     await page.keyboard.press("ArrowLeft");
     await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
     await expect.poll(() => getInputs.filter((input) => input.variant === "evidence").length).toBe(3);
