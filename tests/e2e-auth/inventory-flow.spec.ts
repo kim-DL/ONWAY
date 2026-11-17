@@ -210,10 +210,10 @@ async function verifyDetailActions(detail: Locator) {
     return button.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
-      return { background: style.backgroundColor, color: style.color, rect: rect.toJSON(), icons: element.querySelectorAll("svg").length };
+      return { background: style.backgroundColor, color: getComputedStyle(element.querySelector("[data-kind]") ?? element).color, rect: rect.toJSON(), icons: element.querySelectorAll("svg").length };
     });
   }));
-  expect(new Set(actions.map((action) => action.background)).size, "each inventory action has a distinct surface color").toBe(4);
+  expect(new Set(actions.map((action) => action.background)).size, "inventory actions share the neutral surface").toBe(1);
   expect(new Set(actions.map((action) => action.color)).size, "each inventory action has a distinct ink color").toBe(4);
   for (const [index, action] of actions.entries()) {
     expect(action.rect.height).toBeGreaterThanOrEqual(44);

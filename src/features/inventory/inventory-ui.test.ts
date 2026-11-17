@@ -79,7 +79,10 @@ describe("inventory UI contracts", () => {
     const lastCount = { cycleId: context.cycle.cycleId, checkedAt: "2026-09-10T01:00:00.000Z", checkedBy: "employee-1", stockRevision: 3, changed: false, stockChangedSinceCount: true };
     const changedProduct = { ...eligible, lastCountByLocation: { ...eligible.lastCountByLocation, refrigerated: lastCount } };
     const changed = renderToStaticMarkup(h(InventoryCard, { product: changedProduct, location: "refrigerated", context, countMode: true, onOpen: noop }));
-    expect(changed).toContain('data-count-indicator="changed"'); expect(changed).toContain("변동 후 미확인"); expect(changed).toContain("↻");
+    expect(changed).toContain('data-count-indicator="changed"'); expect(changed).toContain("변동 후 미확인");
+    const changedIndicator = changed.match(/data-state="changed" aria-hidden="true">([\s\S]*?)<\/span>/)?.[1];
+    expect(changedIndicator).toContain('<svg aria-hidden="true"');
+    expect(changedIndicator).toContain('<path d=');
     const doneProduct = { ...changedProduct, lastCountByLocation: { ...changedProduct.lastCountByLocation, refrigerated: { ...lastCount, stockChangedSinceCount: false } } };
     const normal = renderToStaticMarkup(h(InventoryCard, { product: doneProduct, location: "refrigerated", context, onOpen: noop }));
     expect(normal).toContain("이번 주 확인"); expect(normal).not.toContain('data-count-indicator=');

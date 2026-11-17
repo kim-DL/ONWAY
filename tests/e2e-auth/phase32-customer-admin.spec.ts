@@ -29,7 +29,7 @@ test.beforeAll(async () => {
   const db = database();
   const admin = (await db.doc("employees/EMP-ADMIN").get()).data();
   if (!admin) throw new Error("A seeded admin fixture is required.");
-  await db.doc(`employees/${EMPLOYEE_ID}`).set({ ...admin, employeeId: EMPLOYEE_ID, firebaseUid: "phase32-ui-before-login", displayName: "거래처 검증 관리자", sessionVersion: 1, status: "active", roleScopes: ["admin"] });
+  await db.doc(`employees/${EMPLOYEE_ID}`).set({ ...admin, employeeId: EMPLOYEE_ID, firebaseUid: "pending-google-phase32-ui", displayName: "거래처 검증 관리자", sessionVersion: 1, status: "active", roleScopes: ["admin"] });
   await db.runTransaction(async (tx) => {
     const ref = db.doc("secureSettings/adminAccess"); const snapshot = await tx.get(ref);
     const entries = (snapshot.get("entries") as Array<{ email: string }> ?? []).filter((entry) => entry.email !== EMAIL);

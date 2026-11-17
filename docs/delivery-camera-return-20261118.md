@@ -36,3 +36,18 @@ Callable·App Check·사진 보관·request ID·서버 확인 후 완료 계약�
 최종 운영 빌드(앱 타입 포함)·성능/PWA/Hosting 검사 통과. 납품사진 workspace gzip10479B, runtime5244B로 기존 한도를 유지했다. 초기 로딩 gzip144050B, Hosting145개 파일·precache129개다. Next 보안 안내로 중단된 빌드는 동일 명령 재시도 후 성공했으며, 첫 실행 성공으로 집계하지 않는다.
 
 정확한 후보 CI와 운영 배포 결과는 아래에 기록한다. 실제 휴대폰·설치 PWA·카카오맵 왕복·운영 사진 저장은 별도 현장 확인이 필요하다.
+
+## 전체 CI에서 발견한 기존 테스트 불일치
+
+첫 후보 `4f6ed39`, PR #10, Quality Gate `44123645864`에서 기존 테스트 기대값 불일치를 발견했다. `59e4c2f`와 해당 앱 코드·테스트가 동일함을 확인했고 로컬에서도 단위4건을 재현했다.
+
+- 관리자 CSS scope는 `.workspace`가 아니라 현재 `.root`를 검사한다. 기존 avatar 크기·공통 스타일 분리 검사는 유지한다.
+- 제조사 필드의 persisted 값은 `props.current`의 kind/productId/name을 검사한다. 제조사 연결 해제·레거시 보존의 저장 payload 검사는 유지한다.
+- 재고 변동 표시는 옛 문자 ↻ 대신 장식용 SVG/path를 검사한다. 서버 파생 상태·표시 문구·버튼 수 검사는 유지한다.
+- 재고 상세 버튼은 현재 승인된 중립 배경과 각 글자 색을 검사한다. 터치 영역·아이콘 수·배치 검사는 유지한다.
+- 사진 확대 방향키는 준비된 사진 영역에 포커스를 준 뒤 입력한다. 기존 테스트는 다음 버튼에 포커스를 둔 채 사진 영역 전용 키 입력을 기대했다. URL 폐기·추가 수신·페이지 위치 검사는 유지한다.
+- 영업 이력은 현재 `방문 기록` 제목, 거래처 홈은 현재 마지막 확인 freshness를 검사한다. 관리자 fixture는 실제 최초 Google 연결 계약의 `pending-google-` UID로 준비한다. 테스트용 `phase32-ui-before-login` 값을 이미 연결된 계정으로 간주한403을 우회하지 않고 잘못된 fixture를 수정했다.
+
+위 수정은 테스트만 변경한다. 관련 단위61개 통과. 전체 로컬 단위 재검사에서는2143개 통과·23개 조건부 skip, 변경 없는 runtime identity 테스트1개가5초 timeout으로 실패했다. 동일 파일의4개를 별도 재실행해 통과했다. timeout이나 기존 실패를 첫 실행 성공으로 기록하지 않는다. 최종 후보의 CI 결과는 별도로 확인한다.
+
+첫 CI의 전체 browser·production-build·typecheck·lint·audit·functions-build·search-performance·deferred-tools는 통과했다. unit4건, inventory-photos1건, delivery-photos1건, phase17의4건(사진 키보드1건 중복)이 위 불일치로 실패했다. 해당 실패들을 숨기거나 검사를 제외하지 않고 테스트 보완 후보에서 재확인한다.
