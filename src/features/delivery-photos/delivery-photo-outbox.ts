@@ -84,6 +84,12 @@ function assertScope(current: OutboxScope | undefined, expected: OutboxScope) {
   }
 }
 
+async function abortWrite(transaction: OutboxTransaction, error: unknown): Promise<never> {
+  try { transaction.abort(); } catch { /* The failing request may already have aborted it. */ }
+  await transaction.done.catch(() => undefined);
+  throw error;
+}
+
 export const deliveryPhotoOutbox: PhotoOutboxStore = {
   async activate(owner) {
     const transaction = (await db()).transaction(STORES, "readwrite");
@@ -99,8 +105,9 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
   },
   async list(scope) {
     const transaction = (await db()).transaction(STORES);
-    assertScope(await transaction.objectStore("scope").get("current"), scope);
-    const records = await readRecords(transaction);
+    const [current, count] = await Promise.all([transaction.objectStore("scope").get("current"), transaction.objectStore("jobs").count()]);
+    assertScope(current, scope);
+    const records = count ? await readRecords(transaction) : [];
     await transaction.done;
     return records.filter((record) => record.version === 1 && record.owner === scope.owner);
   },
@@ -112,7 +119,7 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
       assertOutboxCapacity(await readRecords(transaction), record);
       await jobs.add(record, record.job.jobId);
       await transaction.done;
-    } catch (error) { try { transaction.abort(); } catch { /* Already aborted by the browser. */ } await transaction.done.catch(() => undefined); throw error; }
+    } catch (error) { return abortWrite(transaction, error); }
   },
   async save(scope, record, worker) {
     const transaction = (await db()).transaction(STORES, "readwrite");
@@ -143,7 +150,7 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
         await states.put(mutableState(record, payload), id);
       }
       await transaction.done;
-    } catch (error) { try { transaction.abort(); } catch { /* Already aborted by the browser. */ } await transaction.done.catch(() => undefined); throw error; }
+    } catch (error) { return abortWrite(transaction, error); }
   },
   async claim(scope, id, worker, stage, now, liveWorkers) {
     const transaction = (await db()).transaction(STORES, "readwrite");
@@ -159,7 +166,7 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
       record.lease = { worker, stage, until: now + LEASE_MS };
       await states.put(mutableState(record, (await states.get(id))?.payload ?? "original"), id); await transaction.done;
       return record;
-    } catch (error) { try { transaction.abort(); } catch { /* Already aborted by the browser. */ } await transaction.done.catch(() => undefined); throw error; }
+    } catch (error) { return abortWrite(transaction, error); }
   },
   async remove(scope, id, worker) {
     const transaction = (await db()).transaction(STORES, "readwrite");
@@ -171,7 +178,7 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
         await transaction.objectStore("states").delete(id); await transaction.objectStore("prepared").delete(id);
       }
       await transaction.done;
-    } catch (error) { try { transaction.abort(); } catch { /* Already aborted by the browser. */ } await transaction.done.catch(() => undefined); throw error; }
+    } catch (error) { return abortWrite(transaction, error); }
   },
   async clear(scope) {
     if (typeof indexedDB === "undefined") return;

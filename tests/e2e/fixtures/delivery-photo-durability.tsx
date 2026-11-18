@@ -55,7 +55,7 @@ function Fixture() {
   const input = useRef<DeliveryPhotoInputControllerHandle>(null);
   const jobs = useSyncExternalStore(coordinator.subscribe, coordinator.getSnapshot, coordinator.getSnapshot);
   return <main><button onClick={() => input.current?.openCamera("customer")}>납품사진 촬영</button>
-    <DeliveryPhotoInputController ref={input} coordinator={coordinator} />
+    <DeliveryPhotoInputController ref={input} coordinator={coordinator} jobs={jobs} />
     <DeliveryPhotoUploadPanel coordinator={coordinator} jobs={jobs} names={names} />
   </main>;
 }

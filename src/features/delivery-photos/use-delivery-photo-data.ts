@@ -16,7 +16,7 @@ const FRESH_MS = 60_000;
 export function useDeliveryPhotoData(session: AuthenticatedSession) {
   const dateKey = deliveryPhotoDateKey();
   const key = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${dateKey}`;
-  const [state, setState] = useState<{ key: string; snapshot: DeliveryPhotoSnapshot | null; loading: boolean; error: string }>(() => ({
+  const [state, setState] = useState<{ key: string; snapshot: DeliveryPhotoSnapshot | null; loading: boolean; error: string; authBlocked?: boolean }>(() => ({
     key, snapshot: readDeliveryPhotoSnapshot(key), loading: true, error: "",
   }));
   const [attempt, setAttempt] = useState(0);
@@ -25,8 +25,9 @@ export function useDeliveryPhotoData(session: AuthenticatedSession) {
   useEffect(() => {
     let active = true;
     let pending = false;
-    const publish = (snapshot: DeliveryPhotoSnapshot | null, error = "", loading = false) => {
-      if (active) setState({ key, snapshot, loading, error });
+    const publish = (snapshot: DeliveryPhotoSnapshot | null, error = "", loading = false, denied = false) => {
+      if (active) setState((previous) => ({ key, snapshot, loading, error,
+        authBlocked: denied || (!snapshot && previous.key === key && Boolean(previous.authBlocked)) }));
     };
     const load = async (force = false) => {
       if (!active || pending) return;
@@ -46,7 +47,7 @@ export function useDeliveryPhotoData(session: AuthenticatedSession) {
         if (auth) clearDeliveryPhotoSnapshot(key);
         publish(auth ? null : readDeliveryPhotoSnapshot(key), auth
           ? "사용 권한을 확인하지 못했습니다. 다시 로그인해주세요."
-          : "최신 정보를 불러오지 못했습니다.");
+          : "최신 정보를 불러오지 못했습니다.", false, auth);
       } finally { pending = false; }
     };
     const resume = () => {
@@ -78,7 +79,7 @@ export function useDeliveryPhotoData(session: AuthenticatedSession) {
   }, [key]);
   const clear = useCallback(() => {
     clearDeliveryPhotoSnapshot(key);
-    setState({ key, snapshot: null, loading: false, error: "" });
+    setState({ key, snapshot: null, loading: false, error: "", authBlocked: true });
   }, [key]);
   return { ...current, refresh, accept, clear };
 }

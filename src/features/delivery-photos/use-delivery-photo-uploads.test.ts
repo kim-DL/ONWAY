@@ -21,7 +21,9 @@ it("keeps the newest card and retry while counting only pending photos for each 
     job("invalid", "b", "failed", "preparation", false), job("queued", "b", "queued"), job("paused", "c", "paused")];
   const session: AuthenticatedSession = { uid: "test", displayName: "합성 직원", claims: { employeeId: "test", sessionVersion: 1, permissionsVersion: 1, roleScopes: ["delivery"] } };
   const result = useDeliveryPhotoUploads(session, () => undefined);
-  expect([...result.byCustomer.values()].map(row => row.jobId)).toEqual(["newest", "invalid", "paused"]);
-  expect([...result.pendingByCustomer]).toEqual([["a", 2], ["b", 1], ["c", 1]]);
-  expect([...result.retryByCustomer.values()].map(row => row.jobId)).toEqual(["retry-new"]);
+  const rows = [...result.byCustomer.values()];
+  expect(rows.map(row => row.job.jobId)).toEqual(["newest", "invalid", "paused"]);
+  expect(rows.map(row => row.pendingCount)).toEqual([2, 1, 1]);
+  expect(rows.map(row => row.retryJob?.jobId)).toEqual(["retry-new", undefined, undefined]);
+  expect(rows.map(row => row.attention?.jobId)).toEqual(["retry-new", "invalid", "paused"]);
 });

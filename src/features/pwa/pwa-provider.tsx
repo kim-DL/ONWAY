@@ -11,13 +11,16 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { Serwist as WindowSerwist } from "@serwist/window";
+import dynamic from "next/dynamic";
+import type { registerAppUpdates, UpdateNotice } from "./app-updates";
 
 import { InitialStatusIcon } from "@/components/ui/initial-status-icon";
 import {
   probeNetworkReachability,
   subscribeToNetworkRecovery,
 } from "./network-status";
+
+const UpdateNoticeCard = dynamic(() => import("./update-notice"), { ssr: false });
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -53,11 +56,9 @@ export function PwaProvider({ children }: { children: ReactNode }) {
   const standalone = useSyncExternalStore(subscribeToStandalone, getStandaloneSnapshot, () => false);
   const [isOnline, setIsOnline] = useState(true);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [updateReady, setUpdateReady] = useState(false);
-  const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [notice, setNotice] = useState<UpdateNotice | null>(null);
   const installPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
-  const serwistRef = useRef<WindowSerwist | null>(null);
-  const acceptedUpdateRef = useRef(false);
+  const updates = useRef<ReturnType<typeof registerAppUpdates> | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -75,7 +76,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
         recoveryCleanup = subscribeToNetworkRecovery(() => {
           if (!active) return;
           setIsOnline(true);
-          void serwistRef.current?.update().catch(() => undefined);
+          void updates.current?.update().catch(() => undefined);
         });
       }
     };
@@ -87,7 +88,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       recoveryCleanup = subscribeToNetworkRecovery(() => {
         if (!active) return;
         setIsOnline(true);
-        void serwistRef.current?.update().catch(() => undefined);
+        void updates.current?.update().catch(() => undefined);
       });
     };
     const handleVisibility = () => {
@@ -111,7 +112,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleOnline = () => {
-      void serwistRef.current?.update().catch(() => undefined);
+      void updates.current?.update().catch(() => undefined);
     };
     const handleInstallPrompt = (event: Event) => {
       const promptEvent = event as BeforeInstallPromptEvent;
@@ -139,28 +140,13 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
 
     let active = true;
-    void import("@serwist/window")
-      .then(({ Serwist }) => {
-        if (!active) return;
-        const serwist = new Serwist("/sw.js", {
-          scope: "/",
-          type: "classic",
-          updateViaCache: "none",
-        });
-        serwistRef.current = serwist;
-        serwist.addEventListener("waiting", () => {
-          if (active) setUpdateReady(true);
-        });
-        serwist.addEventListener("controlling", () => {
-          if (active && acceptedUpdateRef.current) window.location.reload();
-        });
-        return serwist.register({ immediate: true });
-      })
-      .catch(() => undefined);
-
+    void import("./app-updates").then(({ registerAppUpdates }) => {
+      if (active) updates.current = registerAppUpdates(setNotice);
+    }).catch(() => undefined);
     return () => {
       active = false;
-      serwistRef.current = null;
+      updates.current?.dispose();
+      updates.current = null;
     };
   }, []);
 
@@ -173,13 +159,6 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     setInstallPrompt(null);
   }, []);
 
-  const applyUpdate = useCallback(() => {
-    if (!serwistRef.current) return;
-    acceptedUpdateRef.current = true;
-    setApplyingUpdate(true);
-    serwistRef.current.messageSkipWaiting();
-  }, []);
-
   const installState: InstallState = standalone ? "installed" : installPrompt ? "available" : "unsupported";
   const value = useMemo(
     () => ({ installState, isOnline, install }),
@@ -188,16 +167,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
 
   return (
     <PwaContext.Provider value={value}>
-      {updateReady ? (
-        <aside className="pwa-update" role="status" aria-live="polite" data-testid="pwa-update-ready">
-          <span className="pwa-update__icon"><InitialStatusIcon name="refresh" size={20} /></span>
-          <span><strong>새 버전이 준비되었습니다.</strong><small>입력 중인 내용은 자동으로 새로고침되지 않습니다.</small></span>
-          <div>
-            <button type="button" className="pwa-update__later" disabled={applyingUpdate} onClick={() => setUpdateReady(false)}>나중에</button>
-            <button type="button" className="pwa-update__apply" disabled={applyingUpdate} onClick={applyUpdate}>{applyingUpdate ? "적용 중…" : "업데이트"}</button>
-          </div>
-        </aside>
-      ) : null}
+      {notice && <UpdateNoticeCard notice={notice} onApply={() => updates.current?.apply()} onDismiss={() => updates.current?.dismiss()} />}
       {children}
       {!isOnline ? (
         <div className="pwa-connectivity" role="status" data-testid="pwa-offline-status">

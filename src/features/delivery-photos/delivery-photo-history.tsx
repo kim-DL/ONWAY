@@ -54,7 +54,7 @@ export function DeliveryPhotoHistory({ customer, session, onClose, sync, initial
     <section className={styles.history} aria-label={`${customer.name} 최근 납품사진`}>
       {state.status === "loading" ? <LoadingStatus className={styles.status} label="최근 납품사진 불러오는 중" detail="등록된 사진과 최근 납품 기록을 확인하고 있습니다." /> : null}
       {state.status === "error" ? <div className={styles.error} role="alert"><p>{state.message}</p><button type="button" onClick={() => setAttempt((value) => value + 1)}>다시 시도</button></div> : null}
-      {state.status === "ready" ? <DeliveryPhotoHistoryDates customerName={customer.name} session={session}
+      {state.status === "ready" ? <DeliveryPhotoHistoryDates customerId={customer.customerId} customerName={customer.name} session={session}
         photos={state.photos} fromDateKey={state.fromDateKey} onDeleted={(photoId, update) => {
           sync(update); setState((current) => ({ ...current, photos: current.photos.filter((photo) => photo.photoId !== photoId) }));
           setAttempt((value) => value + 1);

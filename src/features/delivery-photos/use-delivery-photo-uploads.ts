@@ -5,13 +5,15 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { DeliveryPhotoMetadata } from "@/domain/delivery-photo";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import type { DeliveryPhotoUploadCoordinator } from "./delivery-photo-upload-memory";
-import type { DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
+import { isActiveDeliveryPhotoUpload, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 
 const EMPTY_UPLOADS: readonly DeliveryPhotoUploadProjection[] = Object.freeze([]);
 
 export function useDeliveryPhotoUploads(session: AuthenticatedSession, onConfirmed: (photo: DeliveryPhotoMetadata) => void, canMerge = true, reconcile?: () => void) {
   const namespace = JSON.stringify([session.uid, session.claims.employeeId, session.claims.sessionVersion, session.claims.permissionsVersion]);
-  const [storageError, setStorageError] = useState(false);
+  const [failedNamespace, setFailedNamespace] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const retryStorage = () => { setFailedNamespace(""); setAttempt((value) => value + 1); };
   const [loaded, setLoaded] = useState<{ namespace: string; coordinator: DeliveryPhotoUploadCoordinator } | null>(null);
   const coordinator = loaded?.namespace === namespace ? loaded.coordinator : null;
   useEffect(() => {
@@ -19,11 +21,11 @@ export function useDeliveryPhotoUploads(session: AuthenticatedSession, onConfirm
     void import("./delivery-photo-upload-memory").then(async (module) => {
       if (!current) return;
       const coordinator = module.getDeliveryPhotoUploadCoordinator(session);
-      const ready = await coordinator.ready;
-      if (current) { setStorageError(!ready); if (ready) setLoaded({ namespace, coordinator }); }
-    }).catch(() => { if (current) setStorageError(true); });
+      const ready = await (attempt ? coordinator.retryStorage() : coordinator.ready);
+      if (current) { setFailedNamespace(ready ? "" : namespace); if (ready) setLoaded({ namespace, coordinator }); }
+    }).catch(() => { if (current) setFailedNamespace(namespace); });
     return () => { current = false; };
-  }, [namespace, session]);
+  }, [attempt, namespace, session]);
 
   const subscribe = useCallback((listener: () => void) => coordinator?.subscribe(listener) ?? (() => undefined), [coordinator]);
   const getSnapshot = useCallback(() => coordinator?.getSnapshot() ?? EMPTY_UPLOADS, [coordinator]);
@@ -47,20 +49,16 @@ export function useDeliveryPhotoUploads(session: AuthenticatedSession, onConfirm
     }
   }, [coordinator, jobs, onConfirmed, canMerge]);
 
-  const grouped = useMemo(() => {
-    const byCustomer = new Map<string, DeliveryPhotoUploadProjection>();
-    const pendingByCustomer = new Map<string, number>();
-    const retryByCustomer = new Map<string, DeliveryPhotoUploadProjection>();
+  const byCustomer = useMemo(() => {
+    const rows = new Map<string, { job: DeliveryPhotoUploadProjection; pendingCount: number; retryJob?: DeliveryPhotoUploadProjection; attention?: DeliveryPhotoUploadProjection }>();
     for (const job of jobs) {
-      const { customerId } = job;
-      if (!byCustomer.has(customerId)) byCustomer.set(customerId, job);
-      if (job.status !== "completed" && job.errorCategory !== "auth"
-        && !(job.status === "failed" && job.errorCategory === "preparation" && job.durable === false)) {
-        pendingByCustomer.set(customerId, (pendingByCustomer.get(customerId) ?? 0) + 1);
-      }
-      if (job.status === "failed" && job.errorCategory === "retryable" && !retryByCustomer.has(customerId)) retryByCustomer.set(customerId, job);
+      let row = rows.get(job.customerId);
+      if (!row) { row = { job, pendingCount: 0 }; rows.set(job.customerId, row); }
+      if (isActiveDeliveryPhotoUpload(job)) row.pendingCount++;
+      if (job.status === "paused" || job.status === "failed") row.attention ??= job;
+      if (job.status === "failed" && job.errorCategory === "retryable") row.retryJob ??= job;
     }
-    return { byCustomer, pendingByCustomer, retryByCustomer };
+    return rows;
   }, [jobs]);
-  return { coordinator, jobs, ...grouped, ready: coordinator !== null, storageError };
+  return { coordinator, jobs, byCustomer, ready: coordinator !== null, storageError: failedNamespace === namespace, retryStorage };
 }

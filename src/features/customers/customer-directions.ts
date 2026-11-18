@@ -1,43 +1,42 @@
-import type { Customer } from "@/domain/customer";
-import { buildKakaoDirectionsUrlToCoordinate } from "@/features/school-detail/kakao-directions";
-import { isCustomerPoint } from "./customer-point";
+import type { Customer, CustomerPoint } from "@/domain/customer";
 import type { MouseEvent } from "react";
-import type { CustomerPoint } from "@/domain/customer";
+import { registeredCustomerAddress } from "./customer-address";
 
-type DirectionCustomer = Pick<Customer, "name" | "deliveryAddress" | "officialAddress">;
-const addressOf = (customer: DirectionCustomer) => customer.deliveryAddress.trim() || customer.officialAddress.trim();
+type Addresses = Pick<Customer, "deliveryAddress" | "officialAddress">;
+type DirectionCustomer = Addresses & Pick<Customer, "name" | "customerId" | "revision">;
+const loadDirections = () => import("./customer-directions-repository");
 
 /** The normal anchor fallback searches the displayed address, never a stale pin or a shop name. */
-export function customerDirectionsHref(customer: DirectionCustomer): string | null {
-  const address = addressOf(customer);
+export function customerDirectionsHref(customer: Addresses): string | null {
+  const address = registeredCustomerAddress(customer);
   return address ? `https://map.kakao.com/link/search/${encodeURIComponent(address)}` : null;
 }
 
-const pending = new WeakSet<HTMLAnchorElement>();
+export function preloadCustomerDirections(customer: Customer) {
+  const address = registeredCustomerAddress(customer);
+  if (address && customer.status === "active") void loadDirections()
+    .then((api) => api.resolveDirectionsPoint(address, customer)).catch(() => undefined);
+}
 export async function openCustomerDirections(event: MouseEvent<HTMLAnchorElement>, customer: DirectionCustomer,
-  resolve: (address: string, popup: Window | null) => Promise<CustomerPoint | null> = async (address, popup) => {
-    const api = await import("./customer-directions-repository");
-    if (popup && !popup.closed) api.renderDirectionsLoading(popup);
-    return api.resolveDirectionsPoint(address);
-  }) {
-  if (event.defaultPrevented || (event.button !== undefined && event.button !== 0 && event.button !== 1)) return;
+  resolve?: (address: string, popup: Window | null) => Promise<CustomerPoint | null>) {
+  if (event.defaultPrevented || event.button > 1) return;
   event.preventDefault();
-  const anchor = event.currentTarget; const originalHref = anchor.href;
-  if (pending.has(anchor)) return;
-  pending.add(anchor); anchor.setAttribute("aria-busy", "true");
+  const anchor = event.currentTarget;
+  if (anchor.ariaBusy === "true") return;
+  const originalHref = anchor.href;
+  const version = anchor.dataset.directionsVersion;
+  const current = () => anchor.isConnected && anchor.href === originalHref && anchor.dataset.directionsVersion === version;
+  anchor.ariaBusy = "true";
   // Reserve the window during the user's gesture so async geocoding does not trigger a popup block.
   let popup: Window | null = null;
   try {
-    popup = window.open("about:blank", "_blank");
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!mobile) popup = window.open("about:blank", "_blank");
     if (popup) popup.opener = null;
-    const point = await resolve(addressOf(customer), popup);
-    if (!anchor.isConnected || anchor.href !== originalHref) { popup?.close(); return; }
-    if (!isCustomerPoint(point)) throw new Error("unresolved-address");
-    const href = buildKakaoDirectionsUrlToCoordinate(customer.name, point.latitude, point.longitude);
-    if (popup) { if (!popup.closed) popup.location.replace(href); }
-    else window.location.assign(href);
+    const navigation = await loadDirections();
+    await navigation.navigateToCustomer(customer, registeredCustomerAddress(customer), popup, mobile, current, resolve);
   } catch {
     popup?.close();
-    if (anchor.isConnected && anchor.href === originalHref) window.alert("주소를 확인하지 못했어요. 인터넷 연결과 등록 주소를 확인한 뒤 다시 시도해주세요.");
-  } finally { pending.delete(anchor); anchor.removeAttribute("aria-busy"); }
+    if (current()) window.alert("주소를 확인하지 못했어요. 인터넷 연결과 등록 주소를 확인한 뒤 다시 시도해주세요.");
+  } finally { anchor.ariaBusy = null; }
 }

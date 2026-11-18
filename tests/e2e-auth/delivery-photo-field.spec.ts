@@ -1,13 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import sharp from "sharp";
 
 import { PHASE3_TEST_PINS } from "../../scripts/fixtures/phase3-auth";
 import { customerSchema, getCustomerChoseong, normalizeCustomerName } from "../../src/domain/customer";
-import { deliveryDateKeyInSeoul } from "../../functions/src/delivery-photo/delivery-photo-service";
+import { DeliveryPhotoService, deliveryDateKeyInSeoul } from "../../functions/src/delivery-photo/delivery-photo-service";
+import { GoogleDeliveryPhotoStorage } from "../../functions/src/delivery-photo/delivery-photo-store";
 
 const project = "demo-onnuriway";
 const customerPath = "companies/onnuri/customers";
@@ -542,7 +545,7 @@ test("Safari-style PNG fallback and late picker change save camera and album pho
 test("recent customer history lazily relays thumbnails and only the selected evidence", async ({ page }) => {
   await removePilotPhotos([ids[1]!]);
   const errors: string[] = []; const warnings: string[] = []; const directWrites: string[] = [];
-  const listInputs: Array<{ scope?: string; customerId?: string; limit?: number }> = [];
+  const listInputs: Array<{ scope?: string; customerId?: string; limit?: number; deliveryDateKey?: string }> = [];
   const getInputs: Array<{ photoId?: string; variant?: string }> = [];
   const listResults: Array<{ scope?: string; customerId?: string; photos?: Array<{ photoId: string; createdAt: string }> }> = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -609,14 +612,26 @@ test("recent customer history lazily relays thumbnails and only the selected evi
     await expect(history.getByText("사진은 최근 7일간 보관됩니다.")).toBeVisible();
     const dates = history.getByRole("group", { name: "사진 기록 날짜" });
     await expect(dates.getByRole("button", { name: "전체" })).toHaveAttribute("aria-pressed", "true");
-    await dates.getByRole("button", { name: "오늘" }).click();
+    const selectDay = async (label: string, key: string, count: number) => {
+      const response = page.waitForResponse((value) => value.url().endsWith("/listDeliveryPhotos")
+        && value.request().method() === "POST" && value.request().postDataJSON()?.data?.deliveryDateKey === key);
+      await dates.getByRole("button", { name: label }).click();
+      const result = await response;
+      expect(result.ok()).toBe(true);
+      const body = await result.json();
+      expect((body.data ?? body.result).photos).toHaveLength(count);
+    };
+    const yesterdayKey = deliveryDateKeyInSeoul(new Date(now.valueOf() - 86_400_000));
+    await selectDay("오늘", dateKey, 3);
     await expect(history.getByRole("list").getByRole("button", { name: /^대전식품 납품사진,/u })).toHaveCount(3);
-    await dates.getByRole("button", { name: "어제" }).click();
+    await selectDay("어제", yesterdayKey, 0);
     await expect(history.getByText("이 날짜에 납품사진 기록이 없습니다.")).toBeVisible();
     await dates.getByRole("button", { name: "전체" }).click();
-    await expect.poll(() => listInputs.length).toBe(1);
-    expect(listInputs[0]).toEqual({ scope: "customer", customerId: ids[1], limit: 30 });
-    await expect.poll(() => listResults.length).toBe(1);
+    const base = { scope: "customer", customerId: ids[1], limit: 30 };
+    expect(listInputs.filter((input) => input.scope === "customer")).toEqual([
+      base, { ...base, deliveryDateKey: dateKey }, { ...base, deliveryDateKey: yesterdayKey },
+    ]);
+    await expect.poll(() => listResults.length).toBe(3);
     expect(listResults[0]).toMatchObject({ scope: "customer", customerId: ids[1] });
     expect(listResults[0]!.photos).toHaveLength(3);
     expect(listResults[0]!.photos!.map((photo) => Date.parse(photo.createdAt)))
@@ -737,21 +752,16 @@ test("history is discoverable without a photo today and filters a past server re
   await page.getByLabel("납품사진 거래처 검색").fill("");
 
   const pastPhoto = await sharp({ create: { width: 720, height: 480, channels: 3, background: "#789b7e" } }).jpeg().toBuffer();
-  await chooseRowPhoto(page, "대전식품", "카메라 촬영", pastPhoto, "past-history.jpg");
-  await expect(page.getByText("남음 1곳 · 기록완료 2곳")).toBeVisible({ timeout: 30_000 });
-  await page.route("**/listDeliveryPhotos", async (route) => {
-    const input = (route.request().postDataJSON() as { data?: { scope?: string; customerId?: string } } | null)?.data;
-    if (input?.scope !== "customer" || input.customerId !== ids[1]) { await route.continue(); return; }
-    const response = await route.fetch();
-    const body = await response.json() as { result?: { fromDateKey: string; photos: Array<{ deliveryDateKey: string; createdAt: string }> } };
-    const result = body.result;
-    if (!result?.photos.length) throw new Error("Expected the uploaded customer history.");
-    const yesterday = new Date(Date.parse(`${result.fromDateKey}T00:00:00Z`) + 6 * 86_400_000).toISOString().slice(0, 10);
-    result.photos[0] = { ...result.photos[0]!, deliveryDateKey: yesterday,
-      createdAt: new Date(Date.parse(result.photos[0]!.createdAt) - 86_400_000).toISOString() };
-    await route.fulfill({ response, json: body });
-  });
-  await page.locator("details").getByText(/기록완료/u).click();
+  const bucketName = "demo-onnuriway-delivery-photos.appspot.com";
+  if (!/^(?:http:\/\/)?(?:127\.0\.0\.1|localhost):\d+$/.test(process.env.STORAGE_EMULATOR_HOST ?? "")
+    || process.env.DELIVERY_PHOTO_BUCKET !== bucketName) throw new Error("Past-photo fixture requires the demo Storage emulator.");
+  const yesterday = Timestamp.fromMillis(Date.now() - 86_400_000);
+  const actor = await db().doc("authz/uid-delivery").get();
+  const bucket = getStorage(getApps().find((app) => app.name === appName)!).bucket(bucketName);
+  const service = new DeliveryPhotoService(db(), new GoogleDeliveryPhotoStorage(bucket), () => yesterday);
+  await service.create({ requestId: randomUUID(), customerId: ids[1]!, source: "camera", contentType: "image/jpeg",
+    fileBase64: pastPhoto.toString("base64") }, { uid: "uid-delivery", employeeId: "EMP-DELIVERY", roleScopes: ["delivery"],
+    isAdmin: false, sessionVersion: actor.get("sessionVersion"), permissionsVersion: actor.get("permissionsVersion") }, yesterday);
   await page.getByRole("button", { name: "대전식품 사진 기록" }).click();
   const pastHistory = page.getByRole("dialog", { name: "대전식품 납품사진", exact: true });
   await expect(pastHistory.getByText("최근 기록 1장")).toBeVisible();
@@ -1015,7 +1025,13 @@ test("empty route offers setup without changing the day until Save", async ({ pa
   const editor = page.getByRole("dialog", { name: "내 납품처 편집" });
   await editor.getByRole("searchbox", { name: "거래처 검색" }).fill("한빛");
   await editor.getByRole("button", { name: "한빛유통 내 납품처에 추가" }).click();
+  const confirmDiscard = page.waitForEvent("dialog").then(async (dialog) => {
+    expect(dialog.message()).toBe("저장하지 않은 변경사항을 버릴까요?");
+    await dialog.accept();
+  });
   await editor.getByRole("button", { name: "취소" }).click();
+  await confirmDiscard;
+  await expect(editor).toBeHidden();
   await expect(page.getByRole("button", { name: "내 납품처", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "내 납품처", exact: true }).click();
   const reopened = page.getByRole("dialog", { name: "내 납품처 편집" });
@@ -1026,6 +1042,11 @@ test("empty route offers setup without changing the day until Save", async ({ pa
 });
 
 test("revision conflict refreshes server state without overwriting the draft", async ({ page }) => {
+  const baseline = db().batch();
+  baseline.set(db().doc(routePath), { employeeId: "EMP-DELIVERY", customerIds: [ids[0]], revision: 1,
+    updatedAt: Timestamp.now(), updatedByEmployeeId: "EMP-DELIVERY" });
+  baseline.delete(db().doc(`companies/onnuri/deliveryPhotoDays/EMP-DELIVERY_${dateKey}`));
+  await baseline.commit();
   await login(page);
   await expect(page.getByText("남음 0곳 · 기록완료 1곳")).toBeVisible();
   await page.getByRole("button", { name: "내 납품처", exact: true }).click();

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
@@ -10,14 +10,15 @@ import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
 
 import { customerAddress } from "./customer-address";
-import { customerDirectionsHref, openCustomerDirections } from "./customer-directions";
+import { preloadCustomerDirections } from "./customer-directions";
+import { CustomerCardDirectionsLink } from "./customer-directions-link";
 import { CustomerBadges, CustomerCoreInformation, CustomerPhoneLink, confirmClosedCustomer, customerPasswordLabel, customerPhoneHref } from "./customer-card";
 import { customerDetailContacts } from "./customer-detail-contacts";
 import { customerContactDisplayName } from "./customer-contact-name";
 import { CustomerOverviewPhoto } from "./customer-overview-photo";
 import styles from "./customer-detail.module.css";
 
-const CustomerMap = dynamic(() => import("./customer-map"), {
+const CustomerMap = dynamic(() => import(/* webpackChunkName: "customer-map" */ "./customer-map"), {
   loading: () => <div className={styles.mapLoading} role="status">지도를 준비하고 있어요.</div>,
 });
 const DeliveryPhotoCustomerSection = dynamic(() => import("@/features/delivery-photos/delivery-photo-customer-section"));
@@ -25,11 +26,7 @@ const DeliveryPhotoCustomerSection = dynamic(() => import("@/features/delivery-p
 const dateFormat = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeZone: "Asia/Seoul" });
 
 export function CustomerDirectionsLink({ customer }: { customer: Customer }) {
-  const href = customerDirectionsHref(customer);
-  if (!href) return <span className={styles.action} aria-disabled="true"><Icon name="route" size={20} />주소 미등록</span>;
-  return <a className={`${styles.action} ${styles.primaryAction}`} href={href} target="_blank" rel="noopener noreferrer"
-    onClick={(event) => { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); }}
-    onAuxClick={(event) => { if (event.button === 1) { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); } }}><Icon name="route" size={20} />길찾기</a>;
+  return <CustomerCardDirectionsLink customer={customer} className={`${styles.action} ${styles.primaryAction}`} disabledClassName={styles.action} label="길찾기" />;
 }
 
 function ContactList({ customer, contacts }: { customer: Customer; contacts: readonly CustomerContact[] }) {
@@ -40,20 +37,21 @@ function ContactList({ customer, contacts }: { customer: Customer; contacts: rea
   </li>)}</ul>;
 }
 
+function focusMarkerInfo(panel: HTMLElement | null) {
+  if (!panel) return;
+  panel.focus({ preventScroll: true });
+  panel.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
+}
+
 export function CustomerDetail({ customer, session, onClose, onEdit, onRecordPhoto }: {
   customer: Customer; session: AuthenticatedSession; onClose: () => void;
   onEdit: () => void;
   onRecordPhoto?: (() => void) | undefined;
 }) {
   const [markerInfo, setMarkerInfo] = useState(false);
-  const markerInfoRef = useRef<HTMLElement>(null);
+  useEffect(() => { preloadCustomerDirections(customer); }, [customer]);
   const { visible: visibleContacts, additional: additionalContacts, phoneContact: contact } = customerDetailContacts(customer.contacts);
   const phoneHref = contact ? customerPhoneHref(contact.phoneNumber) : null;
-  useEffect(() => {
-    if (!markerInfo || !markerInfoRef.current) return;
-    markerInfoRef.current.focus({ preventScroll: true });
-    markerInfoRef.current.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
-  }, [markerInfo]);
 
   return <BottomSheet open title={customer.name} onClose={onClose}>
     <div className={styles.detail} data-customer-detail>
@@ -83,7 +81,7 @@ export function CustomerDetail({ customer, session, onClose, onEdit, onRecordPho
         <div className={styles.sectionTitle}><h3 id="customer-location-heading">납품 위치</h3><span><Icon name="location" size={14} />{customer.deliveryPoint ? "지정한 지점" : "위치 미등록"}</span></div>
         <p className={styles.deliveryAddress}>{customerAddress(customer)}</p>
         <CustomerMap point={customer.deliveryPoint} name={customer.name} hideHeading onMarkerClick={() => setMarkerInfo((current) => !current)} />
-        {markerInfo && customer.deliveryPoint ? <section ref={markerInfoRef} tabIndex={-1} className={styles.markerInfo} aria-label="납품지점 정보" data-customer-marker-info>
+        {markerInfo && customer.deliveryPoint ? <section ref={focusMarkerInfo} tabIndex={-1} className={styles.markerInfo} aria-label="납품지점 정보" data-customer-marker-info>
           <div className={styles.sectionTitle}><h3>{customer.name}</h3><button type="button" className={styles.closeMarker} onClick={() => setMarkerInfo(false)} aria-label="납품지점 정보 접기"><Icon name="close" size={18} /></button></div>
           <CustomerCoreInformation customer={customer} />
         </section> : null}

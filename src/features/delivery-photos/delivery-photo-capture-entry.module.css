@@ -11,3 +11,7 @@
 .entry .entryReturn{display:flex;align-items:center;justify-content:center;gap:6px;justify-self:center;min-height:44px;color:#3f587b;font-size:.8125rem}
 @media(max-width:360px){.entry{padding:12px}.entrySources{grid-template-columns:1fr}}
 @media(forced-colors:active){.entry,.entry .entrySources button{border-color:CanvasText;color:ButtonText}.entry .entryReturn{color:LinkText}}
+.continuous{margin:.7rem 0 1rem;min-width:0}
+.continuous header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem}
+.continuous h2{margin:0;font-size:1.04rem}
+.continuous header button{border:1px solid #cbd6e9;font-size:.875rem}

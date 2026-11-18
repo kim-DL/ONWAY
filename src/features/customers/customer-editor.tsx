@@ -18,7 +18,7 @@ import { customerErrorMessage, customerRepository } from "./customer-repository"
 import editorStyles from "./customer-editor.module.css";
 import styles from "./customer.module.css";
 
-const CustomerMap = dynamic(() => import("./customer-map"), {
+const CustomerMap = dynamic(() => import(/* webpackChunkName: "customer-map" */ "./customer-map"), {
   loading: () => <div className={styles.mapLoading} role="status">지도를 준비하고 있어요.</div>,
 });
 

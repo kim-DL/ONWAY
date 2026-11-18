@@ -1,7 +1,5 @@
 "use client";
 
-import type { MouseEvent } from "react";
-
 import { Icon } from "@/components/ui/icon";
 import fieldList from "@/components/ui/field-list.module.css";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -11,7 +9,8 @@ import { getPrimaryCustomerContact, sanitizeCustomerPhone } from "./customer-sea
 import { customerAddress } from "./customer-address";
 import { customerContactDisplayName } from "./customer-contact-name";
 import { CustomerOverviewPhoto } from "./customer-overview-photo";
-import { customerDirectionsHref, openCustomerDirections } from "./customer-directions";
+import { CustomerCardDirectionsLink, confirmClosedCustomer } from "./customer-directions-link";
+export { CustomerCardDirectionsLink, confirmClosedCustomer } from "./customer-directions-link";
 import styles from "./customer.module.css";
 
 export const primaryCustomerContact = getPrimaryCustomerContact;
@@ -24,13 +23,6 @@ export function customerPhoneHref(phone: string) {
 export function customerPasswordLabel(customer: Pick<Customer, "accessPasswordState" | "accessPassword">) {
   if (customer.accessPasswordState === "none") return "없음";
   return customer.accessPasswordState === "registered" && customer.accessPassword ? customer.accessPassword : "미등록";
-}
-
-export function confirmClosedCustomer(event: MouseEvent<HTMLAnchorElement>, customer: Pick<Customer, "name" | "status">) {
-  event.stopPropagation();
-  if (customer.status === "closed" && !window.confirm(`${customer.name}은(는) 폐업 처리된 거래처입니다. 계속 진행할까요?`)) {
-    event.preventDefault();
-  }
 }
 
 export function CustomerBadges({ customer }: { customer: Pick<Customer, "status" | "noticeType"> }) {
@@ -68,16 +60,6 @@ function CustomerPasswordSummary({ customer, id }: { customer: Customer; id: str
   </span>;
 }
 
-export function CustomerCardDirectionsLink({ customer }: { customer: Customer }) {
-  const href = customerDirectionsHref(customer);
-  if (!href) return <span className={styles.directionsLink} aria-disabled="true"><Icon name="route" size={18} />주소 미등록</span>;
-  return <a className={styles.directionsLink} href={href} target="_blank" rel="noopener noreferrer"
-    aria-label={`${customer.name} 납품지 길안내`} onClick={(event) => { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); }}
-    onAuxClick={(event) => { if (event.button === 1) { confirmClosedCustomer(event, customer); void openCustomerDirections(event, customer); } }}>
-    <Icon name="route" size={18} />길안내
-  </a>;
-}
-
 export function CustomerCard({ customer, onSelect, compact = false }: { customer: Customer; onSelect: () => void; compact?: boolean }) {
   const contact = primaryCustomerContact(customer);
   const Heading = compact ? "h4" : "h2";
@@ -93,7 +75,7 @@ export function CustomerCard({ customer, onSelect, compact = false }: { customer
         </div>
         <div className={styles.contactActions}>
           {contact?.phoneNumber && <CustomerPhoneLink customer={customer} contact={contact} />}
-          <CustomerCardDirectionsLink customer={customer} />
+          <CustomerCardDirectionsLink customer={customer} className={styles.directionsLink} />
         </div>
       </div>
     </div>

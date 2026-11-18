@@ -11,6 +11,7 @@ declare global {
   interface Window {
     __deliveryPhotoEditorFixture: {
       requests: SaveRequest[];
+      loseNextReply: () => void;
       externalUpdate: () => void;
       serverIds: () => string[];
     };
@@ -44,6 +45,8 @@ let snapshot: DeliveryPhotoSnapshot = {
 let serverRevision = absent ? null : 1;
 let serverIds = absent && mode === "route" ? [] : ids.slice(0, 2);
 const requests: SaveRequest[] = [];
+let loseReply = false;
+const receipts = new Map<string, NonNullable<DeliveryPhotoSnapshot["route"]> | DeliveryPhotoSnapshot["day"]>();
 const listeners = new Set<() => void>();
 const publish = () => { for (const listener of listeners) listener(); };
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -52,6 +55,7 @@ const accept = (update: (current: DeliveryPhotoSnapshot) => DeliveryPhotoSnapsho
 
 window.__deliveryPhotoEditorFixture = {
   requests,
+  loseNextReply: () => { loseReply = true; },
   serverIds: () => serverIds,
   externalUpdate: () => {
     serverRevision = (serverRevision ?? 0) + 1;
@@ -68,15 +72,19 @@ export function useDeliveryPhotoData() {
 }
 export function useDeliveryPhotoCatalog() { return { customers, status: "ready", retry() {} }; }
 export function useDeliveryPhotoUploads() {
-  return { coordinator: null, jobs: [], byCustomer: new Map(), pendingByCustomer: new Map(), retryByCustomer: new Map(), ready: false, storageError: false };
+  return { coordinator: null, jobs: [], byCustomer: new Map(), ready: false, storageError: false };
 }
 async function save(input: SaveInput, target: "route" | "day") {
   requests.push({ ...input, customerIds: [...input.customerIds], mode: target });
+  if (receipts.has(input.requestId)) return receipts.get(input.requestId)!;
   if (input.expectedRevision !== serverRevision) throw Object.assign(new Error("Revision conflict"), { code: "functions/aborted" });
   serverRevision = (serverRevision ?? 0) + 1;
   serverIds = [...input.customerIds];
-  return target === "route" ? route(serverRevision, serverIds)
+  const result = target === "route" ? route(serverRevision, serverIds)
     : { ...snapshot.day, revision: serverRevision, customerIds: serverIds, isOverride: true };
+  receipts.set(input.requestId, result);
+  if (loseReply) { loseReply = false; throw new Error("Synthetic response lost after commit"); }
+  return result;
 }
 export const deliveryPhotoRepository = { saveRoute: (input: SaveInput) => save(input, "route"), saveDay: (input: SaveInput) => save(input, "day") };
 export const deliveryPhotoErrorKind = (error: { code?: string }) => error.code === "functions/aborted" ? "conflict" : "temporary";

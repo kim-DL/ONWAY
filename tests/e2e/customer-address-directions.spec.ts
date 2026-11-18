@@ -6,12 +6,19 @@ test.beforeAll(async () => {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-address-directions.tsx", [{ name: "directions-isolation", setup(builder) {
     builder.initialOptions.define = { ...builder.initialOptions.define, "process.env.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS": '"false"' };
-    builder.onResolve({ filter: /customer-repository$|customer-directions-repository$|^client-only$/ }, ({ path }) => ({ path, namespace: "directions-isolation" }));
+    builder.onResolve({ filter: /customer-repository$|firebase\/client$|^firebase\/functions$|^client-only$/ }, ({ path }) => ({ path, namespace: "directions-isolation" }));
     builder.onLoad({ filter: /.*/, namespace: "directions-isolation" }, ({ path }) => ({ loader: "ts", resolveDir: root, contents: path === "client-only" ? "export {};" : `
       export const customerRepository = {};
       export const customerErrorMessage=()=>"error";
-      export {renderDirectionsLoading} from "./src/features/customers/customer-directions-loading";
-      export async function resolveDirectionsPoint(query){window.__directionQueries ??= [];window.__directionQueries.push(query);await new Promise(r=>new URLSearchParams(location.search).has('hold')?window.__finishDirections=r:setTimeout(r,100));return new URLSearchParams(location.search).has('fail')?null:{latitude:36.4,longitude:127.5};}
+      const user={uid:"fixture",getIdTokenResult:async()=>({claims:{employeeId:"fixture",sessionVersion:1,permissionsVersion:1}})};
+      export const getFirebaseClientServices=()=>({auth:{currentUser:user},functions:{}});
+      export const getFirebaseAuthIfInitialized=()=>null;
+      export const ensureFirebaseAppCheckReady=async()=>{};
+      export const httpsCallable=()=>async({query})=>{
+        window.observeDirectionQuery?.(query);
+        await new Promise(r=>new URLSearchParams(location.search).has('hold')?window.__finishDirections=r:setTimeout(r,100));
+        return {data:new URLSearchParams(location.search).has('fail')?[]:[{id:"address",name:query,address:query,point:{latitude:36.4,longitude:127.5}}]};
+      };
     ` }));
   } }]);
 });
@@ -27,8 +34,17 @@ async function open(page: import("@playwright/test").Page, fail = false, hold = 
   expect(errors).toEqual([]);
   await expect(page.getByRole("heading", { name: "주소 길안내 검증" })).toBeVisible();
 }
-test("address lookup shows a centered loader without a raw text page", async ({ page }, info) => {
+test("address lookup indicates progress until the destination is ready", async ({ page, isMobile }, info) => {
   await open(page, false, true);
+  if (isMobile) {
+    const link = page.getByRole("region", { name: "목록 카드" }).getByRole("link");
+    await link.click();
+    await expect(link).toHaveAttribute("aria-busy", "true");
+    await page.waitForFunction(() => "__finishDirections" in window);
+    await page.evaluate(() => (window as unknown as { __finishDirections: () => void }).__finishDirections());
+    await expect(page).toHaveURL(/map\.kakao\.com\/link\/to\//);
+    return;
+  }
   const newPage = page.context().waitForEvent("page");
   await page.getByRole("region", { name: "목록 카드" }).getByRole("link").click();
   const popup = await newPage;
@@ -52,24 +68,26 @@ test("address lookup shows a centered loader without a raw text page", async ({ 
   await popup.close();
 });
 for (const region of ["목록 카드", "상세 화면"]) {
-  test(`${region} opens Kakao directions from the displayed address rather than the old pin`, async ({ page }) => {
+  test(`${region} opens Kakao directions from the displayed address rather than the old pin`, async ({ page, isMobile }) => {
+    const lookups: string[] = [];
+    await page.exposeFunction("observeDirectionQuery", (query: string) => lookups.push(query));
     await open(page);
-    const newPage = page.context().waitForEvent("page");
+    const newPage = isMobile ? Promise.resolve(page) : page.context().waitForEvent("page");
     await page.getByRole("region", { name: region }).getByRole("link").click();
     const popup = await newPage;
     await expect(popup).toHaveURL(`https://map.kakao.com/link/to/${encodeURIComponent("예시식품")},36.4,127.5`);
-    expect(await page.evaluate(() => (window as unknown as { __directionQueries: string[] }).__directionQueries)).toEqual(["대전 대덕구 예시로 38"]);
+    expect(lookups).toEqual(["대전 대덕구 예시로 38"]);
     expect(await popup.evaluate(() => window.opener === null)).toBe(true);
     await popup.close();
   });
 }
-test("an unresolved address closes the popup and keeps the app open", async ({ page }) => {
+test("an unresolved address keeps the app open and cleans up any popup", async ({ page, isMobile }) => {
   await open(page, true);
-  const alert = page.waitForEvent("dialog"); const newPage = page.context().waitForEvent("page");
+  const alert = page.waitForEvent("dialog"); const newPage = isMobile ? Promise.resolve(null) : page.context().waitForEvent("page");
   await page.getByRole("region", { name: "목록 카드" }).getByRole("link").click();
   const popup = await newPage; const dialog = await alert;
   expect(dialog.message()).toContain("주소를 확인하지 못했어요"); await dialog.accept();
-  await expect.poll(() => popup.isClosed()).toBe(true);
+  if (popup) await expect.poll(() => popup.isClosed()).toBe(true);
   await expect(page).toHaveURL("https://customer-directions.test/?fail");
 });
 test("popup blocking falls back to address-based directions in the current tab", async ({ page }) => {

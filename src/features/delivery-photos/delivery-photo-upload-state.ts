@@ -1,5 +1,6 @@
 export const MAX_PENDING_PHOTOS_PER_CUSTOMER = 3;
 export const MAX_PENDING_PHOTOS_TOTAL = 8;
+export const PREVIOUS_DAY_MESSAGE = "이전 날짜 사진입니다. 서버 접수일로 기록됩니다. 날짜 확인 후 전송해주세요.";
 
 import type { DeliveryPhoto } from "@/domain/delivery-photo";
 import type { DeliveryPhotoCreateErrorCategory } from "./delivery-photo-create-repository";

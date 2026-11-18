@@ -606,11 +606,26 @@ export class DeliveryPhotoService {
     }
     const from = Timestamp.fromMillis(now.toMillis() - DELIVERY_PHOTO_RETENTION_HOURS * 60 * 60 * 1000);
     const fromDateKey = deliveryDateKeyInSeoul(from.toDate());
-    const snapshot = await this.db.collection(DELIVERY_PHOTO_PATH)
-      .where("customerId", "==", input.customerId).where("createdAt", ">=", from)
-      .orderBy("createdAt", "desc").limit(Math.min(input.limit * 4, 400)).get();
-    const photos = snapshot.docs.map((doc) => deliveryPhotoFromDocument(doc.data()))
-      .filter((photo) => photo.status === "active" && photo.expiresAt.toMillis() > now.toMillis()).slice(0, input.limit);
+    if (input.deliveryDateKey && (input.deliveryDateKey < fromDateKey || input.deliveryDateKey > deliveryDateKeyInSeoul(now.toDate()))) {
+      return listDeliveryPhotosResultSchema.parse({ scope: "customer", customerId: input.customerId, fromDateKey, photos: [] });
+    }
+    const start = input.deliveryDateKey ? Date.parse(`${input.deliveryDateKey}T00:00:00+09:00`) : from.toMillis();
+    let range = this.db.collection(DELIVERY_PHOTO_PATH).where("customerId", "==", input.customerId)
+      .where("createdAt", ">=", Timestamp.fromMillis(Math.max(start, from.toMillis())));
+    if (input.deliveryDateKey) range = range.where("createdAt", "<", Timestamp.fromMillis(start + 86_400_000));
+    const query = range.orderBy("createdAt", "desc").limit(input.limit);
+    let page = query;
+    const photos: StoredDeliveryPhoto[] = [];
+    while (photos.length < input.limit) {
+      const { docs } = await page.get();
+      for (const doc of docs) {
+        const photo = deliveryPhotoFromDocument(doc.data());
+        if (photo.status === "active" && photo.expiresAt.toMillis() > now.toMillis()) photos.push(photo);
+        if (photos.length === input.limit) break;
+      }
+      if (docs.length < input.limit) break;
+      page = query.startAfter(docs[docs.length - 1]!);
+    }
     await this.verifyRead(actor);
     return listDeliveryPhotosResultSchema.parse({ scope: "customer", customerId: input.customerId, fromDateKey, photos: photos.map(deliveryPhotoMetadata) });
   }

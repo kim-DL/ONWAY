@@ -1,8 +1,7 @@
 import type { PhotoOutboxRecord, PhotoOutboxStore, OutboxScope } from "./delivery-photo-outbox";
-import type { DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
+import { PREVIOUS_DAY_MESSAGE, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 
 const LOCK_PREFIX = "onnuriway-photo-worker:";
-const PREVIOUS_DAY = "이전 날짜 사진입니다. 서버 접수일로 기록됩니다. 날짜 확인 후 전송해주세요.";
 const RETRY_DELAYS = [2_000, 8_000, 30_000, 300_000] as const;
 
 /** Document lifetime, cross-tab leases and durable reconciliation are loaded
@@ -18,7 +17,7 @@ export class PhotoOutboxWorker {
   scope!: OutboxScope;
   constructor(private readonly store: PhotoOutboxStore, private readonly worker: string) {}
 
-  async open(owner: string, live: () => boolean) {
+  async open(owner: string, live: () => boolean, existingScope: OutboxScope | null = null) {
     try {
       if (typeof navigator !== "undefined" && navigator.locks) {
         await new Promise<void>((ready) => {
@@ -30,7 +29,7 @@ export class PhotoOutboxWorker {
         });
       }
       if (!live()) { this.close(); return false; }
-      this.scope = await this.store.activate(owner);
+      this.scope = existingScope ?? await this.store.activate(owner);
       if (!live()) { this.close(); return false; }
       return true;
     } catch (error) { this.close(); throw error; }
@@ -69,7 +68,7 @@ export class PhotoOutboxWorker {
   close() { clearInterval(this.poll); this.release?.(); this.detach?.(); }
   retryDelay(attempt: number) { return RETRY_DELAYS[Math.min(attempt - 1, RETRY_DELAYS.length - 1)]!; }
   async wake(foreground: boolean, state: {
-    records: ReadonlyMap<string, PhotoOutboxRecord>; restore: () => Promise<void>; live: () => boolean; now: () => number;
+    records: ReadonlyMap<string, PhotoOutboxRecord>; restore: () => Promise<boolean>; live: () => boolean; now: () => number;
     expire: (id: string) => void; retry: (id: string) => Promise<boolean>;
   }) {
     if (!state.live()) return false;
@@ -78,7 +77,7 @@ export class PhotoOutboxWorker {
     this.waking = true;
     try {
       do {
-        await state.restore();
+        if (!await state.restore()) return false;
         const foreground = this.foregroundWake; this.foregroundWake = false;
         const now = state.now();
         for (const [id, record] of state.records) {
@@ -114,7 +113,7 @@ export class PhotoOutboxWorker {
     if (this.restoring) return false;
     this.restoring = true;
     try {
-      const records = await this.store.list(this.scope); const workers = await this.liveWorkers();
+      const records = await this.store.list(this.scope); const workers = records.length ? await this.liveWorkers() : undefined;
       if (!live()) return false;
       const ids = new Set(records.map((record) => record.job.jobId));
       for (const [id, job] of jobs) {
@@ -127,7 +126,7 @@ export class PhotoOutboxWorker {
         const id = record.job.jobId;
         if (active.has(id) || jobs.get(id)?.status === "persisting") continue;
         if (record.job.status !== "completed") {
-          if (record.approvedDay !== today) record.job = { ...record.job, status: "paused", message: PREVIOUS_DAY };
+          if (record.approvedDay !== today) record.job = { ...record.job, status: "paused", message: PREVIOUS_DAY_MESSAGE };
           else if ((!record.lease || record.lease.until <= now || workers && !workers.includes(record.lease.worker))
             && (record.job.status === "uploading" || record.job.status === "preparing")) {
             record.job = { ...record.job, status: record.prepared ? "queued" : "preparing" };

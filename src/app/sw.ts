@@ -15,6 +15,7 @@ import {
   isPublicAssetPath,
   isSchoolThumbnailPath,
 } from "@/features/pwa/cache-policy";
+import { appRelease, releaseNotesRequest } from "@/features/pwa/release-notes";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -23,6 +24,10 @@ declare global {
 }
 
 declare const self: ServiceWorkerGlobalScope;
+
+self.addEventListener("message", (event) => {
+  if (event.data === releaseNotesRequest) event.ports[0]?.postMessage(appRelease);
+});
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST ?? [],

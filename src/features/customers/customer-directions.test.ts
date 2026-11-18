@@ -1,22 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MouseEvent } from "react";
+vi.mock("client-only", () => ({}));
 import { customerDirectionsHref, openCustomerDirections } from "./customer-directions";
-const customer = { name: "예시식품", officialAddress: "예전 주소", deliveryAddress: "대전 대덕구 예시로 38" };
+const customer = { customerId: "test", revision: 1, name: "예시식품", officialAddress: "예전 주소", deliveryAddress: "대전 대덕구 예시로 38" };
 afterEach(() => vi.unstubAllGlobals());
 function setup(popupBlocked = false) {
   const popup = { opener: {}, closed: false, document: { title: "", body: { textContent: "" } }, location: { replace: vi.fn() }, close: vi.fn() };
   const browser = { open: vi.fn(() => popupBlocked ? null : popup), location: { assign: vi.fn() }, alert: vi.fn() };
   vi.stubGlobal("window", browser);
-  const anchor = { href: customerDirectionsHref(customer)!, isConnected: true, setAttribute: vi.fn(), removeAttribute: vi.fn() };
+  const anchor = { href: customerDirectionsHref(customer)!, isConnected: true, dataset: { directionsVersion: "test:1" }, ariaBusy: null };
   const event = { defaultPrevented: false, preventDefault: vi.fn(), button: 0, currentTarget: anchor } as unknown as MouseEvent<HTMLAnchorElement>;
   return { popup, browser, anchor, event };
 }
 describe("address-based Kakao directions", () => {
   it("opens a window during the gesture then uses the resolved displayed address", async () => {
     const { popup, browser, event } = setup(); let finish!: (point: { latitude: number; longitude: number }) => void;
-    const resolve = vi.fn(() => new Promise<{ latitude: number; longitude: number }>((done) => { finish = done; }));
+    let lookupStarted!: () => void;
+    const started = new Promise<void>((notify) => { lookupStarted = notify; });
+    const resolve = vi.fn(() => new Promise<{ latitude: number; longitude: number }>((done) => { finish = done; lookupStarted(); }));
     const task = openCustomerDirections(event, customer, resolve);
-    expect(browser.open).toHaveBeenCalledOnce(); expect(resolve).toHaveBeenCalledWith(customer.deliveryAddress, popup);
+    expect(browser.open).toHaveBeenCalledOnce(); await started;
+    expect(resolve).toHaveBeenCalledWith(customer.deliveryAddress, popup);
     expect(popup.opener).toBeNull(); expect(popup.location.replace).not.toHaveBeenCalled();
     finish({ latitude: 36.4, longitude: 127.5 }); await task;
     expect(popup.location.replace).toHaveBeenCalledWith(`https://map.kakao.com/link/to/${encodeURIComponent(customer.name)},36.4,127.5`);
@@ -38,7 +42,7 @@ describe("address-based Kakao directions", () => {
     const resolve = vi.fn(() => new Promise<{ latitude: number; longitude: number }>((done) => { finish = done; }));
     const first = openCustomerDirections(event, customer, resolve);
     await openCustomerDirections(event, customer, resolve);
-    expect(browser.open).toHaveBeenCalledOnce(); expect(resolve).toHaveBeenCalledOnce();
+    expect(browser.open).toHaveBeenCalledOnce(); await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
     finish({ latitude: 36.4, longitude: 127.5 }); await first;
   });
   it.each([null, { latitude: NaN, longitude: 127 }])("closes the blank window and shows an error for an unresolved address", async (point) => {
@@ -48,6 +52,12 @@ describe("address-based Kakao directions", () => {
   it("ignores a late result after the displayed customer address changes", async () => {
     const { popup, anchor, event } = setup();
     await openCustomerDirections(event, customer, async () => { anchor.href = "https://map.kakao.com/link/search/changed"; return { latitude: 36.4, longitude: 127.5 }; });
+    expect(popup.close).toHaveBeenCalledOnce(); expect(popup.location.replace).not.toHaveBeenCalled();
+  });
+  it("ignores a late result when a different revision has the same address", async () => {
+    const { popup, anchor, event } = setup();
+    const dataset = { directionsVersion: "test:1" }; Object.assign(anchor, { dataset });
+    await openCustomerDirections(event, customer, async () => { dataset.directionsVersion = "test:2"; return { latitude: 36.4, longitude: 127.5 }; });
     expect(popup.close).toHaveBeenCalledOnce(); expect(popup.location.replace).not.toHaveBeenCalled();
   });
   it("does not open when closed-customer confirmation was cancelled", async () => {
