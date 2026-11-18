@@ -8,10 +8,14 @@ import { deliveryPhotoUploadStatusText, isActiveDeliveryPhotoUpload, type Delive
 import styles from "./delivery-photo-upload-panel.module.css";
 const DeliveryPhotoLocalPreview = dynamic(() => import("./delivery-photo-local-preview").then((module) => module.DeliveryPhotoLocalPreview), { ssr: false });
 
-export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
+export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names, focusJob, onFocused }: {
   coordinator: DeliveryPhotoUploadCoordinator; jobs: readonly DeliveryPhotoUploadProjection[]; names: ReadonlyMap<string, { name: string }>;
+  focusJob?: string | null; onFocused?: (cleared: null) => void;
 }) {
   const [viewed, setViewed] = useState<{ jobId: string; origin: HTMLElement } | null>(null);
+  useEffect(() => {
+    if (focusJob) { document.getElementById(`photo-job-${focusJob}`)?.focus(); onFocused?.(null); }
+  }, [focusJob, onFocused]);
   useEffect(() => {
     const removed = (event: Event) => {
       for (const job of coordinator.getSnapshot()) if (job.photoId === (event as CustomEvent<string>).detail) coordinator.dismiss(job.jobId);
@@ -31,7 +35,7 @@ export default function DeliveryPhotoUploadPanel({ coordinator, jobs, names }: {
     <ul className={styles.list}>{shown.map((job, index) => {
       const image = coordinator.getPreview(job.jobId);
       const retryable = coordinator.canRetry(job.jobId);
-      return <li key={job.jobId} className={styles.card} data-photo-job-status={job.status}>
+      return <li key={job.jobId} id={`photo-job-${job.jobId}`} tabIndex={-1} className={styles.card} data-photo-job-status={job.status}>
         {image ? <button type="button" className={styles.preview} onClick={(event) => setViewed({ jobId: job.jobId, origin: event.currentTarget })} aria-label={`촬영 사진 ${index + 1} 크게 보기`}>
           <img src={image.thumbnail} alt={`${names.get(job.customerId)?.name ?? "납품처"} 촬영 미리보기`} width={160} height={120} />
         </button> : <div className={styles.placeholder}>{job.status === "failed" ? "미리보기 없음" : "미리보기 준비 중"}</div>}

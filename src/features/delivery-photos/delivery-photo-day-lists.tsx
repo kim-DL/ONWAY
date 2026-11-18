@@ -1,0 +1,20 @@
+"use client";
+
+import type { ReactNode } from "react";
+import styles from "./photo.module.css";
+
+export default function DeliveryPhotoDayLists({ remaining, completed, show, hasToday, renderRow }: {
+  remaining: readonly string[]; completed: readonly string[]; show: (id: string) => boolean;
+  hasToday: boolean; renderRow: (id: string, directions: boolean) => ReactNode;
+}) {
+  const remainingIds = remaining.filter(show);
+  const completedIds = completed.filter(show);
+  return <>
+      <section className={styles.section} data-photo-list="remaining" aria-labelledby="delivery-photo-remaining-heading"><h2 id="delivery-photo-remaining-heading" tabIndex={-1}>오늘 남은 납품처</h2>
+        {remainingIds.length ? <ul className={styles.list}>{remainingIds.map((id) => renderRow(id, true))}</ul> : <p className={styles.empty}>{remaining.length ? "남은 거래처는 촬영 카드에 표시되어 있어요." : hasToday ? "오늘 목록의 모든 거래처에 사진 기록이 있습니다." : "오늘 납품처가 비어 있습니다. 내 납품처를 설정해 주세요."}</p>}
+      </section>
+      <details className={styles.completed} data-photo-list="completed"><summary>기록완료 {completed.length}곳</summary>
+        {completedIds.length ? <ul className={styles.list}>{completedIds.map((id) => renderRow(id, false))}</ul> : <p className={styles.empty}>{completed.length ? "기록한 거래처는 촬영 카드에 표시되어 있어요." : "아직 기록된 납품사진이 없습니다."}</p>}
+      </details>
+  </>;
+}

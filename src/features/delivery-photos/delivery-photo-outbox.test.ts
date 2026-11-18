@@ -35,6 +35,16 @@ async function until(check: () => void) { await vi.waitFor(check, { timeout: 2_0
 afterEach(async () => { await Promise.all(workers.splice(0).map((worker) => worker.clear())); await clearDeliveryPhotoOutbox(); vi.unstubAllGlobals(); });
 
 describe("durable unsent-photo outbox", () => {
+  it("checks an empty queue without reading payload stores and detects a later insert", async () => {
+    const scope = await deliveryPhotoOutbox.activate(owner);
+    const read = vi.spyOn(IDBObjectStore.prototype, "getAll");
+    try {
+      for (let poll = 0; poll < 10; poll++) expect(await deliveryPhotoOutbox.list(scope)).toEqual([]);
+      expect(read).not.toHaveBeenCalled();
+      await deliveryPhotoOutbox.add(scope, record("new-photo"));
+      expect((await deliveryPhotoOutbox.list(scope))[0]?.job.requestId).toBe("request-new-photo");
+    } finally { read.mockRestore(); }
+  });
   it("allows a fresh session coordinator even if clearing the old storage fails", async () => {
     const first = getDeliveryPhotoUploadCoordinator(session); await first.ready;
     const clear = vi.spyOn(first, "clear").mockRejectedValueOnce(new Error("storage unavailable"));

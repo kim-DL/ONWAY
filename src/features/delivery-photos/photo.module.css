@@ -11,6 +11,8 @@
 .list{display:grid;min-width:0;margin:0;padding:0;list-style:none;border-top:1px solid #dce6df}
 .row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.25rem;padding:.4rem .15rem;border-bottom:1px solid #dce6df;background:#fff}
 .photoMain{min-width:0}
+.directions{display:inline-flex;align-items:center;gap:.3rem;min-height:44px;max-width:100%;padding:0 .35rem;color:var(--mode-customer-text);font-size:.875rem;font-weight:700;overflow-wrap:anywhere}
+.directions svg{flex:none}
 .workspace .rowText{display:grid;width:100%;min-height:48px;gap:.1rem;align-content:center;justify-items:start;padding:.2rem .35rem;text-align:left;overflow-wrap:anywhere}
 .row strong{color:#334155;font-size:.98rem}
 .row small,.inToday{color:#526174;font-size:.8125rem;font-weight:500;line-height:1.35}
@@ -29,11 +31,12 @@
 .empty,.freshness{align-items:center;text-align:center;margin:.3rem 0;padding:.65rem .15rem;color:var(--shell-ink-soft);font-size:.88rem;line-height:1.45}
 .notice{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:.5rem 0;padding:.6rem;border-radius:12px;background:#fff2e7;color:#704020;font-size:.88rem;line-height:1.4}
 @media(max-width:380px){.workspace{padding:.75rem}}
-.editorContent{display:grid;gap:.7rem;padding:.2rem 0 1rem;min-width:0}
+.editorContent{display:grid;gap:.7rem;padding:.2rem 0 1rem;min-width:0;container-type:inline-size}
 .count,.hint{margin:0;color:var(--shell-ink-soft);font-size:.86rem}
 .selected,.candidates{display:grid;gap:.4rem;margin:0;padding:0;list-style:none;min-width:0}
 .selected li,.candidates li{display:flex;align-items:center;gap:.4rem;min-width:0;min-height:48px;padding:.2rem .35rem;border-radius:12px;background:#f5f9f7}
-.selected strong,.candidates span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selected strong,.candidates span{flex:1;min-width:0;overflow-wrap:anywhere}
+@container(max-width:20rem){.selected li{display:grid;grid-template-columns:auto minmax(0,1fr)}.selected .controls{grid-column:1/-1;justify-self:end}}
 .number{width:1.5rem;text-align:center;color:var(--mode-customer-text);font-weight:800}
 .controls{display:flex;gap:.15rem}
 :is(.controls,.candidates,.error) button{min-width:44px;min-height:44px;padding:.4rem;border-radius:10px;color:var(--mode-customer-text);background:white;font-weight:800}

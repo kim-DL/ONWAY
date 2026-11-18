@@ -123,7 +123,8 @@ export const createDeliveryPhotoResultSchema = deliveryPhotoMetadataSchema;
 
 export const listDeliveryPhotosInputSchema = z.discriminatedUnion("scope", [
   z.object({ scope: z.literal("today") }).strict(),
-  z.object({ scope: z.literal("customer"), customerId: idSchema, limit: z.number().int().min(1).max(100).default(30) }).strict(),
+  z.object({ scope: z.literal("customer"), customerId: idSchema, deliveryDateKey: deliveryDateKeySchema.optional(),
+    limit: z.number().int().min(1).max(100).default(30) }).strict(),
 ]);
 export const deliveryPhotoCustomerSummarySchema = z.object({
   customerId: idSchema,

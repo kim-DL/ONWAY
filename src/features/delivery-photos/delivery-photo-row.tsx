@@ -1,12 +1,14 @@
 "use client";
 import { Icon } from "@/components/ui/icon";
 import type { Customer } from "@/domain/customer";
+import type { ReactNode } from "react";
 import { MAX_PENDING_PHOTOS_PER_CUSTOMER, deliveryPhotoUploadStatusText, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import styles from "./photo.module.css";
 
-export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onAdd, onView, onCapture, onMore, onRetry }: {
+export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob, attention, onShowJob, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onAdd, onView, onCapture, onMore, onRetry, directions }: {
   customer: Customer; count?: number | undefined; latestAt?: string | undefined; job?: DeliveryPhotoUploadProjection | undefined; retryJob?: DeliveryPhotoUploadProjection | undefined;
   pendingCount?: number | undefined; captureAllowed?: boolean | undefined;
+  attention?: DeliveryPhotoUploadProjection | undefined; onShowJob?: (id: string) => void; directions?: ReactNode;
   inToday?: boolean | undefined; onAdd?: ((customerId: string) => void) | undefined;
   uploadReady: boolean; onView: (customer: Customer) => void; onCapture: (customer: Customer) => void; onMore: (customer: Customer) => void; onRetry: (jobId: string) => void;
 }) {
@@ -17,25 +19,29 @@ export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob,
   const status = job && job.status !== "completed" && deliveryPhotoUploadStatusText(job);
   const active = !uploadReady || !captureAllowed || pendingCount >= MAX_PENDING_PHOTOS_PER_CUSTOMER;
   const photoSummary = count && `사진 ${count}장${time ? ` · 마지막 등록 ${time}` : ""}`;
-  const detail = pendingCount ? `${pendingCount}장 전송 대기·진행 중` : status || photoSummary;
+  const detail = attention ? photoSummary : pendingCount ? `${pendingCount}장 전송 대기·진행 중` : status || photoSummary;
   return <li className={styles.row}><div className={styles.photoMain}>
     <button type="button" className={styles.rowText} onClick={() => onView(customer)} aria-label={`${customer.name} 사진 기록`}>
       <strong>{customer.name}</strong>
       {customerSecondary ? <small>{customerSecondary}</small> : null}
       {detail ? <small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{detail}</small> : null}
     </button>
-    {retryJob ? <button type="button" onClick={() => onRetry(retryJob.jobId)} aria-label={`${customer.name} 사진 업로드 다시 시도`}>재시도</button> : null}
+    {attention ? <button type="button" onClick={() => onShowJob?.(attention.jobId)}>
+      {attention.errorCategory === "auth" || (attention.errorCategory === "preparation" && !attention.durable) ? "사진 확인 필요" : attention.status === "paused" ? "날짜 확인 필요" : "재시도 필요"}
+    </button> : null}
+    {retryJob && (!attention || attention.jobId === retryJob.jobId) ? <button type="button" onClick={() => onRetry(retryJob.jobId)} aria-label={`${customer.name} 사진 업로드 다시 시도`}>재시도</button> : null}
+    {directions}
     {onAdd ? <div>
       {inToday ? <span className={styles.inToday}>오늘 목록</span> : <button type="button" onClick={() => onAdd(customer.customerId)}>오늘 추가</button>}
     </div> : null}
   </div><div className={styles.photoActions}>
-    <button type="button" className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
-      onClick={() => onCapture(customer)}>
+    <button type="button" data-camera-customer={customer.customerId} className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
+      onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onCapture(customer); }}>
       {/* Reuse the pre-sized static WebP without an image transformation service. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/ui/customer-ceramic-camera-v1.webp" alt="" width={48} height={48} /></button>
     <button type="button" aria-label={`${customer.name} 더보기`} aria-haspopup="dialog"
-      onClick={() => onMore(customer)}><Icon name="more-refined" size={24} /></button>
+      onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onMore(customer); }}><Icon name="more-refined" size={24} /></button>
   </div>
   </li>;
 }

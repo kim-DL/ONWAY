@@ -75,6 +75,7 @@ function fixture() {
     where(field: string, operator: string, boundary: unknown): FakeQuery;
     orderBy(field: string, direction?: "asc" | "desc"): FakeQuery;
     limit(limit: number): FakeQuery;
+    startAfter(doc: Snapshot): FakeQuery;
     get(): Promise<{ docs: Snapshot[]; size: number }>;
   };
   type FakeTransaction = {
@@ -85,18 +86,20 @@ function fixture() {
     update(reference: Ref, value: Value): void;
     delete(reference: Ref): void;
   };
-  const makeQuery = (path: string, filters: Array<[string, string, unknown]> = [], order?: [string, "asc" | "desc"], maximum = Number.POSITIVE_INFINITY): FakeQuery => ({
+  const makeQuery = (path: string, filters: Array<[string, string, unknown]> = [], order?: [string, "asc" | "desc"], maximum = Number.POSITIVE_INFINITY, after?: string): FakeQuery => ({
     where: (field: string, operator: string, boundary: unknown) => makeQuery(path, [...filters, [field, operator, boundary]], order, maximum),
     orderBy: (field: string, direction: "asc" | "desc" = "asc") => makeQuery(path, filters, [field, direction], maximum),
     limit: (limit: number) => makeQuery(path, filters, order, limit),
+    startAfter: (doc) => makeQuery(path, filters, order, maximum, doc.id),
     get: async () => {
       let entries = [...data.entries()].filter(([key]) => key.startsWith(`${path}/`) && !key.slice(path.length + 1).includes("/"));
       entries = entries.filter(([, value]) => filters.every(([field, operator, boundary]) => {
         const comparison = compare(valueAt(value, field), boundary);
-        return operator === "==" ? comparison === 0 : operator === ">=" ? comparison >= 0 : operator === "<=" ? comparison <= 0 : false;
+        return operator === "==" ? comparison === 0 : operator === ">=" ? comparison >= 0 : operator === "<=" ? comparison <= 0 : operator === "<" && comparison < 0;
       }));
       if (order) entries.sort(([, left], [, right]) => compare(valueAt(left, order[0]), valueAt(right, order[0])) * (order[1] === "desc" ? -1 : 1));
-      const docs = entries.slice(0, maximum).map(([key]) => snapshot(ref(key)));
+      const offset = after ? entries.findIndex(([key]) => key === `${path}/${after}`) + 1 : 0;
+      const docs = entries.slice(offset, offset + maximum).map(([key]) => snapshot(ref(key)));
       return { docs, size: docs.length };
     },
   });
@@ -1009,6 +1012,21 @@ describe("private delivery photo lifecycle", () => {
       { photoId: recent.photoId, variant: "evidence" }, actor, recentAt,
       () => Timestamp.fromMillis(recentAt.toMillis() + 168 * 60 * 60 * 1000),
     )).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("finds yesterday behind a full first page and excludes deleted photos at the Seoul day boundary", async () => {
+    const state = fixture();
+    const yesterday = Timestamp.fromDate(new Date("2026-09-21T14:59:59.999Z"));
+    state.setClock(yesterday);
+    const retained = await state.service.create(upload(), actor, yesterday);
+    const removed = await state.service.create(upload(), actor, yesterday);
+    await state.service.delete({ requestId: randomUUID(), photoId: removed.photoId }, actor, yesterday);
+    state.setClock(now);
+    for (let index = 0; index < 30; index++) await state.service.create(upload(), actor, now);
+    const input = { scope: "customer" as const, customerId: "customer-a", limit: 30 };
+    expect((await state.service.list(input, actor, now)).photos).toHaveLength(30);
+    expect((await state.service.list({ ...input, deliveryDateKey: "2026-09-21" }, actor, now)).photos.map((photo) => photo.photoId)).toEqual([retained.photoId]);
+    expect((await state.service.list({ ...input, deliveryDateKey: "2026-09-20" }, actor, now)).photos).toEqual([]);
   });
 
   it.each([101, 160, 500])("returns a bounded today aggregate for %i distinct customers", async (count) => {

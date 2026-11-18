@@ -162,7 +162,40 @@ for (const mode of ["route", "day"] as const) {
     expect(errors).toEqual([]);
     expect(external).toEqual([]);
   });
+  test(`${mode} replays a lost reply and uses a fresh ID for a changed edit`, async ({ page }) => {
+    for (const change of [false, true]) {
+      const { dialog } = await openFixture(page, mode);
+      const save = dialog.getByRole("button", { name: "저장", exact: true });
+      await page.evaluate(() => window.__deliveryPhotoEditorFixture.loseNextReply());
+      await save.click();
+      await expect(dialog.getByRole("alert")).toContainText("저장하지 못했습니다");
+      if (change) await dialog.getByRole("button", { name: /가람상회 (오늘만 제외|내 납품처에서 제외)/ }).click();
+      await save.click();
+      if (change) await expect(dialog.getByRole("alert")).toContainText("다른 기기");
+      else await expect(dialog).toBeHidden();
+      const requests = await page.evaluate(() => window.__deliveryPhotoEditorFixture.requests);
+      expect(requests).toHaveLength(2);
+      expect(requests[0]!.requestId === requests[1]!.requestId).toBe(!change);
+    }
+  });
 }
+
+test("all four dirty editor exits ask once and preserve edits when dismissed", async ({ page }) => {
+  const { dialog } = await openFixture(page, "day");
+  const prompts: string[] = [];
+  page.on("dialog", async (prompt) => { prompts.push(prompt.message()); await prompt.dismiss(); });
+  for (const exit of [
+    () => dialog.getByRole("button", { name: "취소", exact: true }).click(),
+    () => dialog.getByRole("button", { name: "닫기", exact: true }).click(),
+    () => page.keyboard.press("Escape"), () => page.goBack(),
+  ]) {
+    const previous = prompts.length;
+    await exit();
+    await expect.poll(() => prompts.length).toBe(previous + 1);
+    await expect(dialog.getByRole("listitem").first()).toContainText("나래상회");
+  }
+  expect(new Set(prompts)).toEqual(new Set(["저장하지 않은 변경사항을 버릴까요?"]));
+});
 
 test("recommended and manually adjusted order is reflected in the photo workspace", async ({ page }) => {
   const { dialog, errors, external } = await openFixture(page, "day", false, false);

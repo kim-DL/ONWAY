@@ -68,13 +68,14 @@ export function deliveryPhotoDownloadBlob(input: unknown, expectedPhotoId: strin
   return blob;
 }
 
-async function list(customerId: string, session: AuthenticatedSession, signal?: AbortSignal): Promise<DeliveryPhotoHistoryResult> {
-  const input = listDeliveryPhotosInputSchema.parse({ scope: "customer", customerId, limit: 30 });
+async function list(customerId: string, session: AuthenticatedSession, signal?: AbortSignal, deliveryDateKey?: string): Promise<DeliveryPhotoHistoryResult> {
+  const input = listDeliveryPhotosInputSchema.parse({ scope: "customer", customerId, limit: 30, ...(deliveryDateKey && { deliveryDateKey }) });
   const { services, user } = await verifyDeliveryPhotoSession(session, signal);
   const response = await httpsCallable<typeof input, unknown>(services.functions, "listDeliveryPhotos", { timeout: 60_000 })(input);
   await verifySameDeliveryPhotoSession(session, user, signal);
   const parsed = listDeliveryPhotosResultSchema.safeParse(response.data);
   if (!parsed.success || parsed.data.scope !== "customer" || parsed.data.customerId !== customerId) throw invalidDeliveryPhotoResponse();
+  if (parsed.data.photos.some((photo) => photo.customerId !== customerId || (deliveryDateKey && photo.deliveryDateKey !== deliveryDateKey))) throw invalidDeliveryPhotoResponse();
   return parsed.data;
 }
 

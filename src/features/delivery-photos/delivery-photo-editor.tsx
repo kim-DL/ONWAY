@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
-import { BottomSheet, BottomSheetActions } from "@/components/ui/bottom-sheet";
+import { BottomSheet, BottomSheetActions, useBottomSheetClose } from "@/components/ui/bottom-sheet";
 import { searchInputProps } from "@/components/ui/search-input-props";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
@@ -10,9 +10,16 @@ import { searchCustomers } from "@/features/customers/customer-search";
 
 import { addDeliveryPhotoCustomer, moveDeliveryPhotoCustomer, removeDeliveryPhotoCustomer } from "./delivery-photo-editor-model";
 import { useDeliveryPhotoRecents } from "./use-delivery-photo-recents";
+import { deliveryPhotoErrorKind, deliveryPhotoRepository } from "./delivery-photo-repository";
+import type { useDeliveryPhotoData } from "./use-delivery-photo-data";
 import styles from "./photo.module.css";
 
 export type DeliveryPhotoEditorMode = "route" | "day";
+
+function CancelEdit({ busy }: { busy: boolean }) {
+  const close = useBottomSheetClose();
+  return <button type="button" onClick={() => close?.()} disabled={busy}>취소</button>;
+}
 
 export function DeliveryPhotoEditor({ mode, session, customers, initialIds, initialAddId, revision = null,
   onSave, onClose }: {
@@ -22,7 +29,7 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
   initialIds: readonly string[];
   initialAddId?: string | undefined;
   revision: number | null | undefined;
-  onSave: (ids: readonly string[], expectedRevision: number | null) => Promise<"saved" | "conflict" | "error">;
+  onSave: (ids: readonly string[], expectedRevision: number | null, requestId: string) => Promise<"saved" | "conflict" | "error">;
   onClose: () => void;
 }) {
   const { recentCustomers, rememberCustomer } = useDeliveryPhotoRecents(session, customers);
@@ -34,6 +41,7 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
     ? addDeliveryPhotoCustomer(baseline.ids, initialAddId, knownIds) : [...baseline.ids]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const submission = useRef<{ content: string; id: string } | null>(null);
   const [error, setError] = useState<"conflict" | "error" | "">("");
   const dirty = ids.join("\0") !== baseline.ids.join("\0");
   const candidates = useMemo(() => (query.trim() ? searchCustomers(customers, query) : recentCustomers)
@@ -45,7 +53,9 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
     setBusy(true);
     setError("");
     try {
-      const result = await onSave(ids, baseline.revision);
+      const content = JSON.stringify(ids);
+      if (submission.current?.content !== content) submission.current = { content, id: crypto.randomUUID() };
+      const result = await onSave(ids, baseline.revision, submission.current.id);
       if (result === "saved") onClose();
       else setError(result);
     } catch {
@@ -76,8 +86,34 @@ export function DeliveryPhotoEditor({ mode, session, customers, initialIds, init
       {error === "conflict" ? <div role="alert" className={styles.error}>다른 기기에서 목록이 바뀌었습니다. 최신 목록을 확인한 뒤 다시 편집해 주세요.<button type="button" onClick={onClose}>최신 목록 보기</button></div> : null}
       {error === "error" ? <p role="alert" className={styles.error}>저장하지 못했습니다. 다시 시도해 주세요.</p> : null}
     </div>
-    <BottomSheetActions className={styles.actions ?? ""} busy={busy}><button type="button" onClick={onClose} disabled={busy}>취소</button><button type="button" onClick={() => void save()} disabled={!dirty || busy || error === "conflict"}>{busy ? "저장 중" : "저장"}</button></BottomSheetActions>
+    <BottomSheetActions className={styles.actions ?? ""} busy={busy}><CancelEdit busy={busy} /><button type="button" onClick={() => void save()} disabled={!dirty || busy || error === "conflict"}>{busy ? "저장 중" : "저장"}</button></BottomSheetActions>
   </BottomSheet>;
+}
+
+export function WorkspaceOrderEditor({ data, ...props }: Omit<ComponentProps<typeof DeliveryPhotoEditor>, "onSave"> & {
+  data: Pick<ReturnType<typeof useDeliveryPhotoData>, "accept" | "clear" | "refresh">;
+}) {
+  const saveEditor = async (ids: readonly string[], expectedRevision: number | null, requestId: string): Promise<"saved" | "conflict" | "error"> => {
+    try {
+      const input = { requestId, expectedRevision, customerIds: [...ids] };
+      if (props.mode === "route") {
+        const route = await deliveryPhotoRepository.saveRoute(input);
+        data.accept((current) => ({ ...current, route, day: current.day.isOverride ? current.day
+          : { ...current.day, customerIds: route.customerIds }, refreshedAt: Date.now() }));
+      } else {
+        const day = await deliveryPhotoRepository.saveDay(input);
+        data.accept((current) => ({ ...current, day, refreshedAt: Date.now() }));
+      }
+      return "saved";
+    } catch (error) {
+      const kind = deliveryPhotoErrorKind(error);
+      if (kind === "auth") { data.clear(); return "error"; }
+      if (kind === "conflict") { data.refresh(); return "conflict"; }
+      return "error";
+    }
+  };
+
+  return <DeliveryPhotoEditor {...props} onSave={saveEditor} />;
 }
 
 export default DeliveryPhotoEditor;

@@ -188,11 +188,11 @@ test("a focused customer has no duplicate row or empty search and remaining list
   await openDetail(page, "?targetOnly");
   await page.getByRole("button", { name: /납품사진 기록하기$/ }).click();
   const remaining = page.getByRole("region", { name: "오늘 남은 납품처", exact: true });
-  await expect(remaining).toContainText("위 촬영 영역");
+  await expect(remaining).toContainText("촬영 카드");
   await expect(remaining.getByRole("list")).toHaveCount(0);
   await page.getByRole("searchbox", { name: "납품사진 거래처 검색" }).fill("예시 거래처 가");
   const search = page.getByRole("region", { name: "거래처 검색 결과", exact: true });
-  await expect(search).toContainText("위 촬영 영역");
+  await expect(search).toContainText("촬영 카드");
   await expect(search.getByRole("list")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "예시 거래처 가 사진 촬영", exact: true })).toHaveCount(1);
 });

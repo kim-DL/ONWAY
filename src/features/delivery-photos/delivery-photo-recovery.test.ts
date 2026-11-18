@@ -40,6 +40,28 @@ afterEach(async () => {
 });
 
 describe("durable photo automatic recovery", () => {
+  it("keeps capture closed after a failed first read and recovers the same stored request on retry", async () => {
+    vi.spyOn(deliveryPhotoOutbox, "list").mockRejectedValueOnce(new Error("temporary read failure"));
+    const record = saved(); record.approvedDay = "2026-11-03";
+    const create = vi.fn(async () => metadata());
+    const { coordinator } = await restore(record, create);
+    expect(await coordinator.ready).toBe(false);
+    expect(coordinator.canBegin("customer")).toBe(false);
+    expect(await Promise.all([coordinator.retryStorage(), coordinator.retryStorage()])).toEqual([true, true]);
+    expect(coordinator.getPendingCount("customer")).toBe(1);
+    expect(coordinator.getSnapshot()[0]).toMatchObject({ status: "paused", requestId: "same-request" });
+    expect(coordinator.canBegin("customer")).toBe(true);
+    await coordinator.retry("retained");
+    await vi.waitFor(() => expect(create).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ requestId: "same-request" }), session));
+  });
+  it("does not reactivate the previous owner if another session took over during a read failure", async () => {
+    vi.spyOn(deliveryPhotoOutbox, "list").mockRejectedValueOnce(new Error("temporary read failure"));
+    const { coordinator } = await restore(saved(), vi.fn(async () => metadata()));
+    const other = await deliveryPhotoOutbox.activate("other-session");
+    await deliveryPhotoOutbox.add(other, { ...saved(), owner: other.owner });
+    expect(await coordinator.retryStorage()).toBe(false);
+    expect(await deliveryPhotoOutbox.list(other)).toHaveLength(1);
+  });
   it("resumes a previously exhausted network failure on a new app session with the same request", async () => {
     const create = vi.fn(async () => metadata());
     const { coordinator } = await restore(saved(), create);

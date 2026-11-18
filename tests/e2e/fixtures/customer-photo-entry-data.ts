@@ -70,7 +70,7 @@ const coordinator = {
 };
 export function useDeliveryPhotoUploads() {
   const ready = useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => uploadReady, () => uploadReady);
-  return { coordinator: ready ? coordinator : null, jobs: [], byCustomer: new Map(), pendingByCustomer: new Map(), retryByCustomer: new Map(), ready, storageError: false };
+  return { coordinator: ready ? coordinator : null, jobs: [], byCustomer: new Map(), ready, storageError: false };
 }
 
 export const deliveryPhotoHistoryRepository = {

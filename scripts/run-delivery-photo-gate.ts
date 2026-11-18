@@ -85,12 +85,14 @@ const today = await service.list({ scope: "today" }, actor, now);
 if (today.scope !== "today" || today.photos.length !== 1 || today.customers[0]?.count !== 1) throw new Error("Today aggregation failed.");
 const recent = await service.list({ scope: "customer", customerId: "delivery-photo-a", limit: 30 }, actor, now);
 if (recent.scope !== "customer" || recent.photos.length !== 1) throw new Error("Recent customer list failed.");
+const daily = await service.list({ scope: "customer", customerId: photo.customerId, limit: 30, deliveryDateKey: photo.deliveryDateKey }, actor, now);
+if (daily.photos.length !== 1 || daily.photos[0]?.photoId !== photo.photoId) throw new Error("Seoul day query failed.");
 const download = await service.get({ photoId: photo.photoId, variant: "evidence" }, actor, now, () => now);
 if (!download.fileBase64 || download.contentType !== "image/webp") throw new Error("Private relay failed.");
 
 await db.doc(`authz/${actor.uid}`).update({ active: false });
 let revoked = false;
-try { await service.list({ scope: "today" }, actor, now); } catch { revoked = true; }
+try { await service.list({ scope: "customer", customerId: photo.customerId, limit: 30, deliveryDateKey: photo.deliveryDateKey }, actor, now); } catch { revoked = true; }
 if (!revoked) throw new Error("Revoked session was accepted.");
 await db.doc(`authz/${actor.uid}`).update({ active: true });
 

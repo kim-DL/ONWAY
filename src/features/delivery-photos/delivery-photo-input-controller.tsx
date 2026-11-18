@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type ChangeEvent } from "react";
 
 import type { DeliveryPhotoUploadCoordinator } from "./delivery-photo-upload-memory";
+import type { DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import styles from "./photo.module.css";
 
 export type DeliveryPhotoInputControllerHandle = {
@@ -14,13 +15,27 @@ type PendingPicker = { customerId: string; source: "camera" | "album" };
 
 export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControllerHandle, {
   coordinator: DeliveryPhotoUploadCoordinator | null;
-}>(function DeliveryPhotoInputController({ coordinator }, ref) {
+  jobs: readonly DeliveryPhotoUploadProjection[];
+  onSelected?: (customerId: string) => void;
+  canSelect?: (customerId: string) => boolean;
+}>(function DeliveryPhotoInputController({ coordinator, jobs, onSelected, canSelect }, ref) {
   const camera = useRef<HTMLInputElement>(null);
   const album = useRef<HTMLInputElement>(null);
   const pending = useRef<PendingPicker | null>(null);
   const returnedFromPicker = useRef(false);
   const reading = useRef(false);
   const localJob = useRef<string | null>(null);
+  const selectedJob = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedJob.current) return;
+    const job = jobs.find((entry) => entry.jobId === selectedJob.current);
+    if (!job) return;
+    if (job.status === "failed") selectedJob.current = null;
+    if (job.status === "queued" || job.status === "uploading" || job.status === "completed") {
+      selectedJob.current = null;
+      onSelected?.(job.customerId);
+    }
+  }, [jobs, onSelected]);
   const releasePicker = () => {
     pending.current = null;
     returnedFromPicker.current = false;
@@ -74,10 +89,12 @@ export const DeliveryPhotoInputController = forwardRef<DeliveryPhotoInputControl
     const target = pending.current;
     const nativeFile = input.files?.item(0) ?? null;
     if (!coordinator || !target || !nativeFile || reading.current) { if (!nativeFile) releasePicker(); return; }
+    if (canSelect && !canSelect(target.customerId)) { input.value = ""; releasePicker(); return; }
     const job = coordinator.begin(target.customerId, target.source);
     if (!job) { input.value = ""; releasePicker(); return; }
     localJob.current = job.jobId; reading.current = true;
     try {
+      selectedJob.current = job.jobId;
       await coordinator.acceptNativeSource(job.jobId, nativeFile);
       localJob.current = null;
     } catch (error) {

@@ -33,5 +33,5 @@ export function useDeliveryPhotoData() {
 }
 export function useDeliveryPhotoCatalog() { return { customers, status: "ready", retry() {} }; }
 export function useDeliveryPhotoUploads() {
-  return { coordinator: null, jobs: [], byCustomer: new Map(), pendingByCustomer: new Map(), retryByCustomer: new Map(), ready: false, storageError: false };
+  return { coordinator: null, jobs: [], byCustomer: new Map(), ready: false, storageError: false };
 }

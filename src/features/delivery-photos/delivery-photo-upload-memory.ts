@@ -8,7 +8,7 @@ import { deliveryPhotoDateKey } from "./delivery-photo-memory";
 import type { OutboxScope, PhotoOutboxRecord, PhotoOutboxStore } from "./delivery-photo-outbox";
 import { MAX_PENDING_PHOTO_BYTES, outboxBytes } from "./delivery-photo-outbox-size";
 import { lazyDeliveryPhotoOutbox } from "./delivery-photo-outbox-lazy";
-import { MAX_PENDING_PHOTOS_PER_CUSTOMER, MAX_PENDING_PHOTOS_TOTAL, isActiveDeliveryPhotoUpload,
+import { PREVIOUS_DAY_MESSAGE, MAX_PENDING_PHOTOS_PER_CUSTOMER, MAX_PENDING_PHOTOS_TOTAL, isActiveDeliveryPhotoUpload,
   type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import type { PhotoOutboxWorker } from "./delivery-photo-outbox-worker";
 import type { PreparedDeliveryPhoto } from "./delivery-photo-preparation";
@@ -43,7 +43,6 @@ export function deliveryPhotoUploadNamespace(session: AuthenticatedSession) {
   return JSON.stringify([session.uid, session.claims.employeeId, session.claims.sessionVersion, session.claims.permissionsVersion]);
 }
 type LocalPreview = { thumbnail: string; full: string };
-const PREVIOUS_DAY = "이전 날짜 사진입니다. 서버 접수일로 기록됩니다. 날짜 확인 후 전송해주세요.";
 
 export class DeliveryPhotoUploadCoordinator {
   private readonly jobs = new Map<string, DeliveryPhotoUploadProjection>();
@@ -65,7 +64,7 @@ export class DeliveryPhotoUploadCoordinator {
   private scope: OutboxScope | null = null;
   private readonly worker: string;
   private outboxWorker: PhotoOutboxWorker | undefined;
-  readonly ready: Promise<boolean>;
+  ready: Promise<boolean>;
 
   constructor(readonly session: AuthenticatedSession, private readonly dependencies: DeliveryPhotoUploadDependencies = defaultDependencies()) {
     this.worker = dependencies.uuid(); this.ready = this.initialize();
@@ -75,6 +74,11 @@ export class DeliveryPhotoUploadCoordinator {
   getPreview = (jobId: string) => this.previews.get(jobId);
   private today() { return deliveryPhotoDateKey(new Date(this.dependencies.now())); }
   private live(epoch: number, id?: string) { return this.authorized && this.epoch === epoch && (!id || this.jobs.has(id)); }
+  async retryStorage() {
+    const previous = this.ready;
+    if (!await previous && this.authorized && this.ready === previous) this.ready = this.initialize();
+    return this.ready;
+  }
   private async initialize() {
     const epoch = this.epoch;
     try {
@@ -82,9 +86,9 @@ export class DeliveryPhotoUploadCoordinator {
         const { PhotoOutboxWorker } = await import("./delivery-photo-outbox-worker");
         const worker = new PhotoOutboxWorker(this.dependencies.store, this.worker);
         this.outboxWorker = worker;
-        if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch))) return false;
-        this.scope = worker.scope; await this.wake(true);
-        if (!this.live(epoch)) { worker.close(); return false; }
+        if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch), this.scope)) return false;
+        this.scope = worker.scope;
+        if (!await this.wake(true) || !this.live(epoch)) { worker.close(); return false; }
         worker.start((foreground) => { void this.wake(foreground); }, () => {
           this.epoch++; this.authorized = false;
           for (const controller of this.controllers.values()) controller.abort();
@@ -102,9 +106,10 @@ export class DeliveryPhotoUploadCoordinator {
     });
     if (expired) this.publish();
     if (restored) { this.pumpPreparation(); this.pumpRelays(); }
+    return Boolean(restored);
   }
   private async restore() {
-    if (!this.outboxWorker) return;
+    if (!this.outboxWorker) return false;
     const epoch = this.epoch;
     let detailsChanged = false;
     const active = new Set(this.activeRelays); if (this.activePreparation) active.add(this.activePreparation);
@@ -119,6 +124,7 @@ export class DeliveryPhotoUploadCoordinator {
         detailsChanged = this.makePreview(record) || detailsChanged;
       } });
     if (restored) this.publish(detailsChanged);
+    return restored;
   }
   getPendingCount(customerId: string) { return this.snapshot.filter((job) => job.customerId === customerId && isActiveDeliveryPhotoUpload(job)).length; }
   canBegin(customerId: string) {
@@ -209,7 +215,7 @@ export class DeliveryPhotoUploadCoordinator {
   async retry(jobId: string, manual = true) {
     if (!this.canRetry(jobId)) return false;
     const record = this.records.get(jobId)!; const job = this.jobs.get(jobId)!;
-    if (!manual && record.approvedDay !== this.today()) { this.update(jobId, { status: "paused", message: PREVIOUS_DAY }); return false; }
+    if (!manual && record.approvedDay !== this.today()) { this.update(jobId, { status: "paused", message: PREVIOUS_DAY_MESSAGE }); return false; }
     if (job.errorCategory === "storage" && !job.durable && record.source) return this.acceptSource(jobId, record.source);
     const claimed = await this.claim(jobId, record.prepared ? "upload" : "prepare");
     if (!claimed) return false;
@@ -300,7 +306,7 @@ export class DeliveryPhotoUploadCoordinator {
           const prepared = await this.dependencies.prepare(record.source!, controller.signal);
           if (!this.live(epoch, id)) return;
           record.prepared = prepared; record.source = null;
-          record.job = { ...record.job, status: record.approvedDay === this.today() ? "queued" : "paused", message: record.approvedDay === this.today() ? "" : PREVIOUS_DAY };
+          record.job = { ...record.job, status: record.approvedDay === this.today() ? "queued" : "paused", message: record.approvedDay === this.today() ? "" : PREVIOUS_DAY_MESSAGE };
           const saved = { ...record, lease: null };
           await this.save(saved, this.worker);
           if (!this.live(epoch, id)) return;
@@ -330,7 +336,7 @@ export class DeliveryPhotoUploadCoordinator {
         if (!record?.prepared || !this.live(epoch, job.jobId)) continue;
         progressed = true;
         if (record.approvedDay !== this.today()) {
-          record.job = { ...record.job, status: "paused", message: PREVIOUS_DAY }; record.lease = null;
+          record.job = { ...record.job, status: "paused", message: PREVIOUS_DAY_MESSAGE }; record.lease = null;
           await this.save(record, this.worker); this.records.set(job.jobId, record); this.jobs.set(job.jobId, record.job); this.publish(); continue;
         }
         this.records.set(job.jobId, record); this.activeRelays.add(job.jobId);
@@ -348,7 +354,7 @@ export class DeliveryPhotoUploadCoordinator {
       // Logout/revocation during encoding must not start a new network write.
       if (!this.live(epoch, id)) return;
       if (record.approvedDay !== this.today()) {
-        this.update(id, { status: "paused", message: PREVIOUS_DAY }); record.lease = null; await this.save(record, this.worker); return;
+        this.update(id, { status: "paused", message: PREVIOUS_DAY_MESSAGE }); record.lease = null; await this.save(record, this.worker); return;
       }
       const metadata = await this.dependencies.create({ requestId: record.job.requestId, customerId: record.job.customerId,
         source: record.job.source, contentType: record.prepared!.contentType, fileBase64 }, this.session);
