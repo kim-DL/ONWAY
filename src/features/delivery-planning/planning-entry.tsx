@@ -54,9 +54,9 @@ export default function PlanningEntry({ customers, snapshot, accept, refresh, on
     }
   };
   return <>
-    <button type="button" className={styles.trigger} aria-haspopup="dialog" aria-expanded={open === "manage"}
+    <button type="button" aria-haspopup="dialog" aria-expanded={open === "manage"}
       onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setOpen("manage"); }}>
-      <Icon name="sliders-refined" size={18} />납품처 관리
+      <span><Icon name="sliders-refined" size={16} /></span>납품처 관리<Icon name="chevron-right" size={13} />
     </button>
     {open === "manage" && <BottomSheet open title="납품처 관리" onClose={closeManagement}>
       <PlanningActions onChoose={(tool) => { selection.current = tool; }} />

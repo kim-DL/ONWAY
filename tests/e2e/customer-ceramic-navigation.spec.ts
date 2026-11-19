@@ -142,7 +142,7 @@ test("delivery photo search renders ceramic cards inside the real workspace", as
   expect(errors).toEqual([]);
 });
 
-test("delivery photo header keeps one management entry and the gallery beside search", async ({ page }) => {
+test("delivery photo keeps one management entry beside the day summary and the gallery beside search", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("requestfailed", request => errors.push(request.url()));
@@ -152,12 +152,22 @@ test("delivery photo header keeps one management entry and the gallery beside se
     await page.getByRole("button", { name: "납품사진", exact: true }).click();
     const workspace = page.locator("[data-delivery-photo-workspace]");
     const header = workspace.locator(":scope > header");
-    const management = header.getByRole("button", { name: "납품처 관리", exact: true });
+    const management = workspace.getByRole("button", { name: "납품처 관리", exact: true });
     const gallery = workspace.getByRole("button", { name: "갤러리", exact: true });
+    const summary = workspace.getByRole("status").filter({ hasText: /^남음 \d+곳 · 기록완료 \d+곳$/ });
     await expect(management).toBeVisible();
-    await expect(header.getByRole("button")).toHaveCount(1);
+    await expect(management).toHaveCount(1);
+    await expect(header.getByRole("button")).toHaveCount(0);
+    await expect(summary).toBeVisible();
     await expect(workspace.getByRole("button", { name: "인공지능 경로 추천", exact: true })).toHaveCount(0);
-    expect((await management.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const managementBox = (await management.boundingBox())!;
+    const summaryBox = (await summary.boundingBox())!;
+    const galleryBox = (await gallery.boundingBox())!;
+    expect(managementBox.height).toBeGreaterThanOrEqual(44);
+    expect(managementBox.y).toBeGreaterThanOrEqual(galleryBox.y + galleryBox.height);
+    expect(managementBox.x).toBeGreaterThan(summaryBox.x + summaryBox.width);
+    expect(managementBox.y).toBeLessThanOrEqual(summaryBox.y);
+    expect(managementBox.y + managementBox.height).toBeGreaterThan(summaryBox.y + summaryBox.height);
     const position = await gallery.evaluate(button => {
       const search = button.parentElement!.querySelector("input")!.getBoundingClientRect();
       const gallery = button.getBoundingClientRect();
@@ -186,7 +196,7 @@ test("management opens all four tools and remains usable on narrow and enlarged 
   const tools = page.getByRole("dialog", { name: "납품처 관리", exact: true });
   const actions = [["오늘 납품처", "오늘 순서 편집"], ["내 납품처", "내 납품처 편집"],
     ["송장 사진으로 등록", "사진으로 납품 준비"], ["인공지능 경로 추천", "인공지능 경로 추천"]] as const;
-  const output = "output/delivery-photo-workspace-renewal/";
+  const output = "output/delivery-photo-controls-20261119/";
   await expect(workspace.getByRole("link", { name: /길안내$/ }).first()).toBeVisible();
   await workspace.locator("ul img:visible").evaluateAll(images => Promise.all(images.map(image => (image as HTMLImageElement).decode())));
   await page.screenshot({ path: output + "workspace-" + info.project.name + ".png", scale: "css", animations: "disabled" });
@@ -212,6 +222,12 @@ test("management opens all four tools and remains usable on narrow and enlarged 
   await page.setViewportSize({ width: 320, height: 760 });
   await page.addStyleTag({ content: "html{font-size:200%}" });
   await page.emulateMedia({ forcedColors: "active" });
+  for (const button of [management, workspace.getByRole("button", { name: "갤러리", exact: true })]) {
+    const box = (await button.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.x + box.width).toBeLessThanOrEqual(320);
+    expect(await button.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  }
   await management.focus();
   await page.keyboard.press("Enter");
   await expect(tools).toBeVisible();

@@ -41,22 +41,24 @@ export default function DeliveryPhotoToolbar({ summary, progress, query, onQuery
   return <>
     <header className={styles.header}>
       <h1 id="delivery-photo-heading">납품사진</h1>
-      {children}
     </header>
-    <div className={styles.progress}>
-      <strong role="status">{summary}</strong>
-      {progress !== undefined && <span className={styles.progressTrack} aria-hidden="true">
-        <span style={{ width: `${progress}%` }} />
-      </span>}
-    </div>
     <div className={`${photoStyles.searchActions} ${styles.searchActions}`}>
       <SearchField value={query} onChange={onQueryChange} label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" />
       {onOpenGallery && <button type="button" ref={galleryButton} onClick={() => {
         returnScroll.current = galleryButton.current?.closest(".workspace-content")?.scrollTop ?? 0;
         onOpenGallery();
       }}>
-        <Icon name="images" size={21} strokeWidth={1.75} />갤러리
+        <span><Icon name="images" size={19} strokeWidth={1.75} /></span>갤러리
       </button>}
+    </div>
+    <div className={styles.dayBar}>
+      <div className={styles.progress}>
+        <strong role="status">{summary}</strong>
+        {progress !== undefined && <span className={styles.progressTrack} aria-hidden="true">
+          <span style={{ width: `${progress}%` }} />
+        </span>}
+      </div>
+      {children}
     </div>
   </>;
 }

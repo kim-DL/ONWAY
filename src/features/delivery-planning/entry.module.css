@@ -1,12 +1,10 @@
-.trigger.trigger{display:inline-flex;align-items:center;gap:6px;min-width:44px;min-height:44px;border:1px solid #c9d4df;border-radius:10px;background:#f9fbfc;color:#354b65;font-size:.8125rem;line-height:1.25;text-align:left}
-.trigger svg,.icon{flex:none}
 .tools h3{margin:6px 0;color:#516074;font-size:.75rem;letter-spacing:.02em}
 .group+.group{margin-top:16px}
 .tools button{display:grid;grid-template-columns:36px minmax(0,1fr) 16px;align-items:center;gap:10px;width:100%;min-height:56px;padding:7px 4px;border:0;border-bottom:1px solid #e0e6ec;border-radius:0;background:transparent;color:#293b52;font:inherit;text-align:left;cursor:pointer;overflow-wrap:anywhere}
 .tools button:focus-visible{outline:2px solid #466a91;outline-offset:-2px;border-radius:8px}
-.tools button:hover,.trigger.trigger:hover{background:#eaf1f6}
+.tools button:hover{background:#eaf1f6}
 .tools small,.tools strong{display:block;line-height:1.35}
 .tools strong{font-size:.9375rem;font-weight:750}
 .tools small{margin-top:3px;color:#526176;font-size:.8125rem}
 .icon{display:grid;place-items:center;height:36px;border-radius:9px;background:#edf2f7;color:#416181}
-@media(forced-colors:active){.trigger.trigger{border-color:ButtonText}.tools button:focus-visible{outline-color:Highlight}}
+@media(forced-colors:active){.tools button:focus-visible{outline-color:Highlight}}

@@ -51,20 +51,21 @@ async function openFixture(page: Page, mode: "route" | "day", absent = false, ed
   return { dialog, errors, external };
 }
 
-test("management stays in the header and search restores the day list and focus", async ({ page }) => {
+test("management stays beside the day summary and search restores the day list and focus", async ({ page }) => {
   const { dialog } = await openFixture(page, "day", false, false, "가".repeat(100));
   await dialog.getByRole("button", { name: "취소", exact: true }).click();
   await expect(dialog).toBeHidden();
-  const header = page.locator("[data-delivery-photo-workspace] > header");
-  const manage = header.getByRole("button", { name: "납품처 관리", exact: true });
+  const workspace = page.locator("[data-delivery-photo-workspace]");
+  const manage = workspace.getByRole("button", { name: "납품처 관리", exact: true });
   const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
   const dayList = page.getByRole("region", { name: "오늘 남은 납품처" });
   for (const width of [320, 390, 430, 1280]) {
     await page.setViewportSize({ width, height: 844 });
-    await expect(header.getByRole("button")).toHaveCount(1);
+    await expect(manage).toHaveCount(1);
     const box = (await manage.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
-    expect(box.y + box.height).toBeLessThan((await search.boundingBox())!.y);
+    const searchBox = (await search.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(searchBox.y + searchBox.height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await search.fill("가람");
