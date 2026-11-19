@@ -40,17 +40,16 @@
 .progressTrack{display:block;width:min(100%,108px);height:4px;overflow:hidden;border-radius:99px;background:#dce5e8}
 .progressTrack span{display:block;height:100%;border-radius:inherit;background:#3e796e}
 .searchActions > button[type] {
-  display: grid;
-  grid-template-columns: 19px minmax(0, auto) 19px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  column-gap: 5px;
+  gap: 5px;
   min-height: 52px;
   max-width: 50%;
   padding: 5px clamp(6px, 2vw, 12px);
-  border: 1px solid #2196f3;
+  border: 1px solid #b7ccdc;
   border-radius: 14px;
-  background: #e3f2fd;
+  background: #eaf3fa;
   box-shadow: inset 0 1px #ffffffb3, 0 2px 4px #24485e12;
   color: #164f49;
   font-size: .875rem;
@@ -58,6 +57,7 @@
   text-align: center;
   overflow-wrap: anywhere;
 }
+.searchActions > button > svg { flex: none; }
 @media(hover:hover){.dayBar>button[type]:hover{background:#e1edf8}}
 @media(max-width:359px){.searchActions>div{gap:4px;padding-inline:6px}}
 @media(max-width:18em){.searchActions{flex-wrap:wrap}.searchActions>div{flex-basis:8rem}}

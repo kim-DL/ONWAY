@@ -171,16 +171,19 @@ test("delivery photo keeps one management entry beside the day summary and the g
     const position = await gallery.evaluate(button => {
       const search = button.parentElement!.querySelector("input")!.getBoundingClientRect();
       const gallery = button.getBoundingClientRect();
+      const icon = button.querySelector("svg")!.getBoundingClientRect();
       const label = button.querySelector("span")!.getBoundingClientRect();
       return {
         gap: gallery.left - search.right,
         offset: Math.abs(gallery.y + gallery.height / 2 - search.y - search.height / 2),
-        labelOffset: Math.abs(label.x + label.width / 2 - gallery.x - gallery.width / 2),
+        contentOffset: Math.abs((icon.left + label.right) / 2 - (gallery.left + gallery.right) / 2),
+        verticalOffset: Math.abs((icon.top + icon.bottom) / 2 - (label.top + label.bottom) / 2),
       };
     });
     expect(position.gap).toBeGreaterThan(0);
     expect(position.offset).toBeLessThan(2);
-    expect(position.labelOffset).toBeLessThan(1);
+    expect(position.contentOffset).toBeLessThan(1);
+    expect(position.verticalOffset).toBeLessThan(1);
     expect(await workspace.evaluate(el => Number.parseFloat(getComputedStyle(el).paddingTop))).toBeLessThanOrEqual(4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const back = page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "거래처", exact: true });
