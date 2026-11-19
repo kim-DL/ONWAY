@@ -48,7 +48,7 @@ export default function DeliveryPhotoToolbar({ summary, progress, query, onQuery
         returnScroll.current = galleryButton.current?.closest(".workspace-content")?.scrollTop ?? 0;
         onOpenGallery();
       }}>
-        <span><Icon name="images" size={19} strokeWidth={1.75} /></span>갤러리
+        <Icon name="images" size={19} strokeWidth={1.75} /><span>갤러리</span>
       </button>}
     </div>
     <div className={styles.dayBar}>
