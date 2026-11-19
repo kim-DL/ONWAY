@@ -8,11 +8,11 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-19.2",
+  id: "2026-11-19.3",
   date: "2026-11-19",
   changes: [
-    { title: "납품사진 갤러리", text: "납품사진 검색창 옆 갤러리에서 직원별로 어제와 오늘 사진을 넘겨 볼 수 있어요." },
-    { title: "업체별 사진 대조", text: "업체 찾기에서 같은 업체의 두 날짜 사진을 비교하고 확대할 수 있어요." },
-    { title: "보던 사진 유지", text: "새 사진이 등록돼도 보고 있던 사진은 제자리에 있어요." },
+    { title: "납품처 관리", text: "오늘 순서 편집, 기본 목록, 송장 등록과 경로 추천을 한 곳에서 열 수 있어요." },
+    { title: "깔끔해진 납품사진", text: "거래처 이름에서 사진 기록을 열고, 오른쪽에서 바로 촬영하거나 더보기 메뉴를 이용할 수 있어요." },
+    { title: "거래처 검색", text: "검색할 때는 일치하는 업체만 목록에 보이고, 거래처 더보기에서 오늘 목록에 추가할 수 있어요." },
   ],
 };

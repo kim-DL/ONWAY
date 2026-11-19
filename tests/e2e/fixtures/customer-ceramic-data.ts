@@ -29,9 +29,12 @@ export function useDeliveryPhotoData() {
   const deliveryDateKey = deliveryPhotoDateKey();
   const customerIds = new URLSearchParams(location.search).has("photoSamples") ? customers.slice(0, 8).map(customer => customer.customerId) : [];
   return { snapshot: { route: null, day: { deliveryDateKey, revision: 1, isOverride: customerIds.length > 0, customerIds },
-    today: { scope: "today", deliveryDateKey, photos: [], customers: [], truncated: false }, refreshedAt: Date.now() }, loading: false, error: "", clear() {}, accept() {}, refresh() {} };
+    today: { scope: "today", deliveryDateKey, photos: [], customers: customerIds.slice(6).map(customerId => ({ customerId, count: 1, latest: null })), truncated: false },
+    refreshedAt: Date.now() }, loading: false, error: "", clear() {}, accept() {}, refresh() {} };
 }
 export function useDeliveryPhotoCatalog() { return { customers, status: "ready", retry() {} }; }
 export function useDeliveryPhotoUploads() {
-  return { coordinator: null, jobs: [], byCustomer: new Map(), ready: false, storageError: false };
+  const photoSamples = new URLSearchParams(location.search).has("photoSamples");
+  return { coordinator: photoSamples ? { canBegin: () => true, begin: () => null } : null, jobs: [],
+    byCustomer: new Map(), ready: photoSamples, storageError: false };
 }

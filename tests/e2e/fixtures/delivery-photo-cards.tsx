@@ -24,7 +24,7 @@ function Cards() {
   const record = (action: string, customerId: string) => setEvents(current => [...current, `${action}:${customerId}`]);
   return <div className="workspace-shell" data-mode="customer">
     <main className={styles.workspace} data-delivery-photo-workspace>
-      <header className={styles.header}><h1>납품사진</h1></header>
+      <header><h1>납품사진</h1></header>
       <label className={styles.search}><span className={styles.srOnly}>납품사진 거래처 검색</span><input aria-label="납품사진 거래처 검색" value="" readOnly placeholder="거래처 검색 · 초성" /></label>
       <h2 style={{ fontSize: "1rem" }}>검색 결과</h2>
       <ul className={styles.list} aria-label="검색된 납품처">
@@ -32,14 +32,13 @@ function Cards() {
           count={index === 1 ? 2 : 0} latestAt={index === 1 ? "2026-11-04T02:26:00.000Z" : undefined}
           uploadReady={index !== 4} inToday={index === 3 || added.includes(customer.customerId)}
           pendingCount={index === 3 ? 3 : 0} job={index === 2 ? failed : undefined} retryJob={index === 2 ? failed : undefined}
-          onAdd={id => { setAdded(current => [...current, id]); record("add", id); }}
           onView={value => record("history", value.customerId)} onCapture={value => record("camera", value.customerId)}
           onMore={value => { record("more", value.customerId); setMore(value); }} onRetry={id => record("retry", id)} />)}
       </ul>
       <output aria-label="동작 기록" style={{ display: "block", fontSize: ".75rem", overflowWrap: "anywhere", paddingTop: 16 }}>{events.join("\n")}</output>
       {more ? <DeliveryPhotoMoreMenu customer={more} albumDisabled={more.customerId === examples[4]!.customerId}
         onAlbum={value => record("album", value.customerId)} onOpenCustomerDetail={id => record("detail", id)}
-        onClose={() => setMore(null)} className={styles.moreActions} /> : null}
+        onAdd={id => { setAdded(current => [...current, id]); record("add", id); }} onClose={() => setMore(null)} /> : null}
     </main>
   </div>;
 }

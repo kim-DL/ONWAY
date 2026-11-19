@@ -51,6 +51,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
   const uploads = useDeliveryPhotoUploads(session, acceptConfirmed, Boolean(snapshot), refreshData);
   const activeCustomers = useMemo(() => catalog.customers.filter((customer) => customer.status === "active"), [catalog.customers]);
   const [query, setQuery] = useState("");
+  const searching = Boolean(query.trim());
   const [editor, setEditor] = useState<{ mode: DeliveryPhotoEditorMode; addId?: string; onDone?: () => void } | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const [moreCustomer, setMoreCustomer] = useState<Customer | null>(null);
@@ -83,30 +84,30 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
   const renderRow = (id: string, search = false, directions = false) => {
     const customer = byId.get(id); if (!customer) return null;
     const summary = summaries.get(id);
+    const inToday = search && todayIds.includes(id);
     return <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt}
       {...uploads.byCustomer.get(id)} onShowJob={setFocusJob}
-      captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} inToday={todayIds.includes(id)}
-      directions={directions && <DirectionsLink customer={customer} className={styles.directions} />}
-      onAdd={search ? (customerId) => setEditor({ mode: "day", addId: customerId }) : undefined}
+      captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} inToday={inToday}
+      directions={(directions || (inToday && !summary?.count)) && <DirectionsLink customer={customer} className={styles.directions} />}
       onView={setHistoryCustomer} onCapture={capture} onMore={(value) => { rememberList(); setMoreCustomer(value); }} onRetry={retry} />;
   };
 
   return <><section hidden={galleryOpen} className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
-    <WorkspacePhotoToolbar session={session} customers={activeCustomers} hasToday={todayIds.length > 0} completion={completion}
+    <WorkspacePhotoToolbar session={session} customers={activeCustomers} completion={completion}
       data={data} catalog={catalog} uploads={uploads} targetVisible={Boolean(requestedCustomer)} onEdit={setEditor} query={query} onQueryChange={setQuery}
       galleryOpen={galleryOpen} onOpenGallery={onOpenGallery}>
       {requestedCustomerId ? <DeliveryPhotoCaptureEntry state={captureEntry}
         onCamera={() => { if (requestedCustomer) capture(requestedCustomer); }}
         onAlbum={() => { if (requestedCustomer) album(requestedCustomer); }} onReturn={onReturnToCustomer} /> : null}
     </WorkspacePhotoToolbar>
-    {query.trim() ? <DeliveryPhotoSearchResults matches={matches} show={showInList}
-      renderRow={(id) => renderRow(id, true)} /> : null}
     {!snapshot && data.loading ? <LoadingStatus className={styles.empty} label="오늘 납품처 불러오는 중" detail="오늘 납품 기록을 확인하고 있습니다." /> : null}
     {captureId && captureId !== requestedCustomerId && byId.has(captureId) ? <ContinuousCapture customerId={captureId} origin={originList}
       onFinish={() => setCaptureId(null)}><ul className={styles.list}>{renderRow(captureId)}</ul></ContinuousCapture> : null}
+    {searching ? <DeliveryPhotoSearchResults matches={matches} show={showInList}
+      renderRow={(id) => renderRow(id, true)} /> : null}
     {uploads.coordinator && uploads.jobs.length ? <DeliveryPhotoUploadPanel coordinator={uploads.coordinator} jobs={uploads.jobs} names={byId} focusJob={focusJob} onFocused={setFocusJob} /> : null}
     {ready ? <DeliveryPhotoDayLists remaining={completion.remainingCustomerIds} completed={completion.completedCustomerIds}
-      show={showInList} hasToday={todayIds.length > 0} renderRow={(id, directions) => renderRow(id, false, directions)} /> : null}
+      searching={searching} show={showInList} hasToday={todayIds.length > 0} renderRow={(id, directions) => renderRow(id, false, directions)} /> : null}
     {editor && ready ? <DeliveryPhotoEditor key={`${editor.mode}:${editor.addId ?? ""}`} mode={editor.mode} session={session} customers={activeCustomers}
       initialIds={editor.mode === "route" ? routeIds : todayIds} initialAddId={editor.addId}
       revision={snapshot?.[editor.mode]?.revision}
@@ -114,7 +115,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
     {historyCustomer ? <DeliveryPhotoHistoryLoader key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${historyCustomer.customerId}`}
       customer={historyCustomer} session={session} onClose={() => setHistoryCustomer(null)} sync={data.accept} /> : null}
     {moreCustomer ? <DeliveryPhotoMoreMenu customer={moreCustomer} albumDisabled={!captureAvailable(moreCustomer.customerId)}
-      onAlbum={album} onOpenCustomerDetail={onOpenCustomerDetail} onClose={() => setMoreCustomer(null)} className={styles.moreActions!} /> : null}
+      onAlbum={album} onOpenCustomerDetail={onOpenCustomerDetail} onClose={() => setMoreCustomer(null)}
+      onAdd={ready && searching && !todayIds.includes(moreCustomer.customerId) ? (addId) => setEditor({ mode: "day", addId }) : undefined} /> : null}
     <DeliveryPhotoInputController ref={inputs} coordinator={uploads.coordinator} jobs={uploads.jobs} onSelected={setCaptureId} canSelect={captureAvailable} />
   </section>{galleryOpen && onReturnToCustomer && <WorkspacePhotoGallery session={session} catalog={catalog} data={data} onBack={onReturnToCustomer} />}</>;
 }

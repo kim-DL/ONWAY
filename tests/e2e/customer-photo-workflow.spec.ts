@@ -1,3 +1,4 @@
+import { openDeliveryPhotoTool } from "../helpers/open-delivery-photo-tool";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -32,10 +33,9 @@ test.beforeAll(async () => {
     "functions": `export const httpsCallable=(_services,name)=>async input=>{const r=await fetch("/api/"+name,{method:"POST",body:JSON.stringify(input)});return {data:await r.json()}};`,
     "client": `import {session} from ${data};const user={uid:session.uid,getIdTokenResult:async()=>({claims:session.claims})};const services={auth:{currentUser:user},functions:{}};export const getFirebaseClientServices=()=>services;export const getFirebaseAuthIfInitialized=()=>services.auth;`,
     "use-delivery-photo-catalog": `import {customers} from ${data};const catalog=[{...customers[0],name:"예시 급식 납품 거래처 긴 이름 어린이 급식센터 별관"}];export const useDeliveryPhotoCatalog=()=>({customers:catalog,status:"ready",retry(){}});`,
-    "planning-entry": "export default ()=>null;",
   };
   const fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-photo-workflow.tsx", [{ name: "photo-workflow", setup(builder) {
-    builder.onResolve({ filter: /^client-only$|^firebase\/functions$|firebase\/client$|use-delivery-photo-catalog$|planning-entry$/ },
+    builder.onResolve({ filter: /^client-only$|^firebase\/functions$|firebase\/client$|use-delivery-photo-catalog$/ },
       ({ path }) => ({ path: path.split("/").at(-1)!, namespace: "workflow" }));
     builder.onLoad({ filter: /.*/, namespace: "workflow" }, ({ path }) => ({ contents: mocks[path]!, resolveDir: root }));
   } }]);
@@ -63,6 +63,9 @@ async function install(context: BrowserContext, hold: { today?: Promise<void>; d
     if (url.origin !== origin) return route.abort();
     if (url.pathname === "/") return route.fulfill({ contentType: "text/html; charset=utf-8", body: html });
     if (url.pathname === "/ui/customer-ceramic-camera-v1.webp") return route.fulfill({ contentType: "image/webp", body: readFileSync(new URL("../../public/ui/customer-ceramic-camera-v1.webp", import.meta.url)) });
+    if (["/ui/delivery-invoice-stack.svg", "/ui/delivery-smart-route.svg"].includes(url.pathname)) {
+      return route.fulfill({ contentType: "image/svg+xml", body: readFileSync(new URL(`../../public${url.pathname}`, import.meta.url)) });
+    }
     const name = url.pathname.split("/").pop();
     const input = route.request().postDataJSON();
     if (name === "getDeliveryPhotoRoute") return route.fulfill({ body: "null", contentType: "application/json" });
@@ -89,13 +92,19 @@ async function install(context: BrowserContext, hold: { today?: Promise<void>; d
 const camera = (page: Page) => page.getByRole("region", { name: "오늘 남은 납품처" }).getByRole("button", { name: /카메라 촬영$/ });
 const file = () => ({ name: "sample.jpg", mimeType: "image/jpeg", buffer: jpeg });
 
-test("one tap on the remaining row hands off its verified delivery address", async ({ page, context, isMobile }) => {
+test("one tap in the remaining list or its search result uses the same verified delivery address", async ({ page, context, isMobile }) => {
   await install(context);
   const lookups: string[] = [];
   context.on("request", (request) => { if (request.url().endsWith("/api/searchCustomerLocations")) lookups.push(request.postDataJSON().query); });
   await page.goto(origin);
+  const remaining = page.getByRole("region", { name: "오늘 남은 납품처" });
+  const href = await remaining.getByRole("link", { name: /길안내$/ }).getAttribute("href");
+  await page.getByRole("searchbox", { name: "납품사진 거래처 검색" }).fill("예시");
+  await expect(remaining).toBeHidden();
+  const directions = page.getByRole("region", { name: "거래처 검색 결과" }).getByRole("link", { name: /길안내$/ });
+  await expect(directions).toHaveAttribute("href", href!);
   const destination = isMobile ? Promise.resolve(page) : context.waitForEvent("page");
-  await page.getByRole("region", { name: "오늘 남은 납품처" }).getByRole("link", { name: /길안내$/ }).click();
+  await directions.click();
   await expect(await destination).toHaveURL(/https:\/\/map\.kakao\.com\/link\/to\/[^/]+,36\.4,127\.5$/);
   expect(lookups).toEqual(["대전광역시 서구 예시로 1"]);
 });
@@ -250,7 +259,7 @@ test("photo, capture, outbox, date history and editor controls fit long names at
   await dialog.getByRole("button", { name: "어제", exact: true }).click();
   await expect(dialog.getByRole("listitem")).toHaveCount(1);
   await check("history", dialog); await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "순서 편집", exact: true }).click();
+  await openDeliveryPhotoTool(page, "오늘 납품처");
   await check("editor", dialog); await page.keyboard.press("Escape");
   const chooser = page.waitForEvent("filechooser"); await camera(page).click(); await (await chooser).setFiles(file());
   const pin = page.getByRole("region", { name: "추가 촬영 납품처" });

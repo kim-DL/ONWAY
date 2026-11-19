@@ -12,7 +12,7 @@ import { addDeliveryPhotoCustomer, moveDeliveryPhotoCustomer, removeDeliveryPhot
 import { useDeliveryPhotoRecents } from "./use-delivery-photo-recents";
 import { deliveryPhotoErrorKind, deliveryPhotoRepository } from "./delivery-photo-repository";
 import type { useDeliveryPhotoData } from "./use-delivery-photo-data";
-import styles from "./photo.module.css";
+import styles from "./delivery-photo-editor.module.css";
 
 export type DeliveryPhotoEditorMode = "route" | "day";
 

@@ -35,13 +35,14 @@ describe("delivery photo field workspace", () => {
     expect(html.match(/type="file"/gu)).toHaveLength(2);
   });
 
-  it("renders the deferred toolbar with its shared search and full accessible greeting", () => {
-    const html = renderToStaticMarkup(createElement(DeliveryPhotoToolbar, { displayName: session.displayName, summary: "남음 2곳 · 기록완료 0곳",
-      ready: true, hasToday: true, onEdit: () => undefined, query: "", onQueryChange: () => undefined }));
+  it("keeps the management slot, progress and gallery next to the shared search", () => {
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoToolbar, { summary: "남음 2곳 · 기록완료 1곳",
+      progress: 100 / 3, query: "", onQueryChange: () => undefined, onOpenGallery: () => undefined },
+    createElement("button", { type: "button" }, "납품처 관리")));
     expect(html).toContain('aria-label="납품사진 거래처 검색"');
-    expect(html).toContain("홍길동님 안녕하세요.");
-    expect(html).toContain("내 납품처");
-    expect(html).toContain("오늘 납품처");
+    expect(html).toContain("남음 2곳 · 기록완료 1곳");
+    expect(html).toContain("납품처 관리");
+    expect(html).toContain("갤러리");
     expect(html).not.toContain("새로고침");
   });
 

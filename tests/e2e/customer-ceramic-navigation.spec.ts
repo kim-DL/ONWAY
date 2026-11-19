@@ -1,3 +1,4 @@
+import { openDeliveryPhotoTool } from "../helpers/open-delivery-photo-tool";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -141,7 +142,7 @@ test("delivery photo search renders ceramic cards inside the real workspace", as
   expect(errors).toEqual([]);
 });
 
-test("delivery photo header uses the active customer mode and raised planning buttons", async ({ page }) => {
+test("delivery photo header keeps one management entry and the gallery beside search", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("requestfailed", request => errors.push(request.url()));
@@ -151,67 +152,79 @@ test("delivery photo header uses the active customer mode and raised planning bu
     await page.getByRole("button", { name: "납품사진", exact: true }).click();
     const workspace = page.locator("[data-delivery-photo-workspace]");
     const header = workspace.locator(":scope > header");
-    await expect(header.getByRole("button", { name: "거래처로 돌아가기", exact: true })).toHaveCount(0);
-    const back = page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "거래처", exact: true });
-    await expect(back).toBeVisible();
-    await expect(back).toHaveAttribute("aria-pressed", "true");
-    const invoice = workspace.getByRole("button", { name: "사진으로 등록", exact: true });
-    const route = workspace.getByRole("button", { name: "인공지능 경로 추천", exact: true });
-    for (const action of [invoice, route]) {
-      await expect(action).toBeVisible();
-      const box = (await action.boundingBox())!;
-      expect(box.height).toBeGreaterThanOrEqual(48);
-      expect(box.height).toBeLessThanOrEqual(56);
-      expect(await action.evaluate(el => getComputedStyle(el).boxShadow)).not.toBe("none");
-      expect(await action.locator("img").evaluate(async el => { await (el as HTMLImageElement).decode(); return (el as HTMLImageElement).naturalWidth; })).toBe(32);
-    }
-    const first = (await invoice.boundingBox())!, second = (await route.boundingBox())!;
-    expect(first.y).toBe(second.y);
-    expect(second.x).toBeGreaterThan(first.x + first.width);
+    const management = header.getByRole("button", { name: "납품처 관리", exact: true });
+    const gallery = workspace.getByRole("button", { name: "갤러리", exact: true });
+    await expect(management).toBeVisible();
+    await expect(header.getByRole("button")).toHaveCount(1);
+    await expect(workspace.getByRole("button", { name: "인공지능 경로 추천", exact: true })).toHaveCount(0);
+    expect((await management.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const position = await gallery.evaluate(button => {
+      const search = button.parentElement!.querySelector("input")!.getBoundingClientRect();
+      const gallery = button.getBoundingClientRect();
+      return { gap: gallery.left - search.right, offset: Math.abs(gallery.y + gallery.height / 2 - search.y - search.height / 2) };
+    });
+    expect(position.gap).toBeGreaterThan(0);
+    expect(position.offset).toBeLessThan(2);
     expect(await workspace.evaluate(el => Number.parseFloat(getComputedStyle(el).paddingTop))).toBeLessThanOrEqual(4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const back = page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "거래처", exact: true });
+    await expect(back).toHaveAttribute("aria-pressed", "true");
     await back.focus();
-    await expect(back).toBeFocused();
-    await page.screenshot({ path: `output/playwright/photo-header-${width}-${test.info().project.name}.png` });
-    if (width === 390) await page.screenshot({ path: `output/playwright/photo-header-detail-${test.info().project.name}.png`, scale: "css", clip: { x: 0, y: 0, width, height: 250 } });
     await page.keyboard.press("Enter");
     await expect(page.getByRole("group", { name: "거래처 빠른 메뉴" })).toBeVisible();
   }
   expect(errors).toEqual([]);
 });
 
-test("planning cards open their tools and a populated photo screen stays compact and accessible", async ({ page }) => {
+test("management opens all four tools and remains usable on narrow and enlarged screens", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, "?photoSamples");
   await page.getByRole("button", { name: "납품사진", exact: true }).click();
   const workspace = page.locator("[data-delivery-photo-workspace]");
-  await expect(workspace.getByText("남음 8곳 · 기록완료 0곳", { exact: true })).toBeVisible();
-  const header = workspace.locator(":scope > header");
-  expect((await header.boundingBox())!.height).toBeLessThan(58);
-  await expect(workspace.getByRole("group", { name: "납품처 관리" }).getByRole("button", { name: "순서 편집", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "거래처로 돌아가기", exact: true })).toHaveCount(0);
-  for (const [button, title] of [["사진으로 등록", "사진으로 납품 준비"], ["인공지능 경로 추천", "인공지능 경로 추천"]] as const) {
-    await workspace.getByRole("button", { name: button, exact: true }).click();
+  await expect(workspace.getByText("남음 6곳 · 기록완료 2곳", { exact: true })).toBeVisible();
+  const management = workspace.getByRole("button", { name: "납품처 관리", exact: true });
+  const tools = page.getByRole("dialog", { name: "납품처 관리", exact: true });
+  const actions = [["오늘 납품처", "오늘 순서 편집"], ["내 납품처", "내 납품처 편집"],
+    ["송장 사진으로 등록", "사진으로 납품 준비"], ["인공지능 경로 추천", "인공지능 경로 추천"]] as const;
+  const output = "output/delivery-photo-workspace-renewal/";
+  await expect(workspace.getByRole("link", { name: /길안내$/ }).first()).toBeVisible();
+  await workspace.locator("ul img:visible").evaluateAll(images => Promise.all(images.map(image => (image as HTMLImageElement).decode())));
+  await page.screenshot({ path: output + "workspace-" + info.project.name + ".png", scale: "css", animations: "disabled" });
+  await management.focus();
+  await page.keyboard.press("Enter");
+  await expect(tools.getByRole("button", { name: "오늘 납품처", exact: true })).toBeVisible();
+  await expect(management).toHaveAttribute("aria-expanded", "true");
+  for (const [name] of actions) await expect(tools.getByRole("button", { name, exact: true })).toBeVisible();
+  await tools.locator("img").evaluateAll(images => Promise.all(images.map(image => (image as HTMLImageElement).decode())));
+  await page.screenshot({ path: output + "management-" + info.project.name + ".png", scale: "css", animations: "disabled" });
+  await page.goBack();
+  await expect(tools).toBeHidden();
+  await expect(management).toBeFocused();
+  for (const [name, title] of actions) {
+    await openDeliveryPhotoTool(page, name);
     const dialog = page.getByRole("dialog", { name: title, exact: true });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "창 닫기", exact: true }).click();
-    await expect(dialog).toHaveCount(0);
+    await page.goBack();
+    await expect(dialog).toBeHidden();
+    await expect(management).toBeFocused();
   }
   expect((await new AxeBuilder({ page }).include("[data-delivery-photo-workspace]").analyze()).violations).toEqual([]);
-  await workspace.locator('img[src$=".svg"]').evaluateAll(images => Promise.all(images.map(image => (image as HTMLImageElement).decode())));
-  await page.screenshot({ path: `output/delivery-planning-buttons/preview-390-${test.info().project.name}.png`, scale: "css" });
   await page.setViewportSize({ width: 320, height: 760 });
   await page.addStyleTag({ content: "html{font-size:200%}" });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  for (const name of ["사진으로 등록", "인공지능 경로 추천"]) {
-    const button = workspace.getByRole("button", { name, exact: true });
+  await page.emulateMedia({ forcedColors: "active" });
+  await management.focus();
+  await page.keyboard.press("Enter");
+  await expect(tools).toBeVisible();
+  for (const [name] of actions) {
+    const button = tools.getByRole("button", { name, exact: true });
+    const size = (await button.boundingBox())!;
+    expect(size.height).toBeGreaterThanOrEqual(44);
     expect(await button.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   }
-  await page.emulateMedia({ forcedColors: "active" });
-  const invoice = workspace.getByRole("button", { name: "사진으로 등록", exact: true });
-  await invoice.focus(); await expect(invoice).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "사진으로 납품 준비", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(tools).toBeHidden();
+  await expect(management).toBeFocused();
 });
 
 for (const target of ["납품사진"]) {

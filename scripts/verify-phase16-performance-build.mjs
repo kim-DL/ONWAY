@@ -150,6 +150,8 @@ const deliveryPhotoFieldLayers = [
   { name: "customer-entry", boundaries: ["delivery-photo-customer-section"], javascript: 6 * 1024, cssRaw: 3 * 1024, cssGzip: 1024 },
   { name: "capture-entry", boundaries: ["delivery-photo-capture-entry"], javascript: 4 * 1024, cssRaw: 3 * 1024, cssGzip: 1024 },
   { name: "row", boundaries: ["delivery-photo-row"], javascript: 2 * 1024, cssRaw: 0, cssGzip: 0 },
+  // Load editor styling when the user opens a list editor.
+  { name: "editor", boundaries: ["delivery-photo-editor"], javascript: 4 * 1024, cssRaw: 3.5 * 1024, cssGzip: 1024 },
   { name: "preview", boundaries: ["delivery-photo-upload-panel"], javascript: 2 * 1024, cssRaw: 2 * 1024, cssGzip: 1024 },
   { name: "inspection", boundaries: ["delivery-photo-local-preview"], javascript: 2 * 1024, cssRaw: 1024, cssGzip: 512 },
   { name: "durability", boundaries: ["delivery-photo-outbox", "delivery-photo-outbox-lazy", "delivery-photo-outbox-worker"], javascript: 4 * 1024 - 128, cssRaw: 0, cssGzip: 0 },

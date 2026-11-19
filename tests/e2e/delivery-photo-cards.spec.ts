@@ -70,7 +70,8 @@ test("photo card controls remain centered across full cards and fit every viewpo
         expect(Math.abs(control.y + control.height / 2 - row.card.y - row.card.height / 2), JSON.stringify(row)).toBeLessThan(2);
         expect(control.right, JSON.stringify(row)).toBeLessThanOrEqual(row.card.right);
       }
-      expect(row.more.x - row.camera.right, JSON.stringify(row)).toBeGreaterThanOrEqual(4);
+      expect(row.more.x - row.camera.right, JSON.stringify(row)).toBeGreaterThanOrEqual(0);
+      expect(row.more.x - row.camera.right, JSON.stringify(row)).toBeLessThanOrEqual(1);
     }
     for (const image of await rows.getByRole("button", { name: /카메라 촬영$/ }).locator("img").all()) {
       expect(await image.evaluate(async element => {
@@ -104,7 +105,8 @@ test("photo card actions remain separate and the real more menu closes after sel
   await dialog.getByRole("button", { name: "거래처 상세정보", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(events).toContainText("detail:PREVIEW-0");
-  await page.getByRole("listitem").first().getByRole("button", { name: "오늘 추가", exact: true }).click();
+  await more.click();
+  await dialog.getByRole("button", { name: "오늘 목록에 추가", exact: true }).click();
   await expect(page.getByRole("listitem").first()).toContainText("오늘 목록");
   await page.getByRole("button", { name: "온유 식당 사진 업로드 다시 시도", exact: true }).click();
   await expect(events).toContainText("retry:retry-photo");

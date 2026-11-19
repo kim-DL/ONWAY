@@ -5,11 +5,11 @@ import type { ReactNode } from "react";
 import { MAX_PENDING_PHOTOS_PER_CUSTOMER, deliveryPhotoUploadStatusText, type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import styles from "./photo.module.css";
 
-export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob, attention, onShowJob, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onAdd, onView, onCapture, onMore, onRetry, directions }: {
+export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob, attention, onShowJob, pendingCount = 0, uploadReady, captureAllowed = true, inToday, onView, onCapture, onMore, onRetry, directions }: {
   customer: Customer; count?: number | undefined; latestAt?: string | undefined; job?: DeliveryPhotoUploadProjection | undefined; retryJob?: DeliveryPhotoUploadProjection | undefined;
   pendingCount?: number | undefined; captureAllowed?: boolean | undefined;
   attention?: DeliveryPhotoUploadProjection | undefined; onShowJob?: (id: string) => void; directions?: ReactNode;
-  inToday?: boolean | undefined; onAdd?: ((customerId: string) => void) | undefined;
+  inToday?: boolean | undefined;
   uploadReady: boolean; onView: (customer: Customer) => void; onCapture: (customer: Customer) => void; onMore: (customer: Customer) => void; onRetry: (jobId: string) => void;
 }) {
   const password = customer.accessPasswordState === "registered" && customer.accessPassword;
@@ -23,25 +23,27 @@ export function DeliveryPhotoRow({ customer, count = 0, latestAt, job, retryJob,
   return <li className={styles.row}><div className={styles.photoMain}>
     <button type="button" className={styles.rowText} onClick={() => onView(customer)} aria-label={`${customer.name} 사진 기록`}>
       <strong>{customer.name}</strong>
-      {customerSecondary ? <small>{customerSecondary}</small> : null}
-      {detail ? <small role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>{detail}</small> : null}
+      <span className={styles.rowMeta}>
+        {customerSecondary && <small>{customerSecondary}</small>}
+        <span className={styles.photoHistory} role={job?.status === "failed" ? "alert" : status ? "status" : undefined}>
+          <Icon name="images" size={14} />{detail || "사진 기록"}
+        </span>
+      </span>
     </button>
     {attention ? <button type="button" onClick={() => onShowJob?.(attention.jobId)}>
       {attention.errorCategory === "auth" || (attention.errorCategory === "preparation" && !attention.durable) ? "사진 확인 필요" : attention.status === "paused" ? "날짜 확인 필요" : "재시도 필요"}
     </button> : null}
     {retryJob && (!attention || attention.jobId === retryJob.jobId) ? <button type="button" onClick={() => onRetry(retryJob.jobId)} aria-label={`${customer.name} 사진 업로드 다시 시도`}>재시도</button> : null}
     {directions}
-    {onAdd ? <div>
-      {inToday ? <span className={styles.inToday}>오늘 목록</span> : <button type="button" onClick={() => onAdd(customer.customerId)}>오늘 추가</button>}
-    </div> : null}
+    {inToday && <span className={styles.inToday}><Icon name="check" size={13} />오늘 목록</span>}
   </div><div className={styles.photoActions}>
     <button type="button" data-camera-customer={customer.customerId} className={styles.photoPrimary} aria-label={`${customer.name} 카메라 촬영`} disabled={active}
       onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onCapture(customer); }}>
       {/* Reuse the pre-sized static WebP without an image transformation service. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/ui/customer-ceramic-camera-v1.webp" alt="" width={48} height={48} /></button>
+      <img src="/ui/customer-ceramic-camera-v1.webp" alt="" width={40} height={40} /></button>
     <button type="button" aria-label={`${customer.name} 더보기`} aria-haspopup="dialog"
-      onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onMore(customer); }}><Icon name="more-refined" size={24} /></button>
+      onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onMore(customer); }}><Icon name="more-refined" size={20} /></button>
   </div>
   </li>;
 }

@@ -1,3 +1,4 @@
+import { openDeliveryPhotoTool } from "../helpers/open-delivery-photo-tool";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { buildInventoryPhotoFixture } from "../helpers/build-inventory-photo-fixture";
@@ -38,7 +39,7 @@ async function openFixture(page: Page, mode: "route" | "day", absent = false, ed
     return request.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}*{box-sizing:border-box}${fixture.css}</style><div id="root"></div><script>${fixture.script.replaceAll("</script>", "<\\/script>")}</script></html>` });
   });
   await page.goto(`https://photo-editor.test/?mode=${mode}${absent ? "&absent" : ""}${displayName ? `&displayName=${encodeURIComponent(displayName)}` : ""}`);
-  await page.getByRole("button", { name: mode === "day" ? "오늘 납품처" : "내 납품처", exact: true }).click();
+  await openDeliveryPhotoTool(page, mode === "day" ? "오늘 납품처" : "내 납품처");
   const dialog = page.getByRole("dialog", { name: mode === "route" ? "내 납품처 편집" : "오늘 순서 편집", exact: true });
   await expect(dialog).toBeVisible();
   if (edit && mode === "route" && absent) {
@@ -50,78 +51,31 @@ async function openFixture(page: Page, mode: "route" | "day", absent = false, ed
   return { dialog, errors, external };
 }
 
-test.describe("long welcome copy", () => {
-  test.use({ timezoneId: "Asia/Seoul" });
-  for (const name of ["남궁가나다라마바사아자차카타파하 팀장", "가".repeat(100)]) {
-    test(`evening greeting fits with a ${name.length}-character name`, async ({ page }, info) => {
-      await page.clock.setFixedTime(new Date("2026-11-08T11:00:00Z"));
-      await page.emulateMedia({ reducedMotion: name.length === 100 ? "reduce" : "no-preference" });
-      await openFixture(page, "day", false, false, name);
-      await page.getByRole("dialog").getByRole("button", { name: "취소", exact: true }).click();
-      const greeting = page.locator("header [data-greeting-visual]");
-      if (name.length === 19) await expect(greeting).toHaveAttribute("data-typing", "typing");
-      await expect(greeting).toHaveAttribute("data-typing", "complete", { timeout: 10_000 });
-      await expect(greeting).toContainText(`${name}님 안녕하세요.`);
-      await expect(greeting).toContainText("오늘도 수고 많았어요.");
-      for (const width of [320, 390, 430, 1280]) {
-        await page.setViewportSize({ width, height: 844 });
-        const heading = await page.getByRole("heading", { name: "납품사진", exact: true }).evaluate((element) => {
-          const range = document.createRange(); range.selectNodeContents(element);
-          const box = range.getBoundingClientRect(); return { x: box.x, width: box.width };
-        });
-        const copy = (await greeting.boundingBox())!;
-        expect(copy.x).toBeGreaterThanOrEqual(heading.x + heading.width);
-        expect(copy.x + copy.width).toBeLessThanOrEqual(width);
-        const nameElement = page.locator("header [title]");
-        expect(await nameElement.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
-        expect((await page.locator("header [data-welcome-greeting]").boundingBox())!.height).toBeLessThan(55);
-        await expect(page.locator("header [data-greeting-accessible]")).toContainText(name);
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        if (width === 320) await page.screenshot({ path: `output/delivery-toolbar/long-welcome-${name.length}-${info.project.name}.png` });
-      }
-    });
-  }
-});
-
-test("welcome types the employee greeting and completes without repeating", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await openFixture(page, "day", false, false);
-  const greeting = page.locator("header [data-greeting-visual]");
-  await expect(greeting).toHaveAttribute("data-typing", "typing");
-  expect(await greeting.locator('[data-greeting-character][style*="hidden"]').count()).toBeGreaterThan(0);
-  await expect(greeting).toHaveAttribute("data-typing", "complete");
-  await expect(greeting).toContainText("님 안녕하세요.");
-  await expect(greeting.locator('[data-greeting-character][style*="hidden"]')).toHaveCount(0);
-});
-
-test("top management controls share one row and search clears without losing focus", async ({ page }) => {
-  await openFixture(page, "day", false, false);
-  await page.getByRole("dialog").getByRole("button", { name: "취소", exact: true }).click();
-  const controls = page.getByRole("group", { name: "납품처 관리" });
+test("management stays in the header and search restores the day list and focus", async ({ page }) => {
+  const { dialog } = await openFixture(page, "day", false, false, "가".repeat(100));
+  await dialog.getByRole("button", { name: "취소", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  const header = page.locator("[data-delivery-photo-workspace] > header");
+  const manage = header.getByRole("button", { name: "납품처 관리", exact: true });
   const search = page.getByRole("searchbox", { name: "납품사진 거래처 검색" });
+  const dayList = page.getByRole("region", { name: "오늘 남은 납품처" });
   for (const width of [320, 390, 430, 1280]) {
     await page.setViewportSize({ width, height: 844 });
-    const buttons = await controls.getByRole("button").all();
-    const bounds = await Promise.all(buttons.map((button) => button.boundingBox()));
-    expect(buttons).toHaveLength(3);
-    for (const box of bounds) {
-      expect(box!.height).toBeGreaterThanOrEqual(44);
-      expect(Math.abs(box!.y - bounds[0]!.y)).toBeLessThan(1);
-    }
-    expect(bounds[2]!.y + bounds[2]!.height).toBeLessThan((await search.boundingBox())!.y);
-    const heading = (await page.getByRole("heading", { name: "납품사진", exact: true }).boundingBox())!;
-    const welcome = (await page.locator("header [data-welcome-greeting]").boundingBox())!;
-    expect(welcome.x).toBeGreaterThanOrEqual(heading.x + heading.width);
-    expect(welcome.y).toBeLessThan(heading.y + heading.height + 20);
+    await expect(header.getByRole("button")).toHaveCount(1);
+    const box = (await manage.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.y + box.height).toBeLessThan((await search.boundingBox())!.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
-  await expect(page.getByRole("button", { name: "새로고침", exact: true })).toHaveCount(0);
   await search.fill("가람");
+  await expect(page.getByRole("region", { name: "거래처 검색 결과" })).toBeVisible();
+  await expect(dayList).toBeHidden();
   await page.getByRole("button", { name: "검색어 지우기", exact: true }).click();
   await expect(search).toHaveValue("");
   await expect(search).toBeFocused();
-  await controls.getByRole("button", { name: "순서 편집", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "오늘 순서 편집", exact: true })).toBeVisible();
+  await expect(dayList).toBeVisible();
+  await openDeliveryPhotoTool(page, "오늘 납품처");
+  await expect(dialog).toBeVisible();
 });
 
 for (const mode of ["route", "day"] as const) {
@@ -200,7 +154,7 @@ test("all four dirty editor exits ask once and preserve edits when dismissed", a
 test("recommended and manually adjusted order is reflected in the photo workspace", async ({ page }) => {
   const { dialog, errors, external } = await openFixture(page, "day", false, false);
   await dialog.getByRole("button", { name: "취소", exact: true }).click();
-  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await openDeliveryPhotoTool(page, "인공지능 경로 추천");
   await page.getByRole("button", { name: "납품처 추가 · 순서 편집" }).click();
   await page.getByRole("searchbox", { name: "거래처 검색", exact: true }).fill("다온");
   await page.getByRole("button", { name: "다온상회 오늘만 추가" }).click();
@@ -216,13 +170,13 @@ test("recommended and manually adjusted order is reflected in the photo workspac
   await expect(planning.getByRole("button", { name: "저장 완료", exact: true })).toBeDisabled();
   await planning.getByRole("button", { name: "창 닫기", exact: true }).click();
   const photoNames = page.getByRole("button", { name: / 사진 기록$/ });
-  await expect(photoNames).toHaveText(["다온상회둔산1동", "나래상회둔산1동", "가람상회둔산1동"]);
-  await page.getByRole("button", { name: "인공지능 경로 추천", exact: true }).click();
+  await expect(photoNames.locator("strong")).toHaveText(["다온상회", "나래상회", "가람상회"]);
+  await openDeliveryPhotoTool(page, "인공지능 경로 추천");
   await page.getByRole("button", { name: "납품처 추가 · 순서 편집" }).click();
   await page.getByRole("button", { name: "가람상회 위로 이동" }).click();
   await page.getByRole("button", { name: "저장", exact: true }).click();
   await planning.getByRole("button", { name: "창 닫기", exact: true }).click();
-  await expect(photoNames).toHaveText(["다온상회둔산1동", "가람상회둔산1동", "나래상회둔산1동"]);
+  await expect(photoNames.locator("strong")).toHaveText(["다온상회", "가람상회", "나래상회"]);
   expect(errors).toEqual([]);
   expect(external).toEqual([]);
 });
