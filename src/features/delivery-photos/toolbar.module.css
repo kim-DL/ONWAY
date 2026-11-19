@@ -47,10 +47,10 @@
   min-height: 52px;
   max-width: 50%;
   padding: 5px clamp(6px, 2vw, 12px);
-  border: 1px solid #8cbfb5;
+  border: 1px solid #fbefef;
   border-radius: 14px;
-  background: linear-gradient(155deg, #e4f7f1, #cfeee7);
-  box-shadow: inset 0 1px #ffffffb3, 0 2px 4px #235e5412;
+  background: #fcf8f8;
+  box-shadow: inset 0 1px #ffffffb3, 0 2px 4px #55474712;
   color: #164f49;
   font-size: .875rem;
   line-height: 1.25;
@@ -65,11 +65,7 @@
   border-radius: 8px;
   background: #ffffff80;
 }
-.searchActions > button:active { background: #c3e9df; }
-@media(hover:hover){
-  .dayBar>button[type]:hover{background:#e1edf8}
-  .searchActions>button[type]:hover{border-color:#5f9e91}
-}
+@media(hover:hover){.dayBar>button[type]:hover{background:#e1edf8}}
 @media(max-width:359px){.searchActions>div{gap:4px;padding-inline:6px}}
 @media(max-width:18em){.searchActions{flex-wrap:wrap}.searchActions>div{flex-basis:8rem}}
 @media(prefers-reduced-motion:no-preference){
