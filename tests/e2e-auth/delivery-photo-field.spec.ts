@@ -342,7 +342,8 @@ galleryTest("two-day gallery discards a late list across Seoul midnight and sepa
   const start = deliveryDateKeyInSeoul(new Date());
   const offset = (days: number) => new Date(Date.parse(start + "T00:00:00Z") + days * 86_400_000).toISOString().slice(0, 10);
   const yesterday = offset(-1), tomorrow = offset(1);
-  const shortDate = (date: string) => date.slice(5).replace("-", ".");
+  const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short", timeZone: "UTC" });
+  const shortDate = (date: string) => `${date.slice(5, 7)}월 ${date.slice(8)}일 (${weekday.format(new Date(date))})`;
   let day = start;
   let fail = true;
   let removed = false;

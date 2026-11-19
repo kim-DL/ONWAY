@@ -10,7 +10,8 @@ import styles from "./gallery.module.css";
 type Photo = DeliveryPhotoMetadata;
 export type GalleryAnchor = Pick<Photo, "photoId" | "deliveryDateKey">;
 export function galleryDateLabel(date: string, today: string) {
-  return `${date === today ? "오늘" : "어제"} ${date.slice(5).replace("-", ".")}`;
+  const weekday = "일월화수목금토"[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  return `${date === today ? "오늘" : "어제"} ${date.slice(5, 7)}월 ${date.slice(8)}일 (${weekday})`;
 }
 
 function Preview({ photo, pool, priority, label, selected, onClick }: {

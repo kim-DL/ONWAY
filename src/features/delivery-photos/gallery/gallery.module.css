@@ -5,7 +5,10 @@
 .top button,.days button,.caption button,.message button,.historyLink,.matches button{min-height:44px;border:0;background:transparent;color:#45516a;font:inherit;font-weight:700;cursor:pointer}
 .top button,.historyLink{display:inline-flex;gap:6px;align-items:center;padding:0 8px}
 .top{grid-column:1;grid-row:1;margin-bottom:10px}
-.page>.find{grid-column:2;grid-row:1;align-self:center;min-height:44px;margin:0 12px 10px 0;padding:0 12px;border:1px solid #cdd2de;border-radius:10px;background:#fff;color:#45516a;font:inherit;font-size:.875rem;font-weight:700;cursor:pointer}
+.page>.find{grid-column:2;grid-row:1;align-self:center;display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:0 12px 10px 0;padding:4px 8px;border:1px solid #cbddeb;border-radius:24px;background:#edf4fb;color:#2e5275;font:inherit;font-size:.8125rem;font-weight:750;cursor:pointer}
+.find>span{display:grid;flex:none;place-items:center;width:26px;height:26px;border-radius:50%;background:#dae8f5}
+.find:active{background:#e1edf8}
+@media(hover:hover){.find:hover{background:#e1edf8}}
 .top .back{justify-content:center;min-width:44px;padding:0}
 .page h1{flex:1;margin:0;font-size:clamp(1.15rem,5vw,1.5rem);letter-spacing:-.055em;line-height:1.25}
 .row{min-width:0;padding:10px 0 4px;border-top:1px solid #d9dee4}

@@ -111,7 +111,9 @@ function GalleryWindow({ session, catalog, data, today, anchors }: Omit<Props, "
   const onOpen = (photo: DeliveryPhotoMetadata, origin: HTMLElement) => setViewer({ photo, origin });
   const showViewer = viewer && days.some((day) => day.photos.some((item) => item.photoId === viewer.photo.photoId));
   return <>
-    <button type="button" className={styles.find} onClick={() => setFinding(true)}>업체 찾기</button>
+    <button type="button" className={styles.find} aria-haspopup="dialog" onClick={() => setFinding(true)}>
+      <span><Icon name="search-refined" size={16} /></span>업체 찾기
+    </button>
     <div className={styles.rows}>
       {catalog.status === "error" && <p role="alert" className={styles.message}>업체명을 불러오지 못했어요. <button type="button" onClick={catalog.retry}>다시 시도</button></p>}
       {days.map((day, i) => day.error && <p key={i} role="alert" className={styles.message}>{i === 0 ? "오늘" : "어제"} · {day.error} <button type="button" onClick={refresh}>다시 시도</button></p>)}
