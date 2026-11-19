@@ -311,6 +311,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   const [view, setView] = useState<ShellView>(resumedLocation?.view ?? "schools");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [customerContext, setCustomerContext] = useState<CustomerNavigationContext | null>(null);
+  const [photoGallery, setPhotoGallery] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMounted, setSearchMounted] = useState(false);
   const historyReadyRef = useRef(false);
@@ -340,7 +341,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   }, [mode]);
 
   const writeHistory = useCallback((
-    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean; customerHomeReturn?: boolean; customerContext?: CustomerNavigationContext },
+    next: { mode: WorkMode; view: ShellView; school: School | null; searchOpen: boolean; inventorySettingsReturn?: boolean; customerHomeReturn?: boolean; customerContext?: CustomerNavigationContext; photoGallery?: boolean },
     replace = false,
   ) => {
     const state: Record<string, unknown> = {
@@ -367,6 +368,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         school?: unknown;
         searchOpen?: unknown;
         customerContext?: unknown;
+        photoGallery?: unknown;
       } | undefined;
       if (!snapshot || snapshot.version !== 1) return;
       const restoredMode = isWorkMode(snapshot.mode)
@@ -385,6 +387,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
       setView(restoredView);
       setSelectedSchool(restoredSchool);
       setCustomerContext(readCustomerNavigationContext(snapshot.customerContext, restoredMode, restoredView));
+      setPhotoGallery(restoredMode === "customer" && restoredView === "activity" && snapshot.photoGallery === true);
       const nextSearchOpen = isSchoolWorkMode(restoredMode) && snapshot.searchOpen === true && restoredSchool === null;
       if (nextSearchOpen) setSearchMounted(true);
       setSearchOpen(nextSearchOpen);
@@ -426,6 +429,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 
   const changeMode = (nextMode: WorkMode) => {
     if (!availableModes.includes(nextMode) || nextMode === mode) return;
+    setPhotoGallery(false);
     setChosenMode(nextMode);
     setView((current) => normalizeView(nextMode, current));
     setSelectedSchool(null);
@@ -442,6 +446,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 
   const navigate = (nextView: ShellView) => {
     if (nextView === view && !selectedSchool) return;
+    setPhotoGallery(false);
     setSelectedSchool(null);
     setView(nextView);
     setSearchOpen(false);
@@ -470,6 +475,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   };
 
   const openDeliveryPhotos = (entry?: DeliveryPhotoEntry) => {
+    setPhotoGallery(false);
     if (!entry) { navigate("activity"); return; }
     writeHistory({ mode: "customer", view: "schools", school: null, searchOpen: false,
       customerContext: { kind: "detail", customerId: entry.customerId } }, true);
@@ -483,7 +489,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
   };
 
   const closeCustomerPage = () => {
-    if (window.history.state?.onnuriwayShell?.customerHomeReturn === true) {
+    if (window.history.state?.onnuriwayShell?.photoGallery === true || window.history.state?.onnuriwayShell?.customerHomeReturn === true) {
       window.history.back();
     } else {
       // A restored subpage still needs a way home without a prior history entry.
@@ -493,14 +499,20 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     }
   };
 
+  const photoPage = mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED;
   let content;
   if (selectedSchool && isSchoolWorkMode(mode)) {
     content = <SchoolDetail key={`${mode}:${selectedSchool.schoolId}`} school={selectedSchool} session={session} mode={mode} />;
   } else if (view === "settings") {
     content = <SettingsPage session={session} {...(mode === "inventory" ? { onBack: closeInventorySettings } : mode === "customer" ? { onBack: closeCustomerPage, backLabel: "거래처로 돌아가기" } : {})} />;
-  } else if (mode === "customer" && view === "activity" && DELIVERY_PHOTOS_ENABLED) {
+  } else if (photoPage) {
     content = <DeliveryPhotoWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${customerContext?.kind === "photo-record" ? customerContext.customerId : "all"}`}
       session={session} onOpenCustomerDetail={openCustomerDetailFromPhoto}
+      galleryOpen={photoGallery} onOpenGallery={() => {
+        if (window.history.state?.onnuriwayShell?.photoGallery) return;
+        writeHistory({ mode, view, school: null, searchOpen: false, photoGallery: true, ...(customerContext && { customerContext }) });
+        setPhotoGallery(true);
+      }}
       requestedCustomerId={customerContext?.kind === "photo-record" ? customerContext.customerId : undefined} onReturnToCustomer={closeCustomerPage} />;
   } else if (mode === "customer") {
     content = <CustomerWorkspace key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${customerContext?.kind === "detail" ? customerContext.customerId : "home"}`} session={session}
@@ -518,14 +530,16 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 
   return (
     <main className="workspace-shell" data-mode={mode} data-detail={selectedSchool ? "true" : "false"}>
-      <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
-      <ShellHeader
-        mode={mode}
-        availableModes={availableModes}
-        onModeChange={changeMode}
-        onActiveModeClick={mode === "customer" && view === "activity" ? closeCustomerPage : undefined}
-        onDetailBack={selectedSchool ? closeSchool : undefined}
-      />
+      {!(photoPage && photoGallery) && <>
+        <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
+        <ShellHeader
+          mode={mode}
+          availableModes={availableModes}
+          onModeChange={changeMode}
+          onActiveModeClick={mode === "customer" && view === "activity" ? closeCustomerPage : undefined}
+          onDetailBack={selectedSchool ? closeSchool : undefined}
+        />
+      </>}
       {mode !== "inventory" && mode !== "customer" ? <ShellNavigation mode={mode} view={view} onNavigate={navigate} /> : null}
       <div ref={contentRef} className="workspace-content"><InitialWorkspaceTiming startedAt={startedAt}
         navigationKey={JSON.stringify([mode, view, selectedSchoolId ?? null, searchOpen])}>

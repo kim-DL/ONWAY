@@ -30,7 +30,7 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
   initialIndex: number;
   origin: HTMLElement | null;
   onClose: () => void;
-  onDeleted: (photoId: string, update: DeliveryPhotoDeleteUpdate) => void;
+  onDeleted?: (photoId: string, update: DeliveryPhotoDeleteUpdate) => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
   const photo = photos[index] ?? photos[0];
@@ -68,11 +68,11 @@ export function DeliveryPhotoViewer({ customerName, session, photos, initialInde
     </div>
     {image.status === "ready" ? <PhotoPanZoom key={image.url} stageRef={stageRef} origin={null} onZoomedChange={setZoomed} onSwipe={navigate} /> : null}
     <div className={styles.metadata}><strong>{deliveryPhotoRegisteredAt(photo.createdAt, true)}</strong><span>등록자 {photo.createdByName}</span></div>
-    <BottomSheetActions className={styles.actions ?? ""}>
+    {(onDeleted || photos.length > 1) && <BottomSheetActions className={styles.actions ?? ""}>
       <span className={styles.position} role="status" aria-live="polite">{index + 1} / {photos.length}</span>
       <button type="button" disabled={index === 0} onClick={() => navigate(-1)}><Icon name="arrow-left" />이전</button>
       <button type="button" disabled={index === photos.length - 1} onClick={() => navigate(1)}>다음<Icon name="chevron-right" /></button>
-      <DeliveryPhotoDeleteAction key={photo.photoId} photo={photo} session={session} onDeleted={onDeleted} />
-    </BottomSheetActions>
+      {onDeleted && <DeliveryPhotoDeleteAction key={photo.photoId} photo={photo} session={session} onDeleted={onDeleted} />}
+    </BottomSheetActions>}
   </BottomSheet></div>, document.body);
 }

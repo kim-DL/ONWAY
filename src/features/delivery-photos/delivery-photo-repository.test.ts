@@ -9,6 +9,7 @@ vi.mock("firebase/functions", () => ({ httpsCallable: (_functions: unknown, name
 
 import { classifyDeliveryPhotoCreateError, deliveryPhotoCreateErrorMessage, deliveryPhotoCreateRepository } from "./delivery-photo-create-repository";
 import { deliveryPhotoErrorKind, deliveryPhotoRepository } from "./delivery-photo-repository";
+import { readGalleryPage } from "./gallery/gallery-repository";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
 const timestamp = "2026-09-23T01:18:00.000Z";
@@ -33,6 +34,15 @@ beforeEach(() => {
 });
 
 describe("delivery photo authenticated repository", () => {
+  it("omits absent gallery filters on the callable wire and checks each page's owner and date", async () => {
+    const date = latest.deliveryDateKey;
+    const signal = new AbortController().signal;
+    mock.call.mockResolvedValue({ data: { scope: "gallery", deliveryDateKey: date, customerId: null, photos: [latest], nextCursor: null } });
+    await readGalleryPage(session, date, undefined, null, signal);
+    expect(Object.keys(mock.call.mock.calls[0]![1])).toEqual(["scope", "deliveryDateKey"]);
+    await expect(readGalleryPage(session, date, "different", null, signal)).rejects.toMatchObject({ code: "delivery-photo/invalid-response" });
+    await expect(readGalleryPage(session, "2026-09-22", undefined, null, signal)).rejects.toMatchObject({ code: "delivery-photo/invalid-response" });
+  });
   it("parses route, day and today's metadata and sends the contract inputs", async () => {
     expect(await deliveryPhotoRepository.getRoute()).toEqual(route);
     expect(await deliveryPhotoRepository.getDay()).toEqual(day);
@@ -53,6 +63,8 @@ describe("delivery photo authenticated repository", () => {
 
   it("rejects malformed responses and late responses after auth changes", async () => {
     mock.call.mockResolvedValueOnce({ data: { ...today, customers: [{ customerId: "a", count: -1, latest }] } });
+    await expect(deliveryPhotoRepository.listToday()).rejects.toThrow();
+    mock.call.mockResolvedValueOnce({ data: { scope: "gallery", deliveryDateKey: day.deliveryDateKey, customerId: null, photos: [], nextCursor: null } });
     await expect(deliveryPhotoRepository.listToday()).rejects.toThrow();
     mock.call.mockImplementationOnce(async () => {
       auth.currentUser = { uid: "other", getIdTokenResult: async () => ({ claims: session.claims }) };

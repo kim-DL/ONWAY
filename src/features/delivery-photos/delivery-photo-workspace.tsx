@@ -20,6 +20,7 @@ import type { DeliveryPhotoEditorMode } from "./delivery-photo-editor";
 import styles from "./photo.module.css";
 
 const WorkspacePhotoToolbar = dynamic(() => import("./delivery-photo-toolbar").then((entry) => entry.WorkspacePhotoToolbar), { ssr: false });
+const WorkspacePhotoGallery = dynamic(() => import("./delivery-photo-toolbar").then((entry) => entry.WorkspacePhotoGallery));
 const DeliveryPhotoCaptureEntry = dynamic(() => import("./delivery-photo-capture-entry"), { ssr: false });
 const ContinuousCapture = dynamic(() => import("./delivery-photo-capture-entry").then((entry) => entry.ContinuousCapture), { ssr: false });
 const DirectionsLink = dynamic(() => import("../customers/customer-directions-link"), { ssr: false });
@@ -30,11 +31,13 @@ const DeliveryPhotoEditor = dynamic(() => import("./delivery-photo-editor").then
 const DeliveryPhotoMoreMenu = dynamic(() => import("./delivery-photo-more-menu"));
 const DeliveryPhotoUploadPanel = dynamic(() => import("./delivery-photo-upload-panel"), { ssr: false });
 
-export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requestedCustomerId, onReturnToCustomer }: {
+export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requestedCustomerId, onReturnToCustomer, galleryOpen, onOpenGallery }: {
   session: AuthenticatedSession;
   onOpenCustomerDetail?: (customerId: string) => void;
   requestedCustomerId?: string | undefined;
   onReturnToCustomer?: (() => void) | undefined;
+  galleryOpen?: boolean;
+  onOpenGallery?: () => void;
 }) {
   const data = useDeliveryPhotoData(session);
   const snapshot = data.snapshot;
@@ -88,9 +91,10 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
       onView={setHistoryCustomer} onCapture={capture} onMore={(value) => { rememberList(); setMoreCustomer(value); }} onRetry={retry} />;
   };
 
-  return <section className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
+  return <><section hidden={galleryOpen} className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
     <WorkspacePhotoToolbar session={session} customers={activeCustomers} hasToday={todayIds.length > 0} completion={completion}
-      data={data} catalog={catalog} uploads={uploads} targetVisible={Boolean(requestedCustomer)} onEdit={setEditor} query={query} onQueryChange={setQuery}>
+      data={data} catalog={catalog} uploads={uploads} targetVisible={Boolean(requestedCustomer)} onEdit={setEditor} query={query} onQueryChange={setQuery}
+      galleryOpen={galleryOpen} onOpenGallery={onOpenGallery}>
       {requestedCustomerId ? <DeliveryPhotoCaptureEntry state={captureEntry}
         onCamera={() => { if (requestedCustomer) capture(requestedCustomer); }}
         onAlbum={() => { if (requestedCustomer) album(requestedCustomer); }} onReturn={onReturnToCustomer} /> : null}
@@ -112,5 +116,5 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
     {moreCustomer ? <DeliveryPhotoMoreMenu customer={moreCustomer} albumDisabled={!captureAvailable(moreCustomer.customerId)}
       onAlbum={album} onOpenCustomerDetail={onOpenCustomerDetail} onClose={() => setMoreCustomer(null)} className={styles.moreActions!} /> : null}
     <DeliveryPhotoInputController ref={inputs} coordinator={uploads.coordinator} jobs={uploads.jobs} onSelected={setCaptureId} canSelect={captureAvailable} />
-  </section>;
+  </section>{galleryOpen && onReturnToCustomer && <WorkspacePhotoGallery session={session} catalog={catalog} data={data} onBack={onReturnToCustomer} />}</>;
 }

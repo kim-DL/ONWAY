@@ -121,8 +121,18 @@ export const deliveryPhotoMetadataSchema = z.object({
 }).strict();
 export const createDeliveryPhotoResultSchema = deliveryPhotoMetadataSchema;
 
+export const DELIVERY_PHOTO_GALLERY_PAGE_SIZE = 100;
+const galleryCursorSchema = z.object({
+  seconds: z.number().int().nonnegative().max(253402300799),
+  nanoseconds: z.number().int().min(0).max(999999999),
+  photoId: photoIdSchema,
+}).strict();
+export type DeliveryPhotoGalleryCursor = z.infer<typeof galleryCursorSchema>;
+
 export const listDeliveryPhotosInputSchema = z.discriminatedUnion("scope", [
   z.object({ scope: z.literal("today") }).strict(),
+  z.object({ scope: z.literal("gallery"), deliveryDateKey: deliveryDateKeySchema,
+    customerId: idSchema.optional(), cursor: galleryCursorSchema.optional() }).strict(),
   z.object({ scope: z.literal("customer"), customerId: idSchema, deliveryDateKey: deliveryDateKeySchema.optional(),
     limit: z.number().int().min(1).max(100).default(30) }).strict(),
 ]);
@@ -131,13 +141,18 @@ export const deliveryPhotoCustomerSummarySchema = z.object({
   count: z.number().int().nonnegative(),
   latest: deliveryPhotoMetadataSchema.nullable(),
 }).strict();
+export const deliveryPhotoTodayResultSchema = z.object({
+  scope: z.literal("today"),
+  deliveryDateKey: deliveryDateKeySchema,
+  truncated: z.boolean(),
+  photos: z.array(deliveryPhotoMetadataSchema).max(500),
+  customers: z.array(deliveryPhotoCustomerSummarySchema).max(500),
+}).strict();
 export const listDeliveryPhotosResultSchema = z.discriminatedUnion("scope", [
+  deliveryPhotoTodayResultSchema,
   z.object({
-    scope: z.literal("today"),
-    deliveryDateKey: deliveryDateKeySchema,
-    truncated: z.boolean(),
-    photos: z.array(deliveryPhotoMetadataSchema).max(500),
-    customers: z.array(deliveryPhotoCustomerSummarySchema).max(500),
+    scope: z.literal("gallery"), deliveryDateKey: deliveryDateKeySchema, customerId: idSchema.nullable(),
+    photos: z.array(deliveryPhotoMetadataSchema).max(DELIVERY_PHOTO_GALLERY_PAGE_SIZE), nextCursor: galleryCursorSchema.nullable(),
   }).strict(),
   z.object({
     scope: z.literal("customer"),

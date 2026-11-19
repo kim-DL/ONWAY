@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { FieldValue, Timestamp, type DocumentData, type DocumentReference, type Firestore, type Transaction } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp, type DocumentData, type DocumentReference, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import type { z } from "zod";
 
@@ -11,6 +11,7 @@ import {
   createDeliveryPhotoResultSchema,
   DELIVERY_PHOTO_DAY_OVERRIDE_RETENTION_DAYS,
   DELIVERY_PHOTO_MAX_BYTES,
+  DELIVERY_PHOTO_GALLERY_PAGE_SIZE,
   DELIVERY_PHOTO_RETENTION_HOURS,
   deleteDeliveryPhotoResultSchema,
   deliveryPhotoDayResultSchema,
@@ -584,6 +585,32 @@ export class DeliveryPhotoService {
 
   async list(input: z.infer<typeof listDeliveryPhotosInputSchema>, actor: CustomerActor, now = Timestamp.now()) {
     await this.verifyRead(actor);
+    if (input.scope === "gallery") {
+      const date = input.deliveryDateKey;
+      const yesterday = deliveryDateKeyInSeoul(new Date(now.toMillis() - 86_400_000));
+      if (date !== yesterday && date !== deliveryDateKeyInSeoul(now.toDate())) {
+        throw new HttpsError("out-of-range", "갤러리의 등록일 범위가 바뀌었습니다.");
+      }
+      const collection = this.db.collection(DELIVERY_PHOTO_PATH);
+      const start = Date.parse(`${date}T00:00:00+09:00`);
+      const range = input.customerId
+        ? collection.where("customerId", "==", input.customerId).where("createdAt", ">=", Timestamp.fromMillis(start))
+          .where("createdAt", "<", Timestamp.fromMillis(start + 86_400_000))
+        : collection.where("deliveryDateKey", "==", date);
+      let query = range.orderBy("createdAt", "desc").orderBy(FieldPath.documentId(), "desc").limit(DELIVERY_PHOTO_GALLERY_PAGE_SIZE + 1);
+      if (input.cursor) query = query.startAfter(new Timestamp(input.cursor.seconds, input.cursor.nanoseconds), input.cursor.photoId);
+      const { docs } = await query.get();
+      const records = docs.slice(0, DELIVERY_PHOTO_GALLERY_PAGE_SIZE);
+      const last = records.at(-1);
+      const timestamp = last?.get("createdAt") as Timestamp | undefined;
+      const nextCursor = docs.length > records.length && last && timestamp
+        ? { seconds: timestamp.seconds, nanoseconds: timestamp.nanoseconds, photoId: last.id } : null;
+      const photos = records.map((doc) => deliveryPhotoFromDocument(doc.data())).filter((photo) =>
+        photo.deliveryDateKey === date && photo.status === "active" && photo.expiresAt.toMillis() > now.toMillis());
+      await this.verifyRead(actor);
+      return listDeliveryPhotosResultSchema.parse({ scope: "gallery", deliveryDateKey: date, customerId: input.customerId ?? null,
+        photos: photos.map(deliveryPhotoMetadata), nextCursor });
+    }
     if (input.scope === "today") {
       const dateKey = deliveryDateKeyInSeoul(now.toDate());
       const snapshot = await this.db.collection(DELIVERY_PHOTO_PATH)

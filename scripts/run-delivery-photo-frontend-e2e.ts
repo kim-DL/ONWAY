@@ -28,11 +28,17 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   const cli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
-  const result = spawnSync(process.execPath,
-    [cli, "test", "tests/e2e-auth/delivery-photo-field.spec.ts", "--config", "playwright.phase3.config.ts",
-      ...(process.env.DELIVERY_PHOTO_E2E_GREP ? ["--grep", process.env.DELIVERY_PHOTO_E2E_GREP] : [])],
-    { cwd: process.cwd(), env: environment, stdio: "inherit" });
-  if (result.error) console.error(result.error.message);
-  exitCode = result.status ?? 1;
+  const both = environment.DELIVERY_PHOTO_E2E_BROWSER === "both";
+  const browsers = both ? ["chromium", "webkit"] : [environment.DELIVERY_PHOTO_E2E_BROWSER ?? "chromium"];
+  exitCode = 0;
+  for (const browser of browsers) {
+    const result = spawnSync(process.execPath,
+      [cli, "test", "tests/e2e-auth/delivery-photo-field.spec.ts", "--config", "playwright.phase3.config.ts",
+        ...(both ? ["--output", `output/playwright/delivery-photo-${browser}`, "--reporter=list"] : []),
+        ...(environment.DELIVERY_PHOTO_E2E_GREP ? ["--grep", environment.DELIVERY_PHOTO_E2E_GREP] : [])],
+      { cwd: process.cwd(), env: { ...environment, DELIVERY_PHOTO_E2E_BROWSER: browser }, stdio: "inherit" });
+    if (result.error) console.error(result.error.message);
+    if (result.status !== 0) exitCode = result.status ?? 1;
+  }
 } finally { server.kill("SIGTERM"); }
 process.exit(exitCode);

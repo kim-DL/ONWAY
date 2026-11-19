@@ -10,11 +10,13 @@ import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 
 import type { DeliveryPhotoDeleteUpdate } from "./delivery-photo-delete-model";
+import type { HistoryProps } from "./delivery-photo-history-loader";
 import { deliveryPhotoHistoryErrorMessage, deliveryPhotoHistoryRepository, type DeliveryPhotoHistoryResult } from "./delivery-photo-history-repository";
 import { newestDeliveryPhotos } from "./delivery-photo-history-model";
 import styles from "./delivery-photo-history.module.css";
 
 const DeliveryPhotoHistoryDates = dynamic(() => import("./delivery-photo-history-dates").then((module) => module.DeliveryPhotoHistoryDates), { ssr: false });
+const DeliveryPhotoViewer = dynamic(() => import("./delivery-photo-history-dates").then((module) => module.DeliveryPhotoViewer), { ssr: false });
 
 type HistoryState = { status: "loading"; photos: DeliveryPhotoMetadata[] }
   | { status: "ready"; photos: DeliveryPhotoMetadata[]; fromDateKey: string }
@@ -63,4 +65,8 @@ export function DeliveryPhotoHistory({ customer, session, onClose, sync, initial
   </BottomSheet>;
 }
 
-export default DeliveryPhotoHistory;
+export default function DeliveryPhotoInspection(props: HistoryProps) {
+  if ("inspection" in props) return <DeliveryPhotoViewer customerName={props.customer.name} session={props.session}
+    photos={[props.inspection.photo]} initialIndex={0} origin={props.inspection.origin} onClose={props.onClose} />;
+  return <DeliveryPhotoHistory {...props} />;
+}

@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { ComponentProps, ReactNode } from "react";
+import { useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import type { Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import type { projectDeliveryPhotoCompletion } from "./delivery-photo-domain";
 import { SearchField } from "@/components/ui/search-field";
+import { Icon } from "@/components/ui/icon";
 import { WelcomeGreeting } from "@/features/app-shell/welcome-greeting";
 import { useTimeGreeting } from "@/features/app-shell/time-greeting";
 import { splitGreeting } from "@/features/app-shell/typing-greeting";
@@ -16,7 +17,11 @@ import type { useDeliveryPhotoCatalog } from "./use-delivery-photo-catalog";
 import photoStyles from "./photo.module.css";
 import styles from "./toolbar.module.css";
 
-export default function DeliveryPhotoToolbar({ displayName, summary, ready, hasToday, onEdit, query, onQueryChange, children }: {
+export const WorkspacePhotoGallery = dynamic(() => import(/* webpackChunkName: "delivery-photo-gallery" */ "./gallery/delivery-photo-gallery"), {
+  loading: () => <LoadingStatus label="갤러리 여는 중" />,
+});
+
+export default function DeliveryPhotoToolbar({ displayName, summary, ready, hasToday, onEdit, query, onQueryChange, galleryOpen, onOpenGallery, children }: {
   displayName: string;
   summary: string;
   ready: boolean;
@@ -24,9 +29,22 @@ export default function DeliveryPhotoToolbar({ displayName, summary, ready, hasT
   onEdit: (mode: "route" | "day") => void;
   query: string;
   onQueryChange: (value: string) => void;
+  onOpenGallery?: (() => void) | undefined;
+  galleryOpen?: boolean | undefined;
   children?: ReactNode;
 }) {
   const greeting = useTimeGreeting();
+  const galleryButton = useRef<HTMLButtonElement>(null);
+  const returnScroll = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const scroller = galleryButton.current?.closest(".workspace-content");
+    if (galleryOpen && scroller) scroller.scrollTop = 0;
+    else if (returnScroll.current !== null) {
+      if (scroller) scroller.scrollTop = returnScroll.current;
+      galleryButton.current?.focus({ preventScroll: true });
+      returnScroll.current = null;
+    }
+  }, [galleryOpen]);
   const nameLength = splitGreeting(displayName).length;
   const helloEnd = nameLength + splitGreeting("님 안녕하세요.").length;
   return <>
@@ -46,7 +64,15 @@ export default function DeliveryPhotoToolbar({ displayName, summary, ready, hasT
       <button type="button" onClick={() => onEdit("day")}>오늘 납품처</button>
       <button type="button" disabled={!hasToday} onClick={() => onEdit("day")}>순서 편집</button>
     </div> : null}
-    <SearchField value={query} onChange={onQueryChange} label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" />
+    <div className={`${photoStyles.searchActions} ${styles.searchActions}`}>
+      <SearchField value={query} onChange={onQueryChange} label="납품사진 거래처 검색" placeholder="거래처 검색 · 초성" />
+      {onOpenGallery && <button type="button" ref={galleryButton} onClick={() => {
+        returnScroll.current = galleryButton.current?.closest(".workspace-content")?.scrollTop ?? 0;
+        onOpenGallery();
+      }}>
+        <Icon name="images" size={21} strokeWidth={1.75} />갤러리
+      </button>}
+    </div>
   </>;
 }
 
@@ -68,16 +94,17 @@ function DeliveryPhotoNotices({ uploads, targetVisible, data, catalog }: {
 
 const PlanningEntry = dynamic(() => import("../delivery-planning/planning-entry"), { ssr: false });
 
-export function WorkspacePhotoToolbar({ session, customers, hasToday, completion, data, catalog, uploads, targetVisible, onEdit, query, onQueryChange, children }:
+export function WorkspacePhotoToolbar({ session, customers, hasToday, completion, data, catalog, uploads, targetVisible, onEdit, query, onQueryChange, galleryOpen, onOpenGallery, children }:
   ComponentProps<typeof DeliveryPhotoNotices> & {
     session: AuthenticatedSession; customers: readonly Customer[]; hasToday: boolean; completion: ReturnType<typeof projectDeliveryPhotoCompletion>;
     onEdit: (edit: { mode: "day" | "route"; onDone?: () => void }) => void;
-    query: string; onQueryChange: (value: string) => void; children: ReactNode;
+    query: string; onQueryChange: (value: string) => void; galleryOpen?: boolean | undefined; onOpenGallery?: (() => void) | undefined; children: ReactNode;
   }) {
   const snapshot = data.snapshot;
   const ready = Boolean(snapshot && catalog.status === "ready");
   return <>
-    <DeliveryPhotoToolbar displayName={session.displayName} ready={ready} hasToday={hasToday} onEdit={(mode) => onEdit({ mode })}
+    <DeliveryPhotoToolbar displayName={session.displayName} ready={ready} hasToday={hasToday} galleryOpen={galleryOpen}
+      onOpenGallery={onOpenGallery && (() => { if (snapshot && !data.loading) data.refresh(); onOpenGallery(); })} onEdit={(mode) => onEdit({ mode })}
       summary={ready ? `남음 ${completion.remainingCustomerIds.length}곳 · 기록완료 ${completion.completedCustomerIds.length}곳` : "오늘 목록"} query={query} onQueryChange={onQueryChange}>
       {ready && snapshot && <PlanningEntry key={`${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}:${snapshot.day.deliveryDateKey}`}
         customers={customers} snapshot={snapshot} accept={data.accept} refresh={data.refresh}

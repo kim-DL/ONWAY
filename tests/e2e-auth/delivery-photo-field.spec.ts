@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { devices, expect, test, type Locator, type Page } from "@playwright/test";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -115,6 +115,286 @@ async function chooseRowPhoto(page: Page, customerName: string, source: "카메�
 async function expectImageReady(image: Locator) {
   await expect.poll(() => image.evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0)).toBe(true);
 }
+
+// Windows WebKit needs a persistent profile for the real IndexedDB/File outbox.
+const galleryTest = test.extend({
+  serviceWorkers: "block",
+  context: async ({ browserName, context, playwright, baseURL }, provide, info) => {
+    if (browserName !== "webkit") return provide(context);
+    const persistent = await playwright.webkit.launchPersistentContext(info.outputPath("profile"), {
+      ...devices["iPhone 13"], serviceWorkers: "block", ...(baseURL && { baseURL }),
+    });
+    try { await provide(persistent); } finally { await persistent.close(); }
+  },
+});
+
+async function saveGallerySample(customerId: string, employeeId: string, date: Timestamp, image: Buffer) {
+  const bucketName = "demo-onnuriway-delivery-photos.appspot.com";
+  if (!/^(?:http:\/\/)?(?:127\.0\.0\.1|localhost):\d+$/.test(process.env.STORAGE_EMULATOR_HOST ?? "")
+    || process.env.DELIVERY_PHOTO_BUCKET !== bucketName) throw new Error("Gallery test requires the demo Storage emulator.");
+  const staff = await db().doc(`employees/${employeeId}`).get();
+  const uid = String(staff.get("firebaseUid"));
+  const actor = await db().doc(`authz/${uid}`).get();
+  const bucket = getStorage(getApps().find((app) => app.name === appName)!).bucket(bucketName);
+  return new DeliveryPhotoService(db(), new GoogleDeliveryPhotoStorage(bucket), () => date).create({
+    requestId: randomUUID(), customerId, source: "album", contentType: "image/jpeg", fileBase64: image.toString("base64"),
+  }, { uid, employeeId, roleScopes: staff.get("roleScopes"), sessionVersion: actor.get("sessionVersion"),
+    permissionsVersion: actor.get("permissionsVersion"), isAdmin: false }, date);
+}
+
+for (const width of [320, 390]) {
+  galleryTest(`two-day gallery keeps the inspected photo centered after a confirmed save at ${width}px`, async ({ page }, info) => {
+    const company = ids[1]!;
+    await removePilotPhotos([company]);
+    const portrait = readFileSync("tests/e2e-auth/fixtures/gallery-doorstep.jpg");
+    const landscape = readFileSync("tests/e2e-auth/fixtures/gallery-delivery-cart.jpg");
+    const yesterday = Timestamp.fromMillis(Date.now() - 86_400_000);
+    const seed = (employeeId: string, date: Timestamp, image = landscape) => saveGallerySample(company, employeeId, date, image);
+    const old = await seed("EMP-DELIVERY", yesterday, portrait);
+    const other = await seed("EMP-SALES-A", Timestamp.now());
+    const manifest = JSON.parse(readFileSync(".next/react-loadable-manifest.json", "utf8")) as Record<string, { files: string[] }>;
+    const entryAssets = Object.entries(manifest).find(([key]) => key.endsWith("/gallery/delivery-photo-gallery"))![1].files;
+    const galleryFiles = entryAssets.filter((file) => Object.values(manifest).filter((entry) => entry.files.includes(file)).length === 1);
+    const requests = { galleryAssets: 0, galleryLists: 0, privateImages: 0 };
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (galleryFiles.some((file) => path.endsWith("/" + file))) requests.galleryAssets++;
+      if (request.method() !== "POST") return;
+      if (path.endsWith("/listDeliveryPhotos") && request.postDataJSON()?.data?.scope === "gallery") requests.galleryLists++;
+      if (path.endsWith("/getDeliveryPhoto")) requests.privateImages++;
+    });
+    await login(page);
+    await page.setViewportSize({ width, height: 844 });
+    await page.getByLabel("납품사진 거래처 검색").fill(names[1]!);
+    const gallery = page.getByRole("button", { name: "갤러리", exact: true });
+    const entry = await gallery.evaluate((button) => {
+      const field = button.parentElement!.querySelector("input")!.getBoundingClientRect();
+      const box = button.getBoundingClientRect();
+      return { gap: box.left - field.right, heightDifference: Math.abs(box.y + box.height / 2 - field.y - field.height / 2) };
+    });
+    expect(entry.gap).toBeGreaterThan(0);
+    expect(entry.heightDifference).toBeLessThan(2);
+    const capture = info.project.use.browserName === "chromium" && width === 390;
+    const previews = "output/delivery-photo-gallery-local";
+    if (capture) {
+      mkdirSync(previews, { recursive: true });
+      await expect(page.getByRole("group", { name: "납품처 관리" })).toBeVisible();
+      await expect(page.getByRole("button", { name: `${names[1]} 카메라 촬영` })).toBeEnabled();
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      await gallery.locator("..").screenshot({ path: `${previews}/search-entry.png`, animations: "disabled" });
+    }
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    await page.route("**/createDeliveryPhoto", async (route) => { await pending; await route.continue(); });
+    try {
+      const started = page.waitForRequest((req) => req.method() === "POST" && req.url().endsWith("/createDeliveryPhoto"));
+      await chooseRowPhoto(page, names[1]!, "카메라 촬영", landscape);
+      await started;
+      await page.getByLabel("납품사진 거래처 검색").fill(names[1]!);
+      expect(requests).toEqual({ galleryAssets: 0, galleryLists: 0, privateImages: 0 });
+      await gallery.click();
+      const row = page.locator("[data-gallery-row]").filter({ has: page.locator(`[data-photo-id="${old.photoId}"]`) });
+      const oldCard = row.locator(`[data-photo-id="${old.photoId}"]`);
+      const otherRow = page.locator("[data-gallery-row]").filter({ has: page.locator(`[data-photo-id="${other.photoId}"]`) });
+      await expect(row.getByRole("button", { name: /^어제/ })).toBeEnabled({ timeout: 12_000 });
+      await row.getByRole("button", { name: /^어제/ }).click();
+      await expect(oldCard).toHaveAttribute("data-current", "true");
+      await expectImageReady(oldCard.locator("img"));
+      await expect(page.locator(".workspace-header")).toHaveCount(0);
+      expect(await oldCard.locator("img").evaluate((img: HTMLImageElement) => img.naturalHeight > img.naturalWidth)).toBe(true);
+      expect(requests.galleryAssets).toBeGreaterThan(0);
+      expect(requests.galleryLists).toBeGreaterThan(0);
+      expect(requests.privateImages).toBeGreaterThan(0);
+      const geometry = (card: Locator) => card.evaluate((item) => {
+        const track = item.parentElement!;
+        const a = item.getBoundingClientRect(), b = track.getBoundingClientRect();
+        return { error: Math.abs(a.x + a.width / 2 - b.x - b.width / 2), x: a.x, y: a.y, scroll: track.scrollLeft };
+      });
+      const otherCard = otherRow.locator(`[data-photo-id="${other.photoId}"]`);
+      await expectImageReady(otherCard.locator("img"));
+      expect(await otherCard.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth > img.naturalHeight)).toBe(true);
+      const before = await geometry(oldCard);
+      const neighborBefore = await geometry(otherCard);
+      expect(before.error).toBeLessThan(1);
+      const count = await row.locator("[data-photo-id]").count();
+      await oldCard.evaluate((card, previousCount) => {
+        const track = card.parentElement!;
+        let frames = 0, worst = 0;
+        const sample = () => {
+          if (!card.isConnected) return;
+          if (track.children.length > previousCount) {
+            const a = card.getBoundingClientRect(), b = track.getBoundingClientRect();
+            worst = Math.max(worst, Math.abs(a.x + a.width / 2 - b.x - b.width / 2));
+            if (++frames === 20) { card.setAttribute("data-measured-drift", String(worst)); return; }
+          }
+          requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      }, count);
+      const saved = page.waitForResponse((res) => res.request().method() === "POST" && res.url().endsWith("/createDeliveryPhoto") && res.ok());
+      release();
+      const registered = (await (await saved).json()).result;
+      await expect(row.locator("[data-photo-id]")).toHaveCount(count + 1);
+      await expect(oldCard).toHaveAttribute("data-current", "true");
+      await expect(row.getByRole("button", { name: /^어제/ })).toHaveAttribute("aria-pressed", "true");
+      const after = await geometry(oldCard);
+      await expect(oldCard).toHaveAttribute("data-measured-drift", /.+/);
+      const worst = Number(await oldCard.getAttribute("data-measured-drift"));
+      expect(worst).toBeLessThan(1);
+      expect(after.error).toBeLessThan(1);
+      expect(Math.abs(after.x - before.x)).toBeLessThan(1);
+      expect(Math.abs(after.y - before.y)).toBeLessThan(1);
+      expect(after.scroll).toBeGreaterThan(before.scroll + 100);
+      expect(await geometry(otherCard)).toEqual(neighborBefore);
+      console.info(`${info.project.use.browserName} ${width}px: center error ${before.error} -> ${after.error}px, 20-frame max ${worst}px, neighboring track shift 0px`);
+      await info.attach("gallery-centering", { contentType: "application/json", body: JSON.stringify({ width, before, after, neighborBefore }) });
+      if (capture) await page.screenshot({ path: `${previews}/staff-gallery.png` });
+      await page.getByRole("button", { name: "업체 찾기" }).click();
+      await page.getByRole("dialog").getByLabel("업체 찾기").fill("ㄷㅈㅅㅍ");
+      await page.getByRole("dialog").getByRole("button", { name: new RegExp(names[1]!) }).click();
+      const compare = page.getByRole("dialog", { name: names[1]!, exact: true });
+      await expect(compare.getByRole("region", { name: /^오늘/ }).locator("[data-photo-id]")).toHaveCount(2);
+      await expect(compare.getByRole("region", { name: /^어제/ }).locator(`[data-photo-id="${old.photoId}"]`)).toBeVisible();
+      if (capture) {
+        const todayTrack = compare.getByRole("region", { name: /^오늘/ });
+        await todayTrack.getByRole("button", { name: "다음 사진" }).click();
+        await expect(todayTrack.locator(`[data-photo-id="${other.photoId}"]`)).toHaveAttribute("data-current", "true");
+        await expectImageReady(todayTrack.locator("[data-current=true] img"));
+        await expectImageReady(compare.getByRole("region", { name: /^어제/ }).locator("[data-current=true] img"));
+        await page.screenshot({ path: `${previews}/customer-comparison.png` });
+      }
+      await compare.locator(`[data-photo-id="${old.photoId}"]`).click();
+      const enlarged = page.getByRole("dialog", { name: `${names[1]} 납품사진 보기` });
+      await expectImageReady(enlarged.locator("img").first());
+      const inspectedUrl = await enlarged.locator("img").first().getAttribute("src");
+      const additional = await seed("EMP-SALES-A", Timestamp.now());
+      await page.evaluate(() => document.dispatchEvent(new Event("resume")));
+      await expect(compare.locator(`[data-photo-id="${additional.photoId}"]`)).toBeAttached();
+      await expect(enlarged.locator("img").first()).toHaveAttribute("src", inspectedUrl!);
+      await page.goBack();
+      await expect(compare).toBeVisible();
+      await page.goBack();
+      await expect(oldCard).toHaveAttribute("data-current", "true");
+      const slides = row.locator("[data-photo-id]");
+      const photoIds = await slides.evaluateAll((items) => items.map((item) => item.getAttribute("data-photo-id")));
+      const oldest = photoIds.indexOf(old.photoId);
+      const newest = photoIds.indexOf(registered.photoId);
+      expect(newest).toBe(0);
+      expect(oldest).toBeGreaterThan(newest);
+      for (let index = oldest - 1; index >= newest; index--) {
+        await row.getByRole("button", { name: "이전 사진" }).click();
+        await expect(slides.nth(index)).toHaveAttribute("data-current", "true");
+      }
+      await expect(row.getByRole("button", { name: /^오늘/ })).toHaveAttribute("aria-pressed", "true");
+      await slides.first().getByRole("button", { name: /크게 보기/ }).press("ArrowRight");
+      await expect(slides.nth(1)).toHaveAttribute("data-current", "true");
+      await row.getByRole("button", { name: /^어제/ }).click();
+      await expect(oldCard).toHaveAttribute("data-current", "true");
+      await page.goBack();
+      await expect(gallery).toBeFocused();
+      await expect(page.getByLabel("납품사진 거래처 검색")).toHaveValue(names[1]!);
+    } finally { release(); await removePilotPhotos([company]); }
+  });
+}
+
+galleryTest("two-day gallery keeps yesterday in place when a company's first photo today arrives during comparison", async ({ page }, info) => {
+  const company = ids[3]!;
+  await removePilotPhotos([company]);
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const yesterday = Timestamp.fromMillis(Date.now() - 86_400_000);
+  const previous = await saveGallerySample(company, "EMP-DELIVERY", yesterday, readFileSync("tests/e2e-auth/fixtures/gallery-doorstep.jpg"));
+  await page.route("**/listDeliveryPhotos", async (route) => {
+    const query = route.request().postDataJSON()?.data;
+    if (query?.scope === "gallery" && !query.customerId && query.deliveryDateKey === previous.deliveryDateKey) await hold;
+    await route.continue();
+  });
+  try {
+    await login(page);
+    await page.getByRole("button", { name: "갤러리", exact: true }).click();
+    await page.getByRole("button", { name: "업체 찾기" }).click();
+    await page.getByRole("dialog").getByLabel("업체 찾기").fill(names[3]!);
+    await page.getByRole("dialog").getByRole("button", { name: new RegExp(names[3]!) }).click();
+    const comparison = page.getByRole("dialog", { name: names[3]!, exact: true });
+    await expect(comparison.getByText("등록된 사진이 없습니다.")).toBeVisible();
+    const yesterdayCard = comparison.locator(`[data-photo-id="${previous.photoId}"]`);
+    await expectImageReady(yesterdayCard.locator("img"));
+    const before = await yesterdayCard.boundingBox();
+    const saved = await saveGallerySample(company, "EMP-SALES-A", Timestamp.now(), readFileSync("tests/e2e-auth/fixtures/gallery-delivery-cart.jpg"));
+    await page.evaluate(() => document.dispatchEvent(new Event("resume")));
+    await expect(comparison.locator(`[data-photo-id="${saved.photoId}"]`)).toBeVisible();
+    await expect(yesterdayCard).toHaveAttribute("data-current", "true");
+    const after = await yesterdayCard.boundingBox();
+    expect(Math.abs(after!.x - before!.x)).toBeLessThan(1);
+    expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
+    console.info(`${info.project.use.browserName}: yesterday's company photo moved ${after!.x - before!.x}px horizontally and ${after!.y - before!.y}px vertically`);
+    await comparison.getByRole("button", { name: "닫기", exact: true }).click();
+    await expect(comparison).toBeHidden();
+    await page.getByRole("button", { name: "업체 찾기" }).click();
+    await page.getByRole("dialog").getByLabel("업체 찾기").fill(names[3]!);
+    await page.getByRole("dialog").getByRole("button", { name: new RegExp(names[3]!) }).click();
+    await expect(comparison.getByRole("region").first()).toHaveAccessibleName(/^오늘/);
+  } finally { release(); await removePilotPhotos([company]); }
+});
+
+galleryTest("two-day gallery discards a late list across Seoul midnight and separates empty, failed and single-photo days", async ({ page }) => {
+  const start = deliveryDateKeyInSeoul(new Date());
+  const offset = (days: number) => new Date(Date.parse(start + "T00:00:00Z") + days * 86_400_000).toISOString().slice(0, 10);
+  const yesterday = offset(-1), tomorrow = offset(1);
+  const shortDate = (date: string) => date.slice(5).replace("-", ".");
+  let day = start;
+  let fail = true;
+  let removed = false;
+  const record = (date: string, name: string) => ({
+    photoId: randomUUID(), customerId: ids[1]!, deliveryDateKey: date, source: "camera", createdByName: name, createdByEmployeeId: "SYNTHETIC",
+    createdAt: new Date(date + "T10:00:00+09:00").toISOString(), expiresAt: offset(6) + "T12:00:00.000Z", thumbnail: { width: 320, height: 240 },
+  });
+  const retained = record(start, "테스트 등록자");
+  const expired = record(yesterday, "범위 밖 등록자");
+  let release!: () => void;
+  const wait = new Promise<void>((resolve) => { release = resolve; });
+  let requested = false;
+  await page.route("**/getDeliveryPhotoDay", (route) => route.fulfill({ json: { result: { deliveryDateKey: day, customerIds: [], revision: null, isOverride: false } } }));
+  await page.route("**/listDeliveryPhotos", async (route) => {
+    const input = route.request().postDataJSON()?.data;
+    if (!input) return route.continue();
+    if (input.scope === "today") return route.fulfill({ json: { result: { scope: "today", deliveryDateKey: day,
+      photos: day === start ? [retained] : [], customers: [], truncated: false } } });
+    if (input.deliveryDateKey === yesterday) { requested = true; await wait; }
+    else if (fail) return route.fulfill({ status: 503, json: { error: { status: "UNAVAILABLE", message: "Temporary test error" } } });
+    return route.fulfill({ json: { result: { scope: "gallery", deliveryDateKey: input.deliveryDateKey, customerId: null,
+      nextCursor: null, photos: input.deliveryDateKey === yesterday ? [expired] : input.deliveryDateKey === start && !removed ? [retained] : [] } } });
+  });
+  try {
+    await login(page);
+    await page.clock.install({ time: new Date(start + "T23:59:00+09:00") });
+    await page.getByRole("button", { name: "갤러리", exact: true }).click();
+    await expect.poll(() => requested).toBe(true);
+    const row = page.getByRole("region", { name: retained.createdByName, exact: true });
+    await expect(row.locator(`[data-photo-id="${retained.photoId}"]`)).toBeVisible();
+    await expect(row.getByRole("button", { name: "다음 사진" })).toHaveCount(0);
+    day = tomorrow;
+    await page.clock.fastForward(61_000);
+    await expect(page.getByRole("alert").filter({ hasText: "어제" })).toBeVisible();
+    const stale = page.waitForResponse((response) => response.url().endsWith("/listDeliveryPhotos")
+      && response.request().method() === "POST" && response.request().postDataJSON()?.data?.deliveryDateKey === yesterday);
+    release();
+    await stale;
+    await page.clock.runFor(32);
+    await expect(page.getByText(expired.createdByName)).toHaveCount(0);
+    await expect(page.getByText("어제와 오늘 등록된 납품사진이 없습니다.")).toHaveCount(0);
+    fail = false;
+    await page.getByRole("alert").filter({ hasText: "어제" }).getByRole("button", { name: "다시 시도", exact: true }).click();
+    const dates = row.getByRole("group", { name: "등록일 선택" });
+    await expect(dates.getByRole("button", { name: `어제 ${shortDate(start)}` })).toHaveAttribute("aria-pressed", "true");
+    await expect(dates.getByRole("button", { name: `오늘 ${shortDate(tomorrow)}` })).toBeDisabled();
+    await expect(row.locator("[data-photo-id]")).toHaveCount(1);
+    await expect(page.getByText(/서울\s*기준\s*등록일/)).toHaveCount(0);
+    removed = true;
+    await page.clock.fastForward(60_000);
+    await expect(page.getByText("어제와 오늘 등록된 납품사진이 없습니다.")).toBeVisible();
+  } finally { release(); }
+});
 
 
 async function auditEditorActions(page: Page, trigger: string, title: string, output: string, name: string) {
@@ -746,6 +1026,7 @@ test("history is discoverable without a photo today and filters a past server re
   await emptyHistory.getByRole("group", { name: "사진 기록 날짜" }).getByRole("button", { name: "어제" }).click();
   await expect(emptyHistory.getByText("이 날짜에 납품사진 기록이 없습니다.")).toBeVisible();
   await emptyHistory.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(emptyHistory).toBeHidden();
 
   await page.getByLabel("납품사진 거래처 검색").fill("새봄마트");
   await expect(page.getByRole("button", { name: "새봄마트 사진 기록" })).toBeVisible();

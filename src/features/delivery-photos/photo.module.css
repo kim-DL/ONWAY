@@ -1,4 +1,6 @@
 .workspace{min-width:0;max-width:48rem;margin:0 auto;padding:1rem}
+.searchActions{display:flex;align-items:center;gap:8px}
+.searchActions>div{flex:1;min-width:0}
 .workspace button{min-width:44px;min-height:44px;border:0;border-radius:9px;padding:.45rem .65rem;background:transparent;color:var(--mode-customer-text);font-weight:750;cursor:pointer}
 .workspace :is(.notice) button{border:1px solid #cbd6e9;background:#fff;box-shadow:0 3px #d5dfef}
 .workspace button:disabled{opacity:.5;cursor:default}

@@ -20,6 +20,7 @@ const pwaBuildRevision =
   (process.env.NODE_ENV === "development" ? "development" : randomUUID());
 
 const withSerwist = withSerwistInit({
+  excludeChunks: ["delivery-photo-gallery"],
   additionalPrecacheEntries: [
     { url: "/", revision: pwaBuildRevision },
     { url: "/manifest.webmanifest", revision: pwaBuildRevision },

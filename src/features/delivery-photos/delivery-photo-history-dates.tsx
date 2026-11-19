@@ -13,7 +13,7 @@ import { DeliveryPhotoThumbnail } from "./delivery-photo-thumbnail";
 import styles from "./delivery-photo-history.module.css";
 import dateStyles from "./delivery-photo-history-dates.module.css";
 
-const DeliveryPhotoViewer = dynamic(() => import("./delivery-photo-viewer").then((module) => module.DeliveryPhotoViewer), { ssr: false });
+export const DeliveryPhotoViewer = dynamic(() => import("./delivery-photo-viewer").then((module) => module.DeliveryPhotoViewer), { ssr: false });
 
 export function DeliveryPhotoHistoryDates({ customerId, customerName, session, photos, fromDateKey, onDeleted }: {
   customerId: string;
@@ -40,8 +40,8 @@ export function DeliveryPhotoHistoryDates({ customerId, customerName, session, p
   }, [customerId, selection, session]);
   const result = day?.selection === selection ? day : null;
   const visible = selected ? result?.photos ?? [] : photos;
-  const groups = new Map<string, DeliveryPhotoMetadata[]>();
-  for (const photo of visible) groups.set(photo.deliveryDateKey, [...(groups.get(photo.deliveryDateKey) ?? []), photo]);
+  const groups: Record<string, DeliveryPhotoMetadata[]> = {};
+  for (const photo of visible) (groups[photo.deliveryDateKey] ??= []).push(photo);
 
   return <div className={dateStyles.datesUi}>
     <p className={styles.count}>{selected ? "선택 날짜" : "최근 기록"} {(!selected || result?.photos) && <strong>{visible.length}장 표시</strong>}</p>
@@ -53,7 +53,7 @@ export function DeliveryPhotoHistoryDates({ customerId, customerName, session, p
     </div>
     {selected && !result ? <p className={styles.status} role="status">이 날짜의 사진을 불러오는 중</p>
       : result?.error ? <div role="alert" className={styles.error}>{result.error} <button type="button" onClick={() => select({ date: result.selection.date })}>다시 시도</button></div>
-      : visible.length ? [...groups].map(([date, items]) => <section key={date} className={dateStyles.day} aria-label={`${date} 사진 기록`}>
+      : visible.length ? Object.entries(groups).map(([date, items]) => <section key={date} className={dateStyles.day} aria-label={`${date} 사진 기록`}>
       <h2>{deliveryPhotoHistoryDateLabel(date, dates)}</h2>
       <ul className={styles.grid}>{items.map((photo) => <DeliveryPhotoThumbnail key={photo.photoId}
         photo={photo} customerName={customerName} session={session}

@@ -10,7 +10,7 @@ export default function UpdateNoticeCard({ notice, onApply, onDismiss }: {
   const busy = notice.kind === "applying";
   return <aside className="pwa-update" aria-labelledby="pwa-update-title" data-testid={installed ? "pwa-update-installed" : "pwa-update-ready"}>
     <header className="pwa-update__header">
-      <span className="pwa-update__icon"><Icon name={installed ? "check" : "download"} size={23} /></span>
+      <span className="pwa-update__icon"><Icon name={installed ? "check" : "images"} size={23} /></span>
       <div>
         {notice.notes && <time dateTime={notice.notes.date}>{notice.notes.date.replaceAll("-", ". ")}</time>}
         <h2 id="pwa-update-title" aria-live="polite">{installed ? "급식길을 업데이트했어요" : "급식길 업데이트"}</h2>

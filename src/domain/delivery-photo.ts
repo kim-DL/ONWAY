@@ -15,6 +15,7 @@ export {
   deliveryPhotoDaySchema,
   deliveryPhotoObjectSchema,
   deliveryPhotoRouteSchema,
+  deliveryPhotoTodayResultSchema,
   deliveryPhotoSchema,
   getDeliveryPhotoDayInputSchema,
   getDeliveryPhotoInputSchema,
@@ -25,6 +26,7 @@ export {
   saveDeliveryPhotoRouteInputSchema,
 } from "../../functions/src/delivery-photo/delivery-photo-contract";
 export type {
+  DeliveryPhotoGalleryCursor,
   DeliveryPhoto,
   DeliveryPhotoDay,
   DeliveryPhotoMetadata,

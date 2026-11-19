@@ -79,12 +79,14 @@ async function list(customerId: string, session: AuthenticatedSession, signal?: 
   return parsed.data;
 }
 
-async function load(photoId: string, variant: DeliveryPhotoDownloadVariant, session: AuthenticatedSession, signal?: AbortSignal) {
+async function load(photoId: string, variant: DeliveryPhotoDownloadVariant, session: AuthenticatedSession,
+  signal?: AbortSignal, stillNeeded?: () => boolean) {
   const input = getDeliveryPhotoInputSchema.parse({ photoId, variant });
   const { services, user } = await verifyDeliveryPhotoSession(session, signal);
   const response = await httpsCallable<typeof input, unknown>(services.functions, "getDeliveryPhoto", { timeout: 60_000 })(input);
   await verifySameDeliveryPhotoSession(session, user, signal);
   signal?.throwIfAborted();
+  if (stillNeeded && !stillNeeded()) throw new DOMException("Unused photo", "AbortError");
   return deliveryPhotoDownloadBlob(response.data, photoId, variant);
 }
 

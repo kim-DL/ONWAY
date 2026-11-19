@@ -8,12 +8,11 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-19.1",
+  id: "2026-11-19.2",
   date: "2026-11-19",
   changes: [
-    { title: "납품사진", text: "날짜를 눌러 그날의 사진을 보고, 전송이 멈춘 사진은 거래처에서 다시 열 수 있어요." },
-    { title: "카카오맵", text: "오늘 남은 납품처에서 길안내를 한 번에 시작할 수 있어요." },
-    { title: "연속 촬영", text: "같은 거래처를 이어 찍고 ‘연속 촬영 마치기’로 목록에 돌아갈 수 있어요." },
-    { title: "납품 순서", text: "저장 응답이 끊겨도 같은 순서로 다시 저장할 수 있어요." },
+    { title: "납품사진 갤러리", text: "납품사진 검색창 옆 갤러리에서 직원별로 어제와 오늘 사진을 넘겨 볼 수 있어요." },
+    { title: "업체별 사진 대조", text: "업체 찾기에서 같은 업체의 두 날짜 사진을 비교하고 확대할 수 있어요." },
+    { title: "보던 사진 유지", text: "새 사진이 등록돼도 보고 있던 사진은 제자리에 있어요." },
   ],
 };

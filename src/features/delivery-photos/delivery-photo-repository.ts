@@ -8,10 +8,9 @@ import { z } from "zod";
 import {
   deliveryPhotoDayResultSchema,
   deliveryPhotoRouteSchema,
+  deliveryPhotoTodayResultSchema,
   getDeliveryPhotoDayInputSchema,
   getDeliveryPhotoRouteInputSchema,
-  listDeliveryPhotosInputSchema,
-  listDeliveryPhotosResultSchema,
   saveDeliveryPhotoDayInputSchema,
   saveDeliveryPhotoRouteInputSchema,
 } from "@/domain/delivery-photo";
@@ -20,7 +19,7 @@ import { getFirebaseClientServices } from "@/lib/firebase/client";
 type SaveInput = z.input<typeof saveDeliveryPhotoRouteInputSchema>;
 export type DeliveryPhotoRouteResult = z.infer<typeof deliveryPhotoRouteSchema> | null;
 export type DeliveryPhotoDayResult = z.infer<typeof deliveryPhotoDayResultSchema>;
-export type DeliveryPhotoTodayResult = Extract<z.infer<typeof listDeliveryPhotosResultSchema>, { scope: "today" }>;
+export type DeliveryPhotoTodayResult = z.infer<typeof deliveryPhotoTodayResultSchema>;
 
 async function call<Input, Output>(name: string, input: Input, schema: z.ZodType<Output>): Promise<Output> {
   const services = getFirebaseClientServices();
@@ -41,7 +40,7 @@ export function deliveryPhotoErrorKind(error: unknown): "auth" | "conflict" | "t
 export const deliveryPhotoRepository = {
   getRoute: () => call("getDeliveryPhotoRoute", getDeliveryPhotoRouteInputSchema.parse({}), deliveryPhotoRouteSchema.nullable()),
   getDay: () => call("getDeliveryPhotoDay", getDeliveryPhotoDayInputSchema.parse({}), deliveryPhotoDayResultSchema),
-  listToday: () => call("listDeliveryPhotos", listDeliveryPhotosInputSchema.parse({ scope: "today" }), listDeliveryPhotosResultSchema) as Promise<DeliveryPhotoTodayResult>,
+  listToday: () => call("listDeliveryPhotos", { scope: "today" }, deliveryPhotoTodayResultSchema),
   saveRoute: (input: SaveInput) => call("saveDeliveryPhotoRoute", saveDeliveryPhotoRouteInputSchema.parse(input), deliveryPhotoRouteSchema),
   saveDay: (input: SaveInput) => call("saveDeliveryPhotoDay", saveDeliveryPhotoDayInputSchema.parse(input), deliveryPhotoDayResultSchema),
 };

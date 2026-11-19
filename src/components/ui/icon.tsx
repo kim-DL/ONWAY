@@ -16,6 +16,7 @@ export type IconName =
   | "copy"
   | "download"
   | "home"
+  | "images"
   | "key"
   | "location"
   | "logout"
@@ -61,6 +62,7 @@ const paths: Readonly<Record<IconName, React.ReactNode>> = {
   copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
   download: <><path d="M12 4v12M7 11l5 5 5-5" /><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" /></>,
   home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10M9 20v-6h6v6" /></>,
+  images: <><rect x="6.5" y="3" width="14.5" height="14.5" rx="2.5" /><path d="M3 7v12a2 2 0 0 0 2 2h12M7 14l3.8-3.8 3.1 3 2.4-2.3 4.2 4.2" /><circle cx="16.5" cy="7.4" r="1.2" /></>,
   key: <><circle cx="7.5" cy="7.5" r="4.5" /><path d="m11 11 9 9h2v-4h-3v-3h-3M6.5 6.5h.01" /></>,
   location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
   logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></>,

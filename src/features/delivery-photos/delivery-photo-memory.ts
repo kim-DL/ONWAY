@@ -9,9 +9,10 @@ export type DeliveryPhotoSnapshot = {
 };
 
 let memory: { key: string; generation: number; snapshot: DeliveryPhotoSnapshot | null } | null = null;
+const seoulCalendar = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" });
 
 export function deliveryPhotoDateKey(now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  return seoulCalendar.format(now);
 }
 
 function entry(key: string) {

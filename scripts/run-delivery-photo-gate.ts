@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import assert from "node:assert/strict";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -7,6 +8,7 @@ import sharp from "sharp";
 import type { CustomerActor } from "../functions/src/customer/customer-authorization.js";
 import { DeliveryPhotoService } from "../functions/src/delivery-photo/delivery-photo-service.js";
 import { GoogleDeliveryPhotoStorage } from "../functions/src/delivery-photo/delivery-photo-store.js";
+import type { DeliveryPhotoGalleryCursor } from "../functions/src/delivery-photo/delivery-photo-contract.js";
 
 const projectId = process.env.GCLOUD_PROJECT;
 const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST;
@@ -125,5 +127,44 @@ const expiring = await service.create({ ...request, requestId: randomUUID() }, a
 const cleanup = await service.expire(Timestamp.fromMillis(now.toMillis() + 169 * 60 * 60 * 1000));
 if (cleanup.removed < 2 || cleanup.failures !== 0) throw new Error(`Cleanup failed: ${JSON.stringify(cleanup)}`);
 if ((await db.doc(`companies/onnuri/deliveryPhotos/${expiring.photoId}`).get()).exists) throw new Error("Expired metadata remained.");
+
+// Identical Firestore timestamps and a completely filtered first page exercise the raw cursor.
+const galleryDate = "2026-09-21";
+const createdAt = Timestamp.fromDate(new Date(`${galleryDate}T23:59:59.999+09:00`));
+const pastService = new DeliveryPhotoService(db, new GoogleDeliveryPhotoStorage(bucket), () => createdAt);
+const fixturePhoto = await pastService.create({ ...request, requestId: randomUUID() }, otherActor, createdAt);
+const galleryCollection = db.collection("companies/onnuri/deliveryPhotos");
+const original = (await galleryCollection.doc(fixturePhoto.photoId).get()).data()!;
+const expected = [fixturePhoto.photoId];
+for (let start = 0; start < 505; start += 200) {
+  const batch = db.batch();
+  for (let i = start; i < Math.min(start + 200, 505); i++) {
+    const photoId = `ffffffff-ffff-4fff-8fff-${String(i).padStart(12, "0")}`;
+    const path = `delivery-photos/${galleryDate}/${photoId}/attempts/${original.evidence.uploadAttemptToken}/`;
+    batch.set(galleryCollection.doc(photoId), { ...original, photoId, customerId: i === 0 ? "another-company" : fixturePhoto.customerId,
+      createdAt, expiresAt: i >= 405 ? now : original.expiresAt, evidence: { ...original.evidence, objectPath: path + "evidence.webp" },
+      thumbnail: { ...original.thumbnail, objectPath: path + "thumbnail.webp" } });
+    if (i < 405) expected.push(photoId);
+  }
+  await batch.commit();
+}
+for (const customerId of [undefined, fixturePhoto.customerId]) {
+  let cursor: DeliveryPhotoGalleryCursor | null = null;
+  const seen: string[] = [];
+  let pages = 0;
+  do {
+    const page = await service.list({ scope: "gallery", customerId, deliveryDateKey: galleryDate, ...(cursor && { cursor }) }, actor, now);
+    assert.equal(page.scope, "gallery");
+    if (pages++ === 0) assert.equal(page.photos.length, 0);
+    seen.push(...page.photos.map((item) => item.photoId));
+    cursor = page.nextCursor;
+  } while (cursor && pages < 10);
+  assert.equal(cursor, null);
+  assert.deepEqual(seen, expected.filter((id) => !customerId || !id.endsWith("-000000000000")).sort().reverse());
+}
+await assert.rejects(service.list({ scope: "gallery", deliveryDateKey: "2026-09-20" }, actor, now), { code: "out-of-range" });
+await db.doc(`authz/${actor.uid}`).update({ active: false });
+await assert.rejects(service.list({ scope: "gallery", deliveryDateKey: galleryDate }, actor, now), { code: "permission-denied" });
+console.log("Two-day gallery emulator checks passed: both indexes, equal timestamps, expiry, empty raw page, date range and authorization.");
 
 console.log("Delivery photo emulator gate passed: route/day, create replay, list/get, revocation, owner/other/admin delete authorization, delete replay and expiry cleanup.");

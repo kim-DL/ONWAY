@@ -72,7 +72,7 @@ test("this release is shown once after accepting the previous production-style p
   site.serve("current", currentWorker);
   await update(page); await page.getByRole("button", { name: "업데이트", exact: true }).click();
   await expect(installed(page)).toContainText("급식길을 업데이트했어요");
-  await expect(installed(page).getByText("카카오맵", { exact: true })).toBeVisible();
+  await expect(installed(page).getByText(appRelease.changes[0]!.title, { exact: true })).toBeVisible();
   await installed(page).getByRole("button", { name: "확인" }).click();
   await page.reload(); await expect(page.getByRole("textbox")).toBeVisible();
   await expect(installed(page)).toHaveCount(0);
@@ -84,7 +84,7 @@ test("only the accepting tab reloads and update controls fit narrow and enlarged
   const other = await context.newPage(); await other.goto(site.url);
   const memo = page.getByRole("textbox"); await memo.fill("계속 작성 중");
   site.serve("current", currentWorker); await update(other);
-  await expect(ready(page)).toContainText("연속 촬영"); await expect(ready(other)).toContainText("납품 순서");
+  await expect(ready(page)).toContainText(appRelease.changes[1]!.title); await expect(ready(other)).toContainText(appRelease.changes[2]!.title);
   for (const width of [320, 390, 430, 1280]) {
     await other.setViewportSize({ width, height: 800 });
     for (const size of ["100%", "200%"]) {
