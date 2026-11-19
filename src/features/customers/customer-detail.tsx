@@ -12,7 +12,7 @@ import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-pho
 import { customerAddress } from "./customer-address";
 import { preloadCustomerDirections } from "./customer-directions";
 import { CustomerCardDirectionsLink } from "./customer-directions-link";
-import { CustomerBadges, CustomerCoreInformation, CustomerPhoneLink, confirmClosedCustomer, customerPasswordLabel, customerPhoneHref } from "./customer-card";
+import { CustomerBadges, CustomerCoreInformation, CustomerPhoneLink, customerPasswordLabel } from "./customer-card";
 import { customerDetailContacts } from "./customer-detail-contacts";
 import { customerContactDisplayName } from "./customer-contact-name";
 import { CustomerOverviewPhoto } from "./customer-overview-photo";
@@ -51,7 +51,6 @@ export function CustomerDetail({ customer, session, onClose, onEdit, onRecordPho
   const [markerInfo, setMarkerInfo] = useState(false);
   useEffect(() => { preloadCustomerDirections(customer); }, [customer]);
   const { visible: visibleContacts, additional: additionalContacts, phoneContact: contact } = customerDetailContacts(customer.contacts);
-  const phoneHref = contact ? customerPhoneHref(contact.phoneNumber) : null;
 
   return <BottomSheet open title={customer.name} onClose={onClose}>
     <div className={styles.detail} data-customer-detail>
@@ -94,7 +93,8 @@ export function CustomerDetail({ customer, session, onClose, onEdit, onRecordPho
       </details>
       <BottomSheetActions className={styles.actions!}>
         <CustomerDirectionsLink customer={customer} />
-        {phoneHref && contact ? <a className={styles.action} href={phoneHref} aria-label={`${customer.name} ${customerContactDisplayName(contact) || "담당자"} 바로 전화`} onClick={(event) => confirmClosedCustomer(event, customer)}><Icon name="phone" size={20} />전화</a> : <span className={styles.action} aria-disabled="true"><Icon name="phone" size={20} />연락처 없음</span>}
+        {contact ? <CustomerPhoneLink customer={customer} contact={contact} actionClass={styles.action} />
+          : <span className={styles.action} aria-disabled="true"><Icon name="phone" size={20} />연락처 없음</span>}
         <button type="button" className={styles.action} onClick={onEdit}><Icon name="settings" size={20} />정보 수정</button>
       </BottomSheetActions>
     </div>

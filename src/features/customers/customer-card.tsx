@@ -33,17 +33,18 @@ export function CustomerBadges({ customer }: { customer: Pick<Customer, "status"
   </span>;
 }
 
-export function CustomerPhoneLink({ customer, contact, label = "전화" }: {
+export function CustomerPhoneLink({ customer, contact, label = "전화", actionClass }: {
   customer: Pick<Customer, "name" | "status">;
   contact: CustomerContact;
   label?: string;
+  actionClass?: string | undefined;
 }) {
   const href = customerPhoneHref(contact.phoneNumber);
   if (!href) return null;
-  return <a className={styles.phoneLink} href={href}
-    aria-label={`${customer.name} ${customerContactDisplayName(contact) || "담당자"} ${label}`}
+  return <a className={actionClass ?? styles.phoneLink} href={href}
+    aria-label={`${customer.name} ${customerContactDisplayName(contact) || "담당자"} ${actionClass ? "바로 전화" : label}`}
     onClick={(event) => confirmClosedCustomer(event, customer)}>
-    <Icon name="phone" size={20} /><span className={styles.srOnly}>{label}</span>
+    <Icon name="phone" size={20} />{actionClass ? label : <span className={styles.srOnly}>{label}</span>}
   </a>;
 }
 
