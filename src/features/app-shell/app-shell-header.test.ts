@@ -4,21 +4,25 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import depthStyles from "../../components/ui/depth-button.module.css";
 import { ShellHeader } from "./app-shell-header";
+import { GlassModeControl } from "./glass-mode-control";
 import type { WorkMode } from "./shell-policy";
 import styles from "./app-shell-header.module.css";
 import brandStyles from "./app-brand.module.css";
+import depthModeStyles from "./depth-mode-control.module.css";
+import glassModeStyles from "./glass-mode-control.module.css";
 
 const ALL_MODES: readonly WorkMode[] = ["customer", "delivery", "sales", "inventory"];
-const renderHeader = (availableModes: readonly WorkMode[], mode: WorkMode = availableModes[0]!, detail = false) =>
+const renderHeader = (availableModes: readonly WorkMode[], mode: WorkMode = availableModes[0]!, detail = false, style?: "glass") =>
   renderToStaticMarkup(createElement(ShellHeader, { mode, availableModes, onModeChange: () => undefined,
-    ...(detail ? { onDetailBack: () => undefined } : {}) }));
+    ...(detail ? { onDetailBack: () => undefined } : {}), ...(style ? { ModeControl: GlassModeControl } : {}) }));
 
 describe("shell header", () => {
   it("keeps one persistent set of named mode buttons beside the company identity", () => {
     const html = renderHeader(ALL_MODES, "inventory");
     expect(html).toContain('data-mode-count="4"');
-    expect(html).toContain('data-mode-switcher="glass" data-motion="static"');
+    expect(html).toContain('data-mode-switcher="depth" data-motion="static"');
     expect(html).toContain('data-mode="inventory" aria-pressed="true"');
     expect(html.match(/data-mode="/g)).toHaveLength(4);
     expect(html.replace(/<[^>]+>/g, "")).toContain("온누리종합식품");
@@ -43,6 +47,15 @@ describe("shell header", () => {
     }
   });
 
+  it("can restore the original glass buttons with the same modes and assets", () => {
+    const html = renderHeader(ALL_MODES, "delivery", false, "glass");
+    expect(html).toContain('data-mode-switcher="glass"');
+    expect(html.match(/data-mode="/g)).toHaveLength(4);
+    expect(html).toContain('data-mode="delivery" aria-pressed="true"');
+    expect(html).toContain("/ui/mode-glass-three-v2.webp");
+    expect(html).toContain("/ui/mode-glass-four-v2.webp");
+  });
+
   it("preserves the detail back action and a consistent single authorized choice", () => {
     const html = renderHeader(["delivery"], "delivery", true);
     expect(html).toContain("학교 목록");
@@ -60,22 +73,29 @@ describe("shell header", () => {
       return scoped;
     };
     const scopedCss = scope(readFileSync(new URL("./app-shell-header.module.css", import.meta.url), "utf8"), styles,
-      ["header", "controls", "modeControl", "modeButton", "glassSurface", "glassMaterial", "modeLabel"]);
+      ["header", "controls"]);
     const brandCss = scope(readFileSync(new URL("./app-brand.module.css", import.meta.url), "utf8"), brandStyles,
       ["companyName", "nameLead", "nameDescriptor"]);
+    const depthCss = scope(readFileSync(new URL("../../components/ui/depth-button.module.css", import.meta.url), "utf8"), depthStyles,
+      ["button", "disc", "face"]);
+    const depthModeCss = scope(readFileSync(new URL("./depth-mode-control.module.css", import.meta.url), "utf8"), depthModeStyles,
+      ["depthModeControl", "label"]);
+    const glassCss = scope(readFileSync(new URL("./glass-mode-control.module.css", import.meta.url), "utf8"), glassModeStyles,
+      ["glassModeControl", "modeButton", "glassSurface", "glassMaterial", "modeLabel"]);
     const directory = new URL("../../../output/playwright/header-layout/", import.meta.url);
     mkdirSync(directory, { recursive: true });
-    const write = (name: string, mode: WorkMode, availableModes: readonly WorkMode[], detail = false) =>
-      writeFileSync(new URL(name + ".html", directory), '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>' + globalCss + '</style><style>' + scopedCss + '</style><style>' + brandCss + '</style></head><body><main class="workspace-shell" data-mode="' + mode + '"><div class="aurora-background" aria-hidden="true"><i></i><i></i><i></i></div>' + renderHeader(availableModes, mode, detail) + '</main></body></html>');
+    const write = (name: string, mode: WorkMode, availableModes: readonly WorkMode[], detail = false, style?: "glass") =>
+      writeFileSync(new URL(name + ".html", directory), '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>' + globalCss + '</style><style>' + scopedCss + '</style><style>' + (style === "glass" ? glassCss : depthCss + depthModeCss) + '</style><style>' + brandCss + '</style></head><body><main class="workspace-shell" data-mode="' + mode + '"><div class="aurora-background" aria-hidden="true"><i></i><i></i><i></i></div>' + renderHeader(availableModes, mode, detail, style) + '</main></body></html>');
     for (const mode of ["customer", "delivery", "sales"] as const) {
       for (const state of ["dual", "single", "detail", "triple", "triple-detail"] as const) {
         write(mode + "-" + state, mode, state === "single" ? [mode] : state.startsWith("triple") ? ALL_MODES.slice(0, 3) : ["delivery", "sales"], state.endsWith("detail"));
       }
     }
     write("inventory-four", "inventory", ALL_MODES);
+    write("sales-dual-glass", "sales", ["delivery", "sales"], false, "glass");
     write("delivery-inventory", "delivery", ["customer", "delivery", "inventory"]);
     write("sales-inventory", "sales", ["customer", "sales", "inventory"]);
     expect(scopedCss).not.toContain(":global(");
-    expect(scopedCss).toContain("." + styles.modeControl);
+    expect(depthModeCss).toContain("." + depthModeStyles.depthModeControl);
   });
 });

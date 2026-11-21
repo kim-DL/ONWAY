@@ -137,7 +137,7 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(signature.locator("image")).toHaveAttribute("href", "/brand/onnuri-food-logo.png");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "none");
   const salesButton = header.locator('[data-mode-switcher]:visible button[data-mode="sales"]');
-  await expect(salesButton).toHaveCSS("color", "rgb(11, 79, 118)");
+  await expect(salesButton).toHaveCSS("color", "rgb(36, 89, 186)");
 
   for (const width of [320, 360, 390, 430, 768, 1280]) {
     await page.setViewportSize({ width, height: width > 760 ? 900 : 844 });

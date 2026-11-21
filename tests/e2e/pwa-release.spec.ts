@@ -84,7 +84,10 @@ test("only the accepting tab reloads and update controls fit narrow and enlarged
   const other = await context.newPage(); await other.goto(site.url);
   const memo = page.getByRole("textbox"); await memo.fill("계속 작성 중");
   site.serve("current", currentWorker); await update(other);
-  await expect(ready(page)).toContainText(appRelease.changes[1]!.title); await expect(ready(other)).toContainText(appRelease.changes[2]!.title);
+  for (const change of appRelease.changes) {
+    await expect(ready(page)).toContainText(change.title);
+    await expect(ready(other)).toContainText(change.title);
+  }
   for (const width of [320, 390, 430, 1280]) {
     await other.setViewportSize({ width, height: 800 });
     for (const size of ["100%", "200%"]) {

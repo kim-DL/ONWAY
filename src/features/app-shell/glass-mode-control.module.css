@@ -1,0 +1,118 @@
+.glassModeControl {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.modeButton {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #243348;
+  font: inherit;
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A short contact shadow separates the glass from the page. Keep the optical
+   surface below the label so the text reads as ink on the front plane. */
+.glassSurface {
+  position: absolute;
+  z-index: 0;
+  inset: 5px 0;
+  overflow: clip;
+  border-radius: inherit;
+  box-shadow: 0 1px 2px rgb(30 53 69 / 20%), 0 3px 5px rgb(30 53 69 / 8%);
+  pointer-events: none;
+}
+
+.glassSurface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(130deg,
+    rgb(255 255 255 / 50%) 0%,
+    rgb(255 255 255 / 24%) 42%,
+    rgb(255 255 255 / 6%) 43%,
+    rgb(65 99 119 / 10%) 76%,
+    rgb(255 255 255 / 12%) 100%);
+  pointer-events: none;
+}
+
+.glassMaterial {
+  position: absolute;
+  inset: -10px -6px -10px;
+  border: 0 solid transparent;
+  border-image-source: var(--glass-three);
+  border-image-slice: 57 34 66 35 fill;
+  border-image-width: 12px 8px 12px;
+  border-image-repeat: stretch;
+  pointer-events: none;
+}
+
+:global([data-mode-count="4"]) .glassMaterial {
+  border-image-source: var(--glass-four);
+  border-image-slice: 82 39 98 40 fill;
+}
+
+.modeLabel {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.modeButton[aria-pressed="true"] {
+  color: #0b4f76;
+  font-weight: 760;
+}
+
+.modeButton[aria-pressed="true"] .glassSurface { background: rgb(166 204 228 / 8%); }
+
+.modeButton:focus-visible { outline: 2px solid #0b5a84; outline-offset: 3px; }
+
+@media (min-width: 761px) {
+  .glassModeControl { gap: 10px; }
+  .modeButton { min-height: 48px; padding-inline: 12px; font-size: .875rem; border-radius: 4px; }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .modeButton { transition: transform 140ms ease; }
+  .modeButton:hover { transform: translateY(-1px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modeButton:active { transform: translateY(1px); }
+}
+
+@media (prefers-contrast: more) {
+  .modeButton { border: 1px solid #657d90; background: #f6f9fc; }
+  .modeButton[aria-pressed="true"] { background: #e7f2fa; border-color: #0b5a84; }
+  .glassSurface { display: none; }
+}
+
+@media (forced-colors: active) {
+  .modeButton { color: ButtonText; background: ButtonFace; border: 1px solid ButtonText; box-shadow: none; }
+  .glassSurface { display: none; }
+  .modeButton[aria-pressed="true"] { color: HighlightText; background: Highlight; border-color: Highlight; forced-color-adjust: none; }
+  .modeLabel { text-shadow: none; }
+  .modeButton:focus-visible { outline-color: Highlight; }
+}

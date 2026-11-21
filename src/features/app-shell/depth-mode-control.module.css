@@ -1,0 +1,45 @@
+.depthModeControl {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(44px, calc(3rem - 6px)), 1fr));
+  max-inline-size: 16.875rem;
+  margin-inline-start: auto;
+  gap: 4px;
+}
+
+.depthModeControl > button {
+  --depth-rim: 4px;
+  --depth-bevel: 3px;
+
+  justify-self: center;
+  max-inline-size: 4rem;
+  color: #223d63;
+  font-size: .8125rem;
+  font-weight: 650;
+  letter-spacing: -.035em;
+}
+
+.depthModeControl > [aria-pressed="true"] {
+  color: #2459ba;
+  font-weight: 700;
+}
+
+.label { text-align: center; overflow-wrap: anywhere; word-break: keep-all; }
+
+@media (min-width: 360px) {
+  .depthModeControl > button {
+    --depth-rim: 6px;
+    font-size: .875rem;
+  }
+}
+
+.depthModeControl:has(> button:nth-child(2))::after {
+  position: absolute;
+  inset-inline: 4px;
+  inset-block-end: -4px;
+  block-size: 1px;
+  background: linear-gradient(90deg, transparent, #5b769561 9% 91%, transparent);
+  transform: scaleY(.5);
+  content: "";
+  pointer-events: none;
+}

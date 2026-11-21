@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ShellHeader } from "../../../src/features/app-shell/app-shell-header";
+import { GlassModeControl } from "../../../src/features/app-shell/glass-mode-control";
 import { WelcomeGreeting } from "../../../src/features/app-shell/welcome-greeting";
 import { useHeaderMotionPreference } from "../../../src/features/app-shell/header-motion-preference";
 import type { WorkMode } from "../../../src/features/app-shell/shell-policy";
@@ -29,7 +30,8 @@ function HeaderMotionFixture() {
   };
   return <main className="workspace-shell" data-mode={mode}>
     <div className="aurora-background" aria-hidden="true"><i /><i /><i /></div>
-    <ShellHeader mode={mode} availableModes={availableModes} onModeChange={changeMode} />
+    <ShellHeader mode={mode} availableModes={availableModes} onModeChange={changeMode}
+      {...(document.documentElement.dataset.modeMaterial === "glass" ? { ModeControl: GlassModeControl } : {})} />
     <section className="shell-page"><div className="shell-hero">
       <WelcomeGreeting key={`${mode}:${activity}`} className="shell-greeting" titleId="motion-title" title={mode === "customer" ? "거래처 정보를" : mode === "delivery" ? "어느 학교로" : "다음 방문을"} accent={mode === "customer" ? "한눈에." : mode === "delivery" ? "갈까요?" : "준비해요."}>테스트 담당자님, 반가워요.</WelcomeGreeting>
     </div><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
