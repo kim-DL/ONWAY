@@ -1,0 +1,45 @@
+.button {
+  --depth-rim: 7px;
+  --depth-bevel: 5px;
+
+  inline-size: var(--depth-button-size, 184px);
+  max-inline-size: 100%;
+  min-inline-size: 44px;
+  color: #223d63;
+  flex: none;
+  font: inherit;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.button:disabled { color: GrayText; cursor: not-allowed; opacity: .65; }
+
+.rectangle {
+  min-block-size: max(44px, var(--depth-button-height, 112px));
+  aspect-ratio: auto;
+  border-radius: 7px;
+}
+
+.withIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-inline-size: 0;
+  justify-content: center;
+  gap: .55em;
+  padding-block: .45em;
+}
+
+.withIcon.row { flex-direction: row; padding-inline: .7em; }
+.withIcon:not(.row) .label { max-inline-size: 73%; }
+
+.icon {
+  flex: none;
+  inline-size: 1.9em;
+  block-size: 1.9em;
+}
+
+.label {
+  min-inline-size: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}

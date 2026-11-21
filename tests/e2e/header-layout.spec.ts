@@ -19,10 +19,10 @@ test.beforeAll(async () => {
   motionCss = result.outputFiles.find((file) => file.path.endsWith(".css"))!.text;
 });
 
-async function liveMotionFixture(page: Page, kind = "header", modeCount = 4) {
+async function liveMotionFixture(page: Page, kind = "header", modeCount = 4, material = "depth") {
   const globals = readApplicationStylesheet();
   await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({ contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)) }));
-  await page.setContent(`<!doctype html><html lang="ko" data-fixture="${kind}" data-mode-count="${modeCount}"><head><base href="http://header.fixture/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>헤더 모션 검증</title><style>${globals}</style><style>${motionCss}</style></head><body><div id="root"></div></body></html>`);
+  await page.setContent(`<!doctype html><html lang="ko" data-fixture="${kind}" data-mode-count="${modeCount}" data-mode-material="${material}"><head><base href="http://header.fixture/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>헤더 모션 검증</title><style>${globals}</style><style>${motionCss}</style></head><body><div id="root"></div></body></html>`);
   await page.addScriptTag({ content: motionScript });
 }
 
@@ -34,7 +34,7 @@ async function chooseMode(page: Page, mode: string) {
   await expect(page.locator("main")).toHaveAttribute("data-mode", mode);
 }
 
-test("persistent glass choices stay beside the brand and preserve mode history at every width", async ({ page }, info) => {
+test("persistent round choices stay beside the brand and preserve mode history at every width", async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const width of [320, 360, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 844 });
@@ -68,7 +68,7 @@ test("persistent glass choices stay beside the brand and preserve mode history a
 
 test("repeated selection creates one navigation entry and keeps keyboard focus", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await liveMotionFixture(page);
   await chooseMode(page, "delivery");
   const inventory = selectedModeControl(page, "inventory");
@@ -85,7 +85,7 @@ test("repeated selection creates one navigation entry and keeps keyboard focus",
 
 test("mode switches keep static glass lighting without starting a border animation", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await liveMotionFixture(page);
+  await liveMotionFixture(page, "header", 4, "glass");
   const frame = visibleModeFrame(page);
   await expect(frame).toHaveAttribute("data-motion", "static");
   for (const mode of ["sales", "delivery", "customer", "sales"]) {
@@ -97,6 +97,39 @@ test("mode switches keep static glass lighting without starting a border animati
     expect(await button.evaluate(element => Number.parseFloat(getComputedStyle(element).borderRadius))).toBeLessThanOrEqual(7);
     expect(await button.evaluate(element => getComputedStyle(element, "::before").animationName)).toBe("none");
   }
+});
+
+test("a short press shows the full depth before mode navigation", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await liveMotionFixture(page);
+  const inventory = selectedModeControl(page, "inventory");
+  await inventory.waitFor();
+  const press = await inventory.evaluate(async (button: HTMLButtonElement) => {
+    const surface = button.firstElementChild!;
+    const start = performance.now();
+    const area = button.getBoundingClientRect();
+    let travel = 0;
+    let targetMoved = false;
+    button.click();
+    while (button.getAttribute("aria-pressed") !== "true" && performance.now() - start < 1500) {
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      if (button.getAttribute("aria-pressed") === "true") break;
+      const value = getComputedStyle(surface).transform;
+      if (value !== "none") travel = Math.max(travel, new DOMMatrixReadOnly(value).m42);
+      const rect = button.getBoundingClientRect();
+      targetMoved ||= (["x", "y", "width", "height"] as const).some(key => Math.abs(area[key] - rect[key]) > .1);
+    }
+    return { travel, targetMoved, duration: performance.now() - start };
+  });
+  await expect(inventory).toHaveAttribute("aria-pressed", "true");
+  expect(press.travel).toBeGreaterThanOrEqual(3.8);
+  expect(press.duration).toBeGreaterThanOrEqual(150);
+  expect(press.targetMoved).toBe(false);
+  await expect(inventory).not.toHaveAttribute("data-press-feedback");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await selectedModeControl(page, "delivery").evaluate((button: HTMLButtonElement) => button.click());
+  await expect(selectedModeControl(page, "delivery")).toHaveAttribute("aria-pressed", "true");
+  await expect(selectedModeControl(page, "delivery")).not.toHaveAttribute("data-press-feedback");
 });
 
 test("live header and particles respect user pause, hidden tabs, reduced motion and forced colors", async ({ page }) => {
@@ -129,7 +162,8 @@ test("live header and particles respect user pause, hidden tabs, reduced motion 
   await expect(particle).toHaveCSS("animation-play-state", "paused");
   for (const core of await cloud.locator("[data-quantum-particle] > span").all()) await expect(core).toHaveCSS("animation-play-state", "paused");
   await page.emulateMedia({ reducedMotion: "no-preference", forcedColors: "active" });
-  await expect(selectedModeControl(page, "sales").locator('[aria-hidden="true"]')).toHaveCSS("display", "none");
+  const highContrastFace = selectedModeControl(page, "sales").locator(":scope > span > span");
+  await expect(highContrastFace).toHaveCSS("border-top-style", "solid");
   await expect(cloud).toHaveCSS("visibility", "hidden");
   expect((await new AxeBuilder({ page }).include(".workspace-header").analyze()).violations).toEqual([]);
 });
@@ -149,7 +183,7 @@ test("each work mode has a coordinated four-particle palette and readable quiet 
     await expect(particles).toHaveCount(4);
     expect(await particles.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).color))).toEqual(palettes[mode]);
     const selected = selectedModeControl(page, mode);
-    await expect(selected).toHaveCSS("color", "rgb(11, 79, 118)");
+    await expect(selected).toHaveCSS("color", "rgb(36, 89, 186)");
     await expect(page.locator("[data-welcome-title-accent]")).toHaveCSS("color", { customer: "rgb(39, 74, 148)", delivery: "rgb(27, 100, 218)", sales: "rgb(250, 111, 66)" }[mode]);
     await expect(page.locator("[data-company-wordmark]")).toHaveText("온누리종합식품");
     await expect(page.locator("[data-company-wordmark]").locator("span").first()).toHaveCSS("color", "rgb(49, 91, 101)");
@@ -321,7 +355,7 @@ for (const state of ["triple", "triple-detail"] as const) {
       expect(geometry.controlsRight).toBeLessThanOrEqual(width);
       await expect(group.locator(`[data-mode="${mode}"]`)).toHaveAttribute("aria-pressed", "true");
       const selected = selectedModeControl(page, mode);
-      await expect(selected).toHaveCSS("color", "rgb(11, 79, 118)");
+      await expect(selected).toHaveCSS("color", "rgb(36, 89, 186)");
       for (const button of await visibleModeFrame(page).getByRole("button").all()) {
         const size = await button.evaluate(element => ({ width: element.clientWidth, height: element.clientHeight, fits: element.scrollWidth <= element.clientWidth }));
         expect(size.width).toBeGreaterThanOrEqual(44);
@@ -376,10 +410,10 @@ for (const mode of ["delivery", "sales"] as const) {
           expect(target.height).toBeGreaterThanOrEqual(44);
         }
         if (state !== "single") {
-          expect(targets.slice(state === "detail" ? 1 : 0).every((target) => target.width >= 70)).toBe(true);
+          expect(targets.slice(state === "detail" ? 1 : 0).every((target) => Math.abs(target.width - target.height) < .1)).toBe(true);
           const selected = selectedModeControl(page, mode);
-          await expect(selected).toHaveCSS("color", "rgb(11, 79, 118)");
-          expect(await selected.locator('[aria-hidden="true"] > span').evaluate((element) => getComputedStyle(element).borderImageSource)).toContain("mode-glass-three-v2.webp");
+          await expect(selected).toHaveCSS("color", "rgb(36, 89, 186)");
+          await expect(selected.locator(":scope > span")).toHaveCSS("padding-bottom", "3px");
         }
         expect((await new AxeBuilder({ page }).include(".workspace-header").analyze()).violations).toEqual([]);
         await header.screenshot({ path: `output/playwright/header-layout/${mode}-${state}-${width}-${testInfo.project.name}.png` });
@@ -388,8 +422,8 @@ for (const mode of ["delivery", "sales"] as const) {
   }
 }
 
-test("glass controls remain static and readable with reduced motion and forced colors", async ({ page }) => {
-  const fixture = readFileSync(new URL("../../output/playwright/header-layout/sales-dual.html", import.meta.url), "utf8");
+test("the glass fallback remains static and readable with reduced motion and forced colors", async ({ page }) => {
+  const fixture = readFileSync(new URL("../../output/playwright/header-layout/sales-dual-glass.html", import.meta.url), "utf8");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setContent(fixture);
   const selected = selectedModeControl(page, "sales");
@@ -406,7 +440,7 @@ test("glass controls remain static and readable with reduced motion and forced c
 });
 
 for (const count of [3, 4]) {
-  test(`authorized ${count}-mode layout fills its area at 320px, 390px and desktop including 200% text`, async ({ page }) => {
+  test(`authorized ${count}-mode layout fits 320px, 390px and desktop including 200% text`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const width of [320, 360, 390, 768, 1280]) {
       for (const textSize of ["100%", "200%"]) {
@@ -419,22 +453,30 @@ for (const count of [3, 4]) {
           const group = element.getBoundingClientRect();
           return { width: group.width, left: group.left, right: group.right, buttons: [...element.querySelectorAll("button")].map(button => {
             const rect = button.getBoundingClientRect();
-            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, fits: button.scrollWidth <= button.clientWidth };
+            const label = button.querySelector("span > span > span")!;
+            const text = document.createRange();
+            text.selectNodeContents(label);
+            const available = label.parentElement!.getBoundingClientRect();
+            const glyphs = text.getBoundingClientRect();
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right,
+              fits: glyphs.left >= available.left && glyphs.right <= available.right &&
+                glyphs.top >= available.top && glyphs.bottom <= available.bottom };
           }) };
         });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         expect(layout.buttons.every(button => button.width >= 44 && button.height >= 44 && button.fits)).toBe(true);
-        expect(layout.buttons[0]!.x).toBeCloseTo(layout.left, 1);
-        expect(layout.buttons.at(-1)!.right).toBeCloseTo(layout.right, 1);
-        expect(new Set(layout.buttons.map(button => button.y)).size).toBe(1);
-        expect(layout.buttons.at(-1)!.width).toBeCloseTo(layout.buttons[0]!.width, 1);
+        expect(layout.buttons.every(button => button.x >= layout.left && button.right <= layout.right)).toBe(true);
+        if (textSize === "100%") {
+          expect(new Set(layout.buttons.map(button => button.y)).size).toBe(1);
+          expect(layout.buttons.at(-1)!.width).toBeCloseTo(layout.buttons[0]!.width, 1);
+        }
         expect((await new AxeBuilder({ page }).include(".workspace-header").analyze()).violations).toEqual([]);
       }
     }
   });
 }
 
-test.describe("Galaxy S26 glass navigation", () => {
+test.describe("Galaxy S26 glass fallback", () => {
   test.use({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
   test("three and four authorized choices retain clear materials and text at native density", async ({ page }, info) => {
@@ -444,7 +486,7 @@ test.describe("Galaxy S26 glass navigation", () => {
     for (const count of [3, 4]) {
       const kind = count === 3 ? "three" : "four";
       const materialLoaded = page.waitForResponse(response => response.url().endsWith(`/ui/mode-glass-${kind}-v2.webp`) && response.ok());
-      await liveMotionFixture(page, "header", count);
+      await liveMotionFixture(page, "header", count, "glass");
       await materialLoaded;
       const group = page.getByRole("group", { name: "업무 모드" });
       await expect(group.getByRole("button")).toHaveText(count === 3 ? ["거래처", "학교", "재고"] : ["거래처", "학교", "영업", "재고"]);
