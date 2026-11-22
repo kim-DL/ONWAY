@@ -25,7 +25,7 @@ const fragmentShader = `
     float shade = bevel * (0.10 + 0.17 * max(0.0, -dot(slope, light.xy)));
     float glint = clamp(strip * 0.92 + counter * 0.60 + fresnel * 0.54, 0.0, 1.0);
     float opacity = glint + shade * (1.0 - glint);
-    gl_FragColor = vec4(vec3(glint / max(opacity, 0.001)), coverage * opacity);
+    gl_FragColor = vec4(vec3(glint / max(opacity, 0.001)), coverage * bevel * opacity);
   }
 `;
 

@@ -16,6 +16,11 @@ export type LiveCard = { latest: InventoryNotice; count: number };
 const initial = { ...emptyInbox, live: null as LiveCard | null };
 const Inbox = createContext({ ...initial, openInbox: () => {} });
 
+export function useConfirmedInventoryChanges() {
+  const { policy, ready, recentChanges } = useContext(Inbox);
+  return { channel: ready && policy?.assigned && policy.enabled ? policy.channel : null, recentChanges };
+}
+
 export function InventoryNoticeProvider({ employeeId, children }: { employeeId: string; children: ReactNode }) {
   const [state, setState] = useState(initial);
   const [selection, setSelection] = useState<InboxSnapshot | null>(null);

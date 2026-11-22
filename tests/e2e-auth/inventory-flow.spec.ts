@@ -124,7 +124,8 @@ async function checkGlassPreference(page: Page) {
   });
   for (const value of ["reduce", "no-preference"]) {
     await session.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value }] });
-    await expect(button).toHaveCSS("background-image", value === "reduce" ? "none" : /linear-gradient/);
+    const face = await button.evaluate(el => getComputedStyle(el).getPropertyValue("--solid-glass").trim());
+    expect(face).toBe(value === "reduce" ? "#fafaf8" : "");
     if (value === "no-preference" && webgl) await expect(button.locator("canvas")).toBeVisible();
     else await expect(button.locator("canvas")).toHaveCount(0);
   }
@@ -186,9 +187,10 @@ async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, 
   await scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
   const before = await fab.boundingBox();
   expect(before).not.toBeNull();
-  expect(page.viewportSize()!.width - before!.x - before!.width).toBeCloseTo(16, 0);
+  const list = (await page.locator("[data-inventory-results]").boundingBox())!;
+  expect(before!.x + before!.width).toBeCloseTo(list.x + list.width, 0);
   const viewport = (await scroller.boundingBox())!;
-  expect(viewport.y + viewport.height, "scrolling quantities must stay above the action").toBeLessThanOrEqual(before!.y);
+  expect(viewport.y + viewport.height, "rows can scroll behind the entire floating action").toBeGreaterThanOrEqual(before!.y + before!.height);
   await scroller.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
   const after = await fab.boundingBox();
   expect(after).not.toBeNull();
@@ -456,20 +458,20 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
       await operator.setViewportSize({ width, height: 900 });
       const button = (await adminButton.boundingBox())!;
       const viewport = (await operator.locator(".admin-content").boundingBox())!;
-      expect(width - button.x - button.width).toBeCloseTo(16, 0);
-      expect(viewport.y + viewport.height).toBeLessThanOrEqual(button.y);
+      const results = (await operator.locator("[data-inventory-results]").boundingBox())!;
+      expect(button.x + button.width).toBeCloseTo(results.x + results.width, 0);
+      expect(viewport.y + viewport.height).toBeGreaterThanOrEqual(button.y + button.height);
       if (width <= 820) {
         const nav = (await operator.getByRole("navigation", { name: "관리자 빠른 메뉴" }).boundingBox())!;
         expect(button.y + button.height).toBeLessThanOrEqual(nav.y);
       }
     }
-    const name = "하림 팝콘치킨";
+    const name = "간장 불고기 1kg";
     const id = randomUUID();
     const create = await call("saveInventoryProduct", admin, { requestId: id, productId: null, expectedRevision: null,
       draft: { name, manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 1, defaultLocationId: "freezer1", note: "", urgent: false },
-      initialStock: { quantity: 20, lot: { label: "", expiryState: "dated", expiryDate: expiryAfter(20) } } });
+      initialStock: { quantity: 81, lot: { label: "", expiryState: "dated", expiryDate: expiryAfter(20) } } });
     expect(create.status).toBe(200);
-    const token = await login(page, PHASE3_TEST_PINS.delivery);
     const staff = await login(coworker, PHASE3_TEST_PINS.salesA);
     let revision = (create.body.result as InventoryProduct).stockRevision;
     const move = async (kind: "receive" | "issue" | "adjust", quantity: number, actor = staff) => {
@@ -480,7 +482,16 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
       revision = (result.body.result as { product: InventoryProduct }).product.stockRevision;
       return command;
     };
-    await move("adjust", 19);
+    await move("adjust", 80);
+    const secondLocation = await call("recordInventoryMovement", staff, {
+      requestId: randomUUID(), expectedStockRevision: revision, kind: "receive", productId: id,
+      locationId: "refrigerated", lotId: null, newLot: { label: "", expiryState: "dated", expiryDate: expiryAfter(30) }, quantity: 500, reason: "",
+    });
+    expect(secondLocation.status).toBe(200);
+    revision = (secondLocation.body.result as { product: InventoryProduct }).product.stockRevision;
+    const token = await login(page, PHASE3_TEST_PINS.delivery);
+    const stockRow = page.getByRole("button", { name: new RegExp(name + ", .*상세 보기") });
+    await expect(stockRow).toHaveAccessibleName(name + ", 580 봉, 상세 보기");
     const bell = page.getByRole("button", { name: /^재고 알림함/ });
     await expect(bell).toHaveCount(0);
     expect((await call("assignInventoryNoticeRecipient", token, { employeeId: "EMP-DELIVERY", assigned: true,
@@ -503,18 +514,28 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await coworker.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
     await coworker.getByRole("dialog", { name, exact: true }).getByRole("button", { name: "출고", exact: true }).click();
     const form = coworker.getByRole("dialog", { name: "출고 기록", exact: true });
-    await form.getByRole("spinbutton", { name: "출고 수량 (봉)", exact: true }).fill("4");
+    await form.getByRole("spinbutton", { name: "출고 수량 (봉)", exact: true }).fill("1");
+    let allowStockRead!: () => void;
+    const heldRead = new Promise<void>(resolve => { allowStockRead = resolve; });
+    const holdStock = async (route: Route) => { await heldRead; await route.fallback(); };
+    await page.route("**/getInventoryProduct", holdStock);
     const first = await submitMutation(coworker, form, "출고 기록", "recordInventoryMovement");
     revision = inventoryProductSchema.parse(first.result?.product).stockRevision;
-    await expect(card).toContainText("−4봉");
-    await expect(card).toContainText("냉동1 · 출고");
+    try {
+      await expect(card).toContainText("−1봉");
+      await expect(card).toContainText("냉동1 · 출고");
+      await expect(stockRow).toHaveAccessibleName(name + ", 580 봉, 상세 보기");
+    } finally { allowStockRead(); }
+    await expect(stockRow).toHaveAccessibleName(name + ", 579 봉, 상세 보기");
+    await page.unroute("**/getInventoryProduct", holdStock);
     await expect(search).toBeFocused();
     const addButton = page.getByRole("button", { name: "새 품목 등록", exact: true });
     const checkActionPosition = async () => {
       const button = (await addButton.boundingBox())!;
       const viewport = (await page.locator(".workspace-content").boundingBox())!;
-      expect(page.viewportSize()!.width - button.x - button.width).toBeCloseTo(16, 0);
-      expect(viewport.y + viewport.height).toBeLessThanOrEqual(button.y);
+      const results = (await page.locator("[data-inventory-results]").boundingBox())!;
+      expect(button.x + button.width).toBeCloseTo(results.x + results.width, 0);
+      expect(viewport.y + viewport.height).toBeGreaterThanOrEqual(button.y + button.height);
     };
     await checkActionPosition();
     for (const button of await page.getByRole("group", { name: "업무 모드" }).getByRole("button").all()) {
@@ -528,6 +549,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await move("receive", 2);
     await expect(card).toContainText("냉동1 · 입고");
     await expect(card).toContainText("+2봉");
+    await expect(stockRow).toHaveAccessibleName(name + ", 581 봉, 상세 보기");
     await expect(card).toContainText("외 1건");
     await checkActionPosition();
     await capture(page, info, "notice-desktop");
@@ -544,6 +566,12 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await expect(page.locator("button[data-unread]")).toHaveAttribute("data-unread", "false");
     await capture(page, info, "inbox-desktop");
     await closeInbox();
+    const locations = page.getByRole("group", { name: "보관 장소" });
+    await locations.getByRole("button", { name: "냉동1", exact: true }).click();
+    await expect(stockRow).toHaveAccessibleName(name + ", 81 봉, 상세 보기");
+    await locations.getByRole("button", { name: "냉장", exact: true }).click();
+    await expect(stockRow).toHaveAccessibleName(name + ", 500 봉, 상세 보기");
+    await locations.getByRole("button", { name: "전체", exact: true }).click();
     await page.context().setOffline(true);
     await expect(bell).toHaveCount(0);
     await move("adjust", 12);
@@ -553,6 +581,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await expect(bell).toHaveAttribute("data-unread", "false");
     await closeInbox();
     await expect(card).toHaveCount(0);
+    await expect(stockRow).toHaveAccessibleName(name + ", 512 봉, 상세 보기");
     await page.reload();
     await bell.click();
     await expect(inbox.getByRole("listitem")).toHaveCount(0);
@@ -568,7 +597,8 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     const detail = page.getByRole("dialog", { name, exact: true });
     await expect(detail.getByRole("button", { name: "조정", exact: true })).toBeEnabled();
     await page.setViewportSize({ width: 1280, height: 900 });
-    const quantity = detail.getByText("냉동1 현재 재고", { exact: true }).locator("..").locator("strong").first();
+    await expect(detail.getByRole("combobox", { name: "상세 보관 장소" })).toHaveValue("freezer1");
+    const quantity = detail.getByText("현재 재고", { exact: true }).locator("../..").locator("strong").first();
     await expect(quantity).toHaveText("19봉");
     await move("adjust", 15);
     const refresh = detail.getByRole("button", { name: "최신 수량 보기" });
@@ -604,7 +634,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await retryRefresh.click();
     await expect(detail.getByRole("button", { name: "최신 수량 보기" })).toHaveCount(0);
     await expect(detail.getByRole("button", { name: "조정", exact: true })).toBeEnabled();
-    await expect(detail.getByText("냉동1 현재 재고", { exact: true }).locator("..").locator("strong").first()).toHaveText("15봉");
+    await expect(quantity).toHaveText("15봉");
     await detail.getByRole("button", { name: "닫기", exact: true }).click();
     const options = await openListOptions(page);
     await options.getByRole("button", { name: "앱 설정" }).click();

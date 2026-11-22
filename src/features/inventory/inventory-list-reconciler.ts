@@ -33,7 +33,10 @@ export class InventoryListReconciler {
     }
     for (const product of this.changes.values()) {
       if (product.status === "deleted") products.delete(product.productId);
-      else products.set(product.productId, product);
+      else {
+        const listed = products.get(product.productId);
+        if (!listed || listed.stockRevision <= product.stockRevision && listed.revision <= product.revision) products.set(product.productId, product);
+      }
     }
     return [...products.values()];
   }

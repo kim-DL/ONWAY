@@ -31,7 +31,7 @@ describe("inventory UI contracts", () => {
   it("keeps the floating action reachable and reserves room to scroll the final card above it", () => {
     const css = readFileSync(new URL("./inventory.module.css", import.meta.url), "utf8");
     expect(css).toMatch(/\.workspace\s*\{[^}]*align-content:\s*start/);
-    expect(css).toMatch(/\.stickyActions\s*\{[^}]*position: fixed;[^}]*right: max\(16px, env\(safe-area-inset-right\)/);
+    expect(css).toMatch(/\.stickyActions\s*\{[^}]*position: fixed;[^}]*justify-self: end/);
   });
   it("uses one accessible native row button, quantity units and expiry status without empty photo slots", () => {
     const html = renderToStaticMarkup(h(InventoryCard, { product, location: "refrigerated", context, onOpen: noop }));
