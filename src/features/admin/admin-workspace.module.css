@@ -26,6 +26,8 @@
 .root :global(.admin-topbar__date) { color: var(--admin-muted); font-size: .875rem; }
 .root :global(.admin-topbar button) { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--admin-border); border-radius: 10px; color: var(--admin-ink); background: #fff; font-size: .875rem; font-weight: 700; cursor: pointer; }
 .root :global(.admin-content) { width: min(100%, 1440px); margin-inline: auto; padding: 24px clamp(16px, 3vw, 36px) 32px; }
+.root :global(.admin-main):has([data-admin][data-write-actions]) { height: 100dvh; display: flex; flex-direction: column; }
+.root :global(.admin-content):has([data-admin][data-write-actions]) { flex: 1; overflow: auto; margin-bottom: 76px; }
 .root :global(.admin-page) { min-width: 0; animation: page-enter 180ms ease-out; }
 .root :global(.admin-controls) { min-width: 0; margin: 0; padding: 0; border: 0; }
 @keyframes page-enter { from { opacity: .4; transform: translateY(4px); } }

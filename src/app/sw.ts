@@ -38,8 +38,9 @@ self.addEventListener("push", event => {
     if (!await claimPush(data.binding, data.id)) return;
     const windows = await self.clients.matchAll({type:"window"});
     const focused = windows.some(client => client.visibilityState === "visible" && client.focused);
-    await self.registration.showNotification("급식길 · 새 재고 알림", {
-      silent: focused, body:"알림함에서 상품과 변경 수량을 확인하세요.",tag:"inventory-"+data.id,
+    const hasPreview = typeof data.title === "string" && typeof data.body === "string" && data.title && data.body;
+    await self.registration.showNotification(hasPreview ? data.title : "급식길 · 새 재고 알림", {
+      silent: focused, body: hasPreview ? data.body : "알림함에서 상품과 변경 수량을 확인하세요.",tag:"inventory-"+data.id,
       icon:"/icons/onnuriway-company-icon-192-v4.png",data:{inventory:true,binding:data.binding},
     });
   })());

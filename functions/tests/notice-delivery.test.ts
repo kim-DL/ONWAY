@@ -56,11 +56,12 @@ const device = {
   subscription,
   registeredAt: Timestamp.fromMillis(when.toMillis() - 1000),
 };
-const deliver = (createdAt = when) =>
+const movement = { productName: "하림 팝콘치킨", delta: -4, unitLabel: "봉", locationId: "freezer1", kind: "issue" };
+const deliver = (createdAt = when, details: Record<string, unknown> = movement) =>
   deliverInventoryPush.run({
     data: {
       id: eventId,
-      data: () => ({ audience: [channel], createdAt }),
+      data: () => ({ audience: [channel], createdAt, ...details }),
     },
   } as Parameters<typeof deliverInventoryPush.run>[0]);
 const configure = (data: unknown) => configureInventoryPush.run({ data, rawRequest: {} } as CallableRequest);
@@ -73,7 +74,7 @@ beforeEach(() => {
 });
 
 describe("inventory device delivery", () => {
-  it("registers a device for its verified employee and sends an opaque, time-limited notice", async () => {
+  it("registers a verified device and sends only the committed movement summary", async () => {
     await configure({ action: "enable", channel, subscription, binding });
     expect(dbFixture.write).toHaveBeenCalledWith(
       "device",
@@ -82,9 +83,17 @@ describe("inventory device delivery", () => {
     await deliver();
     expect(dbFixture.send).toHaveBeenCalledWith(
       subscription,
-      JSON.stringify({ type: "inventory-notice", id: eventId, binding }),
+      JSON.stringify({ type: "inventory-notice", id: eventId, binding, title: movement.productName, body: "−4봉 · 냉동1 · 출고" }),
       expect.objectContaining({ TTL: expect.any(Number) }),
     );
+  });
+  it.each([
+    [{ ...movement, kind: "receive", delta: 1000, unitLabel: "개" }, "+1,000낱개 · 냉동1 · 입고"],
+    [{ ...movement, kind: undefined }, "−4봉 · 냉동1 · 수량 조정"],
+    [{}, undefined],
+  ])("handles receipts, earlier adjustments and notices without preview data", async (details, body) => {
+    await deliver(when, details);
+    expect(JSON.parse(dbFixture.send.mock.calls[0]![1]).body).toBe(body);
   });
   it("rejects untrusted push URLs and a different employee channel", async () => {
     await expect(

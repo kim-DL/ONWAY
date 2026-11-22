@@ -12,6 +12,7 @@ import {
   type InventoryActor,
 } from "./inventory-authorization.js";
 import { NOTICE_POLICY_PATH, NOTICE_FEED_PATH } from "./inventory-notification-contract.js";
+import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, inventoryMovementLabels, inventoryChangeLabel } from "./inventory-labels.js";
 import { setPrivateCallableResponse } from "../shared/private-callable-response.js";
 
 // The admin SDK floors Timestamp.toMillis(), while browser timestamps retain microseconds.
@@ -64,6 +65,13 @@ const action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("disable"), channel: grant, endpoint, binding: z.uuid() }),
 ]);
 const deviceId = (value: string) => createHash("sha256").update(value).digest("hex");
+const noticePreview = z.object({
+  productName: z.string().trim().min(1).max(200),
+  unitLabel: z.string().trim().min(1).max(20),
+  delta: z.number().int(),
+  locationId: z.enum(INVENTORY_LOCATIONS),
+  kind: z.enum(["receive", "issue", "adjust"]).default("adjust"),
+});
 
 export const configureInventoryPush = onCall({ ...options, secrets: [vapid] }, async (request) => {
   setPrivateCallableResponse(request);
@@ -133,6 +141,11 @@ export const deliverInventoryPush = onDocumentCreated(
     const db = getAdminFirestore();
     const id = event.data!.id;
     const time = noticeTime(notice.createdAt);
+    const preview = noticePreview.safeParse(notice).data;
+    const display = preview && {
+      title: preview.productName,
+      body: [inventoryChangeLabel(preview.delta, preview.unitLabel), INVENTORY_LOCATION_LABELS[preview.locationId], inventoryMovementLabels[preview.kind]].join(" · "),
+    };
     // Read only device registrations for employees in the committed audience.
     for (const channel of notice.audience as string[]) {
       const registrations = await db.collection(devices).where("channel", "==", channel).get();
@@ -163,7 +176,7 @@ export const deliverInventoryPush = onDocumentCreated(
           try {
             await webpush.sendNotification(
               current.subscription,
-              JSON.stringify({ type: "inventory-notice", id, binding: current.binding }),
+              JSON.stringify({ type: "inventory-notice", id, binding: current.binding, ...display }),
               {
                 TTL: Math.max(0, Math.floor((time + 300_000 - Date.now()) / 1000)),
                 timeout: 10000,

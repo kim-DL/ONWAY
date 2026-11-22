@@ -27,6 +27,7 @@ import {
 } from "./inventory-workspace-snapshot";
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
 import { InventoryProductEditor, InventorySettingsForm } from "./inventory-forms";
+import { InventoryGlassLens } from "./inventory-glass-lens";
 import { scheduleInventoryProductEditorPreload } from "./inventory-editor-loader";
 import { revalidationFreshnessText, type RevalidationFreshness } from "@/lib/revalidation-coordinator";
 import { rememberWorkspaceScroll } from "@/lib/workspace-scroll-memory";
@@ -336,7 +337,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}
     {loading ? <LoadingStatus className={styles.message} label="재고 불러오는 중" detail="등록된 품목과 현재 재고를 확인하고 있습니다." startedAt={loadingStartedAt} /> : <>{productList}{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
     </div>
-    {context?.canWrite ? <div className={styles.stickyActions}><GlassButton variant="primary" aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}><Icon name="plus" />새 품목</GlassButton></div> : null}
+    {context?.canWrite ? <GlassButton className={styles.stickyActions} aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}>{online && <InventoryGlassLens />}<Icon name="plus" size={18} />새 품목</GlassButton> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => { setSelected(null); restoreInventoryProductFocus(selectedId); }} onSaved={saved} onCountSaved={countSaved} /> : null}
     {context?.canWrite && editorOpen ? <InventoryProductEditor product={null} location={location === "all" ? "refrigerated" : location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setEditorOpen(false)} onSaved={(product, detail) => { saved(product); setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) }); }} /> : null}
     {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}

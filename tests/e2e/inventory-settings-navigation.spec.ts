@@ -147,6 +147,17 @@ test("inventory has no empty nav space and other modes retain navigation", async
   await expect(page.locator(".workspace-navigation")).toBeVisible();
 });
 
+test("the inventory action opens the editor by keyboard when WebGL is unavailable", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(window, "WebGL2RenderingContext", { value: undefined }));
+  await open(page);
+  const button = page.getByRole("button", { name: "새 품목 등록" });
+  await button.focus();
+  await expect(button).toBeFocused();
+  await expect(button.locator("canvas")).toHaveCount(0);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "새 품목 등록" })).toBeVisible();
+});
+
 test("inventory scrollbar appears during scrolling without shifting content", async ({ page }) => {
   await open(page);
   for (const width of [390, 1280]) {

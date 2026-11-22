@@ -1,8 +1,8 @@
 .workspace { color: var(--shell-ink, #191f28); display: grid; align-content: start; gap: 8px; padding-bottom: 16px; --inventory-action-inset: 16px; }
 .workspace [data-welcome-greeting] { margin-bottom: -8px; }
-/* A fixed, compact action stays reachable; the last row can scroll fully above it. */
-.workspace[data-write-actions] { padding-bottom: calc(var(--inventory-action-inset) + 64px + env(safe-area-inset-bottom)); }
-.workspace[data-admin] { --inventory-action-inset: 100px; }
+/* End the scrolling viewport above the action, including while the list moves. */
+:global(.workspace-content):has(.stickyActions) { margin-bottom: calc(76px + env(safe-area-inset-bottom)); }
+.workspace[data-write-actions] { padding-bottom: 12px; }
 .row, .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .muted { color: var(--shell-soft-ink, #4e5968); font-size: 13px; line-height: 1.65; margin: 4px 0 0; }
 .indicator { background: #3d586f; transition: left 200ms cubic-bezier(.2,.8,.2,1); }
@@ -43,7 +43,6 @@
 .catalogMeta :global(.glass-button) { min-height: 44px; padding: 4px 8px; margin-block: -8px; margin-left: auto; color: #50667f; font-size: 12px; }
 .list { composes: list from "../../components/ui/field-list.module.css?inventory"; }
 .list .productButton:focus-visible { outline-offset: -3px; }
-.list .productButton { scroll-margin-block-end: calc(var(--inventory-action-inset) + 90px); }
 .productBody { min-width: 0; flex: 1; display: grid; gap: 4px; }
 .cardTitle { font-size: 16px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; word-break: keep-all; }
 .cardMeta, .cardDetails { color: #58687c; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; word-break: keep-all; }
@@ -62,7 +61,7 @@
 .cardStock strong { font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
 .cardStock > span { color: #617084; font-size: 13px; }
 .message { padding: 30px 20px; border: 1px solid #e5e8eb; border-radius: 14px; background: #fff; text-align: center; display: grid; justify-items: center; gap: 16px; color: #4e5968; line-height: 1.7; }
-.loadMore { justify-self: center; scroll-margin-block-end: calc(var(--inventory-action-inset) + 90px); }
+.loadMore { justify-self: center; }
 .productButton { composes: row from "../../components/ui/field-list.module.css?inventory"; display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 8px 4px; font: inherit; text-align: left; cursor: pointer; }
 .sheet { color: #191f28; display: grid; gap: 12px; padding: 2px 0 6px; }
 .appSettings { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 14px 4px; border: 0; border-top: 1px solid #d8e1e8; background: transparent; color: #243348; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
@@ -169,9 +168,14 @@
 .lotCard strong { font-size: 14px; overflow-wrap: anywhere; }
 .sectionHeading h3 { margin: 0; font-size: 16px; }
 .sectionHeading h3 span { color: #1b64da; margin-left: 5px; }
-.stickyActions { position: fixed; bottom: calc(var(--inventory-action-inset) + env(safe-area-inset-bottom)); right: max(16px, env(safe-area-inset-right)); z-index: 5; pointer-events: none; }
-.stickyActions > :global(.glass-button) { min-height: 50px; pointer-events: auto; color: #164b83; background: #d8e9f5d9; border: 1px solid #a5bfd5; backdrop-filter: blur(16px); box-shadow: 0 5px 20px #274b731f, inset 0 1px #ffffff99; border-radius: 14px; padding-inline: 16px; font-size: 14px; }
-@media (min-width: 761px) { .workspace, .workspace[data-admin] { --inventory-action-inset: 16px; } }
+.workspace .stickyActions {
+  position: fixed; bottom: calc(var(--inventory-action-inset) + env(safe-area-inset-bottom)); right: max(16px, env(safe-area-inset-right)); z-index: 5;
+  min-height: 50px; border: 1px solid transparent; border-radius: 99px; color: #242424;
+  background: var(--solid-glass, linear-gradient(160deg, #ffffffb8, #ffffff47));
+  backdrop-filter: blur(2px); box-shadow: inset 0 1px #fffd, inset 0 -1px #0002, 0 4px 12px #0002;
+}
+.workspace .stickyActions:focus-visible { outline-color: currentColor; }
+@media (max-width: 820px) { .workspace[data-admin] { --inventory-action-inset: calc(var(--admin-nav-height) + 16px); } }
 @media (max-width: 480px) { .sheet .row { flex-wrap: wrap; } }
 @media (min-width: 900px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 359px) { .productButton { gap: 6px; } .cardStock { max-width: 68px; } .cardStock strong { font-size: 18px; } .filters { gap: 6px; } }
