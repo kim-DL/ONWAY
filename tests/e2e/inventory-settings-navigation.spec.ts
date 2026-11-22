@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import sharp from "sharp";
 import { buildInventorySettingsFixture } from "../helpers/build-inventory-settings-fixture";
 
 let fixture: Awaited<ReturnType<typeof buildInventorySettingsFixture>>;
@@ -156,6 +157,51 @@ test("the inventory action opens the editor by keyboard when WebGL is unavailabl
   await expect(button.locator("canvas")).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "새 품목 등록" })).toBeVisible();
+});
+
+test("stock digits scroll through the clear face of the floating action", async ({ page }, info) => {
+  await open(page);
+  const button = page.getByRole("button", { name: "새 품목 등록" });
+  const row = page.getByRole("button", { name: "샘플 식품 038, 38 봉, 상세 보기" });
+  const quantity = row.locator("strong");
+  const face = (await button.boundingBox())!;
+  const scroller = page.locator(".workspace-content");
+  const initial = (await quantity.boundingBox())!;
+  await scroller.evaluate((el, dy) => el.scrollBy({ top: dy, behavior: "instant" }), initial.y + initial.height / 2 - face.y - face.height / 2);
+  const digits = (await quantity.boundingBox())!;
+  expect(digits.x).toBeGreaterThan(face.x);
+  expect(digits.x + digits.width).toBeLessThan(face.x + face.width);
+  expect(digits.y).toBeGreaterThan(face.y);
+  expect(digits.y + digits.height).toBeLessThan(face.y + face.height);
+  await expect(button).toHaveCSS("backdrop-filter", "none");
+
+  const clip = { x: Math.floor(digits.x), y: Math.floor(digits.y), width: Math.ceil(digits.width), height: Math.ceil(digits.height) };
+  const sample = async () => sharp(await page.screenshot({ clip, scale: "css" })).removeAlpha().raw().toBuffer();
+  const media = await page.context().newCDPSession(page);
+  const transparency = (value: string) => media.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value }] });
+  await transparency("no-preference");
+  await expect(button).toHaveCSS("background-image", /linear-gradient/);
+  const through = await sample();
+  const path = info.outputPath("stock-through-glass.png");
+  await page.screenshot({ path, scale: "css" });
+  await info.attach("stock-through-glass", { path, contentType: "image/png" });
+  await transparency("reduce");
+  await expect(button).toHaveCSS("background-image", /rgb\(250, 250, 248\)/);
+  const reduced = await sample();
+  await button.evaluate(el => { el.style.visibility = "hidden"; });
+  const bare = await sample();
+  await quantity.evaluate(el => { el.style.visibility = "hidden"; });
+  const background = await sample();
+  for (const actual of [through, reduced]) {
+    let ink = 0, readable = 0;
+    for (let i = 0; i < bare.length; i += 3) {
+      if (background.readUInt8(i) - bare.readUInt8(i) < 90) continue;
+      ink++;
+      if ([0, 1, 2].every(c => Math.abs(actual.readUInt8(i + c) - bare.readUInt8(i + c)) <= 20)) readable++;
+    }
+    expect(ink).toBeGreaterThan(12);
+    expect(readable / ink, "digit strokes under the button retain their original color").toBeGreaterThan(.9);
+  }
 });
 
 test("inventory scrollbar appears during scrolling without shifting content", async ({ page }) => {

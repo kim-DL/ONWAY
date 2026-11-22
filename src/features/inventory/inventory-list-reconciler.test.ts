@@ -91,6 +91,14 @@ describe("inventory catalog read/write reconciliation", () => {
     expect(reconciler.reconcile([newerRemote])).toEqual([newerRemote]);
   });
 
+  it("preserves a newer list page when a stock notice read finishes during pagination", () => {
+    const reconciler = new InventoryListReconciler(session);
+    const fromNotice = product({ stockRevision: 8 });
+    const page = product({ stockRevision: 9 });
+    reconciler.begin(); reconciler.record(session, fromNotice);
+    expect(reconciler.reconcile([page])).toEqual([page]);
+  });
+
   it("rejects stale callbacks across employee, session-version and permissions-version boundaries", () => {
     const reconciler = new InventoryListReconciler(session);
     const item = product(); reconciler.begin();

@@ -83,6 +83,7 @@ export function updateInventorySnapshotProduct(namespace: string, product: Inven
       ? old.map((item) => item.productId === product.productId ? product : item)
       : [...old, product];
   current.snapshot = { ...current.snapshot, catalog: { ...current.snapshot.catalog, products } };
+  return products;
 }
 
 export function updateInventorySnapshotContext(namespace: string, context: InventoryContext, observedDate: string) {

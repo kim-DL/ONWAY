@@ -8,10 +8,10 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-22.5",
+  id: "2026-11-22.6",
   date: "2026-11-22",
   changes: [
-    { title: "재고 알림 미리보기", text: "앱을 닫아도 기기 알림에서 상품명, 변경 수량, 보관 장소와 입출고 종류를 확인할 수 있어요. 잠금 화면 미리보기는 기기 설정을 따라요." },
-    { title: "알림 카드와 새 품목 버튼", text: "재고 알림 카드에서 상품명과 변화량을 한눈에 볼 수 있어요. 새 품목 버튼은 재고 수량을 가리지 않도록 오른쪽 아래에 두었어요." },
+    { title: "목록에서 바로 보는 재고 변경", text: "다른 직원의 입고·출고·조정 알림을 받으면 해당 상품의 최신 수량이 목록에 자동으로 반영돼요." },
+    { title: "수량이 비치는 새 품목 버튼", text: "목록이 화면 아래까지 이어져요. 스크롤하면 재고 수량이 오른쪽 아래 유리 버튼을 그대로 통과해 보여요." },
   ],
 };
