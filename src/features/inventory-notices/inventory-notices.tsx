@@ -75,11 +75,25 @@ export function InventoryNoticeProvider({ employeeId, children }: { employeeId: 
   </Inbox.Provider>;
 }
 
-export function ProductNotice({ productId, revision, onRefresh }: { productId: string; revision: number; onRefresh: () => void }) {
-  const { rows } = useContext(Inbox);
-  const row = rows.find(item => item.productId === productId && item.stockRevision > revision);
-  if (!row) return null;
-  return <InlineNotice row={row} onRefresh={onRefresh} />;
+export function ProductNotice({ productId, revision, loading, onRefresh }: {
+  productId: string; revision: number | undefined; loading: boolean; onRefresh: () => void;
+}) {
+  const { policy, ready, recentChanges } = useContext(Inbox);
+  const [pending, setPending] = useState<{ channel: string; row: InventoryNotice } | null>(null);
+  const channel = policy?.assigned && policy.enabled ? policy.channel : null;
+  let next = pending;
+  if (pending && (pending.row.productId !== productId || (policy && pending.channel !== channel)
+    || (revision !== undefined && revision >= pending.row.stockRevision))) next = null;
+  if (ready && channel && (revision !== undefined || next)) {
+    // Keep a change for this open detail even after it leaves the latest feed page.
+    for (const row of recentChanges) {
+      if (row.productId === productId && row.stockRevision > (revision ?? -1)
+        && row.stockRevision > (next?.row.stockRevision ?? -1)) next = { channel, row };
+    }
+  }
+  if (next !== pending) setPending(next);
+  if (!ready || !next || next.channel !== channel) return null;
+  return <InlineNotice row={next.row} loading={loading} onRefresh={onRefresh} />;
 }
 
 export function NoticeBrand({recipientsOnly=false}: {recipientsOnly?:boolean}) {

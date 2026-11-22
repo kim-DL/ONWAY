@@ -12,8 +12,8 @@ export type InventoryNotice = {
   id: string; productId: string; productName: string; locationId: InventoryLocation; unitLabel: string;
   kind: "receive" | "issue" | "adjust"; delta: number; stockRevision: number; createdAt: number;
 };
-export type InboxSnapshot = { policy: NoticePolicy | null; rows: InventoryNotice[]; ready: boolean; failed: boolean };
-export const emptyInbox: InboxSnapshot = { policy: null, rows: [], ready: false, failed: false };
+export type InboxSnapshot = { policy: NoticePolicy | null; rows: InventoryNotice[]; recentChanges: InventoryNotice[]; ready: boolean; failed: boolean };
+export const emptyInbox: InboxSnapshot = { policy: null, rows: [], recentChanges: [], ready: false, failed: false };
 
 function noticeQuery(db: Firestore, channel: string) {
   return query(collection(db, NOTICE_FEED_PATH), where("audience", "array-contains", channel), orderBy("createdAt", "desc"), limit(NOTICE_WINDOW));
@@ -79,7 +79,7 @@ export function watchInbox(employeeId: string, receive: (snapshot: InboxSnapshot
       if (current !== generation) return;
       if (policy?.assigned && policy.enabled && policy.channel && policy.channel === activePolicy?.channel) {
         activePolicy = policy;
-        if (confirmedRows) receive({ policy, rows: confirmedRows.filter(row => unread(row, policy)), ready: true, failed: false }, null);
+        if (confirmedRows) receive({ policy, recentChanges: confirmedRows, rows: confirmedRows.filter(row => unread(row, policy)), ready: true, failed: false }, null);
         return;
       }
       activePolicy = policy?.assigned && policy.enabled ? policy : null;
@@ -107,7 +107,7 @@ export function watchInbox(employeeId: string, receive: (snapshot: InboxSnapshot
         const seen = previous;
         const fresh = seen ? rows.filter(row => row.createdAt >= seen.newest && !seen.ids.has(row.id)) : null;
         previous = { ids: new Set(rows.map(row => row.id)), newest: Math.max(seen?.newest ?? 0, rows[0]?.createdAt ?? 0) };
-        receive({ policy, rows, ready: true, failed: false }, fresh);
+        receive({ policy, rows, recentChanges: confirmedRows, ready: true, failed: false }, fresh);
       }, () => { if (active()) receive({ ...base, failed: true }, null); });
     });
   };

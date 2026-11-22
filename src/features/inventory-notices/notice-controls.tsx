@@ -22,9 +22,9 @@ function NoticeLine({ row }: { row: InventoryNotice }) {
     <b className={styles.amount} data-increase={row.delta > 0}>{change(row)}</b></>;
 }
 
-export function InlineNotice({ row, onRefresh }: { row: InventoryNotice; onRefresh: () => void }) {
+export function InlineNotice({ row, loading, onRefresh }: { row: InventoryNotice; loading: boolean; onRefresh: () => void }) {
   return <div className={styles.inline}><span role="status">{INVENTORY_LOCATION_LABELS[row.locationId]} {movementLabels[row.kind]} · {change(row)}</span>
-    <button type="button" onClick={onRefresh}>최신 수량 보기</button></div>;
+    <button type="button" disabled={loading} onClick={onRefresh}>최신 수량 보기</button></div>;
 }
 
 export function NoticeInbox({ selection, live, onClose }: {

@@ -520,7 +520,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await expect(inbox.getByRole("listitem")).toHaveCount(0);
     await closeInbox();
     await expect(card).toHaveCount(0);
-    await move("adjust", 10, token);
+    await move("adjust", 19, token);
     await page.setViewportSize({ width: 390, height: 844 });
     await bell.click();
     await expect(inbox.getByRole("listitem")).toHaveCount(0);
@@ -529,12 +529,44 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await page.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
     const detail = page.getByRole("dialog", { name, exact: true });
     await expect(detail.getByRole("button", { name: "조정", exact: true })).toBeEnabled();
-    await move("adjust", 9);
-    await expect(detail.getByRole("status").filter({ hasText: "냉동1 수량 조정 · −1봉" })).toBeVisible();
-    await detail.getByRole("button", { name: "최신 수량 보기" }).click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const quantity = detail.getByText("냉동1 현재 재고", { exact: true }).locator("..").locator("strong").first();
+    await expect(quantity).toHaveText("19봉");
+    await move("adjust", 15);
+    const refresh = detail.getByRole("button", { name: "최신 수량 보기" });
+    await expect(detail.getByRole("status").filter({ hasText: "냉동1 수량 조정 · −4봉" })).toBeVisible();
+    const reader = await browser.newPage({ ...devices["Pixel 7"], baseURL: INVENTORY_E2E_ORIGIN });
+    try {
+      await reader.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+      await login(reader, PHASE3_TEST_PINS.delivery);
+      const readerLogo = reader.getByRole("button", { name: /^재고 알림함/ });
+      await expect(readerLogo).toHaveAttribute("data-unread", "true");
+      await readerLogo.tap();
+      await expect(reader.getByRole("dialog", { name: "재고 알림함" }).getByText("−4봉")).toBeVisible();
+      await expect(page.locator("button[data-unread]")).toHaveAttribute("data-unread", "false");
+      await expect(quantity).toHaveText("19봉");
+      await expect(refresh).toBeEnabled();
+    } finally { await reader.close(); }
+    let releaseRead!: () => void;
+    const delayed = new Promise<void>(resolve => { releaseRead = resolve; });
+    await page.route("**/getInventoryProduct", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await delayed;
+      await route.fulfill({ status: 503, json: { error: { status: "UNAVAILABLE", message: "Fixture read failed" } } });
+    });
+    try {
+      await refresh.click();
+      await expect(refresh).toBeDisabled();
+    } finally { releaseRead(); }
+    const failedDetail = page.getByRole("dialog", { name: "품목 상세", exact: true });
+    await expect(failedDetail.getByRole("alert")).toBeVisible();
+    const retryRefresh = failedDetail.getByRole("button", { name: "최신 수량 보기" });
+    await expect(retryRefresh).toBeEnabled();
+    await page.unroute("**/getInventoryProduct");
+    await retryRefresh.click();
     await expect(detail.getByRole("button", { name: "최신 수량 보기" })).toHaveCount(0);
     await expect(detail.getByRole("button", { name: "조정", exact: true })).toBeEnabled();
-    await expect(detail.getByText("냉동1 현재 재고", { exact: true }).locator("..").locator("strong").first()).toHaveText("9봉");
+    await expect(detail.getByText("냉동1 현재 재고", { exact: true }).locator("..").locator("strong").first()).toHaveText("15봉");
     await detail.getByRole("button", { name: "닫기", exact: true }).click();
     const options = await openListOptions(page);
     await options.getByRole("button", { name: "앱 설정" }).click();
@@ -542,11 +574,11 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await personal.click();
     await expect(personal).not.toBeChecked();
     await expect(bell).toHaveCount(0);
-    await move("adjust", 6);
+    await move("adjust", 12);
     await personal.click();
     await expect(personal).toBeChecked();
     await bell.click();
-    await expect(inbox.getByRole("listitem")).toHaveCount(1);
+    await expect(inbox.getByRole("listitem")).toHaveCount(0);
     await expect(bell).toHaveAttribute("data-unread", "false");
     await expect(inbox.getByText("−3봉", { exact: true })).toHaveCount(0);
     // Seed older synthetic deliveries to exercise paging without another 50
@@ -562,7 +594,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     }
     await batch.commit();
     await expect(bell).toHaveAttribute("data-unread", "true");
-    await expect(inbox.getByRole("listitem")).toHaveCount(1);
+    await expect(inbox.getByRole("listitem")).toHaveCount(0);
     await closeInbox();
     await bell.click();
     await expect(inbox.getByRole("listitem")).toHaveCount(50);
