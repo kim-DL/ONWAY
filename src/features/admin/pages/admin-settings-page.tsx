@@ -226,6 +226,7 @@ export function SettingsPage({
                   <label>
                     <span className="sr-only">활동 태그 {index + 1} 이름</span>
                     <input
+                      type="text"
                       maxLength={40}
                       value={tag.label}
                       disabled={savingTags}
