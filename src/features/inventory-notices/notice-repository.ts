@@ -10,7 +10,7 @@ import { NOTICE_FEED_PATH, NOTICE_POLICY_PATH, NOTICE_WINDOW, type NoticeCommand
 export type NoticePolicy = { assigned: boolean; enabled: boolean; revision: number; channel: string | null };
 export type InventoryNotice = {
   id: string; productId: string; productName: string; locationId: InventoryLocation; unitLabel: string;
-  delta: number; stockRevision: number; createdAt: number;
+  kind: "receive" | "issue" | "adjust"; delta: number; stockRevision: number; createdAt: number;
 };
 export type InboxSnapshot = { policy: NoticePolicy | null; rows: InventoryNotice[]; ready: boolean; failed: boolean };
 export const emptyInbox: InboxSnapshot = { policy: null, rows: [], ready: false, failed: false };
@@ -22,7 +22,7 @@ function noticeQuery(db: Firestore, channel: string) {
 function noticeRow(item: QueryDocumentSnapshot): InventoryNotice {
   const data = item.data();
   return { id: item.id, productId: data.productId, productName: data.productName, delta: data.delta,
-    locationId: data.locationId, unitLabel: data.unitLabel, stockRevision: data.stockRevision, createdAt: data.createdAt.toMillis() };
+    kind: data.kind ?? "adjust", locationId: data.locationId, unitLabel: data.unitLabel, stockRevision: data.stockRevision, createdAt: data.createdAt.toMillis() };
 }
 
 export async function olderNotices(channel: string, afterId: string) {
