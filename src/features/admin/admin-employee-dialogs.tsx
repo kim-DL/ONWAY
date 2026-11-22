@@ -6,6 +6,8 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { Icon } from "@/components/ui/icon";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
+import { INVENTORY_ENABLED } from "@/features/inventory/inventory-feature";
+import { RecipientSetting } from "@/features/inventory-notices/inventory-notices";
 
 import type { AdminEmployee, AdminRole, PinReservation } from "./admin-contract";
 import { AdminDialog } from "./admin-dialog";
@@ -463,6 +465,7 @@ export function EmployeeDetail({
           {working ? "반영 중…" : "변경사항 저장"}
         </GlassButton>
       </fieldset>
+      {INVENTORY_ENABLED ? <RecipientSetting key={employee.employeeId} employeeId={employee.employeeId} disabled={employee.status !== "active"} /> : null}
       <div className="employee-security-actions">
         <h3>인증 보안</h3>
         <p>

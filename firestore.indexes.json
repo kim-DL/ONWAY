@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "inventoryNotices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "audience", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "salesVisits",
       "queryScope": "COLLECTION",
       "fields": [

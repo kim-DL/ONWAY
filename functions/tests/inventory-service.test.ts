@@ -132,6 +132,30 @@ async function stocked() {
   return { ...state, product: first.product, lotId: first.event.lines[0]!.lotId };
 }
 
+describe("manual inventory adjustment notices", () => {
+  it("projects only a committed, nonzero manual delta and deduplicates concurrent retries", async () => {
+    const state = await stocked();
+    await state.service.changeNoticePolicy({ employeeId: viewer.employeeId, assigned: true, requestId: randomUUID(), expectedRevision: 0 }, admin);
+    await state.service.changeNoticePolicy({ employeeId: actor.employeeId, assigned: true, requestId: randomUUID(), expectedRevision: 0 }, admin);
+    const channel = state.values.get(`companies/onnuri/inventoryNoticePolicies/${viewer.employeeId}`)?.channel;
+    expect(channel).toEqual(expect.any(String));
+    const second = await state.service.move(receive(state.product, 20), actor);
+    const movement: InventoryMovementInput = { requestId: randomUUID(), kind: "adjust", productId: state.product.productId,
+      expectedStockRevision: second.product.stockRevision, locationId: "freezer1", lotId: state.lotId, quantity: 6, reason: "묶음 실수량" };
+    const [first, replay] = await Promise.all([state.service.move(movement, actor), state.service.move(movement, actor)]);
+    expect([first.replayed, replay.replayed].sort()).toEqual([false, true]);
+    expect(first.product.quantityByLocation.freezer1).toBe(26);
+    await state.service.move({ ...movement, requestId: randomUUID(), expectedStockRevision: first.product.stockRevision }, actor);
+    await expect(state.service.move({ ...movement, requestId: randomUUID() }, actor)).rejects.toMatchObject({ code: "aborted" });
+    const notices = [...state.values].filter(([path]) => path.includes("/inventoryNotices/"));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toEqual([`companies/onnuri/inventoryNotices/${movement.requestId}`, {
+      productId: state.product.productId, productName: draft.name, unitLabel: "봉", locationId: "freezer1",
+      delta: -4, stockRevision: first.product.stockRevision, audience: [channel], createdAt: expect.anything(),
+    }]);
+  });
+});
+
 describe("editable box packaging without changing historical units", () => {
   it("adds and edits packaging while retaining quantities, lots, events and legacy unit locks", async () => {
     const state = await stocked();

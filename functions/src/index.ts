@@ -28,6 +28,7 @@ export {
 export {
   getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct,
   recordInventoryMovement, recordInventoryCount, updateInventoryLot,
+  assignInventoryNoticeRecipient, setInventoryNoticePreference,
   setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings,
   listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer,
   uploadInventoryPhoto, getInventoryPhoto, expireInventoryPhotos,

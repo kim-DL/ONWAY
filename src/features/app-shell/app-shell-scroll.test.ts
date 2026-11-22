@@ -40,10 +40,11 @@ function renderScrollEffect(school: School | null) {
   harness.school = school;
   harness.stateIndex = 0;
   const shell = AppShell({ session }) as ReactElement<{
-    children: ReactElement<{ session: AuthenticatedSession }>;
+    children: ReactElement<{ children: ReactElement<{ session: AuthenticatedSession }> }>;
   }>;
   harness.effects = [];
-  const content = shell.props.children;
+  const noticeProvider = shell.props.children;
+  const content = noticeProvider.props.children;
   (content.type as (props: { session: AuthenticatedSession }) => unknown)(content.props);
   const effect = harness.effects[0];
   if (!effect) throw new Error("School detail scroll effect is missing");

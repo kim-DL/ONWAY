@@ -13,6 +13,9 @@ assertInventoryE2EEnvironment();
 await import("./seed-emulator.js");
 const seeded = getApps().find((app) => app.name === "phase1-seed");
 if (!seeded) throw new Error("Inventory E2E seed is missing.");
+// Exercise the same Google UID binding as a previously approved operator.
+await getAuth(seeded).updateUser("uid-admin", { email: "admin@onnuriway.test", emailVerified: true,
+  providerToLink: { providerId: "google.com", uid: "inventory-m3-admin", email: "admin@onnuriway.test" } });
 // A dual-role field employee exercises the full four-mode header on mobile.
 await getFirestore(seeded).doc("employees/EMP-DELIVERY").update({ roleScopes: ["delivery", "sales"] });
 await getAuth(seeded).setCustomUserClaims("uid-delivery", { employeeId: "EMP-DELIVERY", roleScopes: ["delivery", "sales"], sessionVersion: 1, permissionsVersion: 1 });

@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 
 import { Icon } from "@/components/ui/icon";
+import { NoticeBell } from "@/features/inventory-notices/inventory-notices";
 import { AppBrand } from "./app-brand";
 // To restore the original glass appearance, import GlassModeControl as DefaultModeControl.
 import { DepthModeControl as DefaultModeControl } from "./depth-mode-control";
@@ -45,6 +46,7 @@ export function ShellHeader({ mode, availableModes, onModeChange, onDetailBack, 
         <ModeControl mode={mode} options={options}
           inDetail={Boolean(onDetailBack)} onModeChange={onModeChange} onActiveModeClick={onActiveModeClick} />
       </div>
+      <NoticeBell />
     </header>
   );
 }

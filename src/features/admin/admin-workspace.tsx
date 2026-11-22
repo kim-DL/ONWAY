@@ -11,6 +11,7 @@ import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useLaunchTiming } from "@/features/auth/auth-loading";
 import { SalesExportWorkspace } from "@/features/export/sales-export-workspace";
 import { INVENTORY_ENABLED } from "@/features/inventory/inventory-feature";
+import { NoticeBell } from "@/features/inventory-notices/inventory-notices";
 
 import type { AdminWorkspaceData } from "./admin-contract";
 import { formatDate, schoolNeedsReview } from "./admin-display";
@@ -156,6 +157,7 @@ function AdminWorkspaceContent({ session }: { session: AuthenticatedSession }) {
           <div>
             <span className="admin-topbar__identity"><Icon name="settings" size={18} />관리자</span>
             <span className="admin-topbar__date">{new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", weekday: "short" }).format(new Date())}</span>
+            <NoticeBell />
           </div>
           <button type="button" disabled={refreshing || status === "loading"} onClick={() => {
             if (interaction.canNavigate()) void reload();

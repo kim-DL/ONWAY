@@ -89,6 +89,13 @@ const deliveryPhotoEntries = dynamicEntries.filter((entry) => entry.boundary.end
 const galleryEntry = dynamicEntries.find((entry) => entry.boundary.endsWith("/gallery/delivery-photo-gallery"));
 const galleryAssets = (galleryEntry?.files ?? []).filter((file) => dynamicEntries.every((entry) => entry === galleryEntry || !entry.files.includes(file)));
 const galleryStylesheets = stylesheets.filter((asset) => galleryAssets.includes(asset.asset));
+// Staff in every work mode can receive a notice. Its controls load only for
+// recipients or when an operator opens the employee's settings.
+const noticeEntries = dynamicEntries.filter(entry => entry.boundary.endsWith("/notice-controls"));
+const noticeAssets = new Set(noticeEntries.flatMap(entry => entry.files));
+const noticeStylesheets = stylesheets.filter(asset => noticeAssets.has(asset.asset));
+const noticeJavascriptGzipBytes = [...noticeAssets].filter(asset => asset.endsWith(".js")).reduce((sum, asset) => sum + sizeAsset(asset).gzipBytes, 0);
+const noticeStylesheetGzipBytes = noticeStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const galleryJavascriptGzipBytes = galleryAssets.filter((asset) => asset.endsWith(".js")).reduce((sum, asset) => sum + sizeAsset(asset).gzipBytes, 0);
 const galleryStylesheetGzipBytes = galleryStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const deliveryPhotoAssetNames = new Set(deliveryPhotoEntries.flatMap((entry) => entry.files));
@@ -244,7 +251,7 @@ const loginStylesheets = stylesheets.filter((asset) => loginEntry?.files.include
 const loginStylesheetAssets = new Set(loginStylesheets.map((asset) => asset.asset));
 const loginCssRawBytes = loginStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const loginCssGzipBytes = loginStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !galleryAssets.includes(asset.asset) && !loginStylesheetAssets.has(asset.asset) && !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !pinChangeAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !noticeAssets.has(asset.asset) && !galleryAssets.includes(asset.asset) && !loginStylesheetAssets.has(asset.asset) && !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !pinChangeAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -345,7 +352,13 @@ for (const asset of inventoryPanZoomAssets) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset) && !inventoryAssetNames.has(asset), `pan/zoom asset ${asset} must wait until the photo dialog opens`);
   assertBudget(dynamicEntries.filter((entry) => entry.files.includes(asset)).every((entry) => inventoryPanZoomEntries.includes(entry)), `pan/zoom asset ${asset} must not leak into other screens`);
 }
-for (const asset of stylesheets.filter((item) => !inventoryStylesheets.includes(item) && !inventoryManufacturerStylesheets.includes(item) && !inventoryPanZoomStylesheets.includes(item))) {
+assertBudget(noticeEntries.length === 1 && noticeStylesheets.length === 1 && noticeJavascriptGzipBytes > 0, "inventory notices must retain a separate controls boundary");
+assertBudget(noticeJavascriptGzipBytes <= 4 * 1024 && noticeStylesheetGzipBytes <= 1.5 * 1024, "notice controls exceed their deferred JS or CSS envelope");
+for (const asset of noticeAssets) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset) &&
+    dynamicEntries.filter(entry => entry.files.includes(asset)).every(entry => noticeEntries.includes(entry)), "notice controls must stay separate from the app shell and work modes");
+}
+for (const asset of stylesheets.filter((item) => !noticeStylesheets.includes(item) && !inventoryStylesheets.includes(item) && !inventoryManufacturerStylesheets.includes(item) && !inventoryPanZoomStylesheets.includes(item))) {
   assertBudget(!/\.inventory(?:-[\w-]+)?_[\w-]+__/u.test(readFileSync(join(nextRoot, asset.asset), "utf8")),
     `inventory scoped CSS must not be merged into unrelated/shared asset ${asset.asset}`);
 }
@@ -358,7 +371,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 4 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the four approved photo viewers");
 }
-const stylesheetPartitions = [...loginStylesheets, ...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...galleryStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...pinChangeStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets];
+const stylesheetPartitions = [...loginStylesheets, ...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...galleryStylesheets, ...noticeStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...pinChangeStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -553,6 +566,8 @@ const report = {
     deliveryPhotoJavascriptGzipBytes: 10 * 1024 + 256,
     galleryJavascriptGzipBytes: 9 * 1024,
     galleryStylesheetGzipBytes: 2.5 * 1024,
+    noticeJavascriptGzipBytes: 4 * 1024,
+    noticeStylesheetGzipBytes: 1.5 * 1024,
     deliveryPhotoHistoryStylesheetRawBytes: 5.5 * 1024,
     deliveryPhotoHistoryStylesheetGzipBytes: 1.75 * 1024,
     deliveryPhotoHistoryJavascriptGzipBytes: 3.5 * 1024,
@@ -579,6 +594,8 @@ const report = {
     initialStylesheetRawBytes,
     initialStylesheetGzipBytes,
     dynamicBoundaryCount: dynamicEntries.length,
+    noticeJavascriptGzipBytes,
+    noticeStylesheetGzipBytes,
     dynamicAssetCount: dynamicAssets.length,
     stylesheetRawBytes,
     stylesheetGzipBytes,

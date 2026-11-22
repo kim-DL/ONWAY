@@ -68,7 +68,8 @@ try {
   // scheduled/external NEIS/Kakao jobs or production functions/.env files.
   writeFileSync(join(functionsRoot, "lib", "inventory-e2e-index.js"), [
     'export { employeeLogin, employeeLogout } from "./auth/callables.js";',
-    'export { activateAdminSession } from "./admin/callables.js";',
+    'export { activateAdminSession, getAdminWorkspace } from "./admin/callables.js";',
+    'export { assignInventoryNoticeRecipient, setInventoryNoticePreference } from "./inventory/callables.js";',
     'export { getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct, recordInventoryMovement, recordInventoryCount, updateInventoryLot, setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings, listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer, uploadInventoryPhoto, getInventoryPhoto } from "./inventory/callables.js";',
   ].join("\n"));
   writeFileSync(join(functionsRoot, ".secret.local"), `PIN_LOOKUP_SECRET=${environment.PIN_LOOKUP_SECRET}\nPIN_PEPPER=${environment.PIN_PEPPER}\n`);
