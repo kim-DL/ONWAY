@@ -28,7 +28,7 @@ import {
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
 import { InventoryProductEditor, InventorySettingsForm } from "./inventory-forms";
 import { InventoryGlassLens } from "./inventory-glass-lens";
-import { InventoryNoticeStockSync } from "./inventory-notice-stock-sync";
+import { InventoryNoticeStockSync } from "@/features/inventory-notices/inventory-notices";
 import { scheduleInventoryProductEditorPreload } from "./inventory-editor-loader";
 import { revalidationFreshnessText, type RevalidationFreshness } from "@/lib/revalidation-coordinator";
 import { rememberWorkspaceScroll } from "@/lib/workspace-scroll-memory";

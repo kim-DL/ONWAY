@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef } from "react";
 import type { InventoryProduct, InventoryProductDetail } from "@/domain/inventory";
-import { useConfirmedInventoryChanges } from "@/features/inventory-notices/inventory-notices";
+import type { InventoryNotice } from "@/features/inventory-notices/notice-repository";
 import { isInventoryAccessFailure } from "./inventory-access-boundary";
 import { inventoryRepository } from "./inventory-repository";
 
@@ -51,24 +51,24 @@ function StockRead({ productId, revision, listed, applyProduct, refreshList }: S
   return null;
 }
 
-export const InventoryNoticeStockSync = memo(function InventoryNoticeStockSync({ products, catalogComplete, applyProduct, refreshList }: {
+export type StockSyncProps = {
   products: InventoryProduct[];
   catalogComplete: boolean;
   applyProduct: StockReadProps["applyProduct"];
   refreshList: StockReadProps["refreshList"];
-}) {
-  const { channel, recentChanges } = useConfirmedInventoryChanges();
-  const catalog = useMemo(() => new Map(channel ? products.map(product => [product.productId, product.stockRevision] as const) : []), [channel, products]);
-  if (!channel) return null;
+};
+
+export const InventoryStockReads = memo(function InventoryStockReads({ products, catalogComplete, changes, applyProduct, refreshList }: StockSyncProps & { changes: InventoryNotice[] }) {
+  const catalog = useMemo(() => new Map(products.map(product => [product.productId, product.stockRevision])), [products]);
   // Includes already-read changes on reconnect. Only a newer stock revision
   // warrants a read; a single lot's delta cannot determine the product totals.
   const needed = new Map<string, number>();
-  for (const { productId, stockRevision } of recentChanges) {
+  for (const { productId, stockRevision } of changes) {
     if (!catalogComplete && !catalog.has(productId)) continue;
     if (stockRevision > (catalog.get(productId) ?? -1) && stockRevision > (needed.get(productId) ?? -1)) {
       needed.set(productId, stockRevision);
     }
   }
-  return Array.from(needed, ([productId, revision]) => <StockRead key={channel + ":" + productId + ":" + catalog.has(productId)}
+  return Array.from(needed, ([productId, revision]) => <StockRead key={productId + ":" + catalog.has(productId)}
     productId={productId} revision={revision} listed={catalog.has(productId)} applyProduct={applyProduct} refreshList={refreshList} />);
 });

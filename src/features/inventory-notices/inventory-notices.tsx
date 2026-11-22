@@ -5,9 +5,12 @@ import dynamic from "next/dynamic";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { INVENTORY_ENABLED } from "@/features/inventory/inventory-feature";
 import { emptyInbox, watchInbox, type InboxSnapshot, type InventoryNotice } from "./notice-repository";
+import type { StockSyncProps } from "../inventory/inventory-notice-stock-sync";
 
 const NoticeInbox = dynamic(() => import("./notice-controls").then(module => module.NoticeInbox));
 const InlineNotice = dynamic(() => import("./notice-controls").then(module => module.InlineNotice));
+// Keep the focused workspace mounted while its background reader first loads.
+const InventoryStockReads = dynamic(() => import("../inventory/inventory-notice-stock-sync").then(module => module.InventoryStockReads), { loading: () => null });
 const DeviceSetting = dynamic(() => import("./device-setting").then(module => module.DeviceSetting));
 const PolicySwitch = dynamic(() => import("./notice-controls").then(module => module.PolicySwitch));
 export const RecipientSetting = dynamic(() => import("./notice-controls").then(module => module.RecipientSetting));
@@ -16,9 +19,10 @@ export type LiveCard = { latest: InventoryNotice; count: number };
 const initial = { ...emptyInbox, live: null as LiveCard | null };
 const Inbox = createContext({ ...initial, openInbox: () => {} });
 
-export function useConfirmedInventoryChanges() {
+export function InventoryNoticeStockSync(props: StockSyncProps) {
   const { policy, ready, recentChanges } = useContext(Inbox);
-  return { channel: ready && policy?.assigned && policy.enabled ? policy.channel : null, recentChanges };
+  if (!ready || !policy?.assigned || !policy.enabled || !policy.channel || !recentChanges.length) return null;
+  return <InventoryStockReads key={policy.channel} {...props} changes={recentChanges} />;
 }
 
 export function InventoryNoticeProvider({ employeeId, children }: { employeeId: string; children: ReactNode }) {
