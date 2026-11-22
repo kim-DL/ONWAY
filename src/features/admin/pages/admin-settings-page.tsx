@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
+import { PersonalNoticeSetting } from "@/features/inventory-notices/inventory-notices";
 
 import type { AdminActivityTag, AdminWorkspaceData } from "../admin-contract";
 import { formatDate, initials } from "../admin-display";
@@ -143,6 +144,7 @@ export function SettingsPage({
         description="현장 앱에 적용할 공개 운영 정책과 현재 관리자 세션을 관리합니다."
       />
       <div className="settings-admin-grid">
+        <PersonalNoticeSetting />
         <article className="admin-panel">
           <header>
             <div>

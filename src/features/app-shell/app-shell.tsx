@@ -41,6 +41,7 @@ import { useTimeGreeting } from "./time-greeting";
 import { WelcomeGreeting } from "./welcome-greeting";
 import { AppBrand } from "./app-brand";
 import { ShellHeader } from "./app-shell-header";
+import { InventoryNoticeProvider, PersonalNoticeSetting } from "@/features/inventory-notices/inventory-notices";
 import { useHeaderMotionPreference } from "./header-motion-preference";
 import { DELIVERY_PHOTOS_ENABLED } from "@/features/delivery-photos/delivery-photo-feature";
 import { readShellResume, shellResumeKey, writeShellResume } from "./shell-resume";
@@ -251,6 +252,7 @@ function SettingsPage({ session, onBack, backLabel = "재고로 돌아가기" }:
         </SoftCard>
 
         <SoftCard className="settings-list">
+          <PersonalNoticeSetting />
           {!session.claims.roleScopes.includes("admin") ? <div><span className="settings-list__icon"><Icon name="user" /></span><span><strong>로그인 PIN</strong><small>원하는 숫자 6자리로 바꿀 수 있습니다. 현재 로그인은 유지됩니다.</small></span><button className="pwa-install-action" type="button" onClick={() => setChangingPin(true)}>PIN 변경</button></div> : null}
           <div><span className="settings-list__icon"><Icon name="check" /></span><span><strong>세션 보호</strong><small>권한 변경을 실시간으로 확인합니다.</small></span><StatusBadge tone="success">안전하게 연결됨</StatusBadge></div>
           <div><span className="settings-list__icon"><Icon name="download" /></span><span><strong>기기 앱</strong><small>{installState === "installed" ? "홈 화면에서 독립 실행됩니다." : "설치하면 오프라인에서도 빠르게 시작합니다."}</small></span>{installState === "available" ? <button className="pwa-install-action" type="button" onClick={() => void install()}>앱 설치</button> : <StatusBadge tone={installState === "installed" ? "success" : "neutral"}>{installState === "installed" ? "설치됨" : "브라우저에서 사용 중"}</StatusBadge>}</div>
@@ -563,8 +565,8 @@ export function AppShell({ session }: { session: AuthenticatedSession }) {
     markAppBootReady("runtime");
   }, []);
 
-  if (isVerifiedAdminSession(session.claims)) {
-    return <ToastProvider><AdminWorkspace session={session} /></ToastProvider>;
-  }
-  return <ToastProvider><AppShellContent session={session} /></ToastProvider>;
+  return <ToastProvider><InventoryNoticeProvider key={`${session.claims.employeeId}:${shellResumeKey(session.uid, session.claims.sessionVersion, session.claims.permissionsVersion)}`}
+    employeeId={session.claims.employeeId}>
+    {isVerifiedAdminSession(session.claims) ? <AdminWorkspace session={session} /> : <AppShellContent session={session} />}
+  </InventoryNoticeProvider></ToastProvider>;
 }

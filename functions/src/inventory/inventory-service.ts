@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { FieldPath, Timestamp, type DocumentData, type Firestore, type Transaction } from "firebase-admin/firestore";
+import { createHash, randomUUID } from "node:crypto";
+import { FieldPath, FieldValue, Timestamp, type DocumentData, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getAdminFirestore } from "../shared/firebase-admin.js";
 import { verifyInventoryTransactionActor, type InventoryAccess, type InventoryActor } from "./inventory-authorization.js";
@@ -25,12 +25,14 @@ import { inventoryProductRecord, inventoryProductWire, summarizeInventoryLotGrou
 import { datesFromDocument, inventoryLotFromDocument, inventoryProductFromDocument, persisted, settingsFromDocument } from "./inventory-document-codec.js";
 import { projectInventoryInspection } from "./inventory-inspection-projection.js";
 import { activeSortedLots, ensureQuantity, summarizeInventoryLots } from "./inventory-lot-calculations.js";
+import { NOTICE_FEED_PATH, NOTICE_POLICY_PATH, NOTICE_ROSTER_PATH, type NoticeCommand } from "./inventory-notification-contract.js";
 import { fieldStage, fieldCompute, fieldTransactionAttempt, fieldTransaction } from "../shared/field-latency.js";
 
 export { inventoryLotFromDocument, inventoryProductFromDocument } from "./inventory-document-codec.js";
 export { summarizeInventoryLots } from "./inventory-lot-calculations.js";
 
 const REQUEST_PATH = "companies/onnuri/inventoryRequests";
+type NoticeRecipient = { employeeId: string; channel: string };
 function withoutMutationDetail<T>(result: T) {
   return result && typeof result === "object" && "detail" in result
     ? Object.fromEntries(Object.entries(result).filter(([key]) => key !== "detail")) : result;
@@ -301,7 +303,17 @@ export class InventoryService {
       const changedIds = new Set(changedLots.map((lot) => lot.lotId));
       const all = [...activeLots.filter((lot) => !changedIds.has(lot.lotId)), ...changedLots];
       if (all.filter((lot) => lot.quantity > 0).length > INVENTORY_MAX_LOTS) throw new HttpsError("resource-exhausted", "상품별 보관 중인 묶음은 200개까지 등록할 수 있습니다.");
-      return this.writeStock(transaction, input, actor, now, product, all, changedLots, input.kind, lines, inspectionCycleId);
+      // Read the audience before any writes. Membership and stock serialize
+      // together, even if an employee turns notifications off during a save.
+      const recipients = input.kind === "adjust" && after !== before ? await this.noticeRecipients(transaction) : [];
+      const result = this.writeStock(transaction, input, actor, now, product, all, changedLots, input.kind, lines, inspectionCycleId);
+      const audience = recipients.filter(member => member.employeeId !== actor.employeeId).map(member => member.channel);
+      if (audience.length) transaction.create(this.db.doc(`${NOTICE_FEED_PATH}/${input.requestId}`), {
+        productId: product.productId, productName: product.name, unitLabel: product.unitLabel,
+        locationId: input.locationId, delta: after - before, stockRevision: result.product.stockRevision,
+        audience, createdAt: FieldValue.serverTimestamp(),
+      });
+      return result;
     });
   }
   async count(input: InventoryCountInput, actor: InventoryActor): Promise<InventoryMutationResult> {
@@ -403,6 +415,38 @@ export class InventoryService {
       this.audit(transaction, input, actor, now, "INVENTORY_SETTINGS_UPDATED", "settings", ["weekday", "urgentDays"]);
       return next;
     });
+  }
+  private async noticeRecipients(transaction: Transaction): Promise<NoticeRecipient[]> {
+    return (await transaction.get(this.db.doc(NOTICE_ROSTER_PATH))).data()?.recipients ?? [];
+  }
+  async changeNoticePolicy(input: NoticeCommand, actor: InventoryActor) {
+    const assignment = "assigned" in input;
+    const employeeId = assignment ? input.employeeId : actor.employeeId;
+    return this.mutation(assignment ? "assignInventoryNoticeRecipient" : "setInventoryNoticePreference",
+      input, actor, assignment ? "admin" : "read", async (transaction, now) => {
+        const ref = this.db.doc(`${NOTICE_POLICY_PATH}/${employeeId}`);
+        const current = (await transaction.get(ref)).data();
+        if (!assignment && current?.assigned !== true) throw new HttpsError("permission-denied", "알림 수신 대상으로 지정되지 않았습니다.");
+        if ((current?.revision ?? 0) !== input.expectedRevision) throw new HttpsError("aborted", "수신 설정이 변경되었습니다. 최신 설정을 확인해주세요.");
+        if (assignment && input.assigned) {
+          const employee = (await transaction.get(this.db.doc(`employees/${employeeId}`))).data();
+          if (employee?.status !== "active" || employee.employeeId !== employeeId)
+            throw new HttpsError("failed-precondition", "활성 직원을 선택해주세요.");
+        }
+        const assigned = assignment ? input.assigned : true;
+        const enabled = assignment ? current?.enabled !== false : input.enabled;
+        const revision = input.expectedRevision + 1;
+        const recipients = (await this.noticeRecipients(transaction)).filter(member => member.employeeId !== employeeId);
+        // Personal mute pauses delivery on the same channel. A revoked grant
+        // retires the channel so a new assignment starts a new inbox.
+        const channel: string | null = assigned ? current?.channel ?? randomUUID() : null;
+        if (channel && enabled) recipients.push({ employeeId, channel });
+        transaction.set(this.db.doc(NOTICE_ROSTER_PATH), { recipients });
+        transaction.set(ref, { assigned, enabled, revision, channel });
+        this.audit(transaction, input, actor, now, assignment ? "INVENTORY_NOTICE_RECIPIENT_UPDATED" : "INVENTORY_NOTICE_PREFERENCE_UPDATED",
+          employeeId, [assignment ? "assigned" : "enabled"], (assignment ? assigned : enabled) ? "켜짐" : "꺼짐");
+        return { revision };
+      });
   }
   async history(productId: string, afterId: string | null) {
     // History remains accessible for inactive/deleted products via a known ID.

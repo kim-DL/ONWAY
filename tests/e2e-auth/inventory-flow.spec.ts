@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { chromium, expect, test, type Locator, type Page, type Request, type Route, type TestInfo } from "@playwright/test";
+import { chromium, devices, expect, test, type Locator, type Page, type Request, type Route, type TestInfo } from "@playwright/test";
 import { build } from "esbuild";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -426,6 +426,159 @@ test.afterEach(async ({ page }, info) => {
     await writeFile(path, JSON.stringify(trace, null, 2));
     await info.attach("inventory-sheet-history", { path, contentType: "application/json" });
   }
+});
+
+test("inventory notices follow assignment, live adjustments and silent reconnect history", async ({ page, browser }, info) => {
+  const operator = await browser.newPage({ baseURL: INVENTORY_E2E_ORIGIN });
+  const coworker = await browser.newPage({ baseURL: INVENTORY_E2E_ORIGIN });
+  await operator.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+  await coworker.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+  try {
+    const admin = await loginAdmin(operator);
+    const name = "하림 팝콘치킨";
+    const id = randomUUID();
+    const create = await call("saveInventoryProduct", admin, { requestId: id, productId: null, expectedRevision: null,
+      draft: { name, manufacturer: "", specification: "", origin: "", unitLabel: "봉", unitsPerBox: 1, defaultLocationId: "freezer1", note: "", urgent: false },
+      initialStock: { quantity: 20, lot: { label: "", expiryState: "dated", expiryDate: expiryAfter(20) } } });
+    expect(create.status).toBe(200);
+    const token = await login(page, PHASE3_TEST_PINS.delivery);
+    const staff = await login(coworker, PHASE3_TEST_PINS.salesA);
+    let revision = (create.body.result as InventoryProduct).stockRevision;
+    const adjust = async (quantity: number, actor = staff) => {
+      const command = { requestId: randomUUID(), expectedStockRevision: revision, kind: "adjust", productId: id,
+        locationId: "freezer1", lotId: id + "-freezer1", quantity, reason: "" };
+      const result = await call("recordInventoryMovement", actor, command);
+      expect(result.status).toBe(200);
+      revision = (result.body.result as { product: InventoryProduct }).product.stockRevision;
+      return command;
+    };
+    await adjust(19);
+    const bell = page.getByRole("button", { name: "재고 알림함" });
+    await expect(bell).toHaveCount(0);
+    expect((await call("assignInventoryNoticeRecipient", token, { employeeId: "EMP-DELIVERY", assigned: true,
+      expectedRevision: 0, requestId: randomUUID() })).body.error?.status).toBe("PERMISSION_DENIED");
+    await operator.getByRole("navigation", { name: "관리자 주요 메뉴" }).getByRole("button", { name: /^직원 관리/ }).click();
+    await operator.getByRole("searchbox", { name: "직원 검색" }).fill("EMP-DELIVERY");
+    const assignment = operator.getByRole("switch", { name: "재고 알림 수신 직원" });
+    await assignment.click();
+    await expect(assignment).toBeChecked();
+    await bell.click();
+    const inbox = page.getByRole("dialog", { name: "재고 알림함" });
+    const closeInbox = () => inbox.getByRole("button", { name: "닫기" }).click();
+    await expect(inbox.getByText("다른 직원이 수량을 조정하면 여기에 표시됩니다.")).toBeVisible();
+    await closeInbox();
+    const search = page.getByRole("searchbox", { name: "품목 검색" });
+    await search.focus();
+    const card = page.getByRole("status").filter({ hasText: name });
+    await page.setViewportSize({ width: 320, height: 780 });
+    await coworker.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
+    await coworker.getByRole("dialog", { name, exact: true }).getByRole("button", { name: "조정", exact: true }).click();
+    const form = coworker.getByRole("dialog", { name: "수량 조정", exact: true });
+    await form.getByRole("spinbutton", { name: "조정 후 최종 수량 (봉)", exact: true }).fill("15");
+    const first = await submitMutation(coworker, form, "수량 조정", "recordInventoryMovement");
+    revision = inventoryProductSchema.parse(first.result?.product).stockRevision;
+    await expect(card).toContainText("−4봉");
+    await expect(card).toContainText("냉동1");
+    await expect(search).toBeFocused();
+    for (const button of await page.getByRole("group", { name: "업무 모드" }).getByRole("button").all()) {
+      const bounds = await button.boundingBox();
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    }
+    await capture(page, info, "notice-mobile");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    expect((await call("recordInventoryMovement", staff, first.input)).status).toBe(200);
+    await adjust(17);
+    await expect(card).toContainText("외 1건");
+    await capture(page, info, "notice-desktop");
+    const cardBounds = (await card.boundingBox())!;
+    const addBounds = (await page.getByRole("button", { name: "새 품목 등록", exact: true }).boundingBox())!;
+    expect(cardBounds.y + cardBounds.height).toBeLessThanOrEqual(addBounds.y);
+    await expect(card).toHaveCount(0, { timeout: 9000 });
+    await bell.click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(2);
+    await capture(page, info, "inbox-desktop");
+    await closeInbox();
+    await page.context().setOffline(true);
+    await expect(bell).toHaveCount(0);
+    await adjust(12);
+    await page.context().setOffline(false);
+    await bell.click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(3);
+    await closeInbox();
+    await expect(card).toHaveCount(0);
+    await page.reload();
+    await bell.click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(3);
+    await closeInbox();
+    await expect(card).toHaveCount(0);
+    await adjust(10, token);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bell.click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(3);
+    await capture(page, info, "inbox-mobile");
+    await closeInbox();
+    await page.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
+    const detail = page.getByRole("dialog", { name, exact: true });
+    await expect(detail.getByRole("button", { name: "조정", exact: true })).toBeEnabled();
+    await adjust(9);
+    await expect(detail.getByRole("status").filter({ hasText: "냉동1 수량 조정 · −1봉" })).toBeVisible();
+    await detail.getByRole("button", { name: "최신 수량 보기" }).click();
+    await expect(detail.getByRole("button", { name: "최신 수량 보기" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "조정", exact: true })).toBeEnabled();
+    await expect(detail.getByText("냉동1 현재 재고", { exact: true }).locator("..").locator("strong").first()).toHaveText("9봉");
+    await detail.getByRole("button", { name: "닫기", exact: true }).click();
+    const options = await openListOptions(page);
+    await options.getByRole("button", { name: "앱 설정" }).click();
+    const personal = page.getByRole("switch", { name: "재고 변경 알림" });
+    await personal.click();
+    await expect(personal).not.toBeChecked();
+    await expect(bell).toHaveCount(0);
+    await adjust(6);
+    await personal.click();
+    await expect(personal).toBeChecked();
+    await bell.click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(4);
+    await expect(inbox.getByText("−3봉", { exact: true })).toHaveCount(0);
+    // Seed older synthetic deliveries to exercise paging without another 50
+    // stock commands. Only the guarded emulator fixture owns these documents.
+    const channel = (await db().doc("companies/onnuri/inventoryNoticePolicies/EMP-DELIVERY").get()).get("channel");
+    const batch = db().batch();
+    for (let index = 0; index < 52; index++) {
+      batch.create(db().collection("companies/onnuri/inventoryNotices").doc(), {
+        audience: [channel], productId: id, productName: `지난 알림 ${index + 1}`, locationId: "freezer1",
+        delta: 1, unitLabel: "봉", stockRevision: 1, createdAt: new Date(Date.now() - 86_400_000 - index * 1000),
+      });
+    }
+    await batch.commit();
+    await expect(inbox.getByRole("listitem")).toHaveCount(50);
+    await inbox.getByRole("button", { name: "이전 알림 보기" }).click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(6);
+    await expect(inbox.getByText("지난 알림 52", { exact: true })).toBeVisible();
+    await inbox.getByRole("button", { name: "더 최근 알림" }).click();
+    await expect(inbox.getByRole("listitem")).toHaveCount(50);
+    const phone = await browser.newPage({ ...devices["Pixel 7"], baseURL: INVENTORY_E2E_ORIGIN });
+    try {
+      await phone.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+      await login(phone, PHASE3_TEST_PINS.delivery);
+      const phoneBell = phone.getByRole("button", { name: "재고 알림함" });
+      await phoneBell.tap();
+      const phoneInbox = phone.getByRole("dialog", { name: "재고 알림함" });
+      await expect(phoneInbox.getByRole("listitem")).toHaveCount(50);
+      await phoneInbox.getByRole("button", { name: "닫기" }).tap();
+      const phoneCard = phone.getByRole("status").filter({ hasText: name });
+      await expect(phoneCard).toHaveCount(0);
+      await adjust(5);
+      await expect(phoneCard).toContainText("−1봉");
+      await capture(phone, info, "notice-touch");
+      await assignment.click();
+      await expect(phoneCard).toHaveCount(0);
+      await expect(phoneBell).toHaveCount(0);
+      await expect(inbox).toHaveCount(0);
+      await expect(bell).toHaveCount(0);
+      await expect(personal).toHaveCount(0);
+    } finally { await phone.close(); }
+  } finally { await coworker.close(); await operator.close(); }
 });
 
 test("360px list options keep readable row toggles and a persistent count-mode segment", async ({ page }, info) => {

@@ -166,6 +166,31 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    function canReadInventoryNotices() {
+      let employee = get(/databases/$(database)/documents/employees/$(employeeId())).data;
+      return sessionValid()
+        && employee.status == 'active' && employee.employeeId == employeeId()
+        && employee.firebaseUid == request.auth.uid
+        && employee.roleScopes is list
+        && employee.roleScopes.toSet() == request.auth.token.roleScopes.toSet()
+        && (!tokenHasScope('admin') || hasVerifiedAdminClaims());
+    }
+
+    match /companies/onnuri/inventoryNoticePolicies/{recipient} {
+      allow get: if canReadInventoryNotices() && (recipient == employeeId() || isAdmin());
+    }
+
+    function isNoticeRecipient() {
+      let policy = get(/databases/$(database)/documents/companies/onnuri/inventoryNoticePolicies/$(employeeId())).data;
+      return policy.assigned == true && policy.enabled == true && policy.channel is string
+        && policy.channel in resource.data.audience;
+    }
+
+    match /companies/onnuri/inventoryNotices/{noticeId} {
+      allow get: if canReadInventoryNotices() && isNoticeRecipient();
+      allow list: if canReadInventoryNotices() && request.query.limit <= 50 && isNoticeRecipient();
+    }
+
     // =============================================================
     // Sales data
     // =============================================================

@@ -8,9 +8,10 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-21.1",
-  date: "2026-11-21",
+  id: "2026-11-22.1",
+  date: "2026-11-22",
   changes: [
-    { title: "업무 모드 버튼", text: "거래처·학교·영업·재고 버튼을 옅은 푸른빛의 원형 버튼으로 바꿨어요. 버튼이 눌리는 모습이 보인 뒤 화면이 전환돼요." },
+    { title: "재고 변경 알림", text: "다른 직원이 수량을 조정하면 상품명과 보관 장소, 바뀐 수량을 알려드려요. 놓친 알림은 상단 종 버튼에서 다시 볼 수 있어요." },
+    { title: "직원별 알림 설정", text: "운영 모드의 직원 관리에서 알림을 받을 직원을 지정해요. 지정된 직원은 개인 설정에서 알림을 끄거나 다시 켤 수 있어요." },
   ],
 };

@@ -1,12 +1,12 @@
 import { z } from "zod";
+import { INVENTORY_LOCATIONS } from "./inventory-labels.js";
+export { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS } from "./inventory-labels.js";
 
 // Pure client/server wire contract. Never import Firebase or Node APIs here.
 export const INVENTORY_COMPANY_ID = "onnuri" as const;
 export const INVENTORY_PRODUCT_PATH = "companies/onnuri/inventoryProducts";
 export const INVENTORY_SETTINGS_PATH = "companies/onnuri/inventorySettings/current";
 export const INVENTORY_CYCLE_PATH = "companies/onnuri/inventoryCountCycles";
-export const INVENTORY_LOCATIONS = ["refrigerated", "freezer1", "freezer2", "sample"] as const;
-export const INVENTORY_LOCATION_LABELS = { refrigerated: "냉장", freezer1: "냉동1", freezer2: "냉동2", sample: "샘플" } as const;
 export const INVENTORY_MAX_QUANTITY = 1_000_000_000;
 export const INVENTORY_MAX_LOTS = 200;
 export const inventoryIdSchema = z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/);

@@ -75,6 +75,8 @@ export const AUDIT_EVENT_LABELS: Record<string, string> = {
   INVENTORY_COUNT_ADJUST: "재고 실사 수량 수정",
   INVENTORY_LOT_UPDATE: "재고 유통기한 수정",
   INVENTORY_SETTINGS_UPDATED: "재고조사 설정 변경",
+  INVENTORY_NOTICE_RECIPIENT_UPDATED: "재고 알림 수신 직원 변경",
+  INVENTORY_NOTICE_PREFERENCE_UPDATED: "개인 재고 알림 설정 변경",
   CUSTOMER_CREATED: "거래처 등록",
   CUSTOMER_UPDATED: "거래처 정보 변경",
   ADMIN_SESSION_ACTIVATED: "관리자 세션 승인",

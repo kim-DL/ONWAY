@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { initializeApp, deleteApp, type App } from "firebase-admin/app";
 import { FieldValue, getFirestore, Timestamp, type Firestore } from "firebase-admin/firestore";
-import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
+import { collection, doc, getDocFromServer, getDoc, getDocs, limit, orderBy, query, setDoc, where } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { InventoryActor } from "../src/inventory/inventory-authorization.js";
 import { INVENTORY_PRODUCT_PATH, inventoryProductDraftSchema, type InventoryMovementInput, type SaveInventoryProductInput } from "../src/inventory/inventory-contract.js";
@@ -12,6 +12,7 @@ import {
 } from "../src/inventory/inventory-manufacturer-contract.js";
 import { InventoryManufacturerService } from "../src/inventory/inventory-manufacturer-service.js";
 import { InventoryService } from "../src/inventory/inventory-service.js";
+import { NOTICE_FEED_PATH, NOTICE_POLICY_PATH } from "../src/inventory/inventory-notification-contract.js";
 import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lot-summary.js";
 
 // Opt-in only. The hard host/project boundary below runs before creating any
@@ -41,7 +42,7 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     const [hostname, port] = host.split(":");
     environment = await initializeTestEnvironment({ projectId, firestore: { host: hostname!, port: Number(port), rules: readFileSync("firestore.rules", "utf8") } });
     for (const actor of [member, admin, viewer]) {
-      await db.doc(`authz/${actor.uid}`).create({ employeeId: actor.employeeId, active: true, sessionVersion: 1, permissionsVersion: 1 });
+      await db.doc(`authz/${actor.uid}`).create({ employeeId: actor.employeeId, active: true, sessionVersion: 1, permissionsVersion: 1, updatedAt: Timestamp.now() });
       await db.doc(`employees/${actor.employeeId}`).create({ employeeId: actor.employeeId, firebaseUid: actor.uid, status: "active", roleScopes: actor.roleScopes });
     }
   }, 30_000);
@@ -52,6 +53,46 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     // Do not clear/import/delete emulator datasets. Every run has its own
     // randomly named demo project, preserving any existing test data.
   });
+
+  it("restricts adjustment history to the active recipient, current grant window and other actors", async () => {
+    const client = (actor: InventoryActor) => environment.authenticatedContext(actor.uid, {
+      employeeId: actor.employeeId, roleScopes: actor.roleScopes, sessionVersion: 1, permissionsVersion: 1,
+    }).firestore();
+    const reader = client(viewer);
+    const policy = doc(reader, NOTICE_POLICY_PATH, viewer.employeeId);
+    const cmd = { employeeId: viewer.employeeId, assigned: true, expectedRevision: 0, requestId: randomUUID() };
+    await expect(service.changeNoticePolicy(cmd, member)).rejects.toMatchObject({ code: "permission-denied" });
+    await expect(service.changeNoticePolicy(cmd, admin)).resolves.toEqual({ revision: 1 });
+    await expect(service.changeNoticePolicy(cmd, admin)).resolves.toEqual({ revision: 1 });
+    const channel = (await assertSucceeds(getDocFromServer(policy))).get("channel");
+    const feed = collection(reader, NOTICE_FEED_PATH);
+    const ref = db.collection(NOTICE_FEED_PATH).doc(randomUUID());
+    await ref.create({ audience: [channel], createdAt: FieldValue.serverTimestamp() });
+    const other = db.collection(NOTICE_FEED_PATH).doc(randomUUID());
+    await other.create({ audience: [randomUUID()], createdAt: FieldValue.serverTimestamp() });
+    const q = query(feed, where("audience", "array-contains", channel), orderBy("createdAt", "desc"), limit(50));
+    expect((await assertSucceeds(getDocs(q))).docs.map(item => item.id)).toContain(ref.id);
+    await assertFails(getDocFromServer(doc(feed, other.id)));
+    await assertFails(getDocFromServer(doc(reader, "companies/onnuri/inventoryNoticeSettings/recipients")));
+    await assertFails(getDocs(query(feed, limit(50))));
+    await assertFails(getDocFromServer(doc(client(member), ref.path)));
+    await assertFails(getDocFromServer(doc(client(member), policy.path)));
+    await assertFails(setDoc(policy, { assigned: true }));
+    await assertFails(setDoc(doc(feed, ref.id), { delta: 300 }));
+    const disable = { expectedRevision: 1, enabled: false, requestId: randomUUID() };
+    await expect(service.changeNoticePolicy(disable, viewer)).resolves.toEqual({ revision: 2 });
+    await assertFails(getDocFromServer(doc(feed, ref.id)));
+    await expect(service.changeNoticePolicy({ ...cmd, requestId: randomUUID() }, admin)).rejects.toMatchObject({ code: "aborted" });
+    await service.changeNoticePolicy({ expectedRevision: 2, enabled: true, requestId: randomUUID() }, viewer);
+    await assertSucceeds(getDocFromServer(doc(feed, ref.id)));
+    await db.doc(`authz/${viewer.uid}`).update({ active: false });
+    try { await assertFails(getDocFromServer(doc(feed, ref.id))); }
+    finally { await db.doc(`authz/${viewer.uid}`).update({ active: true }); }
+    await service.changeNoticePolicy({ ...cmd, assigned: false, expectedRevision: 3, requestId: randomUUID() }, admin);
+    await assertFails(getDocFromServer(doc(feed, ref.id)));
+    await service.changeNoticePolicy({ ...cmd, expectedRevision: 4, requestId: randomUUID() }, admin);
+    await assertFails(getDocFromServer(doc(feed, ref.id)));
+  }, 40_000);
 
   it("preserves legacy stock and history when adding packaging and commits a box movement exactly once", async () => {
     const draft = inventoryProductDraftSchema.parse({ name: "박스 계산 보존 통합검증", unitLabel: "봉", unitsPerBox: 1,

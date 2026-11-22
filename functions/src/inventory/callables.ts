@@ -23,6 +23,7 @@ import {
 import { InventoryManufacturerService } from "./inventory-manufacturer-service.js";
 import { InventoryPhotoDependencyError, InventoryPhotoService, inventoryPhotoErrorDiagnostic } from "./inventory-photo-service.js";
 import { InventoryService } from "./inventory-service.js";
+import { assignNoticeRecipientSchema, setNoticePreferenceSchema } from "./inventory-notification-contract.js";
 import { inventorySummaryResponse } from "./inventory-stock-summary.js";
 import { fieldStage, fieldCompute, observeFieldCount } from "../shared/field-latency.js";
 
@@ -62,6 +63,11 @@ function handler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, ac
   };
 }
 const empty = z.object({}).strict();
+const noticeRevision = z.object({ revision: z.number().int().positive() }).strict();
+export const assignInventoryNoticeRecipient = onCall(options, handler(assignNoticeRecipientSchema, noticeRevision, "admin",
+  (input, actor) => new InventoryService().changeNoticePolicy(input, actor), false));
+export const setInventoryNoticePreference = onCall(options, handler(setNoticePreferenceSchema, noticeRevision, "read",
+  (input, actor) => new InventoryService().changeNoticePolicy(input, actor), false));
 export const getInventoryContext = onCall(options, handler(empty, inventoryContextSchema, "read", async (_input, actor) => ({
   ...await new InventoryService().context(), canWrite: inventoryActorCanWrite(actor), canAdmin: actor.isAdmin,
 })));
