@@ -132,7 +132,7 @@ async function stocked() {
   return { ...state, product: first.product, lotId: first.event.lines[0]!.lotId };
 }
 
-describe("manual inventory adjustment notices", () => {
+describe("inventory movement notices", () => {
   it("projects only a committed, nonzero manual delta and deduplicates concurrent retries", async () => {
     const state = await stocked();
     await state.service.changeNoticePolicy({ employeeId: viewer.employeeId, assigned: true, requestId: randomUUID(), expectedRevision: 0 }, admin);
@@ -148,10 +148,11 @@ describe("manual inventory adjustment notices", () => {
     await state.service.move({ ...movement, requestId: randomUUID(), expectedStockRevision: first.product.stockRevision }, actor);
     await expect(state.service.move({ ...movement, requestId: randomUUID() }, actor)).rejects.toMatchObject({ code: "aborted" });
     const notices = [...state.values].filter(([path]) => path.includes("/inventoryNotices/"));
-    expect(notices).toHaveLength(1);
-    expect(notices[0]).toEqual([`companies/onnuri/inventoryNotices/${movement.requestId}`, {
+    expect(notices).toHaveLength(2);
+    expect(notices[0]![1]).toMatchObject({ kind: "receive", delta: 20, audience: [channel] });
+    expect(notices[1]).toEqual([`companies/onnuri/inventoryNotices/${movement.requestId}`, {
       productId: state.product.productId, productName: draft.name, unitLabel: "봉", locationId: "freezer1",
-      delta: -4, stockRevision: first.product.stockRevision, audience: [channel], createdAt: expect.anything(),
+      kind: "adjust", delta: -4, stockRevision: first.product.stockRevision, audience: [channel], createdAt: expect.anything(),
     }]);
   });
 });

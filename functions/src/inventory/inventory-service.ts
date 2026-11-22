@@ -305,12 +305,12 @@ export class InventoryService {
       if (all.filter((lot) => lot.quantity > 0).length > INVENTORY_MAX_LOTS) throw new HttpsError("resource-exhausted", "상품별 보관 중인 묶음은 200개까지 등록할 수 있습니다.");
       // Read the audience before any writes. Membership and stock serialize
       // together, even if an employee turns notifications off during a save.
-      const recipients = input.kind === "adjust" && after !== before ? await this.noticeRecipients(transaction) : [];
+      const recipients = input.kind !== "transfer" && after !== before ? await this.noticeRecipients(transaction) : [];
       const result = this.writeStock(transaction, input, actor, now, product, all, changedLots, input.kind, lines, inspectionCycleId);
       const audience = recipients.filter(member => member.employeeId !== actor.employeeId).map(member => member.channel);
       if (audience.length) transaction.create(this.db.doc(`${NOTICE_FEED_PATH}/${input.requestId}`), {
         productId: product.productId, productName: product.name, unitLabel: product.unitLabel,
-        locationId: input.locationId, delta: after - before, stockRevision: result.product.stockRevision,
+        kind: input.kind, locationId: input.locationId, delta: after - before, stockRevision: result.product.stockRevision,
         audience, createdAt: FieldValue.serverTimestamp(),
       });
       return result;

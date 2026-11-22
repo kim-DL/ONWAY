@@ -12,6 +12,8 @@ import styles from "./inventory-notices.module.css";
 
 const timeFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
 
+const movementLabels = { receive: "입고", issue: "출고", adjust: "수량 조정" } as const;
+
 function change(row: InventoryNotice) {
   return (row.delta < 0 ? "−" : "+") + Math.abs(row.delta).toLocaleString("ko-KR") + inventoryUnitDisplayLabel(row.unitLabel);
 }
@@ -21,7 +23,7 @@ function NoticeLine({ row }: { row: InventoryNotice }) {
 }
 
 export function InlineNotice({ row, onRefresh }: { row: InventoryNotice; onRefresh: () => void }) {
-  return <div className={styles.inline}><span role="status">{INVENTORY_LOCATION_LABELS[row.locationId]} 수량 조정 · {change(row)}</span>
+  return <div className={styles.inline}><span role="status">{INVENTORY_LOCATION_LABELS[row.locationId]} {movementLabels[row.kind]} · {change(row)}</span>
     <button type="button" onClick={onRefresh}>최신 수량 보기</button></div>;
 }
 
@@ -36,13 +38,13 @@ export function NoticeInbox({ channel, rows, failed, ready, live, dismiss }: {
     </button>
     {createPortal(<div className={styles.announce} role="status" aria-live="polite" aria-atomic="true">
       {!open && latest ? <div className={styles.card}><div className={styles.line}><NoticeLine row={latest} /></div>
-        <small>{INVENTORY_LOCATION_LABELS[latest.locationId]} · 수량 조정{live.count > 1 ? ` 외 ${live.count - 1}건` : ""}</small>
+        <small>{INVENTORY_LOCATION_LABELS[latest.locationId]} · {movementLabels[latest.kind]}{live.count > 1 ? ` 외 ${live.count - 1}건` : ""}</small>
       </div> : null}
     </div>, document.body)}
     <BottomSheet open={open} title="재고 알림함" onClose={() => { dismiss(); setOpen(false); }}>
       {failed ? <p role="status">알림을 불러오지 못했어요. 연결 상태를 확인해주세요.</p>
         : !ready ? <p role="status">알림을 확인하고 있어요.</p>
-        : rows.length ? <NoticeHistory rows={rows} channel={channel} /> : <p className={styles.caption}>다른 직원이 수량을 조정하면 여기에 표시됩니다.</p>}
+        : rows.length ? <NoticeHistory rows={rows} channel={channel} /> : <p className={styles.caption}>다른 직원이 입고·출고·수량 조정을 저장하면 여기에 표시됩니다.</p>}
     </BottomSheet>
   </>;
 }
@@ -69,7 +71,7 @@ function NoticeHistory({ rows, channel }: { rows: InventoryNotice[]; channel: st
   }
   return <><ul ref={list} className={styles.history}>{visible.map(row => <li key={row.id}>
     <div className={styles.line}><NoticeLine row={row} /></div>
-    <small>{INVENTORY_LOCATION_LABELS[row.locationId]}<time dateTime={new Date(row.createdAt).toISOString()}>{timeFormat.format(row.createdAt)}</time></small>
+    <small>{INVENTORY_LOCATION_LABELS[row.locationId]} · {movementLabels[row.kind]}<time dateTime={new Date(row.createdAt).toISOString()}>{timeFormat.format(row.createdAt)}</time></small>
   </li>)}</ul>
     {error && <p role="status">{error}</p>}
     {(pages.length > 0 || (visible.length === NOTICE_WINDOW && tail !== end)) && <div className={styles.paging}>
@@ -99,7 +101,7 @@ export function PolicySwitch({ policy, employeeId, disabled }: { policy: NoticeP
   }
   return <div className={styles.setting}>
     {!assignment && <span className="settings-list__icon"><Icon name="bell" /></span>}
-    <span><strong>{label}</strong><small>{error || (assignment ? "이 직원이 다른 직원의 수량 조정을 받아봅니다." : "꺼 둔 동안에는 새 알림을 받지 않습니다.")}</small></span>
+    <span><strong>{label}</strong><small>{error || (assignment ? "다른 직원의 입고·출고·수량 조정 알림을 받습니다." : "꺼 둔 동안에는 새 알림을 받지 않습니다.")}</small></span>
     <button type="button" className={assignment ? undefined : "pwa-install-action"} role="switch" aria-label={label} aria-checked={checked} disabled={saving || disabled} onClick={() => void toggle()}>
       {saving ? "저장 중" : checked ? "켜짐" : "꺼짐"}
     </button>
