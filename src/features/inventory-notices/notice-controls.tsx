@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { INVENTORY_LOCATION_LABELS, inventoryUnitDisplayLabel } from "../../../functions/src/inventory/inventory-labels";
 import { NOTICE_WINDOW } from "../../../functions/src/inventory/inventory-notification-contract";
 import type { LiveCard } from "./inventory-notices";
-import { olderNotices, saveNoticePolicy, watchNoticePolicy, type InventoryNotice, type NoticePolicy } from "./notice-repository";
+import { acknowledgeInbox, type InboxSnapshot, olderNotices, saveNoticePolicy, watchNoticePolicy, type InventoryNotice, type NoticePolicy } from "./notice-repository";
 import styles from "./inventory-notices.module.css";
 
 const timeFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -27,29 +27,35 @@ export function InlineNotice({ row, onRefresh }: { row: InventoryNotice; onRefre
     <button type="button" onClick={onRefresh}>최신 수량 보기</button></div>;
 }
 
-export function NoticeInbox({ channel, rows, failed, ready, live, dismiss }: {
-  channel: string; rows: InventoryNotice[]; failed: boolean; ready: boolean; live: LiveCard | null; dismiss: () => void;
+export function NoticeInbox({ selection, live, onClose }: {
+  selection: InboxSnapshot | null; live: LiveCard | null; onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const latest = live?.latest;
   return <>
-    <button type="button" className={styles.bell} aria-label="재고 알림함" aria-haspopup="dialog" onClick={() => { dismiss(); setOpen(true); }}>
-      <Icon name="bell" size={20} />
-    </button>
     {createPortal(<div className={styles.announce} role="status" aria-live="polite" aria-atomic="true">
-      {!open && latest ? <div className={styles.card}><div className={styles.line}><NoticeLine row={latest} /></div>
+      {!selection && latest ? <div className={styles.card}><div className={styles.line}><NoticeLine row={latest} /></div>
         <small>{INVENTORY_LOCATION_LABELS[latest.locationId]} · {movementLabels[latest.kind]}{live.count > 1 ? ` 외 ${live.count - 1}건` : ""}</small>
       </div> : null}
     </div>, document.body)}
-    <BottomSheet open={open} title="재고 알림함" onClose={() => { dismiss(); setOpen(false); }}>
-      {failed ? <p role="status">알림을 불러오지 못했어요. 연결 상태를 확인해주세요.</p>
-        : !ready ? <p role="status">알림을 확인하고 있어요.</p>
-        : rows.length ? <NoticeHistory rows={rows} channel={channel} /> : <p className={styles.caption}>다른 직원이 입고·출고·수량 조정을 저장하면 여기에 표시됩니다.</p>}
+    <BottomSheet open={Boolean(selection)} title="재고 알림함" onClose={onClose}>
+      {selection?.failed ? <p role="status">알림을 불러오지 못했어요. 연결 상태를 확인해주세요.</p>
+        : selection?.rows.length && selection.policy?.channel
+          ? <NoticeHistory rows={selection.rows} channel={selection.policy.channel} policy={selection.policy} />
+          : <p className={styles.caption}>확인하지 않은 알림이 없습니다.</p>}
     </BottomSheet>
   </>;
 }
 
-function NoticeHistory({ rows, channel }: { rows: InventoryNotice[]; channel: string }) {
+function NoticeHistory({ rows, channel, policy }: { rows: InventoryNotice[]; channel: string; policy: NoticePolicy }) {
+  const [ackFailed, setAckFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const newest = rows[0]!.id;
+  useEffect(() => {
+    let active = true;
+    void acknowledgeInbox(channel, newest).then(() => { if (active) setAckFailed(false); })
+      .catch(() => { if (active) setAckFailed(true); });
+    return () => { active = false; };
+  }, [channel, newest, attempt]);
   const [pages, setPages] = useState<InventoryNotice[][]>([]);
   const [loading, setLoading] = useState(false);
   const [end, setEnd] = useState("");
@@ -63,7 +69,7 @@ function NoticeHistory({ rows, channel }: { rows: InventoryNotice[]; channel: st
     if (pending.current) return;
     pending.current = true; setLoading(true); setError("");
     try {
-      const older = await olderNotices(channel, tail);
+      const older = await olderNotices(channel, tail, policy);
       if (older.length) setPages(current => [...current, older]);
       else setEnd(tail);
     } catch { setError("이전 알림을 불러오지 못했어요. 다시 시도해주세요."); }
@@ -73,6 +79,7 @@ function NoticeHistory({ rows, channel }: { rows: InventoryNotice[]; channel: st
     <div className={styles.line}><NoticeLine row={row} /></div>
     <small>{INVENTORY_LOCATION_LABELS[row.locationId]} · {movementLabels[row.kind]}<time dateTime={new Date(row.createdAt).toISOString()}>{timeFormat.format(row.createdAt)}</time></small>
   </li>)}</ul>
+    {ackFailed && <p role="status">읽음 상태를 저장하지 못했어요. <button type="button" onClick={() => setAttempt(value => value + 1)}>다시 저장</button></p>}
     {error && <p role="status">{error}</p>}
     {(pages.length > 0 || (visible.length === NOTICE_WINDOW && tail !== end)) && <div className={styles.paging}>
       {pages.length > 0 && <button type="button" disabled={loading} onClick={() => { setPages(current => current.slice(0, -1)); setError(""); }}>더 최근 알림</button>}

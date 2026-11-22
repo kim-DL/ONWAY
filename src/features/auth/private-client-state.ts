@@ -59,6 +59,7 @@ export async function clearPrivateClientState() {
     clearSchoolPhotoClientState().catch(() => undefined),
     import("@/features/delivery-photos/delivery-photo-memory").then((module) => module.clearDeliveryPhotoSnapshot()).catch(() => undefined),
     import("@/features/delivery-photos/delivery-photo-outbox-lazy").then((module) => module.lazyDeliveryPhotoOutbox.clear()).catch(() => undefined),
+    import("@/features/inventory-notices/device-binding").then(module => module.clearDeviceOnLogout()).catch(() => undefined),
     runRegisteredPrivateClientCleanups(),
   ]);
 }

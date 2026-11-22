@@ -15,6 +15,7 @@ import {
   isPublicAssetPath,
   isSchoolThumbnailPath,
 } from "@/features/pwa/cache-policy";
+import { claimPush, readBinding } from "@/features/inventory-notices/device-binding";
 import { appRelease, releaseNotesRequest } from "@/features/pwa/release-notes";
 
 declare global {
@@ -27,6 +28,32 @@ declare const self: ServiceWorkerGlobalScope;
 
 self.addEventListener("message", (event) => {
   if (event.data === releaseNotesRequest) event.ports[0]?.postMessage(appRelease);
+});
+
+self.addEventListener("push", event => {
+  if (!event.data) return;
+  const data = event.data.json();
+  if (data?.type !== "inventory-notice" || typeof data.binding !== "string" || typeof data.id !== "string") return;
+  event.waitUntil((async () => {
+    if (!await claimPush(data.binding, data.id)) return;
+    const windows = await self.clients.matchAll({type:"window"});
+    const focused = windows.some(client => client.visibilityState === "visible" && client.focused);
+    await self.registration.showNotification("급식길 · 새 재고 알림", {
+      silent: focused, body:"알림함에서 상품과 변경 수량을 확인하세요.",tag:"inventory-"+data.id,
+      icon:"/icons/onnuriway-company-icon-192-v4.png",data:{inventory:true,binding:data.binding},
+    });
+  })());
+});
+self.addEventListener("notificationclick", event => {
+  if (!event.notification.data?.inventory) return;
+  event.notification.close();
+  event.waitUntil((async () => {
+    if ((await readBinding())?.id !== event.notification.data.binding) return;
+    const windows=await self.clients.matchAll({type:"window"});
+    const client=windows.find(w=>new URL(w.url).origin===self.location.origin);
+    if (client) { await client.focus(); client.postMessage("OPEN_INVENTORY_INBOX"); }
+    else await self.clients.openWindow("/?inventoryInbox=1");
+  })());
 });
 
 const serwist = new Serwist({

@@ -1,23 +1,4 @@
-.bell {
-  display: inline-grid;
-  place-items: center;
-  justify-self: end;
-  inline-size: 44px;
-  block-size: 44px;
-  border: 1px solid #cbd6dd;
-  border-radius: 50%;
-  background: #fcfcfa;
-  color: #40566b;
-  cursor: pointer;
-}
-.bell:focus-visible, .setting button:focus-visible, .inline button:focus-visible { outline: 3px solid #3d6d98; outline-offset: 2px; }
-:global(.workspace-header.workspace-header):has(.bell) { grid-template-columns: minmax(44px, 1fr) minmax(188px, 3fr) 44px; column-gap: 4px; }
-@media (max-width: 359px) {
-  :global(.workspace-header):has(.bell) :global([data-company-wordmark] > span) { display: block; }
-}
-@media (min-width: 761px) {
-  :global(.workspace-header.workspace-header):has(.bell) { grid-template-columns: auto minmax(0, 1fr) 44px; column-gap: 14px; }
-}
+.setting button:focus-visible, .inline button:focus-visible { outline: 3px solid #3d6d98; outline-offset: 2px; }
 .announce { position: fixed; z-index: 15; inset: auto max(20px, env(safe-area-inset-right)) 88px auto; pointer-events: none; }
 .card {
   max-inline-size: min(360px, calc(100vw - 32px));
