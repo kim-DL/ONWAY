@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Icon } from "@/components/ui/icon";
-import { INVENTORY_LOCATION_LABELS, inventoryUnitDisplayLabel } from "../../../functions/src/inventory/inventory-labels";
+import { INVENTORY_LOCATION_LABELS, inventoryChangeLabel, inventorySignedQuantity, inventoryUnitDisplayLabel, inventoryMovementLabels as movementLabels } from "../../../functions/src/inventory/inventory-labels";
 import { NOTICE_WINDOW } from "../../../functions/src/inventory/inventory-notification-contract";
 import type { LiveCard } from "./inventory-notices";
 import { acknowledgeInbox, type InboxSnapshot, olderNotices, saveNoticePolicy, watchNoticePolicy, type InventoryNotice, type NoticePolicy } from "./notice-repository";
@@ -12,10 +12,8 @@ import styles from "./inventory-notices.module.css";
 
 const timeFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-const movementLabels = { receive: "입고", issue: "출고", adjust: "수량 조정" } as const;
-
 function change(row: InventoryNotice) {
-  return (row.delta < 0 ? "−" : "+") + Math.abs(row.delta).toLocaleString("ko-KR") + inventoryUnitDisplayLabel(row.unitLabel);
+  return inventoryChangeLabel(row.delta, row.unitLabel);
 }
 function NoticeLine({ row }: { row: InventoryNotice }) {
   return <><strong className={styles.name}>{row.productName}</strong>
@@ -33,8 +31,15 @@ export function NoticeInbox({ selection, live, onClose }: {
   const latest = live?.latest;
   return <>
     {createPortal(<div className={styles.announce} role="status" aria-live="polite" aria-atomic="true">
-      {!selection && latest ? <div className={styles.card}><div className={styles.line}><NoticeLine row={latest} /></div>
-        <small>{INVENTORY_LOCATION_LABELS[latest.locationId]} · {movementLabels[latest.kind]}{live.count > 1 ? ` 외 ${live.count - 1}건` : ""}</small>
+      {!selection && latest ? <div className={styles.card}>
+        <div className={styles.description}>
+          <strong className={styles.name}>{latest.productName}</strong>
+          <div className={styles.meta}><Icon name="location" size={13} />
+            <span>{INVENTORY_LOCATION_LABELS[latest.locationId]} · {movementLabels[latest.kind]}</span>
+            {live.count > 1 && <span className={styles.extra}>외 {live.count - 1}건</span>}
+          </div>
+        </div>
+        <b className={styles.amount} data-increase={latest.delta > 0}><bdi>{inventorySignedQuantity(latest.delta)}</bdi><span>{inventoryUnitDisplayLabel(latest.unitLabel)}</span></b>
       </div> : null}
     </div>, document.body)}
     <BottomSheet open={Boolean(selection)} title="재고 알림함" onClose={onClose}>

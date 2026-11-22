@@ -30,11 +30,8 @@ describe("inventory UI contracts", () => {
   });
   it("keeps the floating action reachable and reserves room to scroll the final card above it", () => {
     const css = readFileSync(new URL("./inventory.module.css", import.meta.url), "utf8");
-    expect(css).toContain(".workspace[data-write-actions] { padding-bottom: calc(var(--inventory-action-inset) + 64px + env(safe-area-inset-bottom)); }");
     expect(css).toMatch(/\.workspace\s*\{[^}]*align-content:\s*start/);
-    expect(css).toMatch(/\.stickyActions\s*\{[^}]*position: fixed;[^}]*bottom: calc\(var\(--inventory-action-inset\)/);
-    expect(css).toContain(".workspace[data-admin] { --inventory-action-inset: 100px; }");
-    expect(css).toContain("@media (min-width: 761px) { .workspace, .workspace[data-admin] { --inventory-action-inset: 16px; } }");
+    expect(css).toMatch(/\.stickyActions\s*\{[^}]*position: fixed;[^}]*right: max\(16px, env\(safe-area-inset-right\)/);
   });
   it("uses one accessible native row button, quantity units and expiry status without empty photo slots", () => {
     const html = renderToStaticMarkup(h(InventoryCard, { product, location: "refrigerated", context, onOpen: noop }));

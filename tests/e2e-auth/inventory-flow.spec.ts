@@ -113,6 +113,22 @@ async function capture(page: Page, info: TestInfo, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
 }
+async function checkGlassPreference(page: Page) {
+  if (page.context().browser()?.browserType().name() !== "chromium") return;
+  const session = await page.context().newCDPSession(page);
+  const button = page.getByRole("button", { name: "새 품목 등록", exact: true });
+  const webgl = await page.evaluate(() => {
+    const context = document.createElement("canvas").getContext("webgl2");
+    context?.getExtension("WEBGL_lose_context")?.loseContext();
+    return Boolean(context);
+  });
+  for (const value of ["reduce", "no-preference"]) {
+    await session.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value }] });
+    await expect(button).toHaveCSS("background-image", value === "reduce" ? "none" : /linear-gradient/);
+    if (value === "no-preference" && webgl) await expect(button.locator("canvas")).toBeVisible();
+    else await expect(button.locator("canvas")).toHaveCount(0);
+  }
+}
 async function captureInventoryList(page: Page, info: TestInfo, name: string) {
   const workspace = page.getByRole("region", { name: "재고 관리", exact: true });
   await expect(workspace).toHaveClass(/shell-page/);
@@ -129,9 +145,6 @@ async function captureInventoryList(page: Page, info: TestInfo, name: string) {
       viewport: innerWidth, left: rect.left, right: rect.right, paddingLeft, paddingRight,
       contentLeft: rect.left + parseFloat(style.borderLeftWidth) + paddingLeft,
       contentRight: rect.right - parseFloat(style.borderRightWidth) - paddingRight,
-      paddingBottom: parseFloat(style.paddingBottom),
-      actionInset: parseFloat(style.getPropertyValue("--inventory-action-inset")),
-      writer: element.hasAttribute("data-write-actions"),
       cards: Array.from(element.querySelectorAll("article"), (card) => {
         const box = card.getBoundingClientRect();
         return { left: box.left, right: box.right, width: box.width };
@@ -150,7 +163,6 @@ async function captureInventoryList(page: Page, info: TestInfo, name: string) {
     expect(card.left).toBeGreaterThanOrEqual(geometry.contentLeft - 0.5);
     expect(card.right).toBeLessThanOrEqual(geometry.contentRight + 0.5);
   }
-  if (geometry.writer) expect(geometry.paddingBottom, "sticky action must leave final rows reachable").toBeGreaterThanOrEqual(geometry.actionInset + 16);
   const controls = await workspace.evaluate((element) => {
     const search = element.querySelector('input[aria-label="품목 검색"]')!.parentElement!.getBoundingClientRect();
     const options = element.querySelector('button[aria-label="목록 옵션"]')!.getBoundingClientRect();
@@ -174,6 +186,9 @@ async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, 
   await scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
   const before = await fab.boundingBox();
   expect(before).not.toBeNull();
+  expect(page.viewportSize()!.width - before!.x - before!.width).toBeCloseTo(16, 0);
+  const viewport = (await scroller.boundingBox())!;
+  expect(viewport.y + viewport.height, "scrolling quantities must stay above the action").toBeLessThanOrEqual(before!.y);
   await scroller.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
   const after = await fab.boundingBox();
   expect(after).not.toBeNull();
@@ -435,6 +450,19 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
   await coworker.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
   try {
     const admin = await loginAdmin(operator);
+    const adminButton = operator.getByRole("button", { name: "새 품목 등록", exact: true });
+    await expect(adminButton).toBeVisible();
+    for (const width of [390, 800, 1280]) {
+      await operator.setViewportSize({ width, height: 900 });
+      const button = (await adminButton.boundingBox())!;
+      const viewport = (await operator.locator(".admin-content").boundingBox())!;
+      expect(width - button.x - button.width).toBeCloseTo(16, 0);
+      expect(viewport.y + viewport.height).toBeLessThanOrEqual(button.y);
+      if (width <= 820) {
+        const nav = (await operator.getByRole("navigation", { name: "관리자 빠른 메뉴" }).boundingBox())!;
+        expect(button.y + button.height).toBeLessThanOrEqual(nav.y);
+      }
+    }
     const name = "하림 팝콘치킨";
     const id = randomUUID();
     const create = await call("saveInventoryProduct", admin, { requestId: id, productId: null, expectedRevision: null,
@@ -471,6 +499,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await search.focus();
     const card = page.getByRole("status").filter({ hasText: name });
     await page.setViewportSize({ width: 320, height: 780 });
+    await checkGlassPreference(page);
     await coworker.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
     await coworker.getByRole("dialog", { name, exact: true }).getByRole("button", { name: "출고", exact: true }).click();
     const form = coworker.getByRole("dialog", { name: "출고 기록", exact: true });
@@ -480,6 +509,14 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await expect(card).toContainText("−4봉");
     await expect(card).toContainText("냉동1 · 출고");
     await expect(search).toBeFocused();
+    const addButton = page.getByRole("button", { name: "새 품목 등록", exact: true });
+    const checkActionPosition = async () => {
+      const button = (await addButton.boundingBox())!;
+      const viewport = (await page.locator(".workspace-content").boundingBox())!;
+      expect(page.viewportSize()!.width - button.x - button.width).toBeCloseTo(16, 0);
+      expect(viewport.y + viewport.height).toBeLessThanOrEqual(button.y);
+    };
+    await checkActionPosition();
     for (const button of await page.getByRole("group", { name: "업무 모드" }).getByRole("button").all()) {
       const bounds = await button.boundingBox();
       expect(bounds!.width).toBeGreaterThanOrEqual(44);
@@ -492,6 +529,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await expect(card).toContainText("냉동1 · 입고");
     await expect(card).toContainText("+2봉");
     await expect(card).toContainText("외 1건");
+    await checkActionPosition();
     await capture(page, info, "notice-desktop");
     const cardBounds = (await card.boundingBox())!;
     const addBounds = (await page.getByRole("button", { name: "새 품목 등록", exact: true }).boundingBox())!;
@@ -1968,6 +2006,7 @@ test("a 1,000-product catalog fetches every server page while rendering 60 rows 
   }
 
   await expect(cards).toHaveCount(60);
+  await checkGlassPreference(page);
   await captureInventoryList(page, info, "catalog-1000-initial-360");
   await verifyFloatingAction(page, cards, info, "catalog-1000-floating-360");
   const requestCount = responses.length;

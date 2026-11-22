@@ -18,6 +18,7 @@
 }
 
 * { box-sizing: border-box; }
+@media (prefers-reduced-transparency: reduce) { :root { --solid-glass: #fafaf8; } }
 
 html {
   min-width: 320px;

@@ -51,7 +51,7 @@ export function DeviceSetting({ channel }: { channel: string }) {
         <small role="status">
           {message ||
             (supported
-              ? "급식길을 닫아도 이 기기에 재고 알림을 표시합니다."
+              ? "앱을 닫아도 상품명과 변경 수량을 받습니다. 잠금 화면 표시는 기기 설정을 따릅니다."
               : "지원되는 브라우저로 열어주세요. iPhone은 홈 화면에 추가한 급식길에서 켤 수 있어요.")}
         </small>
       </span>

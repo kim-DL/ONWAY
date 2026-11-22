@@ -8,11 +8,10 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-22.4",
+  id: "2026-11-22.5",
   date: "2026-11-22",
   changes: [
-    { title: "상품 상세의 수량 갱신", text: "다른 기기에서 알림을 읽어도, 열어 둔 상품의 최신 수량을 불러올 때까지 갱신 안내가 남아요." },
-    { title: "재고 변경 알림", text: "온누리 로고에 점이 보이면 눌러서 놓친 알림을 확인하세요. 한 기기에서 열면 다른 기기에서도 읽음으로 바뀌어요." },
-    { title: "기기 알림", text: "앱 설정에서 이 기기의 알림을 허용하면 급식길을 닫아도 새 재고 알림을 받을 수 있어요." },
+    { title: "재고 알림 미리보기", text: "앱을 닫아도 기기 알림에서 상품명, 변경 수량, 보관 장소와 입출고 종류를 확인할 수 있어요. 잠금 화면 미리보기는 기기 설정을 따라요." },
+    { title: "알림 카드와 새 품목 버튼", text: "재고 알림 카드에서 상품명과 변화량을 한눈에 볼 수 있어요. 새 품목 버튼은 재고 수량을 가리지 않도록 오른쪽 아래에 두었어요." },
   ],
 };
