@@ -3,8 +3,7 @@
 import type { ComponentType } from "react";
 
 import { Icon } from "@/components/ui/icon";
-import { NoticeBell } from "@/features/inventory-notices/inventory-notices";
-import { AppBrand } from "./app-brand";
+import { NoticeBrand } from "@/features/inventory-notices/inventory-notices";
 // To restore the original glass appearance, import GlassModeControl as DefaultModeControl.
 import { DepthModeControl as DefaultModeControl } from "./depth-mode-control";
 import type { WorkMode } from "./shell-policy";
@@ -41,12 +40,11 @@ export function ShellHeader({ mode, availableModes, onModeChange, onDetailBack, 
         <button className="workspace-header__back" type="button" onClick={onDetailBack}>
           <Icon name="arrow-left" /><span>학교 목록</span>
         </button>
-      ) : <AppBrand />}
+      ) : <NoticeBrand />}
       <div className={`workspace-header__controls ${styles.controls}`}>
         <ModeControl mode={mode} options={options}
           inDetail={Boolean(onDetailBack)} onModeChange={onModeChange} onActiveModeClick={onActiveModeClick} />
       </div>
-      <NoticeBell />
     </header>
   );
 }

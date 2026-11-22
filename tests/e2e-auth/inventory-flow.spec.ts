@@ -453,7 +453,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
       return command;
     };
     await move("adjust", 19);
-    const bell = page.getByRole("button", { name: "재고 알림함" });
+    const bell = page.getByRole("button", { name: /^재고 알림함/ });
     await expect(bell).toHaveCount(0);
     expect((await call("assignInventoryNoticeRecipient", token, { employeeId: "EMP-DELIVERY", assigned: true,
       expectedRevision: 0, requestId: randomUUID() })).body.error?.status).toBe("PERMISSION_DENIED");
@@ -465,7 +465,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await bell.click();
     const inbox = page.getByRole("dialog", { name: "재고 알림함" });
     const closeInbox = () => inbox.getByRole("button", { name: "닫기" }).click();
-    await expect(inbox.getByText("다른 직원이 입고·출고·수량 조정을 저장하면 여기에 표시됩니다.")).toBeVisible();
+    await expect(inbox.getByText("확인하지 않은 알림이 없습니다.")).toBeVisible();
     await closeInbox();
     const search = page.getByRole("searchbox", { name: "품목 검색" });
     await search.focus();
@@ -497,10 +497,13 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     const addBounds = (await page.getByRole("button", { name: "새 품목 등록", exact: true }).boundingBox())!;
     expect(cardBounds.y + cardBounds.height).toBeLessThanOrEqual(addBounds.y);
     await expect(card).toHaveCount(0, { timeout: 9000 });
+    const confirmedRead = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/acknowledgeInventoryInbox"));
     await bell.click();
     await expect(inbox.getByRole("listitem")).toHaveCount(2);
     await expect(inbox.getByRole("listitem").first()).toContainText("냉동1 · 입고");
     await expect(inbox.getByRole("listitem").nth(1)).toContainText("냉동1 · 출고");
+    expect((await confirmedRead).status()).toBe(200);
+    await expect(page.locator("button[data-unread]")).toHaveAttribute("data-unread", "false");
     await capture(page, info, "inbox-desktop");
     await closeInbox();
     await page.context().setOffline(true);
@@ -508,18 +511,19 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await move("adjust", 12);
     await page.context().setOffline(false);
     await bell.click();
-    await expect(inbox.getByRole("listitem")).toHaveCount(3);
+    await expect(inbox.getByRole("listitem")).toHaveCount(1);
+    await expect(bell).toHaveAttribute("data-unread", "false");
     await closeInbox();
     await expect(card).toHaveCount(0);
     await page.reload();
     await bell.click();
-    await expect(inbox.getByRole("listitem")).toHaveCount(3);
+    await expect(inbox.getByRole("listitem")).toHaveCount(0);
     await closeInbox();
     await expect(card).toHaveCount(0);
     await move("adjust", 10, token);
     await page.setViewportSize({ width: 390, height: 844 });
     await bell.click();
-    await expect(inbox.getByRole("listitem")).toHaveCount(3);
+    await expect(inbox.getByRole("listitem")).toHaveCount(0);
     await capture(page, info, "inbox-mobile");
     await closeInbox();
     await page.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
@@ -542,22 +546,28 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await personal.click();
     await expect(personal).toBeChecked();
     await bell.click();
-    await expect(inbox.getByRole("listitem")).toHaveCount(4);
+    await expect(inbox.getByRole("listitem")).toHaveCount(1);
+    await expect(bell).toHaveAttribute("data-unread", "false");
     await expect(inbox.getByText("−3봉", { exact: true })).toHaveCount(0);
     // Seed older synthetic deliveries to exercise paging without another 50
     // stock commands. Only the guarded emulator fixture owns these documents.
     const channel = (await db().doc("companies/onnuri/inventoryNoticePolicies/EMP-DELIVERY").get()).get("channel");
     const batch = db().batch();
+    const batchTime = new Date();
     for (let index = 0; index < 52; index++) {
-      batch.create(db().collection("companies/onnuri/inventoryNotices").doc(), {
+      batch.create(db().collection("companies/onnuri/inventoryNotices").doc(`00000000-0000-4000-8000-${String(52 - index).padStart(12, "0")}`), {
         audience: [channel], productId: id, productName: `지난 알림 ${index + 1}`, locationId: "freezer1",
-        delta: 1, unitLabel: "봉", stockRevision: 1, createdAt: new Date(Date.now() - 86_400_000 - index * 1000),
+        delta: 1, unitLabel: "봉", stockRevision: 1, createdAt: batchTime,
       });
     }
     await batch.commit();
+    await expect(bell).toHaveAttribute("data-unread", "true");
+    await expect(inbox.getByRole("listitem")).toHaveCount(1);
+    await closeInbox();
+    await bell.click();
     await expect(inbox.getByRole("listitem")).toHaveCount(50);
     await inbox.getByRole("button", { name: "이전 알림 보기" }).click();
-    await expect(inbox.getByRole("listitem")).toHaveCount(6);
+    await expect(inbox.getByRole("listitem")).toHaveCount(2);
     await expect(inbox.getByRole("listitem").filter({ hasText: "지난 알림 52" })).toContainText("냉동1 · 수량 조정");
     await inbox.getByRole("button", { name: "더 최근 알림" }).click();
     await expect(inbox.getByRole("listitem")).toHaveCount(50);
@@ -565,10 +575,10 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     try {
       await phone.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
       await login(phone, PHASE3_TEST_PINS.delivery);
-      const phoneBell = phone.getByRole("button", { name: "재고 알림함" });
+      const phoneBell = phone.getByRole("button", { name: /^재고 알림함/ });
       await phoneBell.tap();
       const phoneInbox = phone.getByRole("dialog", { name: "재고 알림함" });
-      await expect(phoneInbox.getByRole("listitem")).toHaveCount(50);
+      await expect(phoneInbox.getByRole("listitem")).toHaveCount(0);
       await phoneInbox.getByRole("button", { name: "닫기" }).tap();
       const phoneCard = phone.getByRole("status").filter({ hasText: name });
       await expect(phoneCard).toHaveCount(0);
@@ -576,6 +586,12 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
       await expect(phoneCard).toContainText("냉동1 · 출고");
       await expect(phoneCard).toContainText("−1봉");
       await capture(phone, info, "notice-touch");
+      await expect(bell).toHaveAttribute("data-unread", "true");
+      await phoneBell.tap();
+      await expect(phoneInbox.getByRole("listitem")).toHaveCount(1);
+      await expect(bell).toHaveAttribute("data-unread", "false");
+      await expect(phoneBell).toHaveAttribute("data-unread", "false");
+      await phoneInbox.getByRole("button", { name: "닫기" }).tap();
       await coworker.reload();
       await coworker.getByRole("button", { name: new RegExp(name + ", .*상세 보기") }).click();
       await coworker.getByRole("dialog", { name, exact: true }).getByRole("button", { name: "입고", exact: true }).click();

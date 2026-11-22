@@ -7,7 +7,7 @@ import { getFirebaseClientServices } from "@/lib/firebase/client";
 import type { InventoryLocation } from "@/domain/inventory";
 import { NOTICE_FEED_PATH, NOTICE_POLICY_PATH, NOTICE_WINDOW, type NoticeCommand } from "../../../functions/src/inventory/inventory-notification-contract";
 
-export type NoticePolicy = { assigned: boolean; enabled: boolean; revision: number; channel: string | null };
+export type NoticePolicy = { assigned: boolean; enabled: boolean; revision: number; channel: string | null; readTime: number; readId: string };
 export type InventoryNotice = {
   id: string; productId: string; productName: string; locationId: InventoryLocation; unitLabel: string;
   kind: "receive" | "issue" | "adjust"; delta: number; stockRevision: number; createdAt: number;
@@ -22,10 +22,21 @@ function noticeQuery(db: Firestore, channel: string) {
 function noticeRow(item: QueryDocumentSnapshot): InventoryNotice {
   const data = item.data();
   return { id: item.id, productId: data.productId, productName: data.productName, delta: data.delta,
-    kind: data.kind ?? "adjust", locationId: data.locationId, unitLabel: data.unitLabel, stockRevision: data.stockRevision, createdAt: data.createdAt.toMillis() };
+    kind: data.kind ?? "adjust", locationId: data.locationId, unitLabel: data.unitLabel, stockRevision: data.stockRevision, createdAt: data.createdAt.seconds * 1000 + data.createdAt.nanoseconds / 1_000_000 };
 }
 
-export async function olderNotices(channel: string, afterId: string) {
+export function unread(row: InventoryNotice, policy: NoticePolicy) {
+  return row.createdAt > policy.readTime ||
+    (row.createdAt === policy.readTime && row.id > policy.readId);
+}
+
+export async function acknowledgeInbox(channel: string, noticeId: string) {
+  const services = getFirebaseClientServices();
+  if (!services?.auth.currentUser) throw Error("로그인이 필요합니다.");
+  await httpsCallable(services.functions, "acknowledgeInventoryInbox")({channel, noticeId});
+}
+
+export async function olderNotices(channel: string, afterId: string, policy: NoticePolicy) {
   const services = getFirebaseClientServices();
   const uid = services?.auth.currentUser?.uid;
   if (!services || !uid) throw new Error("로그인 상태를 확인해주세요.");
@@ -33,7 +44,7 @@ export async function olderNotices(channel: string, afterId: string) {
   if (!cursor.exists()) throw new Error("알림을 다시 불러와주세요.");
   const page = await getDocsFromServer(query(noticeQuery(services.firestore, channel), startAfter(cursor)));
   if (uid !== services.auth.currentUser?.uid) throw new Error("로그인 상태를 확인해주세요.");
-  return page.docs.map(noticeRow);
+  return page.docs.map(noticeRow).filter(row => unread(row, policy));
 }
 
 export function watchNoticePolicy(employeeId: string, receive: (value: NoticePolicy | null, failed?: boolean) => void) {
@@ -46,7 +57,7 @@ export function watchNoticePolicy(employeeId: string, receive: (value: NoticePol
     }
     const data = snapshot.data();
     receive({ assigned: data?.assigned === true, enabled: data?.enabled !== false, revision: data?.revision ?? 0,
-      channel: typeof data?.channel === "string" ? data.channel : null });
+      readTime: data?.readTime ?? 0, readId: data?.readId ?? "", channel: typeof data?.channel === "string" ? data.channel : null });
   }, () => receive(null, true));
 }
 
@@ -62,8 +73,17 @@ export function watchInbox(employeeId: string, receive: (snapshot: InboxSnapshot
     stopFeed?.(); stopPolicy?.();
     receive(emptyInbox, null);
     if (!navigator.onLine || document.visibilityState === "hidden") return;
+    let activePolicy: NoticePolicy | null = null;
+    let confirmedRows: InventoryNotice[] | null = null;
     stopPolicy = watchNoticePolicy(employeeId, (policy, failed = false) => {
       if (current !== generation) return;
+      if (policy?.assigned && policy.enabled && policy.channel && policy.channel === activePolicy?.channel) {
+        activePolicy = policy;
+        if (confirmedRows) receive({ policy, rows: confirmedRows.filter(row => unread(row, policy)), ready: true, failed: false }, null);
+        return;
+      }
+      activePolicy = policy?.assigned && policy.enabled ? policy : null;
+      confirmedRows = null;
       const feed = ++feedGeneration;
       stopFeed?.();
       const base = { ...emptyInbox, policy, failed };
@@ -75,12 +95,15 @@ export function watchInbox(employeeId: string, receive: (snapshot: InboxSnapshot
       let previous: { ids: Set<string>; newest: number } | null = null;
       const active = () => current === generation && feed === feedGeneration;
       stopFeed = onSnapshot(q, { includeMetadataChanges: true }, snapshot => {
-        if (!active()) return;
+        if (!active() || !activePolicy) return;
+        const policy = activePolicy;
         if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites || uid !== services.auth.currentUser?.uid) {
           previous = null;
+          confirmedRows = null;
           receive(base, null); return;
         }
-        const rows = snapshot.docs.map(noticeRow);
+        confirmedRows = snapshot.docs.map(noticeRow);
+        const rows = confirmedRows.filter(row => unread(row, policy));
         const seen = previous;
         const fresh = seen ? rows.filter(row => row.createdAt >= seen.newest && !seen.ids.has(row.id)) : null;
         previous = { ids: new Set(rows.map(row => row.id)), newest: Math.max(seen?.newest ?? 0, rows[0]?.createdAt ?? 0) };

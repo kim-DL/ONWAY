@@ -442,7 +442,9 @@ export class InventoryService {
         const channel: string | null = assigned ? current?.channel ?? randomUUID() : null;
         if (channel && enabled) recipients.push({ employeeId, channel });
         transaction.set(this.db.doc(NOTICE_ROSTER_PATH), { recipients });
-        transaction.set(ref, { assigned, enabled, revision, channel });
+        transaction.set(ref, { assigned, enabled, revision, channel,
+          readTime: channel === current?.channel ? current?.readTime ?? 0 : 0,
+          readId: channel === current?.channel ? current?.readId ?? "" : "" });
         this.audit(transaction, input, actor, now, assignment ? "INVENTORY_NOTICE_RECIPIENT_UPDATED" : "INVENTORY_NOTICE_PREFERENCE_UPDATED",
           employeeId, [assignment ? "assigned" : "enabled"], (assignment ? assigned : enabled) ? "켜짐" : "꺼짐");
         return { revision };
