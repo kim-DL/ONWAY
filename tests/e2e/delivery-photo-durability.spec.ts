@@ -77,6 +77,140 @@ async function install(context: BrowserContext, options: { loseFirstResponse?: b
   return { requests, photos, errors, external };
 }
 
+for (const source of ["camera", "album"] as const) {
+  test(`a superseded camera cannot attach a late file to another customer's ${source} picker`, async ({ context }) => {
+    const evidence = await install(context);
+    const page = await context.newPage();
+    await page.goto("https://photo-durability.test/");
+    const first = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "납품사진 촬영", exact: true }).click();
+    const stale = (await first).element();
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await page.getByRole("button", { name: source === "camera" ? "다른 납품처 촬영" : "다른 납품처 앨범" }).click();
+    const choice = page.getByRole("dialog", { name: "합성 납품처 사진을 기다리고 있어요" });
+    await expect(choice).toHaveAccessibleDescription("다른 납품처 사진을 새로 선택하면 이전 사진은 저장되지 않을 수 있어요.");
+    const next = page.waitForEvent("filechooser");
+    await choice.getByRole("button", { name: source === "camera" ? "새 촬영 시작" : "앨범 열기" }).click();
+    const current = await next;
+
+    // A platform result belongs to the input that launched its native picker.
+    await stale.evaluate((node, data) => {
+      const input = node as HTMLInputElement;
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([Uint8Array.from(atob(data), char => char.charCodeAt(0))], "earlier.jpg", { type: "image/jpeg" }));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.dispatchEvent(new Event("cancel", { bubbles: true }));
+    }, jpeg.toString("base64"));
+    expect(await page.evaluate(() => window.__photoDurability.coordinator.getSnapshot())).toHaveLength(0);
+    await current.setFiles({ name: "current.jpg", mimeType: "image/jpeg", buffer: jpeg });
+    await expect.poll(() => evidence.photos.size).toBe(1);
+    expect(await page.evaluate(() => window.__photoDurability.requests.map(({ customerId, source }) => ({ customerId, source }))))
+      .toEqual([{ customerId: "other", source }]);
+  });
+}
+
+for (const signal of ["resume", "pageshow"] as const) {
+  test(`a new capture opens after a picker returns with only ${signal}`, async ({ context }) => {
+    const evidence = await install(context);
+    const page = await context.newPage();
+    await page.goto("https://photo-durability.test/");
+    const first = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "납품사진 촬영", exact: true }).click();
+    await first;
+    await page.evaluate(event => (event === "resume" ? document : window).dispatchEvent(new Event(event)), signal);
+    await page.getByRole("button", { name: "다른 납품처 촬영" }).click();
+    const next = page.waitForEvent("filechooser", { timeout: 4_000 });
+    await page.getByRole("button", { name: "새 촬영 시작" }).click();
+    await (await next).setFiles({ name: "next.jpg", mimeType: "image/jpeg", buffer: jpeg });
+    await expect.poll(() => evidence.photos.size).toBe(1);
+    expect(await page.evaluate(() => window.__photoDurability.requests[0]?.customerId)).toBe("other");
+  });
+}
+
+for (const wait of ["in the open choice", "after choosing to wait"] as const) {
+  test(`a delayed camera file returned ${wait} is kept offline for its original customer`, async ({ context, browserName }) => {
+    const evidence = await install(context);
+    const page = await context.newPage();
+    await page.goto("https://photo-durability.test/");
+    const choosing = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "납품사진 촬영", exact: true }).click();
+    const original = await choosing;
+    const setOffline = async (offline: boolean) => {
+      if (browserName === "chromium") return context.setOffline(offline);
+      // Playwright WebKit's protocol disconnect also blocks local blob: image decoding.
+      // Drive its network signal directly and check that no request crossed the fixture.
+      await page.evaluate(value => {
+        Object.defineProperty(navigator, "onLine", { configurable: true, value: !value });
+        window.dispatchEvent(new Event(value ? "offline" : "online"));
+      }, offline);
+    };
+    await setOffline(true);
+    expect(await page.evaluate(() => navigator.onLine)).toBe(false);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await page.getByRole("button", { name: "다른 납품처 앨범" }).click();
+    const choice = page.getByRole("dialog", { name: "합성 납품처 사진을 기다리고 있어요" });
+    await expect(choice).toBeVisible();
+    if (wait === "after choosing to wait") await choice.getByRole("button", { name: "이전 사진 기다리기" }).click();
+    await original.setFiles({ name: "earlier.jpg", mimeType: "image/jpeg", buffer: jpeg });
+    await expect(choice).toHaveCount(0);
+    await expect.poll(() => page.evaluate(async () => (await window.__photoDurability.records())
+      .map(({ job, prepared }) => [job.customerId, job.source, job.status, Boolean(prepared?.blob.size)])))
+      .toEqual([["customer", "camera", "queued", true]]);
+    expect(evidence.requests).toHaveLength(0);
+    const [requestId] = await page.evaluate(() => window.__photoDurability.coordinator.getSnapshot().map(job => job.requestId));
+    await setOffline(false);
+    await expect.poll(() => evidence.photos.size).toBe(1);
+    expect(await page.evaluate(() => window.__photoDurability.requests.map(({ customerId, source, requestId }) => ({ customerId, source, requestId }))))
+      .toEqual([{ customerId: "customer", source: "camera", requestId }]);
+  });
+}
+
+test("native cancel while a replacement is offered leaves the next capture ready", async ({ context }) => {
+  await install(context);
+  const page = await context.newPage();
+  await page.goto("https://photo-durability.test/");
+  const choosing = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "납품사진 촬영", exact: true }).click();
+  const original = await choosing;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const nextButton = page.getByRole("button", { name: "다른 납품처 촬영" });
+  await nextButton.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await original.element().dispatchEvent("cancel");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const next = page.waitForEvent("filechooser");
+  await nextButton.click();
+  await (await next).element().dispatchEvent("cancel");
+  expect(await page.evaluate(() => window.__photoDurability.coordinator.getSnapshot())).toHaveLength(0);
+});
+
+test("native cancel and late camera results preserve consecutive photos for the same customer", async ({ context }) => {
+  const evidence = await install(context);
+  const page = await context.newPage();
+  await page.goto("https://photo-durability.test/");
+  const button = page.getByRole("button", { name: "납품사진 촬영", exact: true });
+  let chooserCount = 0;
+  page.on("filechooser", () => { chooserCount += 1; });
+  const cancelled = page.waitForEvent("filechooser");
+  await button.click();
+  await (await cancelled).element().dispatchEvent("cancel");
+  expect(await page.evaluate(() => window.__photoDurability.coordinator.getSnapshot())).toHaveLength(0);
+
+  for (let index = 1; index <= 2; index++) {
+    const choosing = page.waitForEvent("filechooser");
+    await button.click();
+    const picker = await choosing;
+    await button.click();
+    expect(chooserCount).toBe(index + 1);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await picker.setFiles({ name: "capture.jpg", mimeType: "image/jpeg", buffer: jpeg });
+    await expect.poll(() => evidence.photos.size).toBe(index);
+  }
+  expect(await page.evaluate(() => window.__photoDurability.requests.map(({ customerId, source }) => ({ customerId, source }))))
+    .toEqual([{ customerId: "customer", source: "camera" }, { customerId: "customer", source: "camera" }]);
+});
+
 for (const stage of ["source", "prepared"] as const) {
   test(`${stage} bytes survive repeated lease and retry state writes after reopening the page`, async ({ context }) => {
     const evidence = await install(context);
@@ -155,6 +289,51 @@ test("temporary outbox startup failure recovers with an explicit reload without 
   await expect.poll(() => page.evaluate(() => window.__photoDurability.coordinator.getSnapshot()[0]?.status)).toBe("completed");
   expect(evidence.requests).toHaveLength(1);
   expect(evidence.errors).toEqual([]); expect(evidence.external).toEqual([]);
+});
+
+for (const action of ["return to the app", "reopen the delivery workspace"] as const) {
+  test(`a transient outbox failure recovers when users ${action} in the same document`, async ({ context }) => {
+    const evidence = await install(context);
+    const page = await context.newPage(); await page.goto("https://photo-durability.test/?failOpenOnce");
+    await expect(page.getByRole("button", { name: "화면 다시 열기" })).toBeVisible();
+    expect(await page.evaluate(() => window.__photoDurability.coordinator.canBegin("customer"))).toBe(false);
+    if (action === "return to the app") {
+      await page.evaluate(() => {
+        document.dispatchEvent(new Event("visibilitychange")); document.dispatchEvent(new Event("resume")); window.dispatchEvent(new Event("focus"));
+      });
+    } else {
+      const toggle = page.getByRole("button", { name: "납품사진 모드 전환" });
+      await toggle.click(); await toggle.click();
+    }
+    await expect(page.getByRole("button", { name: "납품사진 촬영", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => window.__photoDurability.coordinator.canBegin("customer"))).toBe(true);
+    const requestId = await capture(page);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(() => page.evaluate(() => window.__photoDurability.coordinator.getSnapshot()[0]?.status)).toBe("completed");
+    expect(await page.evaluate(() => window.__photoDurability.activationAttempts)).toBe(2);
+    expect(evidence.requests.map((request) => request.requestId)).toEqual([requestId]);
+    expect(evidence.errors).toEqual([]); expect(evidence.external).toEqual([]);
+  });
+}
+
+test("a persistent storage failure makes one recovery attempt per foreground transition", async ({ context }) => {
+  const evidence = await install(context);
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector("[data-storage-failed]")) return;
+      observer.disconnect();
+      document.dispatchEvent(new Event("visibilitychange")); document.dispatchEvent(new Event("resume")); window.dispatchEvent(new Event("focus"));
+    });
+    observer.observe(document, { subtree: true, childList: true });
+  });
+  await page.goto("https://photo-durability.test/?failOpenAlways");
+  const error = page.getByRole("button", { name: "화면 다시 열기" });
+  const attempts = () => page.evaluate(() => window.__photoDurability.activationAttempts);
+  await expect.poll(attempts).toBe(2); await expect(error).toBeVisible();
+  expect(await page.evaluate(() => window.__photoDurability.coordinator.canBegin("customer"))).toBe(false);
+  expect(await attempts()).toBe(2);
+  expect(evidence.requests).toEqual([]); expect(evidence.errors).toEqual([]); expect(evidence.external).toEqual([]);
 });
 
 test("a photo survives closing the page during source reading and resumes with the same request", async ({ context }) => {

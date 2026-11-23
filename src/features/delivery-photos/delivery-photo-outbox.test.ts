@@ -269,6 +269,7 @@ describe("durable unsent-photo outbox", () => {
     const job = coordinator.begin("customer", "camera")!; const accepting = coordinator.acceptNativeSource(job.jobId, native);
     await until(() => expect(read).toHaveBeenCalled());
     expect(coordinator.canBegin("another-customer")).toBe(false);
+    expect(coordinator.captureBlockReason("another-customer")).toBe("reading");
     expect(coordinator.canRetry(job.jobId)).toBe(false);
     expect(await coordinator.retry(job.jobId)).toBe(false);
     await coordinator.clear();

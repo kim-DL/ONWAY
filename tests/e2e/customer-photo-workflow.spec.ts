@@ -150,8 +150,15 @@ test("cancelling keeps the row, finishing during upload preserves focus and one 
   await expect(camera(page)).toBeFocused(); await expect(page.locator("summary")).toHaveText("기록완료 0곳");
   uploading.release();
   await expect(page.locator("summary")).toHaveText("기록완료 1곳");
-  await page.locator("summary").click();
-  await expect(page.getByRole("button", { name: / 사진 기록$/ })).toContainText("사진 1장");
+  const completed = page.locator("[data-photo-list=completed]");
+  await expect(completed.locator("li")).toHaveCount(0);
+  await completed.locator("summary").click();
+  await expect(completed.getByRole("button", { name: / 사진 기록$/ })).toContainText("사진 1장");
+  const originalRow = await completed.locator("li").elementHandle();
+  await completed.locator("summary").click();
+  await completed.locator("summary").click();
+  await expect(completed.getByRole("button", { name: / 사진 기록$/ })).toBeVisible();
+  expect(await originalRow!.evaluate(row => row.isConnected)).toBe(true);
   expect(uploads).toHaveLength(1);
 });
 
@@ -205,7 +212,7 @@ test("a failed stored photo links to the item that can be retried", async ({ pag
   const uploads = await install(context);
   await page.goto(origin + "/?seed&failed"); await page.locator("input").setInputFiles(file());
   await expect(page.locator("output")).not.toBeEmpty(); const id = await page.locator("output").innerText();
-  await page.goto(origin); await page.getByRole("button", { name: "재시도 필요" }).click();
+  await page.goto(origin); await page.getByRole("button", { name: "보관 상태 확인" }).click();
   await expect(page.locator(`#photo-job-${id}`)).toBeFocused();
   await page.getByRole("button", { name: "보관 다시 시도" }).click();
   await expect(page.locator("summary")).toHaveText("기록완료 1곳"); expect(uploads).toEqual([id]);
@@ -266,4 +273,25 @@ test("photo, capture, outbox, date history and editor controls fit long names at
   await check("continuous", pin);
   await page.goto(origin + "/?detail"); await expect(page.getByRole("button", { name: / 사진 촬영$/ })).toBeEnabled();
   await check("entry", page.getByRole("region", { name: "납품사진 기록 대상" }));
+});
+
+test("the album menu can replace an unresolved camera and save from the new picker", async ({ page, context }) => {
+  const uploads = await install(context);
+  await page.goto(origin);
+  const first = page.waitForEvent("filechooser");
+  await camera(page).click();
+  await first;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.getByRole("button", { name: / 더보기$/ }).click();
+  await page.getByRole("button", { name: "앨범에서 사진 추가" }).click();
+  const choice = page.getByRole("dialog", { name: /사진을 기다리고 있어요$/ });
+  await expect(choice).toBeVisible();
+  await expect(page.getByRole("dialog", { name: / 더보기$/ })).toHaveCount(0);
+  const album = page.waitForEvent("filechooser");
+  await choice.getByRole("button", { name: "앨범 열기" }).click();
+  const input = await album;
+  expect(await input.element().getAttribute("capture")).toBeNull();
+  await input.setFiles(file());
+  await expect(page.getByText("✓ 저장 완료", { exact: true })).toBeVisible();
+  expect(uploads).toHaveLength(1);
 });

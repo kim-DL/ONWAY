@@ -113,18 +113,21 @@ export class PhotoOutboxWorker {
     if (this.restoring) return false;
     this.restoring = true;
     try {
+      // The database snapshot can arrive after a local upload has advanced.
+      const jobsAtRead = new Map(jobs);
       const records = await this.store.list(this.scope); const workers = records.length ? await this.liveWorkers() : undefined;
       if (!live()) return false;
       const ids = new Set(records.map((record) => record.job.jobId));
       for (const [id, job] of jobs) {
-        if (job.durable && job.status !== "completed" && !ids.has(id) && !active.has(id)) {
+        if (jobsAtRead.get(id) === job && job.durable && job.status !== "completed" && !ids.has(id) && !active.has(id)) {
           remove(id);
           if (typeof window !== "undefined") window.dispatchEvent(new Event("onnuriway:delivery-photo-reconcile"));
         }
       }
       for (const record of records) {
         const id = record.job.jobId;
-        if (active.has(id) || jobs.get(id)?.status === "persisting") continue;
+        const local = jobs.get(id);
+        if (local !== jobsAtRead.get(id) || active.has(id) || local?.status === "persisting") continue;
         if (record.job.status !== "completed") {
           if (record.approvedDay !== today) record.job = { ...record.job, status: "paused", message: PREVIOUS_DAY_MESSAGE };
           else if ((!record.lease || record.lease.until <= now || workers && !workers.includes(record.lease.worker))
@@ -133,7 +136,6 @@ export class PhotoOutboxWorker {
           }
           // A failed storage operation cannot persist its own error. Keep the
           // visible manual-retry state unless another tab confirmed this photo.
-          const local = jobs.get(id);
           if (record.approvedDay === today && local?.status === "failed" && local.errorCategory === "storage") record.job = local;
         }
         accept(record);

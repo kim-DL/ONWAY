@@ -115,6 +115,16 @@ test("closed customers retain history but cannot start a new photo record", asyn
   await expect(page.getByRole("button", { name: /납품사진 기록,/ })).toBeEnabled();
 });
 
+test("catalog failure replaces target loading with one retry and keeps the detail return available", async ({ page }) => {
+  await openDetail(page, "?catalogError");
+  await page.getByRole("button", { name: /납품사진 기록하기$/ }).click();
+  await expect(page.getByRole("alert")).toContainText("거래처 정보를 불러오지 못했습니다.");
+  await expect(page.getByText("선택한 거래처 불러오는 중")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "거래처 상세로 돌아가기" })).toBeVisible();
+  await page.getByRole("button", { name: "다시 시도", exact: true }).click();
+  await expect(page.getByRole("button", { name: /사진 촬영$/ })).toBeEnabled();
+});
+
 test("camera and album wait for upload storage without blocking the entry", async ({ page }) => {
   await openDetail(page, "?uploadLoading");
   const record = page.getByRole("button", { name: /납품사진 기록하기$/ });

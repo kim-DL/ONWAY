@@ -30,8 +30,10 @@ function Cards() {
       <ul className={styles.list} aria-label="검색된 납품처">
         {examples.map((customer, index) => <DeliveryPhotoRow key={customer.customerId} customer={customer}
           count={index === 1 ? 2 : 0} latestAt={index === 1 ? "2026-11-04T02:26:00.000Z" : undefined}
-          uploadReady={index !== 4} inToday={index === 3 || added.includes(customer.customerId)}
-          pendingCount={index === 3 ? 3 : 0} job={index === 2 ? failed : undefined} retryJob={index === 2 ? failed : undefined}
+          blocked={index === 4 ? "opening" : index === 3 ? "customerLimit" : null} inToday={index === 3 || added.includes(customer.customerId)}
+          pendingCount={index === 3 ? 3 : index === 2 || index === 1 ? 1 : 0}
+          job={index === 1 || index === 3 ? { ...failed, status: "uploading", errorCategory: null } : undefined}
+          attention={index === 2 ? failed : undefined} onShowJob={id => record("show", id)}
           onView={value => record("history", value.customerId)} onCapture={value => record("camera", value.customerId)}
           onMore={value => { record("more", value.customerId); setMore(value); }} onRetry={id => record("retry", id)} />)}
       </ul>

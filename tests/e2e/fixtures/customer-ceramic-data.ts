@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DeliveryPhotoInputController } from "../../../src/features/delivery-photos/delivery-photo-input-controller";
 import { getCustomerChoseong, normalizeCustomerName, type Customer } from "../../../src/domain/customer";
 import type { AuthenticatedSession } from "../../../src/features/auth/auth-context";
 import { deliveryPhotoDateKey } from "../../../src/features/delivery-photos/delivery-photo-memory";
@@ -35,6 +36,6 @@ export function useDeliveryPhotoData() {
 export function useDeliveryPhotoCatalog() { return { customers, status: "ready", retry() {} }; }
 export function useDeliveryPhotoUploads() {
   const photoSamples = new URLSearchParams(location.search).has("photoSamples");
-  return { coordinator: photoSamples ? { canBegin: () => true, begin: () => null } : null, jobs: [],
-    byCustomer: new Map(), ready: photoSamples, storageError: false };
+  return { coordinator: photoSamples ? { globalCaptureBlockReason: () => null, captureBlockReason: () => null, canBegin: () => true, begin: () => null } : null, jobs: [],
+    byCustomer: new Map(), Inputs: photoSamples ? DeliveryPhotoInputController : null, ready: photoSamples, storageError: false };
 }

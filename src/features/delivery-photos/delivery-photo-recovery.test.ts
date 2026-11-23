@@ -93,6 +93,39 @@ describe("durable photo automatic recovery", () => {
     expect(create).toHaveBeenCalledOnce();
   });
 
+  it("keeps a server confirmation when an older foreground read finishes after upload", async () => {
+    const storedClaim = deliveryPhotoOutbox.claim.bind(deliveryPhotoOutbox);
+    let releaseClaim!: () => void;
+    const waitingForClaim = new Promise<void>((resolve) => { releaseClaim = resolve; });
+    const claim = vi.spyOn(deliveryPhotoOutbox, "claim").mockImplementationOnce(async (...args) => {
+      await waitingForClaim; return storedClaim(...args);
+    });
+    const create = vi.fn(async () => metadata());
+    const { coordinator, viewport } = await restore(saved({ status: "queued", errorCategory: null }), create);
+    await vi.waitFor(() => expect(claim).toHaveBeenCalled());
+    const storedList = deliveryPhotoOutbox.list.bind(deliveryPhotoOutbox);
+    let gotSnapshot!: () => void; let releaseSnapshot!: () => void;
+    const snapshotRead = new Promise<void>((resolve) => { gotSnapshot = resolve; });
+    const waitingForSnapshot = new Promise<void>((resolve) => { releaseSnapshot = resolve; });
+    vi.spyOn(deliveryPhotoOutbox, "list").mockImplementationOnce(async (scope) => {
+      const records = await storedList(scope); gotSnapshot(); await waitingForSnapshot; return records;
+    });
+    viewport.dispatchEvent(new Event("focus"));
+    await snapshotRead; releaseClaim();
+    await vi.waitFor(() => expect(coordinator.getSnapshot()[0]?.status).toBe("completed"));
+    const states: string[] = [];
+    const stop = coordinator.subscribe(() => { states.push(coordinator.getSnapshot()[0]?.status ?? "missing"); });
+    releaseSnapshot();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    stop();
+    const scope = await deliveryPhotoOutbox.activate(deliveryPhotoUploadNamespace(session));
+    expect((await storedList(scope))[0]?.job.status).toBe("completed");
+    viewport.dispatchEvent(new Event("focus"));
+    await vi.waitFor(() => expect(coordinator.getSnapshot()[0]?.status).toBe("completed"));
+    expect(states).not.toContain("queued");
+    expect(create).toHaveBeenCalledOnce();
+  });
+
   it("retains a foreground signal received while a polling restore is pending", async () => {
     const create = vi.fn(async () => metadata());
     const state = await restore(saved({ updatedAt: capturedAt + 60_000, retryAt: capturedAt + 360_000 }), create, 10);

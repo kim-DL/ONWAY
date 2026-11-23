@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { customerSchema, getCustomerChoseong, normalizeCustomerName, type Customer } from "@/domain/customer";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { DeliveryPhotoRow } from "./delivery-photo-row";
+import { DeliveryPhotoInputController } from "./delivery-photo-input-controller";
 import { DeliveryPhotoWorkspace } from "./delivery-photo-workspace";
 import DeliveryPhotoToolbar from "./delivery-photo-toolbar";
 
@@ -25,10 +26,15 @@ const customer: Customer = customerSchema.parse({
 });
 
 describe("delivery photo field workspace", () => {
-  it("renders a non-blocking loading shell with stable native camera and album inputs", () => {
+  it("renders the loading shell while capture is unavailable", () => {
     const html = renderToStaticMarkup(createElement(DeliveryPhotoWorkspace, { session }));
     expect(html).toContain("납품사진");
     expect(html).toContain("불러오는 중");
+    expect(html).not.toContain("data-camera-customer");
+  });
+
+  it("mounts exactly one native input for each source when capture is ready", () => {
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoInputController, { coordinator: null, jobs: [], names: new Map() }));
     expect(html).toContain('aria-label="납품사진 카메라 촬영"');
     expect(html).toContain('capture="environment"');
     expect(html).toContain('aria-label="납품사진 앨범 선택"');
@@ -61,14 +67,14 @@ describe("delivery photo field workspace", () => {
     { value: { ...customer, administrativeDong: "" }, expected: "출입비번 00123*" },
     { value: { ...customer, administrativeDong: "", accessPassword: "", accessPasswordState: "unknown" as const }, expected: "" },
   ])("formats existing customer location/password data without placeholders", ({ value, expected }) => {
-    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer: value, uploadReady: true,
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer: value, blocked: null,
       onView: () => undefined, onCapture: () => undefined, onMore: () => undefined, onRetry: () => undefined }));
     if (expected) expect(html).toContain(expected);
     else expect(html).not.toContain("<small");
   });
 
   it("makes the information area the sole history action and keeps camera and more separate", () => {
-    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, count: 3, latestAt: "2026-09-24T01:42:00.000Z", uploadReady: true,
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, count: 3, latestAt: "2026-09-24T01:42:00.000Z", blocked: null,
       onView: () => undefined, onCapture: () => undefined, onMore: () => undefined, onRetry: () => undefined }));
     expect(html).toContain("탄방동 · 출입비번 00123*");
     expect(html).toContain("사진 3장 · 마지막 등록 10:42");
@@ -79,7 +85,7 @@ describe("delivery photo field workspace", () => {
   });
 
   it("exposes history before a customer has a photo today", () => {
-    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, uploadReady: true,
+    const html = renderToStaticMarkup(createElement(DeliveryPhotoRow, { customer, blocked: null,
       onView: () => undefined, onCapture: () => undefined, onMore: () => undefined, onRetry: () => undefined }));
     expect(html).toContain('aria-label="농진 사진 기록"');
     expect(html).toContain('aria-label="농진 카메라 촬영"');
