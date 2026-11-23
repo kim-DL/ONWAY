@@ -2,16 +2,17 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { AuthHeader, AuthLoadingScreen, LaunchTimingProvider } from "./auth-loading";
+import { AuthLoadingScreen, LaunchTimingProvider } from "./auth-loading";
 
 describe("privacy-safe application entry", () => {
-  it.each(["boot", "session", "workspace"] as const)("keeps the same public header and one status during %s", (stage) => {
-    const header = renderToStaticMarkup(createElement(AuthHeader));
+  it.each(["boot", "session", "workspace"] as const)("shows the company name and local logo with one status during %s", (stage) => {
     const markup = renderToStaticMarkup(createElement(LaunchTimingProvider, null,
       createElement(AuthLoadingScreen, { stage })));
-    expect(markup).toContain(header);
-    expect(markup).toContain('class="auth-launch-group"');
-    expect(markup).toContain('href="/brand/onnuri-food-logo-auth.webp"');
+    expect(markup).toContain('class="auth-launch-brand"');
+    expect(markup).toContain('src="/brand/onnuri-food-logo-auth.webp"');
+    const heading = markup.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1];
+    expect(heading?.replace(/<wbr\s*\/?>/g, "")).toBe("온누리종합식품");
+    expect(markup).not.toContain("급식길");
     expect(markup).not.toContain("/icons/");
     expect(markup.match(/role="status"/g)).toHaveLength(1);
     expect(markup).toContain(`data-auth-stage="${stage}"`);

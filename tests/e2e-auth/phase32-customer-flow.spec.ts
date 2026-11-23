@@ -207,8 +207,8 @@ test("mobile network handoff preserves the current customer and explicit logout 
 
 test("recent customers keep selected results within the ten-row limit, deduplicate, survive return and clear safely", async ({ page }, testInfo) => {
   await login(page, true, false);
-  await expect(page.locator("[data-customer-workspace] [data-freshness]")).toHaveAttribute("data-freshness", "fresh");
-  await expect(page.locator("[data-customer-workspace] [data-freshness]")).toContainText("마지막 확인");
+  await expect(page.getByRole("button", { name: "전체보기", exact: true })).toBeEnabled();
+  await expect(page.locator("[data-customer-workspace] [data-freshness]")).toHaveCount(0);
   await expect(page.locator("[data-customer-card]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /자주 찾는 거래처/ })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("customer-home-empty.png"), fullPage: true });

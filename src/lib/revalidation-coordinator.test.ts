@@ -18,7 +18,7 @@ describe("memory-only revalidation coordinator", () => {
 
     resolve("ready");
     await expect(first.promise).resolves.toBe("ready");
-    expect(coordinator.getLastSuccessAt()).toBe(1_000);
+    expect(coordinator.remainingTtl(true)).toBe(60_000);
     now = 60_999;
     expect(coordinator.run(task, { hasData: true }).kind).toBe("skipped");
     expect(task).toHaveBeenCalledOnce();
@@ -37,14 +37,14 @@ describe("memory-only revalidation coordinator", () => {
     expect(task).toHaveBeenCalledTimes(3);
 
     coordinator.invalidate();
-    expect(coordinator.getLastSuccessAt()).toBeNull();
+    expect(coordinator.remainingTtl(true)).toBe(0);
     expect(coordinator.run(task, { hasData: true }).kind).toBe("started");
   });
 
   it("does not mark a failed or invalidated request as fresh", async () => {
     const failed = new RevalidationCoordinator("EMP:1:1");
     await expect(failed.run(async () => { throw new Error("offline"); }, { hasData: true }).promise).rejects.toThrow("offline");
-    expect(failed.getLastSuccessAt()).toBeNull();
+    expect(failed.remainingTtl(true)).toBe(0);
 
     let resolve!: () => void;
     const invalidated = new RevalidationCoordinator("EMP:1:1", 60_000, () => 5_000);
@@ -52,7 +52,7 @@ describe("memory-only revalidation coordinator", () => {
     invalidated.invalidate();
     resolve();
     await run.promise;
-    expect(invalidated.getLastSuccessAt()).toBeNull();
+    expect(invalidated.remainingTtl(true)).toBe(0);
   });
 
   it("invalidates progressive callbacks from an older generation", () => {
@@ -65,10 +65,9 @@ describe("memory-only revalidation coordinator", () => {
   });
 
   it("distinguishes quiet success, background refresh, and stale fallback text", () => {
-    const checkedAt = new Date(2026, 8, 20, 13, 5).getTime();
-    expect(revalidationFreshnessText("fresh", checkedAt)).toMatch(/^마지막 확인 /);
-    expect(revalidationFreshnessText("refreshing", checkedAt)).toMatch(/^최신 정보 확인 중 · 마지막 확인 /);
-    expect(revalidationFreshnessText("stale-error", checkedAt)).toMatch(/^갱신 실패 · 기존 정보 표시 · 마지막 확인 /);
-    expect(revalidationFreshnessText("idle", null)).toBe("");
+    expect(revalidationFreshnessText("fresh")).toBe("");
+    expect(revalidationFreshnessText("refreshing")).toBe("최신 정보 확인 중");
+    expect(revalidationFreshnessText("stale-error")).toBe("갱신 실패 · 기존 정보 표시");
+    expect(revalidationFreshnessText("idle")).toBe("");
   });
 });

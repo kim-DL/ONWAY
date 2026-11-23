@@ -83,16 +83,16 @@ describe("sensitive customer repository lifecycle", () => {
     const receive = vi.fn(); const error = vi.fn();
     cleanups.push(customerRepository.subscribe("one:1:1", receive, error));
     await vi.advanceTimersByTimeAsync(0);
-    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
+    expect(receive).toHaveBeenLastCalledWith([customer]);
     connection.onLine = false; viewport.dispatchEvent(new Event("offline"));
-    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
+    expect(receive).toHaveBeenLastCalledWith([customer]);
     expect(readCustomerWorkspaceSnapshot("one:1:1").catalog?.customers).toEqual([customer]);
     expect(error).toHaveBeenLastCalledWith(expect.objectContaining({ code: "unavailable" }), true);
     connection.onLine = true; viewport.dispatchEvent(new Event("online"));
     await vi.advanceTimersByTimeAsync(0);
     expect(sdk.call).toHaveBeenCalledTimes(2);
     auth.currentUser = null; sdk.authListener?.(null);
-    expect(receive).toHaveBeenLastCalledWith([], expect.any(Number));
+    expect(receive).toHaveBeenLastCalledWith([]);
     expect(readCustomerWorkspaceSnapshot("one:1:1").catalog).toBeNull();
   });
   it("does not send offline writes from a retained editor", async () => {
@@ -125,7 +125,7 @@ describe("sensitive customer repository lifecycle", () => {
 
     await vi.advanceTimersByTimeAsync(60_000);
     expect(sdk.call).toHaveBeenCalledTimes(2);
-    expect(freshness).toHaveBeenLastCalledWith({ status: "fresh", lastSuccessAt: expect.any(Number) });
+    expect(freshness).toHaveBeenLastCalledWith("fresh");
   });
   it("keeps the successful list visible when a background refresh fails", async () => {
     const receive = vi.fn(); const error = vi.fn(); const freshness = vi.fn();
@@ -134,9 +134,9 @@ describe("sensitive customer repository lifecycle", () => {
     sdk.call.mockRejectedValueOnce({ code: "functions/unavailable" });
     await vi.advanceTimersByTimeAsync(60_000);
     expect(receive).toHaveBeenCalledTimes(1);
-    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
+    expect(receive).toHaveBeenLastCalledWith([customer]);
     expect(error).toHaveBeenLastCalledWith({ code: "functions/unavailable" }, true);
-    expect(freshness).toHaveBeenLastCalledWith({ status: "stale-error", lastSuccessAt: expect.any(Number) });
+    expect(freshness).toHaveBeenLastCalledWith("stale-error");
   });
   it("deduplicates an in-flight refresh across lifecycle events", async () => {
     let resolve!: (value: unknown) => void;
@@ -165,7 +165,7 @@ describe("sensitive customer repository lifecycle", () => {
     cleanups.push(customerRepository.subscribe("one:1:1", staleReceive, vi.fn(), vi.fn(), { hasData: true }));
     await vi.advanceTimersByTimeAsync(0);
     expect(sdk.call).toHaveBeenCalledTimes(2);
-    expect(staleReceive).toHaveBeenCalledWith([customer], expect.any(Number));
+    expect(staleReceive).toHaveBeenCalledWith([customer]);
   });
   it("renders safe localized errors and never returns backend input strings", () => {
     expect(customerErrorMessage({ code: "functions/aborted", message: "00123*" })).toContain("다른 직원이");
@@ -177,7 +177,7 @@ describe("sensitive customer repository lifecycle", () => {
     const receive = vi.fn(); const error = vi.fn();
     cleanups.push(customerRepository.subscribe("one:1:1", receive, error));
     await vi.advanceTimersByTimeAsync(0);
-    expect(receive).toHaveBeenCalledWith([], expect.any(Number)); expect(error).toHaveBeenCalledTimes(1); expect(sdk.call).not.toHaveBeenCalled();
+    expect(receive).toHaveBeenCalledWith([]); expect(error).toHaveBeenCalledTimes(1); expect(sdk.call).not.toHaveBeenCalled();
   });
   it("immediately revalidates a reconnect that occurred while the old request was pending", async () => {
     let resolve!: (value: unknown) => void;
@@ -189,6 +189,6 @@ describe("sensitive customer repository lifecycle", () => {
     resolve({ data: { customers: [customer], nextCursor: null } });
     await vi.advanceTimersByTimeAsync(0);
     expect(sdk.call).toHaveBeenCalledTimes(2);
-    expect(receive).toHaveBeenLastCalledWith([customer], expect.any(Number));
+    expect(receive).toHaveBeenLastCalledWith([customer]);
   });
 });

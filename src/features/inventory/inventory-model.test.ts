@@ -80,9 +80,9 @@ describe("inventory catalog model", () => {
     expect(matchesInventorySearch(product(), "소고기")).toBe(false);
   });
   it("preserves legacy matching for Unicode forms, punctuation and cross-field substrings", () => {
-    const items = [product(), product({ name: "닭·가슴살", manufacturer: "ＡＢＣ", specification: "１００Ｇ", origin: "국내 산" }),
+    const items = [product(), product({ name: "닭·가슴살", manufacturer: "ＡＢＣ İΣ𐐀", specification: "１００Ｇ", origin: "국내 산" }),
       product({ name: "닭 가슴살".normalize("NFD"), manufacturer: "ㄱㄴ 식품", specification: "A-01", origin: "" })];
-    const queries = ["", " \t\n", "닭가슴살", "ㄷㄱㅅ", "ᄃᄀᄉ", "닭 가슴살".normalize("NFD"), "살온누리", "1kg국내", "ＡＢＣ", "abc", "100g", "１００Ｇ", "닭·가슴", "닭가슴", "A-01", "a01", "ㄱㄴ", "ㄱㄴㅅ", "없는품목", "product-1"];
+    const queries = ["", " \t\n", "닭가슴살", "ㄷㄱㅅ", "ᄃᄀᄉ", "닭 가슴살".normalize("NFD"), "살온누리", "1kg국내", "ＡＢＣ", "abc", "100g", "１００Ｇ", "İΣ𐐀", "𐐨", "닭·가슴", "닭가슴", "A-01", "a01", "ㄱㄴ", "ㄱㄴㅅ", "없는품목", "product-1"];
     // Frozen pre-optimization expression is the oracle: notably initials are
     // extracted before NFKC, and punctuation is retained rather than stripped.
     const previousNormalize = (value: string) => value.normalize("NFKC").toLocaleLowerCase("ko-KR").replace(/\s+/gu, "");

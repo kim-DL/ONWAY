@@ -1,12 +1,9 @@
 import { INVENTORY_LOCATIONS, INVENTORY_MAX_QUANTITY, inventoryExpiryDays, type InventoryContext, type InventoryLocation, type InventoryLot, type InventoryProduct } from "@/domain/inventory";
 
 const INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
-function normalize(value: string) { return value.normalize("NFKC").toLocaleLowerCase("ko-KR").replace(/\s+/gu, ""); }
+function normalize(value: string) { return value.normalize("NFKC").toLowerCase().replace(/\s+/gu, ""); }
 export function inventoryInitials(value: string): string {
-  return Array.from(value, (character) => {
-    const code = character.charCodeAt(0) - 0xac00;
-    return code >= 0 && code <= 11171 ? INITIALS[Math.floor(code / 588)] : character;
-  }).join("");
+  return value.replace(/[가-힣]/g, (syllable) => INITIALS[Math.floor((syllable.charCodeAt(0) - 0xac00) / 588)]!);
 }
 export function inventorySearchText(product: InventoryProduct) {
   const target = [product.name, product.manufacturer, product.specification, product.origin].join(" ");

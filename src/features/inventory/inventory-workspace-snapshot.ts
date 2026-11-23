@@ -10,7 +10,7 @@ export type InventoryWorkspaceSnapshot = {
     products: InventoryProduct[];
     observedDate: string;
     freshness: RevalidationFreshness;
-    lastSuccessAt: number | null;
+    complete: boolean;
   };
   ui: { location: InventoryLocationFilter; query: string; urgentOnly: boolean; showInactive: boolean; limit: number; scrollTop: number };
 };
@@ -65,11 +65,11 @@ export function subscribeInventoryCatalog(namespace: string, listener: (catalog:
   return () => current.listeners.delete(listener);
 }
 
-export function updateInventoryCatalogFreshness(namespace: string, freshness: RevalidationFreshness, lastSuccessAt: number | null) {
+export function updateInventoryCatalogFreshness(namespace: string, freshness: RevalidationFreshness) {
   const current = entry;
   if (!current || current.namespace !== namespace) return;
   if (!current.snapshot.catalog) return;
-  current.snapshot = { ...current.snapshot, catalog: { ...current.snapshot.catalog, freshness, lastSuccessAt: lastSuccessAt ?? current.snapshot.catalog.lastSuccessAt } };
+  current.snapshot = { ...current.snapshot, catalog: { ...current.snapshot.catalog, freshness } };
 }
 
 export function updateInventorySnapshotProduct(namespace: string, product: InventoryProduct) {

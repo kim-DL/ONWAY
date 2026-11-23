@@ -33,7 +33,7 @@ export const useLaunchTiming = () => useContext(LaunchTimingContext);
 export function AuthBrand({ company = false }: { company?: boolean } = {}) {
   return (
     <div className="auth-brand" aria-label={company ? "온누리종합식품" : "급식길"}>
-      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark variant="auth" /></span>
+      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark variant="company" /></span>
       <span><strong>{company ? "온누리종합식품" : "급식길"}</strong>{company ? null : <small>온누리종합식품</small>}</span>
     </div>
   );
@@ -44,7 +44,7 @@ export function AuthHeader({ company = false }: { company?: boolean } = {}) {
 }
 
 const launchLabels = {
-  boot: "급식길 여는 중",
+  boot: "앱을 여는 중",
   session: "로그인 확인 중",
   workspace: "업무 화면 여는 중",
 };
@@ -64,16 +64,19 @@ export function AuthLoadingScreen({ stage, message, waitingForConnection = false
   return (
     <main className="auth-shell auth-shell--launch" data-auth-stage={waitingForConnection ? "connection" : stage}>
       <div className="auth-launch-group">
-        <AuthHeader />
-        <section className="auth-launch-content" aria-label="급식길 준비">
-          <h1 className="sr-only">급식길</h1>
+        <div className="auth-launch-brand">
+          {/* eslint-disable-next-line @next/next/no-img-element -- The shared offline logo is already sized and compressed. */}
+          <img src="/brand/onnuri-food-logo-auth.webp" width={576} height={214} alt="" />
+          <h1>온누리<wbr />종합식품</h1>
+        </div>
+        <div className="auth-launch-content">
           <LoadingStatus
             label={message ?? launchLabels[stage]}
             detail={message ? undefined : launchDetails[stage]}
             startedAt={startedAt}
             indicator={!waitingForConnection}
           />
-        </section>
+        </div>
       </div>
     </main>
   );

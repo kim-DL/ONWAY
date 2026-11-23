@@ -62,6 +62,10 @@ const serwist = new Serwist({
   precacheOptions: {
     cacheName: PWA_CACHE_NAMES.appShell,
     cleanupOutdatedCaches: true,
+    // A notification opens the same static document. Preserve the query in the
+    // address bar so the authenticated workspace can consume the inbox intent.
+    urlManipulation: ({ url }) =>
+      isAppShellPath(url.pathname) && url.search === "?inventoryInbox=1" ? [new URL("/", url)] : [],
   },
   skipWaiting: false,
   clientsClaim: true,

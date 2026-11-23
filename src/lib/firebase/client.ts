@@ -1,145 +1,40 @@
 import "client-only";
 
-import { FirebaseError, getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import {
-  getToken,
-  initializeAppCheck,
-  ReCaptchaEnterpriseProvider,
-  type AppCheck,
-} from "firebase/app-check";
-import {
-  browserLocalPersistence,
-  browserPopupRedirectResolver,
-  browserSessionPersistence,
-  connectAuthEmulator,
-  getAuth,
-  indexedDBLocalPersistence,
-  initializeAuth,
-  type Auth,
-} from "firebase/auth";
-import {
-  connectFirestoreEmulator,
-  getFirestore,
-  initializeFirestore,
-  memoryLocalCache,
-  type Firestore,
-} from "firebase/firestore";
-import {
-  connectFunctionsEmulator,
-  getFunctions,
-  type Functions,
-} from "firebase/functions";
-import { getFirebasePublicConfig } from "./config";
+import { FirebaseError } from "firebase/app";
+import { connectFirestoreEmulator, getFirestore, initializeFirestore, memoryLocalCache, type Firestore } from "firebase/firestore";
+import { getFirebaseAuthServices, type FirebaseAuthServices } from "./auth-client";
 
-export interface FirebaseClientServices {
-  app: FirebaseApp;
-  auth: Auth;
+export { ensureFirebaseAppCheckReady } from "./auth-client";
+
+export interface FirebaseClientServices extends FirebaseAuthServices {
   firestore: Firestore;
-  functions: Functions;
 }
 
 const emulatorMarker = Symbol.for("onnuriway.firebase-emulators-connected");
 let services: FirebaseClientServices | null | undefined;
-let appCheck: AppCheck | undefined;
-
-function getClientAuth(app: FirebaseApp): Auth {
-  try {
-    // AuthProvider keeps sessions in localStorage. Prefer that same backend
-    // during initialization so opening another tab cannot migrate it away.
-    return initializeAuth(app, {
-      persistence: [browserLocalPersistence, indexedDBLocalPersistence, browserSessionPersistence],
-      popupRedirectResolver: browserPopupRedirectResolver,
-    });
-  } catch (error) {
-    if (error instanceof FirebaseError && error.code === "auth/already-initialized") return getAuth(app);
-    throw error;
-  }
-}
 
 export function getFirebaseClientServices(): FirebaseClientServices | null {
-  if (services !== undefined) {
-    return services;
-  }
-
-  const config = getFirebasePublicConfig();
-
-  if (!config) {
+  if (services !== undefined) return services;
+  const authServices = getFirebaseAuthServices();
+  if (!authServices) {
     services = null;
     return services;
   }
-
-  const usesEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
-  const appCheckSiteKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY;
-  if (!usesEmulators && !appCheckSiteKey) {
-    services = null;
-    return services;
-  }
-
-  const appAlreadyExists = getApps().length > 0;
-  const app = appAlreadyExists ? getApp() : initializeApp(config);
-  if (
-    !usesEmulators &&
-    appCheckSiteKey
-  ) {
-    // The SDK reuses the instance for identical options, including after HMR.
-    appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
-      isTokenAutoRefreshEnabled: true,
-    });
-  }
-  const firestore = appAlreadyExists
-    ? getFirestore(app)
-    : initializeFirestore(app, { localCache: memoryLocalCache() });
-
-  services = {
-    app,
-    auth: getClientAuth(app),
-    firestore,
-    functions: getFunctions(app, "asia-northeast3"),
-  };
-
-  connectLocalEmulators(services);
-  return services;
-}
-
-/** Validate this app before sending a PIN; never expose or persist its token ourselves. */
-export async function ensureFirebaseAppCheckReady(): Promise<void> {
-  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") return;
-  if (!getFirebaseClientServices() || !appCheck) {
-    throw new FirebaseError("appCheck/unconfigured", "App verification is unavailable.");
-  }
-
-  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let firestore: Firestore;
   try {
-    await Promise.race([
-      // Reuse the SDK cache/in-flight request instead of forcing a new assessment.
-      getToken(appCheck, false),
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new FirebaseError(
-          "appCheck/deadline-exceeded", "App verification timed out.",
-        )), 12_000);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
+    firestore = initializeFirestore(authServices.app, { localCache: memoryLocalCache() });
+  } catch (error) {
+    // An app initialized by another entry point retains its Firestore settings.
+    if (!(error instanceof FirebaseError) || error.code !== "failed-precondition") throw error;
+    firestore = getFirestore(authServices.app);
   }
-}
-
-function connectLocalEmulators(firebase: FirebaseClientServices): void {
-  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS !== "true") {
-    return;
+  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") {
+    const host = globalThis as typeof globalThis & Record<symbol, boolean>;
+    if (!host[emulatorMarker]) {
+      connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
+      host[emulatorMarker] = true;
+    }
   }
-
-  const markerHost = globalThis as typeof globalThis & Record<symbol, boolean>;
-
-  if (markerHost[emulatorMarker]) {
-    return;
-  }
-
-  connectAuthEmulator(firebase.auth, "http://127.0.0.1:9099", {
-    disableWarnings: true,
-  });
-  connectFirestoreEmulator(firebase.firestore, "127.0.0.1", 8080);
-  connectFunctionsEmulator(firebase.functions, "127.0.0.1", 5001);
-  markerHost[emulatorMarker] = true;
+  services = { ...authServices, firestore };
+  return services;
 }

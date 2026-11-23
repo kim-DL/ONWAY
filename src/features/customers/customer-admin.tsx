@@ -33,7 +33,7 @@ function CustomerAdminContent({ session }: { session: AuthenticatedSession }) {
     <GlassButton onClick={() => setEditing("import")} disabled={catalog.status !== "ready"}>일괄 등록</GlassButton>
     <label className={styles.search}><Icon name="search" size={21} /><input {...searchInputProps} name="admin-customer-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="거래처명 또는 초성 검색" aria-label="관리할 거래처 검색" /></label>
     {catalog.status === "error" ? <div className={styles.empty} role="alert"><p>{catalog.message}</p><GlassButton onClick={catalog.retry}>다시 불러오기</GlassButton></div> : catalog.status === "loading" ? <p className={styles.empty} role="status">거래처 정보를 불러오고 있어요.</p> : <>
-      <CustomerCatalogFreshness freshness={catalog.freshness} lastSuccessAt={catalog.lastSuccessAt} onRetry={catalog.retry} />
+      <CustomerCatalogFreshness freshness={catalog.freshness} onRetry={catalog.retry} />
       <p className={styles.resultCount} role="status">{customers.length}곳</p>
       {customers.length ? <ul className={styles.adminList}>{customers.map((customer) => <li key={customer.customerId}><button type="button" onClick={() => setEditing(customer)} aria-label={`${customer.name} 수정`}><span><strong>{customer.name}</strong><small>{customerAddress(customer)}</small></span><CustomerBadges customer={customer} /><Icon name="chevron-right" size={20} /></button></li>)}</ul> : <div className={styles.empty}><h3>{query ? "등록된 거래처를 찾을 수 없습니다." : "등록된 거래처가 없습니다."}</h3><p>거래처 등록 버튼으로 납품 정보를 추가해주세요.</p></div>}
     </>}

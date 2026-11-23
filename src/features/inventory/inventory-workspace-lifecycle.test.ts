@@ -137,20 +137,20 @@ describe("inventory in-memory draft lifecycle", () => {
 
     render(); expect(isLoading()).toBe(true);
     const firstCleanup = harness.effects[0]!() as () => void; await settle();
-    expect(catalog()?.products).toEqual([first]);
+    expect(catalog()).toMatchObject({ products: [first], complete: false });
     expect(card(first.productId)?.product).toEqual(first);
     expect(isLoading()).toBe(false);
     firstCleanup();
 
     resetMountedInstance();
     render();
-    expect(catalog()?.products).toEqual([first]);
+    expect(catalog()).toMatchObject({ products: [first], complete: false });
     expect(card(first.productId)?.product).toEqual(first);
     expect(isLoading()).toBe(false);
     const secondCleanup = harness.effects[0]!() as () => void; await settle();
     expect(harness.list).toHaveBeenCalledOnce();
     finish(); await settle();
-    expect(catalog()?.products).toEqual([first, second]);
+    expect(catalog()).toMatchObject({ products: [first, second], complete: true });
     expect(card(second.productId)?.product).toEqual(second);
     expect(isLoading()).toBe(false);
     secondCleanup();

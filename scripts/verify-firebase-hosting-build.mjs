@@ -144,11 +144,12 @@ async function verifyLocal() {
   check(worker === await readFile(join(root, "public/sw.js"), "utf8"), "out/sw.js is stale relative to the latest generated worker.");
   check(worker.includes("SKIP_WAITING") && /skipWaiting\s*:\s*(?:!1|false)/u.test(worker), "PWA must retain explicit user-controlled updates.");
   const precached = parsePrecache(worker);
+  check(!precached.includes("/brand/onnuri-food-logo.png"), "Use the shared WebP for the offline company mark.");
   for (const pathname of precached) {
     check(pathname.startsWith("/_next/static/") || publicFiles.has(pathname), `Unexpected precached response: ${pathname}.`);
     check((await stat(outputFile(pathname))).isFile(), `Precached asset is missing from out: ${pathname}.`);
   }
-  for (const pathname of ["/", "/manifest.webmanifest", "/brand/onnuri-food-logo.png", launchLogo, ...panelAssets, ...actionIcons, ...manifest.icons.map((icon) => icon.src)])
+  for (const pathname of ["/", "/manifest.webmanifest", launchLogo, ...panelAssets, ...actionIcons, ...manifest.icons.map((icon) => icon.src)])
     check(precached.includes(pathname), `PWA installation asset is not precached: ${pathname}.`);
   for (const entry of precacheEntries(worker).filter((entry) => entry.url !== "/" && entry.url !== "/manifest.webmanifest" && !entry.url.startsWith("/_next/"))) {
     check(entry.revision === sha256(await readFile(outputFile(entry.url))), `Static public asset revision must follow its bytes: ${entry.url}.`);

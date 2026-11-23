@@ -35,8 +35,8 @@ async function fixture(page: Page, width = 320, kind = "navigation") {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("http://127.0.0.1:3102/admin-fixture", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>관리자 검증</title>" }));
   await page.goto("http://127.0.0.1:3102/admin-fixture");
-  await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
-    contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
+  await page.route("**/brand/onnuri-food-logo-auth.webp", (route) => route.fulfill({
+    contentType: "image/webp", body: readFileSync(new URL("../../public/brand/onnuri-food-logo-auth.webp", import.meta.url)),
   }));
   await page.route("**/icons/onnuriway-company-icon-192-v4.png", (route) => route.fulfill({
     contentType: "image/png", body: readFileSync(new URL("../../public/icons/onnuriway-company-icon-192-v4.png", import.meta.url)),

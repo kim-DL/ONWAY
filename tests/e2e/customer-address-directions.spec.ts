@@ -6,13 +6,13 @@ test.beforeAll(async () => {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/customer-address-directions.tsx", [{ name: "directions-isolation", setup(builder) {
     builder.initialOptions.define = { ...builder.initialOptions.define, "process.env.NEXT_PUBLIC_ENABLE_DELIVERY_PHOTOS": '"false"' };
-    builder.onResolve({ filter: /customer-repository$|firebase\/client$|^firebase\/functions$|^client-only$/ }, ({ path }) => ({ path, namespace: "directions-isolation" }));
+    builder.onResolve({ filter: /customer-repository$|auth-context$|firebase\/client$|^firebase\/functions$|^client-only$/ }, ({ path }) => ({ path, namespace: "directions-isolation" }));
     builder.onLoad({ filter: /.*/, namespace: "directions-isolation" }, ({ path }) => ({ loader: "ts", resolveDir: root, contents: path === "client-only" ? "export {};" : `
       export const customerRepository = {};
       export const customerErrorMessage=()=>"error";
       const user={uid:"fixture",getIdTokenResult:async()=>({claims:{employeeId:"fixture",sessionVersion:1,permissionsVersion:1}})};
       export const getFirebaseClientServices=()=>({auth:{currentUser:user},functions:{}});
-      export const getFirebaseAuthIfInitialized=()=>null;
+      export const useAuth=()=>({state:{status:"unauthenticated"}});
       export const ensureFirebaseAppCheckReady=async()=>{};
       export const httpsCallable=()=>async({query})=>{
         window.observeDirectionQuery?.(query);

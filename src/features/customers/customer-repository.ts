@@ -19,8 +19,6 @@ import {
   getCustomerRevalidationCoordinator, updateCustomerCatalogFreshness,
 } from "./customer-workspace-snapshot";
 
-export type CustomerRevalidationState = { status: RevalidationFreshness; lastSuccessAt: number | null };
-
 function customerFailure(code: "unauthenticated" | "unavailable" | "resource-exhausted") {
   return Object.assign(new Error(code), { code });
 }
@@ -70,9 +68,9 @@ async function list(): Promise<Customer[]> {
   return customers;
 }
 
-function subscribe(namespace: string, onData: (customers: Customer[], refreshedAt: number) => void,
+function subscribe(namespace: string, onData: (customers: Customer[]) => void,
   onError: (error: unknown, hadData: boolean) => void,
-  onFreshness: (state: CustomerRevalidationState) => void = () => undefined,
+  onFreshness: (status: RevalidationFreshness) => void = () => undefined,
   options: { hasData?: boolean; forceInitial?: boolean } = {}): () => void {
   const services = getFirebaseClientServices();
   if (!services?.auth.currentUser) {
@@ -93,7 +91,7 @@ function subscribe(namespace: string, onData: (customers: Customer[], refreshedA
     generation += 1;
     loaded = false;
     discardCustomerWorkspaceCatalog(namespace);
-    if (!closed) { onData([], Date.now()); onFreshness({ status: "idle", lastSuccessAt: null }); }
+    if (!closed) { onData([]); onFreshness("idle"); }
     clearTimeout(timer);
   };
   const schedule = () => {
@@ -113,18 +111,17 @@ function subscribe(namespace: string, onData: (customers: Customer[], refreshedA
     const requestGeneration = generation;
     clearTimeout(timer);
     if (loaded && run.kind === "started") {
-      updateCustomerCatalogFreshness(namespace, "refreshing", coordinator.getLastSuccessAt());
-      onFreshness({ status: "refreshing", lastSuccessAt: coordinator.getLastSuccessAt() });
+      updateCustomerCatalogFreshness(namespace, "refreshing");
+      onFreshness("refreshing");
     }
     try {
       const result = await run.promise;
       if (generation === requestGeneration && services.auth.currentUser?.uid === uid) {
         loaded = true;
-        const refreshedAt = coordinator.getLastSuccessAt() ?? Date.now();
-        const customers = commitCustomerCatalogRead(namespace, result.customers, refreshedAt, result.writeGeneration);
+        const customers = commitCustomerCatalogRead(namespace, result.customers, result.writeGeneration);
         if (!closed && customers) {
-          onData(customers, refreshedAt);
-          onFreshness({ status: "fresh", lastSuccessAt: refreshedAt });
+          onData(customers);
+          onFreshness("fresh");
         }
       }
     } catch (error) {
@@ -133,8 +130,8 @@ function subscribe(namespace: string, onData: (customers: Customer[], refreshedA
         const invalidSession = ["permission-denied", "unauthenticated", "failed-precondition"].some((reason) => code.endsWith(reason));
         if (invalidSession) { terminal = true; clear(); }
         else {
-          updateCustomerCatalogFreshness(namespace, loaded ? "stale-error" : "idle", coordinator.getLastSuccessAt());
-          onFreshness({ status: loaded ? "stale-error" : "idle", lastSuccessAt: coordinator.getLastSuccessAt() });
+          updateCustomerCatalogFreshness(namespace, loaded ? "stale-error" : "idle");
+          onFreshness(loaded ? "stale-error" : "idle");
         }
         onError(error, loaded && !invalidSession);
       }
@@ -159,10 +156,10 @@ function subscribe(namespace: string, onData: (customers: Customer[], refreshedA
     generation += 1;
     coordinator.invalidate();
     clearTimeout(timer);
-    if (!loaded) onData([], Date.now());
+    if (!loaded) onData([]);
     const status = loaded ? "stale-error" : "idle";
-    updateCustomerCatalogFreshness(namespace, status, null);
-    onFreshness({ status, lastSuccessAt: null });
+    updateCustomerCatalogFreshness(namespace, status);
+    onFreshness(status);
     onError(customerFailure("unavailable"), loaded);
   };
   const onOnline = () => void refresh();

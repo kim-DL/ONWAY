@@ -11,14 +11,14 @@ import {
   acceptCustomerWorkspaceWrite, discardCustomerWorkspaceCatalog, readCustomerWorkspaceSnapshot,
 } from "./customer-workspace-snapshot";
 
-type CustomerState = { key: string; status: "loading" | "ready" | "error"; customers: Customer[]; message: string; canRetainDraft: boolean; freshness: RevalidationFreshness; lastSuccessAt: number | null };
+type CustomerState = { key: string; status: "loading" | "ready" | "error"; customers: Customer[]; message: string; canRetainDraft: boolean; freshness: RevalidationFreshness };
 
 export function useCustomers(session: AuthenticatedSession, onSensitiveStateCleared?: () => void) {
   const key = `${session.uid}:${session.claims.sessionVersion}:${session.claims.permissionsVersion}`;
   const initialCatalog = readCustomerWorkspaceSnapshot(key).catalog;
   const [state, setState] = useState<CustomerState>(initialCatalog
-    ? { key, status: "ready", customers: initialCatalog.customers, message: "", canRetainDraft: true, freshness: initialCatalog.freshness, lastSuccessAt: initialCatalog.lastSuccessAt }
-    : { key, status: "loading", customers: [], message: "", canRetainDraft: false, freshness: "idle", lastSuccessAt: null });
+    ? { key, status: "ready", customers: initialCatalog.customers, message: "", canRetainDraft: true, freshness: initialCatalog.freshness }
+    : { key, status: "loading", customers: [], message: "", canRetainDraft: false, freshness: "idle" });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
@@ -27,12 +27,12 @@ export function useCustomers(session: AuthenticatedSession, onSensitiveStateClea
       if (!active) return;
       setState((current) => current.key === key && current.status === "ready"
         ? { ...current, freshness: "stale-error" }
-        : { key, status: "error", customers: [], message: "거래처 정보는 인터넷 연결 후 확인할 수 있어요.", canRetainDraft: false, freshness: "idle", lastSuccessAt: null });
+        : { key, status: "error", customers: [], message: "거래처 정보는 인터넷 연결 후 확인할 수 있어요.", canRetainDraft: false, freshness: "idle" });
     };
-    const unsubscribe = customerRepository.subscribe(key, (customers, refreshedAt) => {
+    const unsubscribe = customerRepository.subscribe(key, (customers) => {
       if (!active) return;
       if (!navigator.onLine) { offline(); return; }
-      setState({ key, status: "ready", customers, message: "", canRetainDraft: true, freshness: "fresh", lastSuccessAt: refreshedAt });
+      setState({ key, status: "ready", customers, message: "", canRetainDraft: true, freshness: "fresh" });
     }, (error, hadData) => {
       if (!active) return;
       const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
@@ -40,18 +40,18 @@ export function useCustomers(session: AuthenticatedSession, onSensitiveStateClea
       if (!canRetainDraft) { discardCustomerWorkspaceCatalog(key); onSensitiveStateCleared?.(); }
       setState((current) => canRetainDraft && (hadData || current.customers.length > 0) && current.key === key
         ? { ...current, status: "ready", message: "", canRetainDraft, freshness: "stale-error" }
-        : { key, status: "error", customers: [], message: customerErrorMessage(error), canRetainDraft, freshness: "idle", lastSuccessAt: null });
+        : { key, status: "error", customers: [], message: customerErrorMessage(error), canRetainDraft, freshness: "idle" });
     }, (freshness) => {
       if (!active) return;
-      setState((current) => current.key === key && current.status === "ready"
-        ? { ...current, freshness: freshness.status, lastSuccessAt: freshness.lastSuccessAt ?? current.lastSuccessAt }
+      setState((current) => current.key === key && current.status === "ready" && current.freshness !== freshness
+        ? { ...current, freshness }
         : current);
     }, { hasData: hasSnapshot, forceInitial: attempt > 0 });
     // The repository owns offline events and immediately reports them through
     // onError; avoid a second listener racing the same retained screen state.
     return () => { active = false; unsubscribe(); };
   }, [key, attempt, onSensitiveStateCleared]);
-  const current = state.key === key ? state : { key, status: "loading" as const, customers: [], message: "", canRetainDraft: false, freshness: "idle" as const, lastSuccessAt: null };
+  const current = state.key === key ? state : { key, status: "loading" as const, customers: [], message: "", canRetainDraft: false, freshness: "idle" as const };
   return { ...current, accept: (customer: Customer) => {
     acceptCustomerWorkspaceWrite(key, customer);
     setState((existing) => existing.key === key && existing.status === "ready"
@@ -60,9 +60,9 @@ export function useCustomers(session: AuthenticatedSession, onSensitiveStateClea
         : [...existing.customers, customer] }
       : existing);
   }, retry: () => {
-    setState((current) => current.key === key && current.customers.length > 0
+    setState((current) => current.key === key && current.status === "ready"
       ? { ...current, freshness: "refreshing", message: "" }
-      : { key, status: "loading", customers: [], message: "", canRetainDraft: false, freshness: "idle", lastSuccessAt: null });
+      : { key, status: "loading", customers: [], message: "", canRetainDraft: false, freshness: "idle" });
     setAttempt((previous) => previous + 1);
   } };
 }

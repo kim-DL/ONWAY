@@ -5,6 +5,8 @@ const sdk = vi.hoisted(() => ({
   app: {}, appCheck: {},
   getApps: vi.fn(), getToken: vi.fn(), initializeAppCheck: vi.fn(),
   config: vi.fn(), initializeAuth: vi.fn(), getAuth: vi.fn(),
+  initializeFirestore: vi.fn(), getFirestore: vi.fn(),
+  connectAuthEmulator: vi.fn(), connectFirestoreEmulator: vi.fn(), connectFunctionsEmulator: vi.fn(),
 }));
 vi.mock("client-only", () => ({}));
 vi.mock("firebase/app", async (original) => ({
@@ -16,14 +18,14 @@ vi.mock("firebase/app-check", () => ({
   ReCaptchaEnterpriseProvider: class {},
 }));
 vi.mock("firebase/auth", () => ({
-  getAuth: sdk.getAuth, initializeAuth: sdk.initializeAuth, connectAuthEmulator: vi.fn(),
+  getAuth: sdk.getAuth, initializeAuth: sdk.initializeAuth, connectAuthEmulator: sdk.connectAuthEmulator,
   browserLocalPersistence: {}, indexedDBLocalPersistence: {}, browserSessionPersistence: {}, browserPopupRedirectResolver: {},
 }));
 vi.mock("firebase/firestore", () => ({
-  getFirestore: () => ({}), initializeFirestore: () => ({}),
-  memoryLocalCache: vi.fn(), connectFirestoreEmulator: vi.fn(),
+  getFirestore: sdk.getFirestore, initializeFirestore: sdk.initializeFirestore,
+  memoryLocalCache: () => ({ kind: "memory" }), connectFirestoreEmulator: sdk.connectFirestoreEmulator,
 }));
-vi.mock("firebase/functions", () => ({ getFunctions: () => ({}), connectFunctionsEmulator: vi.fn() }));
+vi.mock("firebase/functions", () => ({ getFunctions: () => ({}), connectFunctionsEmulator: sdk.connectFunctionsEmulator }));
 vi.mock("./config", () => ({ getFirebasePublicConfig: sdk.config }));
 
 beforeEach(() => {
@@ -41,6 +43,24 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 describe("PIN app verification preflight", () => {
+  it("waits for a database caller to initialize memory-only Firestore and connect its emulator", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_FIREBASE_EMULATORS", "true");
+    const auth = await import("./auth-client");
+    const authServices = auth.getFirebaseAuthServices();
+    expect(sdk.connectAuthEmulator).toHaveBeenCalledOnce();
+    expect(sdk.connectFunctionsEmulator).toHaveBeenCalledOnce();
+    expect(sdk.initializeFirestore).not.toHaveBeenCalled();
+    expect(sdk.connectFirestoreEmulator).not.toHaveBeenCalled();
+
+    const firestore = {};
+    sdk.initializeFirestore.mockReturnValueOnce(firestore);
+    const client = await import("./client");
+    expect(client.getFirebaseClientServices()).toEqual({ ...authServices, firestore });
+    client.getFirebaseClientServices();
+    expect(sdk.initializeFirestore).toHaveBeenCalledExactlyOnceWith(sdk.app, { localCache: { kind: "memory" } });
+    expect(sdk.connectFirestoreEmulator).toHaveBeenCalledExactlyOnceWith(firestore, "127.0.0.1", 8080);
+  });
+
   it("keeps a previously initialized Auth instance during module recovery", async () => {
     const auth = {};
     sdk.initializeAuth.mockImplementationOnce(() => { throw new FirebaseError("auth/already-initialized", "fixture"); });

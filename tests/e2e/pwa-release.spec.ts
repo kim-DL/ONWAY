@@ -45,6 +45,19 @@ test.beforeAll(async () => {
   currentWorker = result.outputFiles[0]!.text;
 });
 
+test("an offline inventory notification can open the installed shell on its first visit", async ({ page, context, site }) => {
+  site.serve("current", 'self.__SW_MANIFEST = [{url:"/",revision:"shell-fixture"}];' + currentWorker);
+  await page.goto(site.url);
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  await context.setOffline(true);
+
+  const deepLink = site.url + "/?inventoryInbox=1";
+  await page.goto(deepLink);
+  await expect(page).toHaveURL(deepLink);
+  await expect(page.getByRole("textbox", { name: "현장 메모" })).toBeVisible();
+  await expect(page.getByTestId("pwa-offline-status")).toBeVisible();
+});
+
 async function update(page: Page) {
   await page.evaluate(async () => (await navigator.serviceWorker.ready).update().then(() => undefined));
 }

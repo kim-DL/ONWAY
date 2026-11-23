@@ -8,9 +8,10 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-22.7",
-  date: "2026-11-22",
+  id: "2026-11-23.1",
+  date: "2026-11-23",
   changes: [
-    { title: "재고 목록의 새 품목 버튼", text: "오른쪽 아래 버튼의 여백을 줄이고, 더하기 표시와 글자를 가운데 맞췄어요." },
+    { title: "앱 시작", text: "앱을 열면 온누리종합식품 로고와 로딩바가 보여요. 로그인 전에 내려받는 파일도 줄였어요." },
+    { title: "거래처와 재고 목록", text: "마지막 확인 시각을 없애고 재고 목록을 더 빠르게 표시해요. 갱신에 실패하면 기존 정보를 보고 있다는 안내가 나와요." },
   ],
 };

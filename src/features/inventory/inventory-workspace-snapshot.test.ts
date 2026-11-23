@@ -32,7 +32,7 @@ describe("inventory workspace memory snapshot", () => {
   });
   it("stores only catalog and list UI for one namespace", () => {
     getInventoryWorkspaceSession("A:1:1");
-    commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", lastSuccessAt: 1_000 });
+    commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", complete: true });
     updateInventoryWorkspaceUi("A:1:1", { location: "freezer1", query: "만두", urgentOnly: true, showInactive: true, limit: 180, scrollTop: 920 });
     expect(getInventoryWorkspaceSession("A:1:1").snapshot).toMatchObject({
       catalog: { products: [product()] },
@@ -45,7 +45,7 @@ describe("inventory workspace memory snapshot", () => {
 
   it("writes a committed mutation into the snapshot before re-entry", () => {
     getInventoryWorkspaceSession("A:1:1");
-    commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", lastSuccessAt: 1_000 });
+    commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", complete: true });
     updateInventorySnapshotProduct("A:1:1", product(2));
     expect(getInventoryWorkspaceSession("A:1:1").snapshot.catalog?.products).toEqual([product(2)]);
   });
@@ -54,7 +54,7 @@ describe("inventory workspace memory snapshot", () => {
     getInventoryWorkspaceSession("A:1:1");
     getInventoryWorkspaceSession("A:2:1");
 
-    commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", lastSuccessAt: 2_000 });
+    commitInventoryCatalog("A:1:1", { context, products: [product()], observedDate: context.today, freshness: "fresh", complete: true });
     expect(getInventoryWorkspaceSession("A:2:1").snapshot.catalog).toBeNull();
   });
 
@@ -63,11 +63,11 @@ describe("inventory workspace memory snapshot", () => {
     const oldReconciler = first.reconciler;
     const listener = vi.fn();
     const unsubscribe = subscribeInventoryCatalog("A:1:1", listener);
-    expect(commitInventoryCatalog("A:1:1", { context: null, products: [product()], observedDate: context.today, freshness: "refreshing", lastSuccessAt: null }, oldReconciler)).toBe(true);
+    expect(commitInventoryCatalog("A:1:1", { context: null, products: [product()], observedDate: context.today, freshness: "refreshing", complete: false }, oldReconciler)).toBe(true);
     expect(listener).toHaveBeenCalledOnce();
 
     discardInventoryWorkspaceCatalog("A:1:1");
-    expect(commitInventoryCatalog("A:1:1", { context, products: [product(2)], observedDate: context.today, freshness: "fresh", lastSuccessAt: 2_000 }, oldReconciler)).toBe(false);
+    expect(commitInventoryCatalog("A:1:1", { context, products: [product(2)], observedDate: context.today, freshness: "fresh", complete: true }, oldReconciler)).toBe(false);
     expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
   });
