@@ -19,7 +19,7 @@ export type PhotoOutboxRecord = {
   lease: { worker: string; stage: "prepare" | "upload"; until: number } | null;
 };
 export interface PhotoOutboxStore {
-  activate(owner: string, preserveOwner?: boolean): Promise<OutboxScope>;
+  activate(owner: string, guard?: { live: () => boolean; preserveOwner: boolean }): Promise<OutboxScope>;
   list(scope: OutboxScope): Promise<PhotoOutboxRecord[]>;
   add(scope: OutboxScope, record: PhotoOutboxRecord): Promise<void>;
   save(scope: OutboxScope, record: PhotoOutboxRecord, worker?: string): Promise<void>;
@@ -92,12 +92,12 @@ async function abortWrite(transaction: OutboxTransaction, error: unknown): Promi
 }
 
 export const deliveryPhotoOutbox: PhotoOutboxStore = {
-  async activate(owner, preserveOwner = false) {
+  async activate(owner, guard) {
     const transaction = (await db()).transaction(STORES, "readwrite");
     let scope = await transaction.objectStore("scope").get("current");
+    // This transaction may start after logout or after a different session took ownership.
+    if (guard && (!guard.live() || (guard.preserveOwner && scope && scope.owner !== owner))) throw sessionChanged();
     if (scope?.owner !== owner) {
-      // Another tab can acquire the outbox after this tab's first open fails.
-      if (scope && preserveOwner) throw sessionChanged();
       scope = { owner, token: crypto.randomUUID() };
       await transaction.objectStore("jobs").clear();
       await transaction.objectStore("states").clear(); await transaction.objectStore("prepared").clear();

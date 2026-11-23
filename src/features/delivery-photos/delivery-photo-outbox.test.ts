@@ -75,6 +75,25 @@ describe("durable unsent-photo outbox", () => {
     await expect(deliveryPhotoOutbox.list(next)).rejects.toMatchObject({ code: "delivery-photo/outbox-session" });
   });
 
+  it("keeps a new session's pending bytes when a logged-out tab's first open arrives late", async () => {
+    let entered!: () => void;
+    let release!: () => void;
+    const entering = new Promise<void>(resolve => { entered = resolve; });
+    const delayed = new Promise<void>(resolve => { release = resolve; });
+    const previous = worker({ store: { ...deliveryPhotoOutbox, activate: async (...args) => {
+      entered(); await delayed; return deliveryPhotoOutbox.activate(...args);
+    } } });
+    await entering;
+    await previous.clear();
+    const next = await deliveryPhotoOutbox.activate("new-session");
+    await deliveryPhotoOutbox.add(next, { ...record("new-session-photo"), owner: next.owner });
+    release();
+    expect(await previous.ready).toBe(false);
+    expect(await previous.retryStorage()).toBe(false);
+    const [retained] = await deliveryPhotoOutbox.list(next);
+    expect(await retained?.prepared?.blob.text()).toBe("new-session-photo");
+  });
+
   it.each([false, true])("recovers an initial activation failure with a matching or empty store (seeded: %s)", async (seeded) => {
     const activate = vi.fn(deliveryPhotoOutbox.activate).mockRejectedValueOnce(new Error("temporary open failure"));
     const current = worker({ store: { ...deliveryPhotoOutbox, activate } });

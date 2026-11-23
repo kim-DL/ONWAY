@@ -29,7 +29,7 @@ export class PhotoOutboxWorker {
         });
       }
       if (!live()) { this.close(); return false; }
-      this.scope = existingScope ?? await this.store.activate(owner, preserveOwner);
+      this.scope = existingScope ?? await this.store.activate(owner, { live, preserveOwner });
       if (!live()) { this.close(); return false; }
       return true;
     } catch (error) { this.close(); throw error; }
