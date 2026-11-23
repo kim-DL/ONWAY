@@ -2,16 +2,16 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { AuthHeader, AuthLoadingScreen, LaunchTimingProvider } from "./auth-loading";
+import { AuthLoadingScreen, LaunchTimingProvider } from "./auth-loading";
 
 describe("privacy-safe application entry", () => {
-  it.each(["boot", "session", "workspace"] as const)("keeps the same public header and one status during %s", (stage) => {
-    const header = renderToStaticMarkup(createElement(AuthHeader));
+  it.each(["boot", "session", "workspace"] as const)("keeps the small route artwork and one status during %s", (stage) => {
     const markup = renderToStaticMarkup(createElement(LaunchTimingProvider, null,
       createElement(AuthLoadingScreen, { stage })));
-    expect(markup).toContain(header);
+    expect(markup).not.toContain('class="auth-brand"');
+    expect(markup).toContain('<h1 class="sr-only">급식길</h1>');
     expect(markup).toContain('class="auth-launch-group"');
-    expect(markup).toContain('href="/brand/onnuri-food-logo-auth.webp"');
+    expect(markup).toContain('src="/ui/delivery-smart-route.svg"');
     expect(markup).not.toContain("/icons/");
     expect(markup.match(/role="status"/g)).toHaveLength(1);
     expect(markup).toContain(`data-auth-stage="${stage}"`);

@@ -17,10 +17,10 @@ import styles from "./customer-directory.module.css";
 
 const PAGE_SIZE = 32;
 
-export function CustomerDirectory({ sessionKey, customers, onSelect, onClose, status = "ready", message = "", freshness = "idle", lastSuccessAt = null, onRetry }: {
+export function CustomerDirectory({ sessionKey, customers, onSelect, onClose, status = "ready", message = "", freshness = "idle", onRetry }: {
   sessionKey: string; customers: readonly Customer[]; onSelect: (customerId: string) => void; onClose: () => void;
   status?: "ready" | "loading" | "error"; message?: string; onRetry?: () => void;
-  freshness?: RevalidationFreshness; lastSuccessAt?: number | null;
+  freshness?: RevalidationFreshness;
 }) {
   const id = useId();
   const [district, setDistrict] = useState("");
@@ -41,7 +41,7 @@ export function CustomerDirectory({ sessionKey, customers, onSelect, onClose, st
   const reset = () => { setDistrict(""); setDong(""); setQuery(""); setVisibleCount(PAGE_SIZE); };
   return <BottomSheet open title="거래처 전체보기" onClose={onClose}>
     <div className={`${shared.workspace} ${styles.directory}`} data-customer-directory>
-      {status === "ready" ? <CustomerCatalogFreshness freshness={freshness} lastSuccessAt={lastSuccessAt} onRetry={onRetry} /> : null}
+      {status === "ready" ? <CustomerCatalogFreshness freshness={freshness} onRetry={onRetry} /> : null}
       <div ref={filtersRef} className={styles.filters} hidden={status !== "ready"}>
         <div className={styles.summary}><span><Icon name="building" size={18} />등록 거래처 <strong>{customers.length}곳</strong></span>
           {filtered ? <button type="button" onClick={reset}>선택 초기화</button> : null}

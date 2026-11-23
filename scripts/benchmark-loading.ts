@@ -38,7 +38,7 @@ try {
       let stableFrames = 0;
       const frame = () => {
         const now = Math.round(performance.now());
-        const brand = document.querySelector(".auth-brand, .workspace-header");
+        const brand = document.querySelector(".auth-launch-map, .auth-brand, .workspace-header");
         if (brand) {
           state.firstSurface ??= now;
           const bounds = JSON.stringify(brand.getBoundingClientRect().toJSON());
@@ -51,7 +51,7 @@ try {
         const mode = document.querySelector("main.workspace-shell")?.getAttribute("data-mode");
         const ready = mode === "inventory" && document.querySelector('input[aria-label="품목 검색"]:not(:disabled)');
         if (ready) state.workReady ??= now;
-        const stage = ready ? "work-ready" : document.querySelector("[data-workspace-loading], .shell-feature-loading") ? "workspace-placeholder" : document.querySelector(".workspace-header") ? "shell" : document.querySelector("#employee-pin") ? "pin" : document.querySelector(".auth-brand") ? "launch" : "document";
+        const stage = ready ? "work-ready" : document.querySelector("[data-workspace-loading], .shell-feature-loading") ? "workspace-placeholder" : document.querySelector(".workspace-header") ? "shell" : document.querySelector("#employee-pin") ? "pin" : document.querySelector("[data-auth-stage]") ? "launch" : "document";
         if (stage !== last) { state.stages.push({ name: stage, at: now }); last = stage; }
         requestAnimationFrame(frame);
       };

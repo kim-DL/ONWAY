@@ -66,9 +66,8 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   const [calendarRefreshing, setCalendarRefreshing] = useState(false);
   const [calendarError, setCalendarError] = useState("");
   const [countPreference, setCountPreference] = useState({ key: "", enabled: false });
-  const [freshness, setFreshness] = useState<{ status: RevalidationFreshness; lastSuccessAt: number | null }>(initialCatalog
-    ? { status: initialCatalog.freshness, lastSuccessAt: initialCatalog.lastSuccessAt }
-    : { status: "idle", lastSuccessAt: null });
+  const [freshness, setFreshness] = useState<RevalidationFreshness>(initialCatalog?.freshness ?? "idle");
+  const [catalogComplete, setCatalogComplete] = useState(initialCatalog?.complete ?? false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const appSettingsRequested = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -92,7 +91,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     catalogReady.current = true;
     if (catalog.context) { acceptContext(catalog.context); setCalendarRefreshing(false); setCalendarError(""); }
     setProducts(catalog.products); setLoading(false); setError(""); setCalendarObservedDate(catalog.observedDate);
-    setFreshness({ status: catalog.freshness, lastSuccessAt: catalog.lastSuccessAt });
+    setFreshness(catalog.freshness); setCatalogComplete(catalog.complete);
   }, [acceptContext]);
   function changeCountMode(enabled: boolean) {
     if (!context?.canWrite || !calendarReady) return;
@@ -129,7 +128,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
       setContext(null); setProducts([]); setSelected(null); setEditorOpen(false); setSettingsOpen(false); setOptionsOpen(false);
       setQuery(""); setLocation("all"); setUrgentOnly(false); setShowInactive(false); setLimit(60);
       setNotice({ message: "", sequence: 0 }); setLoading(false); setError(inventoryErrorMessage(cause));
-      setFreshness({ status: "idle", lastSuccessAt: null });
+      setFreshness("idle"); setCatalogComplete(false);
       setCalendarRefreshing(false); setCalendarError(inventoryErrorMessage(cause));
     };
     const unsubscribeAccess = subscribeInventoryAccessFailure((cause, uid) => {
@@ -142,8 +141,8 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
       if (pending) queuedAfterFlight = true;
       if (!cancelled) {
         if (catalogReady.current) {
-          updateInventoryCatalogFreshness(sessionKey, "stale-error", null);
-          setFreshness((current) => ({ status: "stale-error", lastSuccessAt: current.lastSuccessAt })); setError("");
+          updateInventoryCatalogFreshness(sessionKey, "stale-error");
+          setFreshness("stale-error"); setError("");
         }
         else setError(INVENTORY_OFFLINE_DRAFT_MESSAGE);
       }
@@ -167,7 +166,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
             if (!mergedProducts) return;
             commitInventoryCatalog(sessionKey, {
               context: progressiveContext, products: mergedProducts, observedDate: inventoryKoreaDate(),
-              freshness: "refreshing", lastSuccessAt: coordinator.getLastSuccessAt(),
+              freshness: "refreshing", complete: coordinator.hasSuccessfulRead(),
             }, reconciler);
           };
           const contextPromise = inventoryRepository.context().then((nextContext) => {
@@ -179,12 +178,11 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
           const [nextContext, nextProducts] = await Promise.all([contextPromise, listPromise]);
           const mergedProducts = reconciler.reconcile(nextProducts);
           if (!mergedProducts) throw new Error("Inventory revalidation disposed");
-          const refreshedAt = Date.now();
           const observedDate = inventoryKoreaDate();
-          if (!requestIsCurrent() || !commitInventoryCatalog(sessionKey, { context: nextContext, products: mergedProducts, observedDate, freshness: "fresh", lastSuccessAt: refreshedAt }, reconciler)) {
+          if (!requestIsCurrent() || !commitInventoryCatalog(sessionKey, { context: nextContext, products: mergedProducts, observedDate, freshness: "fresh", complete: true }, reconciler)) {
             throw new Error("Inventory revalidation superseded");
           }
-          return { nextContext, mergedProducts, observedDate, refreshedAt };
+          return { nextContext, mergedProducts, observedDate };
         } finally {
           acceptingProgress = false;
           if (requestIsCurrent()) reconciler.finish();
@@ -194,23 +192,23 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
       if (force && run.kind === "joined") queuedForce = true;
       pending = true;
       if (catalogReady.current) {
-        updateInventoryCatalogFreshness(sessionKey, "refreshing", null);
-        setFreshness((current) => ({ status: "refreshing", lastSuccessAt: current.lastSuccessAt }));
+        updateInventoryCatalogFreshness(sessionKey, "refreshing");
+        setFreshness("refreshing");
       }
       setCalendarRefreshing(true);
       try {
-        const { nextContext, mergedProducts, observedDate, refreshedAt } = await run.promise;
+        const { nextContext, mergedProducts, observedDate } = await run.promise;
         if (!cancelled && !accessLost && navigator.onLine) {
           catalogReady.current = true;
           acceptContext(nextContext); setProducts(workspaceSession.snapshot.catalog?.products ?? mergedProducts); setError(""); setCalendarObservedDate(observedDate); setCalendarError(""); setCalendarRefreshing(false);
-          setFreshness({ status: "fresh", lastSuccessAt: refreshedAt });
+          setFreshness("fresh"); setCatalogComplete(true);
         }
       } catch (cause) {
         if (!cancelled) {
           if (isInventoryAccessFailure(cause)) revokeAccess(cause);
           if (catalogReady.current) {
-            updateInventoryCatalogFreshness(sessionKey, "stale-error", null);
-            setFreshness((current) => ({ status: "stale-error", lastSuccessAt: current.lastSuccessAt })); setError("");
+            updateInventoryCatalogFreshness(sessionKey, "stale-error");
+            setFreshness("stale-error"); setError("");
           }
           else setError(inventoryErrorMessage(cause));
           setCalendarError(inventoryErrorMessage(cause));
@@ -297,21 +295,33 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   const inactiveView = showInactive && !!context?.canWrite;
   const countControlsReady = calendarReady && !inactiveView;
   const rows = useMemo(() => products.filter((product) => product.status === (inactiveView ? "inactive" : "active") && (location === "all" || inventoryLocationsFor(product).includes(location))).sort((a, b) => a.name.localeCompare(b.name, "ko")), [products, location, inactiveView]);
-  const { countRows, completed } = useMemo(() => {
-    const countRows = context ? rows.filter((product) => inventoryCountEligible(product, context) || inventoryScopeCountState(product, location, context.cycle.cycleId) === "done") : [];
-    const completed = context ? countRows.filter((product) => inventoryScopeCountState(product, location, context.cycle.cycleId) === "done").length : 0;
-    return { countRows, completed };
-  }, [rows, context, location]);
-  // Derived private strings live only with this mounted catalog. A catalog
-  // update or access cleanup replaces them; typing never renormalizes 1,000 rows.
-  const searchableRows = useMemo(() => rows.map((product) => ({ product, search: inventorySearchText(product) })), [rows]);
+  const showCountProgress = !!context && countControlsReady && (context.today === context.cycle.startDate || countMode);
+  const countProgress = useMemo(() => {
+    if (!showCountProgress || !context) return null;
+    let total = 0;
+    let completed = 0;
+    for (const product of rows) {
+      if (inventoryScopeCountState(product, location, context.cycle.cycleId) === "done") {
+        total++;
+        completed++;
+      } else if (inventoryCountEligible(product, context)) {
+        total++;
+      }
+    }
+    return total ? { total, completed } : null;
+  }, [showCountProgress, rows, context, location]);
+  // Prepare normalized text once per visible catalog so the first keystroke
+  // only matches rows. Empty searches can reuse the unfiltered array.
+  const searchIndex = useMemo(() => rows.map(inventorySearchText), [rows]);
   const filtered = useMemo(() => {
-    const matches = inventorySearchMatcher(query);
-    return searchableRows.filter(({ product, search }) => matches(search)
-      && (!countControlsReady || !urgentOnly || !!context && inventoryScopeIsUrgent(product, location, context.today, context.settings.urgentDays))).map(({ product }) => product);
-  }, [searchableRows, query, urgentOnly, context, location, countControlsReady]);
+    const matches = query.trim() ? inventorySearchMatcher(query) : null;
+    const urgent = countControlsReady && urgentOnly && context;
+    if (!matches && !urgent) return rows;
+    return rows.filter((product, index) => (!matches || matches(searchIndex[index]!))
+      && (!urgent || inventoryScopeIsUrgent(product, location, urgent.today, urgent.settings.urgentDays)));
+  }, [rows, searchIndex, query, urgentOnly, context, location, countControlsReady]);
   const selectedId = selected?.productId;
-  const selectedProduct = products.find((product) => product.productId === selectedId);
+  const selectedProduct = selectedId ? products.find((product) => product.productId === selectedId) : undefined;
   const openProduct = useCallback((product: InventoryProduct) => {
     setSelected({ productId: product.productId, location: inventoryOpeningLocation(product, location) });
   }, [location]);
@@ -320,25 +330,25 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     if (!countMode || !countControlsReady || !context || product.status !== "active" || inventoryCountState(product, checkedLocation, context.cycle.cycleId) !== "done") return;
     const next = inventoryNextCountTarget(filtered, product, checkedLocation, location, context);
     setSelected((current) => next ? { ...next, sequence: (current?.sequence ?? 0) + 1, ...(next.productId === product.productId ? { detail } : {}) } : null);
-    showNotice(next ? "저장했어요. 다음 미확인 재고를 확인해주세요." : freshness.status === "refreshing" ? "저장했어요. 추가 품목을 불러오고 있어요." : "저장했어요. 현재 목록의 미확인 재고를 모두 확인했어요.");
+    showNotice(next ? "저장했어요. 다음 미확인 재고를 확인해주세요." : freshness === "refreshing" ? "저장했어요. 추가 품목을 불러오고 있어요." : "저장했어요. 현재 목록의 미확인 재고를 모두 확인했어요.");
   }
   const locationLabel = location === "all" ? "전체" : INVENTORY_LOCATION_LABELS[location];
-  const freshnessText = revalidationFreshnessText(freshness.status, freshness.lastSuccessAt);
+  const freshnessText = revalidationFreshnessText(freshness);
   const optionsActive = showInactive || urgentOnly || countMode;
   return <section ref={workspaceRef} className={admin ? styles.workspace : `shell-page ${styles.workspace}`} data-admin={admin || undefined} data-write-actions={context?.canWrite || undefined} aria-label="재고 관리">
-    {online && context && <InventoryNoticeStockSync key={sessionKey} products={products} catalogComplete={freshness.lastSuccessAt !== null} applyProduct={applyProduct} refreshList={refresh} />}
+    {online && context && <InventoryNoticeStockSync key={sessionKey} products={products} catalogComplete={catalogComplete} applyProduct={applyProduct} refreshList={refresh} />}
     <h1 className={styles.hiddenInput}>재고 관리</h1>
     <div style={{ display: "grid", gap: 8, minWidth: 0, alignSelf: "start", position: admin ? "static" : "sticky", top: 0, zIndex: 2, paddingBottom: admin ? 0 : 4 }} data-inventory-toolbar data-sticky={!admin || undefined}>
     {!admin ? <InventoryGreeting displayName={session.displayName} /> : null}
     {notice.message ? <p role="status" className={styles.success}>{notice.message}</p> : null}
     {context && online && !calendarReady ? <div className={styles.notice} role={calendarError ? "alert" : "status"}><p>{calendarRefreshing ? "날짜가 바뀌어 유통기한·실사 기준을 확인하고 있어요." : "날짜 기준을 갱신하지 못했어요. 기준을 다시 확인한 뒤 실사를 저장해주세요."}</p><p className={styles.muted}>기준 확인 전에는 유통기한·실사 필터를 잠시 멈추고 전체 품목을 보여드려요.</p>{calendarError ? <><p className={styles.muted}>{calendarError}</p><GlassButton disabled={calendarRefreshing} onClick={() => calendarWatcher.current?.refresh()}>날짜 기준 다시 확인</GlassButton></> : null}</div> : null}
     <div className={styles.tabs} style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 4, "--i": location === "all" ? 0 : INVENTORY_LOCATIONS.indexOf(location) + 1 } as CSSProperties} data-catalog role="group" aria-label="보관 장소">{(["all", ...INVENTORY_LOCATIONS] as const).map((item) => <button key={item} type="button" aria-pressed={location === item} style={{ position: "relative", minWidth: 0, minHeight: 48, padding: "8px 1px", border: 0, borderRadius: 8, background: "transparent", color: location === item ? "#25364a" : "#59636f", font: "inherit", fontSize: 13, fontWeight: location === item ? 700 : 600, cursor: "pointer" }} onClick={() => { setLocation(item); setLimit(60); }}>{item === "all" ? "전체" : INVENTORY_LOCATION_LABELS[item]}{item !== "all" ? <i aria-hidden="true" style={{ position: "absolute", left: -2.5, top: 18, width: 1, height: 12, background: "#65717d2b", pointerEvents: "none" }} /> : null}</button>)}<span aria-hidden="true" className={styles.indicator} style={{ position: "absolute", bottom: 4, left: "calc((var(--i) + .5) * (100% + 4px) / 5 - 17px)", width: 30, height: 2, borderRadius: 2, pointerEvents: "none" }} /></div>
-    {context && countControlsReady && countRows.length > 0 && (context.today === context.cycle.startDate || countMode) ? <div className={styles.progressCard} data-count-day><div><span><Icon name="clipboard" size={15} />{context.today === context.cycle.startDate ? "오늘은 재고조사일" : "재고조사 진행 중"}</span><strong>{completed}<small> / {countRows.length}개 확인</small></strong></div><progress value={completed} max={countRows.length} aria-label={`${locationLabel} 실사 ${countRows.length}개 중 ${completed}개 완료`} /></div> : null}
+    {context && countProgress ? <div className={styles.progressCard} data-count-day><div><span><Icon name="clipboard" size={15} />{context.today === context.cycle.startDate ? "오늘은 재고조사일" : "재고조사 진행 중"}</span><strong>{countProgress.completed}<small> / {countProgress.total}개 확인</small></strong></div><progress value={countProgress.completed} max={countProgress.total} aria-label={`${locationLabel} 실사 ${countProgress.total}개 중 ${countProgress.completed}개 완료`} /></div> : null}
     <div className={styles.filters} style={{ display: "flex", alignItems: "stretch" }}>
       <SearchField inputRef={searchRef} label="품목 검색" placeholder="상품명 · 제조사" value={query} onChange={(value) => { setQuery(value); setLimit(60); }} />
       {context?.canWrite || onOpenAppSettings ? <button type="button" className={styles.optionsTrigger} style={{ position: "relative", border: "1px solid #c8d8e3", color: "#376582", display: "grid", placeItems: "center", flex: "0 0 52px", minWidth: 52, minHeight: 52, padding: 0, borderRadius: 11, background: "linear-gradient(150deg, #f9fcff, #e7f0f7)", boxShadow: "inset 0 1px #fff, 0 3px 6px #294c6410", cursor: "pointer" }} aria-label="목록 옵션" aria-haspopup="dialog" aria-expanded={optionsOpen} data-active={optionsActive || undefined} onClick={() => setOptionsOpen(true)}><Icon name="sliders-refined" size={22} strokeWidth={1.5} /><span aria-hidden="true" style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, border: "1px solid #f4f7f9", borderRadius: "50%", background: "#27745d" }} /></button> : null}
     </div>
-    {!loading ? <div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness.status}>{freshnessText}</p> : null}{urgentOnly && context && countControlsReady ? <p className={`${styles.resultCount} ${styles.rowUrgent}`} role="status">임박·기한 경과만 표시</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div> : null}
+    {!loading ? <div className={styles.catalogMeta}><p className={styles.resultCount} aria-live="polite">{filtered.length.toLocaleString("ko-KR")}개 품목{inactiveView ? " · 비활성" : !context?.canWrite ? " · 읽기 전용" : ""}</p>{freshnessText ? <p className={styles.resultCount} role="status" data-freshness={freshness}>{freshnessText}</p> : null}{urgentOnly && context && countControlsReady ? <p className={`${styles.resultCount} ${styles.rowUrgent}`} role="status">임박·기한 경과만 표시</p> : null}{countMode ? <p className={styles.countModeStatus} role="status">재고조사 ON</p> : null}{context?.canAdmin ? <GlassButton compact variant="quiet" aria-label="재고 설정" onClick={() => setSettingsOpen(true)}><Icon name="settings" size={16} />설정</GlassButton> : null}</div> : null}
     </div>
     <div data-inventory-results style={{ display: "grid", gap: 8, minWidth: 0 }}>
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}

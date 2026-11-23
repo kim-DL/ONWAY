@@ -38,7 +38,8 @@ async function open(page: Page, admin = false) {
     return route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>거래처 회귀 확인</title><style>${fixture.css}</style></head><body><div id="root"></div><script>${fixture.script.replaceAll("</script>", "<\\/script>")}</script></body></html>` });
   });
   await page.goto(`http://customer-audit.test/${admin ? "?admin=1" : ""}`);
-  await expect(page.locator('[data-freshness="fresh"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: admin ? "합성감사 거래처 수정" : "전체보기", exact: true })).toBeEnabled();
+  await expect(page.locator("[data-freshness]")).toHaveCount(0);
   return { errors, external };
 }
 
@@ -89,7 +90,7 @@ test("a removed district no longer hides refreshed customers", async ({ page }) 
   expect(diagnostics).toEqual({ errors: [], external: [] });
 });
 
-for (const admin of [false, true]) test(`${admin ? "admin" : "workspace"} retains drafts and shows stale data, last check, and a working retry`, async ({ page }, info) => {
+for (const admin of [false, true]) test(`${admin ? "admin" : "workspace"} retains drafts and stale data until retry returns to a quiet success`, async ({ page }, info) => {
   const diagnostics = await open(page, admin);
   await page.getByRole("button", { name: "거래처 등록", exact: true }).click();
   const editor = page.locator("[data-customer-editor]");
@@ -106,7 +107,7 @@ for (const admin of [false, true]) test(`${admin ? "admin" : "workspace"} retain
     await expect(page.locator("[data-customer-card]")).toHaveCount(1);
   }
   const freshness = page.locator('[data-freshness="stale-error"]');
-  await expect(freshness).toContainText("갱신 실패 · 기존 정보 표시 · 마지막 확인");
+  await expect(freshness.getByRole("status")).toHaveText("갱신 실패 · 기존 정보 표시");
   await expect(page.getByRole("button", { name: admin ? "합성감사 거래처 수정" : "합성감사 거래처 상세 정보", exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.onLine)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -116,7 +117,8 @@ for (const admin of [false, true]) test(`${admin ? "admin" : "workspace"} retain
   await expect(page.locator('[data-freshness="refreshing"]')).toContainText("최신 정보 확인 중");
   await expect.poll(() => page.evaluate(() => window.customerAudit.pendingLists.length)).toBe(1);
   await page.evaluate(() => { for (const resolve of window.customerAudit.pendingLists.splice(0)) resolve(); });
-  await expect(page.locator('[data-freshness="fresh"]')).toContainText("마지막 확인");
+  await expect(page.locator("[data-freshness]")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: admin ? "합성감사 거래처 수정" : "합성감사 거래처 상세 정보", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "다시 불러오기", exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.customerAudit.calls.every((call) => ["listCustomers", "reverseCustomerLocation"].includes(call.name)))).toBe(true);
   expect(diagnostics).toEqual({ errors: [], external: [] });

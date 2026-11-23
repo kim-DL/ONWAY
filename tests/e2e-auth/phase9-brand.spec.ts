@@ -134,7 +134,7 @@ test("company signature stays visible without crowding mobile mode controls and 
   await expect(page.locator("#sales-cycle-title")).toBeVisible({ timeout: 30_000 });
   const signature = header.locator(".app-brand--signature");
   await expect(signature.getByText("온누리종합식품", { exact: true })).toBeVisible();
-  await expect(signature.locator("image")).toHaveAttribute("href", "/brand/onnuri-food-logo.png");
+  await expect(signature.locator("image")).toHaveAttribute("href", "/brand/onnuri-food-logo-auth.webp");
   await expect(signature.locator(".app-brand__mark")).toHaveCSS("animation-name", "none");
   const salesButton = header.locator('[data-mode-switcher]:visible button[data-mode="sales"]');
   await expect(salesButton).toHaveCSS("color", "rgb(36, 89, 186)");

@@ -204,14 +204,15 @@ test("inventory scrollbar appears during scrolling without shifting content", as
   await expect(page.locator(".workspace-content")).toHaveCSS("scrollbar-color", "auto");
 });
 
-test("inventory controls and freshness stay above the scrolling product list", async ({ page }) => {
+test("inventory controls and product count stay above the scrolling product list", async ({ page }) => {
   await open(page);
   const toolbar = page.locator("[data-inventory-toolbar]");
   const scroller = page.locator(".workspace-content");
   for (const width of [320, 502, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await scroller.evaluate(el => { el.scrollTop = 0; });
-    await expect(toolbar.locator("[data-freshness]")).toBeVisible();
+    await expect(toolbar.getByText("80개 품목", { exact: true })).toBeVisible();
+    await expect(toolbar.locator("[data-freshness]")).toHaveCount(0);
     const copy = (await toolbar.locator("[data-welcome-greeting]").boundingBox())!;
     const locations = (await page.getByRole("group", { name: "보관 장소" }).boundingBox())!;
     expect(locations.y - copy.y - copy.height).toBeCloseTo(0, 1);

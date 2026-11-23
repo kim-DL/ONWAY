@@ -12,7 +12,7 @@ describe("company brand signature", () => {
     expect(markup.replace(/<[^>]+>/g, "")).toContain("온누리종합식품");
     expect(markup).toContain("<small>급식길</small>");
     expect(markup).toContain('viewBox="0 0 1200 446"');
-    expect(markup).toContain('href="/brand/onnuri-food-logo.png"');
+    expect(markup).toContain('href="/brand/onnuri-food-logo-auth.webp"');
     expect(markup).not.toContain("/icons/");
   });
 

@@ -17,8 +17,8 @@ export class RevalidationCoordinator {
     private readonly now: () => number = Date.now,
   ) {}
 
-  getLastSuccessAt() {
-    return this.lastSuccessAt;
+  hasSuccessfulRead() {
+    return this.lastSuccessAt !== null;
   }
 
   guardCurrentGeneration() {
@@ -53,12 +53,8 @@ export class RevalidationCoordinator {
   }
 }
 
-export function revalidationFreshnessText(status: RevalidationFreshness, lastSuccessAt: number | null) {
-  const checked = lastSuccessAt === null
-    ? ""
-    : ` · 마지막 확인 ${new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(lastSuccessAt)}`;
-  if (status === "refreshing") return `최신 정보 확인 중${checked}`;
-  if (status === "stale-error") return `갱신 실패 · 기존 정보 표시${checked}`;
-  if (status === "fresh") return `마지막 확인${checked.replace(" · 마지막 확인", " ")}`;
+export function revalidationFreshnessText(status: RevalidationFreshness) {
+  if (status === "refreshing") return "최신 정보 확인 중";
+  if (status === "stale-error") return "갱신 실패 · 기존 정보 표시";
   return "";
 }

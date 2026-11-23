@@ -24,7 +24,7 @@ async function fixture(page: Page, view = "launch", clock = true) {
   if (clock) await page.clock.install({ time: new Date("2026-10-29T00:00:00Z") });
   await page.route("https://loading.fixture/**", async route => {
     const path = new URL(route.request().url()).pathname;
-    if (["/brand/onnuri-food-logo.png", "/brand/onnuri-food-logo-auth.webp", "/icons/onnuriway-company-icon-192-v4.png"].includes(path)) return route.fulfill({ contentType: path.endsWith(".webp") ? "image/webp" : "image/png", body: readFileSync(new URL(`../../public${path}`, import.meta.url)) });
+    if (["/brand/onnuri-food-logo-auth.webp", "/ui/delivery-smart-route.svg"].includes(path)) return route.fulfill({ contentType: path.endsWith(".svg") ? "image/svg+xml" : "image/webp", body: readFileSync(new URL(`../../public${path}`, import.meta.url)) });
     if (path !== "/") return route.abort();
     await route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>급식길 로딩 검증</title><style>${css}</style><style>.fixture-controls{display:flex;gap:12px}.fixture-controls button{min-height:44px;padding:8px}body{margin:0}</style></head><body><div id="root"></div></body></html>` });
   });
@@ -36,7 +36,7 @@ async function fixture(page: Page, view = "launch", clock = true) {
 test("launch thresholds survive fallback remounts and completion adds no dwell", async ({ page }) => {
   await fixture(page);
   const indicator = page.locator("[data-loading-indicator]");
-  await expect(page.getByRole("status")).toHaveText("급식길 여는 중");
+  await expect(page.getByRole("status")).toHaveText("앱을 여는 중");
   await expect(indicator).toHaveAttribute("data-visible", "false");
   await page.clock.runFor(600);
   await page.getByRole("button", { name: "세션 단계", exact: true }).click();
@@ -62,24 +62,24 @@ test("quick operations finish without flashing an animated indicator", async ({ 
   await expect(page.getByRole("status")).toHaveCount(0);
 });
 
-test("launch centers a larger background-free brand and keeps its position through delayed feedback", async ({ page }) => {
+test("launch centers the route artwork without a visible wordmark and keeps its position through delayed feedback", async ({ page }) => {
   for (const width of [320, 390, 840, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await fixture(page);
     await page.addStyleTag({ content: ".fixture-controls{display:none}" });
-    const brand = page.locator(".auth-brand");
-    const mark = brand.locator(".auth-brand__mark");
+    const map = page.locator(".auth-launch-map");
+    const mark = map.locator("img");
     const indicator = page.locator("[data-loading-indicator]");
-    await expect(mark.locator("image")).toHaveAttribute("href", "/brand/onnuri-food-logo-auth.webp");
-    await expect(mark).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(mark).toHaveCSS("box-shadow", "none");
-    expect(await mark.evaluate(element => getComputedStyle(element).filter)).not.toBe("none");
+    await expect(mark).toHaveAttribute("src", "/ui/delivery-smart-route.svg");
+    await expect.poll(() => mark.evaluate(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true);
+    await expect(page.getByRole("heading", { name: "급식길" })).toHaveClass("sr-only");
+    await expect(page.locator(".auth-brand")).toHaveCount(0);
 
     const measure = () => page.locator("main").evaluate(main => {
       const box = main.getBoundingClientRect();
       const group = main.querySelector(".auth-launch-group")!.getBoundingClientRect();
-      const brand = main.querySelector(".auth-brand")!.getBoundingClientRect();
-      const mark = main.querySelector(".auth-brand__mark")!.getBoundingClientRect();
+      const map = main.querySelector(".auth-launch-map")!.getBoundingClientRect();
+      const mark = main.querySelector(".auth-launch-map img")!.getBoundingClientRect();
       const label = main.querySelector("[data-loading-status] > span:first-child")!;
       const labelBox = label.getBoundingClientRect();
       const track = main.querySelector("[data-loading-track]")!.getBoundingClientRect();
@@ -87,22 +87,22 @@ test("launch centers a larger background-free brand and keeps its position throu
         centerX: box.left + box.width / 2,
         centerY: box.top + box.height / 2,
         groupCenterY: group.top + group.height / 2,
-        brandCenterX: brand.left + brand.width / 2,
+        artCenterX: mark.left + mark.width / 2,
         labelCenterX: labelBox.left + labelBox.width / 2,
         trackCenterX: track.left + track.width / 2,
         markWidth: mark.width,
         lineWidth: track.width,
         lineHeight: track.height,
         labelSize: parseFloat(getComputedStyle(label).fontSize),
-        positions: [brand.top, labelBox.top, track.top],
+        positions: [map.top, labelBox.top, track.top],
       };
     });
     const initial = await measure();
     expect(Math.abs(initial.groupCenterY - initial.centerY)).toBeLessThanOrEqual(1);
-    for (const center of [initial.brandCenterX, initial.labelCenterX, initial.trackCenterX]) {
+    for (const center of [initial.artCenterX, initial.labelCenterX, initial.trackCenterX]) {
       expect(Math.abs(center - initial.centerX)).toBeLessThanOrEqual(1);
     }
-    expect(initial.markWidth).toBeGreaterThanOrEqual(112);
+    expect(initial.markWidth).toBeGreaterThanOrEqual(80);
     expect(initial.lineWidth).toBeGreaterThanOrEqual(144);
     expect(initial.lineHeight).toBe(2);
     expect(initial.labelSize).toBeGreaterThanOrEqual(16);
@@ -115,7 +115,7 @@ test("launch centers a larger background-free brand and keeps its position throu
     expect((await measure()).positions).toEqual(initial.positions);
     await expect(page.getByRole("status")).toHaveCount(1);
     await page.emulateMedia({ forcedColors: "active" });
-    await expect(mark).toHaveCSS("filter", "none");
+    expect(await map.evaluate(element => getComputedStyle(element, "::before").display)).toBe("none");
     await page.emulateMedia({ forcedColors: "none" });
   }
 });
@@ -129,7 +129,7 @@ test("launch and PIN remain reachable on short landscape screens with doubled te
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     const clipped = await page.locator("main").evaluate(main => {
       const bounds = main.getBoundingClientRect();
-      return Array.from(main.querySelectorAll(".auth-brand, .auth-brand__mark, h1:not(.sr-only), h2, input, button, [data-loading-status]"))
+      return Array.from(main.querySelectorAll(".auth-launch-map, .auth-brand, .auth-brand__mark, h1:not(.sr-only), h2, input, button, [data-loading-status]"))
         .filter(element => {
           const rect = element.getBoundingClientRect();
           return rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1 || rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1);
@@ -280,7 +280,7 @@ for (const view of ["launch", "pin", "skeleton"]) {
       await expect(page.locator("html")).toHaveCSS("font-size", "32px");
       await expect.poll(() => statusText.evaluateAll(nodes => nodes.map(node => Number.parseFloat(getComputedStyle(node).fontSize))))
         .toEqual(statusFontSizes.map(size => size * 2));
-      const zoomGeometry = await page.locator("main").evaluate(main => Array.from(main.querySelectorAll(".auth-launch-group, .auth-brand, .auth-brand__mark, .auth-launch-content, [data-loading-status], [data-loading-indicator]"))
+      const zoomGeometry = await page.locator("main").evaluate(main => Array.from(main.querySelectorAll(".auth-launch-group, .auth-launch-map, .auth-brand, .auth-brand__mark, .auth-launch-content, [data-loading-status], [data-loading-indicator]"))
         .map(element => { const rect = element.getBoundingClientRect(); const css = getComputedStyle(element); return { className: element.className, left: rect.left, right: rect.right, width: rect.width, minWidth: css.minWidth, maxWidth: css.maxWidth }; }));
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), JSON.stringify(zoomGeometry)).toBeLessThanOrEqual(1);
       expect(await page.locator("main").evaluate(element => Array.from(element.querySelectorAll("h1:not(.sr-only), h2, input, button, .auth-launch-content, .auth-brand, [data-loading-status] > span:not([data-loading-indicator])"))

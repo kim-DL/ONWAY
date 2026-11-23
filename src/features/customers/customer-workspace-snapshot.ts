@@ -6,7 +6,6 @@ export type CustomerWorkspaceSnapshot = {
   catalog: null | {
     customers: Customer[];
     freshness: RevalidationFreshness;
-    lastSuccessAt: number | null;
   };
   ui: { query: string; searchOpen: boolean; scrollTop: number; limit: number };
 };
@@ -52,19 +51,19 @@ export function beginCustomerCatalogRead(namespace: string) {
   return entry?.namespace === namespace ? entry.writeGeneration : null;
 }
 
-export function commitCustomerCatalogRead(namespace: string, customers: Customer[], lastSuccessAt: number, expectedWriteGeneration: number | null) {
+export function commitCustomerCatalogRead(namespace: string, customers: Customer[], expectedWriteGeneration: number | null) {
   const current = entry;
   if (!current || current.namespace !== namespace || expectedWriteGeneration === null) return null;
   if (current.writeGeneration !== expectedWriteGeneration && current.snapshot.catalog) return current.snapshot.catalog.customers;
-  current.snapshot = { ...current.snapshot, catalog: { customers, freshness: "fresh", lastSuccessAt } };
+  current.snapshot = { ...current.snapshot, catalog: { customers, freshness: "fresh" } };
   return customers;
 }
 
-export function updateCustomerCatalogFreshness(namespace: string, freshness: RevalidationFreshness, lastSuccessAt: number | null) {
+export function updateCustomerCatalogFreshness(namespace: string, freshness: RevalidationFreshness) {
   const current = entry;
   if (!current || current.namespace !== namespace) return;
   if (!current.snapshot.catalog) return;
-  current.snapshot = { ...current.snapshot, catalog: { ...current.snapshot.catalog, freshness, lastSuccessAt: lastSuccessAt ?? current.snapshot.catalog.lastSuccessAt } };
+  current.snapshot = { ...current.snapshot, catalog: { ...current.snapshot.catalog, freshness } };
 }
 
 export function acceptCustomerWorkspaceWrite(namespace: string, customer: Customer) {

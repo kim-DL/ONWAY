@@ -55,6 +55,9 @@ vi.mock("firebase/functions", () => ({
 }));
 vi.mock("@/lib/firebase/client", () => ({
   getFirebaseClientServices: () => ({ auth: {}, firestore: {}, functions: {} }),
+}));
+vi.mock("@/lib/firebase/auth-client", () => ({
+  getFirebaseAuthServices: () => ({ auth: {}, functions: {} }),
   ensureFirebaseAppCheckReady: harness.ensureFirebaseAppCheckReady,
 }));
 vi.mock("@/lib/performance/performance-monitor", () => ({ recordFirestoreReads: vi.fn() }));
@@ -89,6 +92,7 @@ function renderProvider() {
 }
 
 async function flushCallbacks() {
+  await vi.dynamicImportSettled();
   for (let step = 0; step < 8; step += 1) await Promise.resolve();
 }
 

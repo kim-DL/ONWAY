@@ -44,8 +44,10 @@ describe("private workspace snapshot cleanup", () => {
 
   it("drops customer and inventory memory before logout completes", async () => {
     const namespace = "EMP:1:1";
-    commitCustomerCatalogRead(namespace, [{ customerId: "customer" } as Customer], 1_000, beginCustomerCatalogRead(namespace));
-    commitInventoryCatalog(namespace, { context: { today: "2026-09-20" } as InventoryContext, products: [], observedDate: "2026-09-20", freshness: "fresh", lastSuccessAt: 1_000 });
+    readCustomerWorkspaceSnapshot(namespace);
+    getInventoryWorkspaceSession(namespace);
+    expect(commitCustomerCatalogRead(namespace, [{ customerId: "customer" } as Customer], beginCustomerCatalogRead(namespace))).toHaveLength(1);
+    expect(commitInventoryCatalog(namespace, { context: { today: "2026-09-20" } as InventoryContext, products: [], observedDate: "2026-09-20", freshness: "fresh", complete: true })).toBe(true);
 
     await clearPrivateClientState();
 

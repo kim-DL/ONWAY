@@ -21,7 +21,7 @@ test.beforeAll(async () => {
 
 async function liveMotionFixture(page: Page, kind = "header", modeCount = 4, material = "depth") {
   const globals = readApplicationStylesheet();
-  await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({ contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)) }));
+  await page.route("**/brand/onnuri-food-logo-auth.webp", (route) => route.fulfill({ contentType: "image/webp", body: readFileSync(new URL("../../public/brand/onnuri-food-logo-auth.webp", import.meta.url)) }));
   await page.setContent(`<!doctype html><html lang="ko" data-fixture="${kind}" data-mode-count="${modeCount}" data-mode-material="${material}"><head><base href="http://header.fixture/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>헤더 모션 검증</title><style>${globals}</style><style>${motionCss}</style></head><body><div id="root"></div></body></html>`);
   await page.addScriptTag({ content: motionScript });
 }
@@ -336,8 +336,8 @@ for (const mode of ["customer", "delivery", "sales"] as const) {
 for (const state of ["triple", "triple-detail"] as const) {
   test(`${mode} ${state} keeps all three labels readable at 320–1280px`, async ({ page }, testInfo) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
-      contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
+    await page.route("**/brand/onnuri-food-logo-auth.webp", (route) => route.fulfill({
+      contentType: "image/webp", body: readFileSync(new URL("../../public/brand/onnuri-food-logo-auth.webp", import.meta.url)),
     }));
     const fixture = readFileSync(new URL(`../../output/playwright/header-layout/${mode}-${state}.html`, import.meta.url), "utf8");
     for (const width of [320, 360, 390, 768, 1280]) {
@@ -373,8 +373,8 @@ for (const mode of ["delivery", "sales"] as const) {
   for (const state of ["dual", "single", "detail"] as const) {
     test(`${mode} ${state} header preserves 320/390/1280 layout and touch targets`, async ({ page }, testInfo) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
-      await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
-        contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
+      await page.route("**/brand/onnuri-food-logo-auth.webp", (route) => route.fulfill({
+        contentType: "image/webp", body: readFileSync(new URL("../../public/brand/onnuri-food-logo-auth.webp", import.meta.url)),
       }));
       const fixture = readFileSync(new URL(`../../output/playwright/header-layout/${mode}-${state}.html`, import.meta.url), "utf8");
       for (const width of [320, 390, 1280]) {
@@ -510,8 +510,8 @@ test.describe("Galaxy S26 glass fallback", () => {
 
 test("work modes preserve a static aurora with a dawn sales palette and accessible forced colors", async ({ page }, testInfo) => {
   const backgrounds: string[] = [];
-  await page.route("**/brand/onnuri-food-logo.png", (route) => route.fulfill({
-    contentType: "image/png", body: readFileSync(new URL("../../public/brand/onnuri-food-logo.png", import.meta.url)),
+  await page.route("**/brand/onnuri-food-logo-auth.webp", (route) => route.fulfill({
+    contentType: "image/webp", body: readFileSync(new URL("../../public/brand/onnuri-food-logo-auth.webp", import.meta.url)),
   }));
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 390, height: 844 });

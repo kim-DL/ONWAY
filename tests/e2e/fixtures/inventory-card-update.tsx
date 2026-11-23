@@ -5,7 +5,7 @@ import { context, products, session } from "./inventory-card-update-data";
 
 const namespace = `${session.uid}:1:1`;
 getInventoryWorkspaceSession(namespace);
-commitInventoryCatalog(namespace, { context, products, observedDate: context.today, freshness: "fresh", lastSuccessAt: Date.now() });
+commitInventoryCatalog(namespace, { context, products, observedDate: context.today, freshness: "fresh", complete: true });
 updateInventoryWorkspaceUi(namespace, { limit: products.length });
 createRoot(document.getElementById("root")!).render(<div className="workspace-content" style={{ height: "100dvh", overflowY: "auto" }}>
   <InventoryWorkspace session={session} />

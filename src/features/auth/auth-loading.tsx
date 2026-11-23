@@ -33,7 +33,7 @@ export const useLaunchTiming = () => useContext(LaunchTimingContext);
 export function AuthBrand({ company = false }: { company?: boolean } = {}) {
   return (
     <div className="auth-brand" aria-label={company ? "온누리종합식품" : "급식길"}>
-      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark variant="auth" /></span>
+      <span className="auth-brand__mark" aria-hidden="true"><AppIconMark variant="company" /></span>
       <span><strong>{company ? "온누리종합식품" : "급식길"}</strong>{company ? null : <small>온누리종합식품</small>}</span>
     </div>
   );
@@ -44,7 +44,7 @@ export function AuthHeader({ company = false }: { company?: boolean } = {}) {
 }
 
 const launchLabels = {
-  boot: "급식길 여는 중",
+  boot: "앱을 여는 중",
   session: "로그인 확인 중",
   workspace: "업무 화면 여는 중",
 };
@@ -64,8 +64,11 @@ export function AuthLoadingScreen({ stage, message, waitingForConnection = false
   return (
     <main className="auth-shell auth-shell--launch" data-auth-stage={waitingForConnection ? "connection" : stage}>
       <div className="auth-launch-group">
-        <AuthHeader />
-        <section className="auth-launch-content" aria-label="급식길 준비">
+        <div className="auth-launch-map" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element -- A presized, offline-cached local SVG. */}
+          <img src="/ui/delivery-smart-route.svg" width={84} height={84} alt="" />
+        </div>
+        <div className="auth-launch-content">
           <h1 className="sr-only">급식길</h1>
           <LoadingStatus
             label={message ?? launchLabels[stage]}
@@ -73,7 +76,7 @@ export function AuthLoadingScreen({ stage, message, waitingForConnection = false
             startedAt={startedAt}
             indicator={!waitingForConnection}
           />
-        </section>
+        </div>
       </div>
     </main>
   );

@@ -20,8 +20,8 @@ import {
   signInWithPopup,
   signInWithCustomToken,
   signOut,
+  type Unsubscribe,
 } from "firebase/auth";
-import { doc, getDocFromServer, onSnapshot, type Unsubscribe } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 import {
@@ -33,9 +33,8 @@ import {
 } from "@/domain/auth";
 import {
   ensureFirebaseAppCheckReady,
-  getFirebaseClientServices,
-  type FirebaseClientServices,
-} from "@/lib/firebase/client";
+  getFirebaseAuthServices,
+} from "@/lib/firebase/auth-client";
 import { APP_METADATA } from "@/lib/app-metadata";
 import { recordFirestoreReads } from "@/lib/performance/performance-monitor";
 import {
@@ -70,6 +69,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const UNCONFIGURED_AUTH_STATE: AuthState = { status: "unconfigured" };
 const subscribeToClientAvailability = () => () => undefined;
+const loadSessionAuthorization = () => import("./session-authorization");
 
 function useIsClient() {
   return useSyncExternalStore(
@@ -113,8 +113,8 @@ async function settleWithin(promise: Promise<unknown>, timeoutMs: number) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const isClient = useIsClient();
-  const services: FirebaseClientServices | null | undefined = isClient
-    ? getFirebaseClientServices()
+  const services = isClient
+    ? getFirebaseAuthServices()
     : undefined;
   const [state, setState] = useState<AuthState>({ status: "resolving" });
   const invalidReasonRef = useRef<string | null>(null);
@@ -203,9 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         const resolveRemoteSession = (forceRefresh = false) => {
-          void user
-            .getIdTokenResult(forceRefresh)
-            .then((token) => {
+          void Promise.all([user.getIdTokenResult(forceRefresh), loadSessionAuthorization()])
+            .then(([token, { watchSessionAuthorization }]) => {
               if (!active || generation !== authGenerationRef.current) {
                 return;
               }
@@ -232,11 +231,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 claims: parsedClaims.data,
               };
               authzUnsubscribe?.();
-              authzUnsubscribe = onSnapshot(
-                doc(services.firestore, "authz", user.uid),
-                // A warm cache may differ only in fromCache after re-login.
-                // Receive that server confirmation without trusting cached authz.
-                { includeMetadataChanges: true },
+              authzUnsubscribe = watchSessionAuthorization(
+                user.uid,
                 (snapshot) => {
                   if (!active || generation !== authGenerationRef.current) return;
                   // Only server snapshots can confirm or revoke authorization.
@@ -286,6 +282,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : { status: "resolving" });
         restoreVerifiedSession();
         function checkConnection(forceRefresh = false) {
+          // A known UID will need Firestore. Fetch its code during the network
+          // probe; the verification path handles a failed import and retry.
+          if (navigator.onLine) void loadSessionAuthorization().catch(() => undefined);
           void probeNetworkReachability().then((reachable) => {
             if (!active || generation !== authGenerationRef.current) return;
             if (!reachable) {
@@ -370,7 +369,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // only for a second observer event can leave popup logins on the splash
       // screen because token refresh notifications may arrive while activation
       // is still guarded.
-      const token = await credential.user.getIdTokenResult(true);
+      const [token, { readServerAuthorization }] = await Promise.all([
+        credential.user.getIdTokenResult(true), loadSessionAuthorization(),
+      ]);
       const firebaseClaim = token.claims.firebase as { sign_in_provider?: unknown } | undefined;
       const parsedClaims = sessionClaimsSchema.safeParse({
         ...token.claims,
@@ -379,7 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!parsedClaims.success || !isVerifiedAdminSession(parsedClaims.data)) {
         throw new Error("Activated admin claims are unavailable.");
       }
-      const authzSnapshot = await getDocFromServer(doc(services.firestore, "authz", credential.user.uid));
+      const authzSnapshot = await readServerAuthorization(credential.user.uid);
       const parsedAuthz = clientAuthzSchema.safeParse(authzSnapshot.data());
       if (!authzSnapshot.exists() || !parsedAuthz.success || !authzMatchesSession(parsedAuthz.data, parsedClaims.data)) {
         throw new Error("Activated admin authorization is unavailable.");
