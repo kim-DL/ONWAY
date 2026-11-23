@@ -19,7 +19,7 @@ export type PhotoOutboxRecord = {
   lease: { worker: string; stage: "prepare" | "upload"; until: number } | null;
 };
 export interface PhotoOutboxStore {
-  activate(owner: string): Promise<OutboxScope>;
+  activate(owner: string, preserveOwner?: boolean): Promise<OutboxScope>;
   list(scope: OutboxScope): Promise<PhotoOutboxRecord[]>;
   add(scope: OutboxScope, record: PhotoOutboxRecord): Promise<void>;
   save(scope: OutboxScope, record: PhotoOutboxRecord, worker?: string): Promise<void>;
@@ -78,10 +78,11 @@ export function assertOutboxCapacity(records: PhotoOutboxRecord[], record: Photo
     throw Object.assign(new Error("Photo outbox capacity exceeded"), { code: "delivery-photo/outbox-full" });
   }
 }
+function sessionChanged() {
+  return Object.assign(new Error("Photo outbox session changed"), { code: "delivery-photo/outbox-session" });
+}
 function assertScope(current: OutboxScope | undefined, expected: OutboxScope) {
-  if (current?.owner !== expected.owner || current.token !== expected.token) {
-    throw Object.assign(new Error("Photo outbox session changed"), { code: "delivery-photo/outbox-session" });
-  }
+  if (current?.owner !== expected.owner || current.token !== expected.token) throw sessionChanged();
 }
 
 async function abortWrite(transaction: OutboxTransaction, error: unknown): Promise<never> {
@@ -91,10 +92,12 @@ async function abortWrite(transaction: OutboxTransaction, error: unknown): Promi
 }
 
 export const deliveryPhotoOutbox: PhotoOutboxStore = {
-  async activate(owner) {
+  async activate(owner, preserveOwner = false) {
     const transaction = (await db()).transaction(STORES, "readwrite");
     let scope = await transaction.objectStore("scope").get("current");
     if (scope?.owner !== owner) {
+      // Another tab can acquire the outbox after this tab's first open fails.
+      if (scope && preserveOwner) throw sessionChanged();
       scope = { owner, token: crypto.randomUUID() };
       await transaction.objectStore("jobs").clear();
       await transaction.objectStore("states").clear(); await transaction.objectStore("prepared").clear();

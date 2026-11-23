@@ -54,6 +54,40 @@ describe("durable unsent-photo outbox", () => {
     expect(second).not.toBe(first); await second.ready;
     await clearDeliveryPhotoUploadMemory();
   });
+  it("preserves another session's pending bytes if the old tab retries its first activation", async () => {
+    const activate = vi.fn(deliveryPhotoOutbox.activate).mockRejectedValueOnce(new Error("temporary open failure"));
+    const previous = worker({ store: { ...deliveryPhotoOutbox, activate } });
+    expect(await previous.ready).toBe(false);
+
+    const next = await deliveryPhotoOutbox.activate("another-verified-session");
+    await deliveryPhotoOutbox.add(next, { ...record("other-photo"), owner: next.owner });
+    expect(await Promise.all([previous.retryStorage(), previous.retryStorage()])).toEqual([false, false]);
+    expect(previous.canBegin("customer")).toBe(false);
+    await previous.clear();
+    const [retained] = await deliveryPhotoOutbox.list(next);
+    expect(retained?.job.requestId).toBe("request-other-photo");
+    expect(await retained?.prepared?.blob.text()).toBe("other-photo");
+
+    // A newly verified session may still take over on its first activation.
+    const fresh = worker();
+    expect(await fresh.ready).toBe(true);
+    expect(fresh.getSnapshot()).toEqual([]);
+    await expect(deliveryPhotoOutbox.list(next)).rejects.toMatchObject({ code: "delivery-photo/outbox-session" });
+  });
+
+  it.each([false, true])("recovers an initial activation failure with a matching or empty store (seeded: %s)", async (seeded) => {
+    const activate = vi.fn(deliveryPhotoOutbox.activate).mockRejectedValueOnce(new Error("temporary open failure"));
+    const current = worker({ store: { ...deliveryPhotoOutbox, activate } });
+    expect(await current.ready).toBe(false);
+    if (seeded) {
+      const scope = await deliveryPhotoOutbox.activate(owner);
+      await deliveryPhotoOutbox.add(scope, { ...record("same-session"), approvedDay: "2026-10-17" });
+    }
+    expect(await current.retryStorage()).toBe(true);
+    expect(current.canBegin("customer")).toBe(true);
+    expect(current.getSnapshot().map(job => job.requestId)).toEqual(seeded ? ["request-same-session"] : []);
+  });
+
   it("shows a retryable storage status if claiming fails and keeps the durable source", async () => {
     const claim = vi.fn(deliveryPhotoOutbox.claim).mockRejectedValueOnce(new Error("storage unavailable"));
     const create = vi.fn(async () => metadata("customer"));

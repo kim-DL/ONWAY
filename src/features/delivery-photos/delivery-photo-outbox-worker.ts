@@ -17,7 +17,7 @@ export class PhotoOutboxWorker {
   scope!: OutboxScope;
   constructor(private readonly store: PhotoOutboxStore, private readonly worker: string) {}
 
-  async open(owner: string, live: () => boolean, existingScope: OutboxScope | null = null) {
+  async open(owner: string, live: () => boolean, existingScope: OutboxScope | null = null, preserveOwner = false) {
     try {
       if (typeof navigator !== "undefined" && navigator.locks) {
         await new Promise<void>((ready) => {
@@ -29,7 +29,7 @@ export class PhotoOutboxWorker {
         });
       }
       if (!live()) { this.close(); return false; }
-      this.scope = existingScope ?? await this.store.activate(owner);
+      this.scope = existingScope ?? await this.store.activate(owner, preserveOwner);
       if (!live()) { this.close(); return false; }
       return true;
     } catch (error) { this.close(); throw error; }

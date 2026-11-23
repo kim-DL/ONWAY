@@ -77,10 +77,10 @@ export class DeliveryPhotoUploadCoordinator {
   private today() { return deliveryPhotoDateKey(new Date(this.dependencies.now())); }
   private live(epoch: number, id?: string) { return this.authorized && this.epoch === epoch && (!id || this.jobs.has(id)); }
   retryStorage() {
-    if (this.storageFailed && this.authorized) this.ready = this.initialize();
+    if (this.storageFailed && this.authorized) this.ready = this.initialize(true);
     return this.ready;
   }
-  private async initialize() {
+  private async initialize(preserveOwner = false) {
     this.storageFailed = false;
     const epoch = this.epoch;
     try {
@@ -88,7 +88,7 @@ export class DeliveryPhotoUploadCoordinator {
         const { PhotoOutboxWorker } = await import("./delivery-photo-outbox-worker");
         const worker = new PhotoOutboxWorker(this.dependencies.store, this.worker);
         this.outboxWorker = worker;
-        if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch), this.scope)) return false;
+        if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch), this.scope, preserveOwner)) return false;
         this.scope = worker.scope;
         if (!await this.wake(true) || !this.live(epoch)) { worker.close(); return false; }
         worker.start((foreground) => { void this.wake(foreground); }, () => {
