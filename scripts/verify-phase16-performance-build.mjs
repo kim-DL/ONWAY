@@ -246,6 +246,8 @@ const inventoryManufacturerStylesheetGzipBytes = inventoryManufacturerStylesheet
 // The renewed login owns one stylesheet loaded with the existing auth boundary.
 // Keep the initial and authenticated-workspace envelopes unchanged.
 const loginEntry = dynamicEntries.find((entry) => entry.boundary.endsWith("/auth-application"));
+const loginJavascriptGzipBytes = (loginEntry?.files ?? []).filter((asset) => asset.endsWith(".js"))
+  .reduce((total, asset) => total + sizeAsset(asset).gzipBytes, 0);
 const loginStylesheets = stylesheets.filter((asset) => loginEntry?.files.includes(asset.asset)
   && readFileSync(join(nextRoot, asset.asset), "utf8").includes(".login-motion__stage"));
 const loginStylesheetAssets = new Set(loginStylesheets.map((asset) => asset.asset));
@@ -270,6 +272,10 @@ for (const asset of workspaceStylesheets) {
 }
 assertBudget(initialStylesheetRawBytes <= 32 * 1024, `initial CSS raw ${initialStylesheetRawBytes}B exceeds 32KiB`);
 assertBudget(initialStylesheetGzipBytes <= 8 * 1024, `initial CSS gzip ${initialStylesheetGzipBytes}B exceeds 8KiB`);
+// Check the entire auth boundary so a transitive Firestore import cannot move
+// the database SDK back onto the anonymous user's critical path unnoticed.
+assertBudget(loginJavascriptGzipBytes > 0 && loginJavascriptGzipBytes <= 100 * 1024,
+  `login JavaScript gzip ${loginJavascriptGzipBytes}B must fit within 100KiB`);
 assertBudget(loginStylesheets.length === 1, "login must retain one isolated stylesheet");
 assertBudget(loginCssRawBytes <= 16 * 1024 && loginCssGzipBytes <= 4 * 1024, "login CSS exceeds its 16KiB raw / 4KiB gzip envelope");
 for (const asset of loginStylesheets) {
@@ -543,6 +549,7 @@ const report = {
     initialRawBytes: 520 * 1024,
     initialGzipBytes: 160 * 1024,
     largestJavascriptGzipBytes: 90 * 1024,
+    loginJavascriptGzipBytes: 100 * 1024,
     loginCssRawBytes: 16 * 1024,
     loginCssGzipBytes: 4 * 1024,
     initialStylesheetRawBytes: 32 * 1024,
@@ -589,6 +596,7 @@ const report = {
     initialRawBytes,
     initialGzipBytes,
     largestJavascriptGzipBytes,
+    loginJavascriptGzipBytes,
     loginCssRawBytes,
     loginCssGzipBytes,
     initialStylesheetRawBytes,

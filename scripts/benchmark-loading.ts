@@ -38,7 +38,7 @@ try {
       let stableFrames = 0;
       const frame = () => {
         const now = Math.round(performance.now());
-        const brand = document.querySelector(".auth-launch-map, .auth-brand, .workspace-header");
+        const brand = document.querySelector(".auth-launch-brand, .auth-brand, .workspace-header");
         if (brand) {
           state.firstSurface ??= now;
           const bounds = JSON.stringify(brand.getBoundingClientRect().toJSON());

@@ -64,12 +64,12 @@ export function AuthLoadingScreen({ stage, message, waitingForConnection = false
   return (
     <main className="auth-shell auth-shell--launch" data-auth-stage={waitingForConnection ? "connection" : stage}>
       <div className="auth-launch-group">
-        <div className="auth-launch-map" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element -- A presized, offline-cached local SVG. */}
-          <img src="/ui/delivery-smart-route.svg" width={84} height={84} alt="" />
+        <div className="auth-launch-brand">
+          {/* eslint-disable-next-line @next/next/no-img-element -- The shared offline logo is already sized and compressed. */}
+          <img src="/brand/onnuri-food-logo-auth.webp" width={576} height={214} alt="" />
+          <h1><span>온누리</span><span>종합식품</span></h1>
         </div>
         <div className="auth-launch-content">
-          <h1 className="sr-only">급식길</h1>
           <LoadingStatus
             label={message ?? launchLabels[stage]}
             detail={message ? undefined : launchDetails[stage]}

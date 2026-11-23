@@ -24,7 +24,7 @@ async function fixture(page: Page, view = "launch", clock = true) {
   if (clock) await page.clock.install({ time: new Date("2026-10-29T00:00:00Z") });
   await page.route("https://loading.fixture/**", async route => {
     const path = new URL(route.request().url()).pathname;
-    if (["/brand/onnuri-food-logo-auth.webp", "/ui/delivery-smart-route.svg"].includes(path)) return route.fulfill({ contentType: path.endsWith(".svg") ? "image/svg+xml" : "image/webp", body: readFileSync(new URL(`../../public${path}`, import.meta.url)) });
+    if (path === "/brand/onnuri-food-logo-auth.webp") return route.fulfill({ contentType: "image/webp", body: readFileSync(new URL(`../../public${path}`, import.meta.url)) });
     if (path !== "/") return route.abort();
     await route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>급식길 로딩 검증</title><style>${css}</style><style>.fixture-controls{display:flex;gap:12px}.fixture-controls button{min-height:44px;padding:8px}body{margin:0}</style></head><body><div id="root"></div></body></html>` });
   });
@@ -62,24 +62,30 @@ test("quick operations finish without flashing an animated indicator", async ({ 
   await expect(page.getByRole("status")).toHaveCount(0);
 });
 
-test("launch centers the route artwork without a visible wordmark and keeps its position through delayed feedback", async ({ page }) => {
+test("launch centers the company logo, name and progress bar through delayed feedback", async ({ page }) => {
   for (const width of [320, 390, 840, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await fixture(page);
     await page.addStyleTag({ content: ".fixture-controls{display:none}" });
-    const map = page.locator(".auth-launch-map");
-    const mark = map.locator("img");
+    const brand = page.locator(".auth-launch-brand");
+    const mark = brand.locator("img");
+    const heading = brand.getByRole("heading", { level: 1, name: /^온누리\s*종합식품$/ });
     const indicator = page.locator("[data-loading-indicator]");
-    await expect(mark).toHaveAttribute("src", "/ui/delivery-smart-route.svg");
+    await expect(mark).toHaveAttribute("src", "/brand/onnuri-food-logo-auth.webp");
+    await expect(mark).toHaveAttribute("alt", "");
     await expect.poll(() => mark.evaluate(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true);
-    await expect(page.getByRole("heading", { name: "급식길" })).toHaveClass("sr-only");
-    await expect(page.locator(".auth-brand")).toHaveCount(0);
+    await expect(heading).toBeVisible();
+    await expect(heading.locator("span")).toHaveCount(2);
+    await expect(page.getByText("급식길", { exact: true })).toHaveCount(0);
 
     const measure = () => page.locator("main").evaluate(main => {
       const box = main.getBoundingClientRect();
       const group = main.querySelector(".auth-launch-group")!.getBoundingClientRect();
-      const map = main.querySelector(".auth-launch-map")!.getBoundingClientRect();
-      const mark = main.querySelector(".auth-launch-map img")!.getBoundingClientRect();
+      const name = main.querySelector(".auth-launch-brand h1")!;
+      const text = document.createRange();
+      text.selectNodeContents(name);
+      const nameBox = text.getBoundingClientRect();
+      const mark = main.querySelector(".auth-launch-brand img")!.getBoundingClientRect();
       const label = main.querySelector("[data-loading-status] > span:first-child")!;
       const labelBox = label.getBoundingClientRect();
       const track = main.querySelector("[data-loading-track]")!.getBoundingClientRect();
@@ -88,34 +94,46 @@ test("launch centers the route artwork without a visible wordmark and keeps its 
         centerY: box.top + box.height / 2,
         groupCenterY: group.top + group.height / 2,
         artCenterX: mark.left + mark.width / 2,
+        nameCenterX: nameBox.left + nameBox.width / 2,
         labelCenterX: labelBox.left + labelBox.width / 2,
         trackCenterX: track.left + track.width / 2,
         markWidth: mark.width,
         lineWidth: track.width,
         lineHeight: track.height,
         labelSize: parseFloat(getComputedStyle(label).fontSize),
-        positions: [map.top, labelBox.top, track.top],
+        nameSize: parseFloat(getComputedStyle(name).fontSize),
+        trackAboveLabel: track.bottom <= labelBox.top,
+        positions: [mark.top, nameBox.top, labelBox.top, track.top],
       };
     });
     const initial = await measure();
     expect(Math.abs(initial.groupCenterY - initial.centerY)).toBeLessThanOrEqual(1);
-    for (const center of [initial.artCenterX, initial.labelCenterX, initial.trackCenterX]) {
+    for (const center of [initial.artCenterX, initial.nameCenterX, initial.labelCenterX, initial.trackCenterX]) {
       expect(Math.abs(center - initial.centerX)).toBeLessThanOrEqual(1);
     }
-    expect(initial.markWidth).toBeGreaterThanOrEqual(80);
+    expect(initial.markWidth).toBeGreaterThanOrEqual(112);
+    expect(initial.markWidth).toBeLessThanOrEqual(136);
     expect(initial.lineWidth).toBeGreaterThanOrEqual(144);
-    expect(initial.lineHeight).toBe(2);
-    expect(initial.labelSize).toBeGreaterThanOrEqual(16);
+    expect(initial.lineHeight).toBeGreaterThanOrEqual(2);
+    expect(initial.labelSize).toBeGreaterThanOrEqual(14);
+    expect(initial.nameSize).toBeGreaterThan(initial.labelSize);
+    expect(initial.trackAboveLabel).toBe(true);
+    await expect(indicator).toHaveCSS("opacity", "1");
+    await expect(indicator.locator("[data-loading-segment]")).toHaveCSS("visibility", "hidden");
     await expect(indicator).toHaveAttribute("data-visible", "false");
-    await page.clock.runFor(1_050);
+    await page.clock.runFor(1_450);
     await expect(indicator).toHaveAttribute("data-visible", "true");
+    await expect(indicator.locator("[data-loading-segment]")).toHaveCSS("visibility", "visible");
     expect((await measure()).positions).toEqual(initial.positions);
+    await expect(page.getByRole("status")).toHaveText("앱을 여는 중");
     await page.clock.runFor(2_000);
     await expect(page.getByText("앱을 준비하고 있습니다.", { exact: true })).toBeVisible();
     expect((await measure()).positions).toEqual(initial.positions);
     await expect(page.getByRole("status")).toHaveCount(1);
     await page.emulateMedia({ forcedColors: "active" });
-    expect(await map.evaluate(element => getComputedStyle(element, "::before").display)).toBe("none");
+    await expect(mark).toBeVisible();
+    await expect(heading).toBeVisible();
+    await expect(page.locator("[data-loading-track]")).toBeVisible();
     await page.emulateMedia({ forcedColors: "none" });
   }
 });
@@ -129,7 +147,7 @@ test("launch and PIN remain reachable on short landscape screens with doubled te
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     const clipped = await page.locator("main").evaluate(main => {
       const bounds = main.getBoundingClientRect();
-      return Array.from(main.querySelectorAll(".auth-launch-map, .auth-brand, .auth-brand__mark, h1:not(.sr-only), h2, input, button, [data-loading-status]"))
+      return Array.from(main.querySelectorAll(".auth-launch-brand, .auth-launch-brand img, .auth-launch-brand h1, .auth-brand, .auth-brand__mark, h1:not(.sr-only), h2, input, button, [data-loading-status]"))
         .filter(element => {
           const rect = element.getBoundingClientRect();
           return rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1 || rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1);
@@ -280,7 +298,7 @@ for (const view of ["launch", "pin", "skeleton"]) {
       await expect(page.locator("html")).toHaveCSS("font-size", "32px");
       await expect.poll(() => statusText.evaluateAll(nodes => nodes.map(node => Number.parseFloat(getComputedStyle(node).fontSize))))
         .toEqual(statusFontSizes.map(size => size * 2));
-      const zoomGeometry = await page.locator("main").evaluate(main => Array.from(main.querySelectorAll(".auth-launch-group, .auth-launch-map, .auth-brand, .auth-brand__mark, .auth-launch-content, [data-loading-status], [data-loading-indicator]"))
+      const zoomGeometry = await page.locator("main").evaluate(main => Array.from(main.querySelectorAll(".auth-launch-group, .auth-launch-brand, .auth-launch-brand img, .auth-launch-brand h1, .auth-brand, .auth-brand__mark, .auth-launch-content, [data-loading-status], [data-loading-indicator]"))
         .map(element => { const rect = element.getBoundingClientRect(); const css = getComputedStyle(element); return { className: element.className, left: rect.left, right: rect.right, width: rect.width, minWidth: css.minWidth, maxWidth: css.maxWidth }; }));
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), JSON.stringify(zoomGeometry)).toBeLessThanOrEqual(1);
       expect(await page.locator("main").evaluate(element => Array.from(element.querySelectorAll("h1:not(.sr-only), h2, input, button, .auth-launch-content, .auth-brand, [data-loading-status] > span:not([data-loading-indicator])"))
