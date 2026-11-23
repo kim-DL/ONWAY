@@ -13,7 +13,12 @@ test.beforeAll(async () => {
     builder.onResolve({ filter: /auth-context$/ }, () => ({ path: "auth", namespace: "loading-fixture" }));
     builder.onResolve({ filter: /^next\/dynamic$/ }, () => ({ path: "dynamic", namespace: "loading-fixture" }));
     builder.onResolve({ filter: /app-shell\/app-shell$/ }, () => ({ path: "shell", namespace: "loading-fixture" }));
-    builder.onLoad({ filter: /.*/, namespace: "loading-fixture" }, ({ path }) => ({ loader: "js", resolveDir: root, contents: path === "auth" ? `import {useState,useEffect} from 'react';export function useAuth(){const [state,setState]=useState({status:'unauthenticated'});useEffect(()=>{const update=e=>setState(e.detail);window.addEventListener('fixture-auth-state',update);return()=>window.removeEventListener('fixture-auth-state',update)},[]);return {state,login:()=>new Promise((_,reject)=>window.addEventListener('fixture-login-fail',()=>reject(new Error('연결을 확인한 뒤 다시 시도해주세요.')),{once:true})),loginWithGoogle:()=>new Promise(()=>{})}}` : path === "dynamic" ? "import {createElement} from 'react';export default function dynamic(){return ()=>createElement('main',null,'인증된 업무 화면')}" : "export const AppShell=()=>null" }));
+    builder.onLoad({ filter: /.*/, namespace: "loading-fixture" }, ({ path }) => ({ loader: "js", resolveDir: root, contents: path === "auth" ? `import {useState,useEffect} from 'react';
+      export function prepareSessionAuthorization() {
+        const root = document.documentElement;
+        root.dataset.authorizationPreloads = String(Number(root.dataset.authorizationPreloads || 0) + 1);
+      }
+      export function useAuth(){const [state,setState]=useState({status:'unauthenticated'});useEffect(()=>{const update=e=>setState(e.detail);window.addEventListener('fixture-auth-state',update);return()=>window.removeEventListener('fixture-auth-state',update)},[]);return {state,login:()=>new Promise((_,reject)=>window.addEventListener('fixture-login-fail',()=>reject(new Error('연결을 확인한 뒤 다시 시도해주세요.')),{once:true})),loginWithGoogle:()=>new Promise(()=>{})}}` : path === "dynamic" ? "import {createElement} from 'react';export default function dynamic(){return ()=>createElement('main',null,'인증된 업무 화면')}" : "export const AppShell=()=>null" }));
   } }] });
   script = result.outputFiles.find(file => file.path.endsWith(".js"))!.text;
   css = readApplicationStylesheet() + result.outputFiles.find(file => file.path.endsWith(".css"))!.text;
@@ -54,6 +59,25 @@ test("launch thresholds survive fallback remounts and completion adds no dwell",
   await expect(page.getByLabel("업무 검색")).toBeEditable();
 });
 
+test("only the first PIN digit starts preparing the verifier, including full-field input", async ({ page }) => {
+  for (const fullField of [false, true]) {
+    await fixture(page, "pin", false);
+    const input = page.getByLabel("직원 PIN", { exact: true });
+    await input.focus();
+    await input.fill("x");
+    await expect(input).toHaveValue("");
+    await expect(page.locator("html")).not.toHaveAttribute("data-authorization-preloads");
+    if (fullField) await input.fill("123456");
+    else {
+      await input.pressSequentially("1");
+      await expect(page.locator("html")).toHaveAttribute("data-authorization-preloads", "1");
+      await input.pressSequentially("23456");
+    }
+    await expect(page.locator("html")).toHaveAttribute("data-authorization-preloads", "1");
+    await expect(page.getByRole("button", { name: "급식길 시작하기" })).toBeEnabled();
+  }
+});
+
 test("quick operations finish without flashing an animated indicator", async ({ page }) => {
   await fixture(page);
   await page.clock.runFor(200);
@@ -75,7 +99,7 @@ test("launch centers the company logo, name and progress bar through delayed fee
     await expect(mark).toHaveAttribute("alt", "");
     await expect.poll(() => mark.evaluate(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true);
     await expect(heading).toBeVisible();
-    await expect(heading.locator("span")).toHaveCount(2);
+    await expect(heading).toHaveCSS("font-weight", "700");
     await expect(page.getByText("급식길", { exact: true })).toHaveCount(0);
 
     const measure = () => page.locator("main").evaluate(main => {
@@ -136,6 +160,30 @@ test("launch centers the company logo, name and progress bar through delayed fee
     await expect(page.locator("[data-loading-track]")).toBeVisible();
     await page.emulateMedia({ forcedColors: "none" });
   }
+});
+
+test("the company name stays still while its light moves only with motion enabled", async ({ page }) => {
+  await fixture(page, "launch", false);
+  const heading = page.getByRole("heading", { level: 1, name: /^온누리\s*종합식품$/ });
+  const solid = async () => {
+    await expect(heading).toHaveCSS("animation-name", "none");
+    await expect(heading).toHaveCSS("background-image", "none");
+    await expect(heading).not.toHaveCSS("color", "rgba(0, 0, 0, 0)");
+    await expect(heading).toHaveCSS("font-weight", "700");
+  };
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await solid();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(heading).toHaveCSS("animation-name", "company-wordmark-light");
+  await expect(heading).toHaveCSS("animation-iteration-count", "2");
+  await expect(heading).toHaveCSS("background-clip", "text");
+  const startBox = await heading.boundingBox();
+  const position = () => heading.evaluate(node => getComputedStyle(node).backgroundPosition);
+  const first = await position();
+  await expect.poll(position).not.toBe(first);
+  expect(await heading.boundingBox()).toEqual(startBox);
+  await page.emulateMedia({ forcedColors: "active" });
+  await solid();
 });
 
 test("launch and PIN remain reachable on short landscape screens with doubled text", async ({ page }) => {

@@ -67,7 +67,7 @@ export function AuthLoadingScreen({ stage, message, waitingForConnection = false
         <div className="auth-launch-brand">
           {/* eslint-disable-next-line @next/next/no-img-element -- The shared offline logo is already sized and compressed. */}
           <img src="/brand/onnuri-food-logo-auth.webp" width={576} height={214} alt="" />
-          <h1><span>온누리</span><span>종합식품</span></h1>
+          <h1>온누리<wbr />종합식품</h1>
         </div>
         <div className="auth-launch-content">
           <LoadingStatus

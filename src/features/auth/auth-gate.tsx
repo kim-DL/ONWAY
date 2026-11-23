@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import { LoadingStatus } from "@/components/ui/loading-status";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
-import { useAuth } from "./auth-context";
+import { prepareSessionAuthorization, useAuth } from "./auth-context";
 import { AuthBrand, AuthHeader, AuthLoadingScreen, useLaunchTiming } from "./auth-loading";
 import { LoginMotion } from "./login-motion";
 import "@/app/styles/login-landing.css";
@@ -114,7 +114,9 @@ function PinLogin({ initialError = null }: { initialError?: string | null }) {
                 disabled={submitting || adminSubmitting}
                 value={pin}
                 onChange={(event) => {
-                  setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  const digits = event.target.value.replace(/\D/g, "").slice(0, 6);
+                  if (!pin && digits) prepareSessionAuthorization();
+                  setPin(digits);
                   setError(null);
                 }}
                 aria-describedby={error ? "pin-error" : "pin-help"}

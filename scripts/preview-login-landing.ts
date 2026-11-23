@@ -17,7 +17,7 @@ const bundle = await build({
     builder.onResolve({ filter: /auth-context$|^next\/dynamic$|performance-monitor$|app-shell\/app-shell$/ }, ({ path }) => ({ path, namespace: "login-preview" }));
     builder.onLoad({ filter: /.*/, namespace: "login-preview" }, ({ path }) => {
       let contents = "";
-      if (path.endsWith("auth-context")) contents = `const reject=async()=>{await new Promise(r=>setTimeout(r,650));throw new Error('로컬 디자인 미리보기입니다. 실제 로그인은 연결하지 않았습니다.');};export const useAuth=()=>({state:{status:'unauthenticated'},login:reject,loginWithGoogle:reject});`;
+      if (path.endsWith("auth-context")) contents = `const reject=async()=>{await new Promise(r=>setTimeout(r,650));throw new Error('로컬 디자인 미리보기입니다. 실제 로그인은 연결하지 않았습니다.');};export const prepareSessionAuthorization=()=>{};export const useAuth=()=>({state:{status:'unauthenticated'},login:reject,loginWithGoogle:reject});`;
       else if (path === "next/dynamic") contents = "export default function dynamic(){return ()=>null}";
       else if (path.endsWith("app-shell/app-shell")) contents = "export const AppShell=()=>null";
       else contents = "export const markAppBootReady=()=>{}";

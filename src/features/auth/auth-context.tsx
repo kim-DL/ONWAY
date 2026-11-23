@@ -71,6 +71,11 @@ const UNCONFIGURED_AUTH_STATE: AuthState = { status: "unconfigured" };
 const subscribeToClientAvailability = () => () => undefined;
 const loadSessionAuthorization = () => import("./session-authorization");
 
+/** Download verifier code only. A failed preload is retried during verification. */
+export function prepareSessionAuthorization() {
+  void loadSessionAuthorization().catch(() => undefined);
+}
+
 function useIsClient() {
   return useSyncExternalStore(
     subscribeToClientAvailability,
@@ -284,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         function checkConnection(forceRefresh = false) {
           // A known UID will need Firestore. Fetch its code during the network
           // probe; the verification path handles a failed import and retry.
-          if (navigator.onLine) void loadSessionAuthorization().catch(() => undefined);
+          if (navigator.onLine) prepareSessionAuthorization();
           void probeNetworkReachability().then((reachable) => {
             if (!active || generation !== authGenerationRef.current) return;
             if (!reachable) {

@@ -11,7 +11,7 @@ describe("privacy-safe application entry", () => {
     expect(markup).toContain('class="auth-launch-brand"');
     expect(markup).toContain('src="/brand/onnuri-food-logo-auth.webp"');
     const heading = markup.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1];
-    expect(heading?.replace(/<[^>]+>/g, "").replace(/\s+/g, "")).toBe("온누리종합식품");
+    expect(heading?.replace(/<wbr\s*\/?>/g, "")).toBe("온누리종합식품");
     expect(markup).not.toContain("급식길");
     expect(markup).not.toContain("/icons/");
     expect(markup.match(/role="status"/g)).toHaveLength(1);

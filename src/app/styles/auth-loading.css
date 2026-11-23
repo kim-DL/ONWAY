@@ -57,17 +57,29 @@
   margin: 0;
   color: #243e4a;
   font-size: clamp(1.8rem, 1.55rem + .8vw, 2.15rem);
-  font-weight: 750;
+  font-weight: 700;
+  word-break: keep-all;
   letter-spacing: -.035em;
   line-height: 1.3;
 }
-.auth-launch-brand h1 span { display: inline-block; }
-.auth-launch-brand h1 span + span {
-  margin-inline-start: .08em;
-  color: #425762;
-  font-size: .92em;
-  font-weight: 500;
-  letter-spacing: -.025em;
+/* Keep the highlight inside the glyphs. A short second pass covers a slower
+   launch; after that only the progress indicator needs to move. */
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .auth-launch-brand h1 {
+      background-image: linear-gradient(104deg, #243e4a 40%, #426875 46%, #688b96 50%, #426875 54%, #243e4a 60%);
+      background-size: 300% 100%;
+      background-position: 100% center;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: company-wordmark-light 2.4s ease-in-out 2;
+    }
+  }
+}
+@keyframes company-wordmark-light {
+  0% { background-position: 100% center; }
+  78%, 100% { background-position: 0% center; }
 }
 .auth-launch-content {
   /* Reserve room for the long-wait message without moving the signature. */
@@ -89,5 +101,5 @@
 }
 .auth-launch-content [data-visible="false"] [data-loading-segment] { visibility: hidden; }
 @media (forced-colors: active) {
-  .auth-launch-brand h1, .auth-launch-brand h1 span + span { color: CanvasText; }
+  .auth-launch-brand h1 { color: CanvasText; }
 }
