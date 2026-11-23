@@ -35,8 +35,9 @@ interface OutboxDatabase extends DBSchema {
   states: { key: string; value: PhotoOutboxState };
   prepared: { key: string; value: { jobId: string; photo: PreparedDeliveryPhoto } };
 }
-const STORES = ["scope", "jobs", "states", "prepared"] as const;
-type OutboxTransaction = IDBPTransaction<OutboxDatabase, typeof STORES, "readonly" | "readwrite">;
+const PHOTO_STORES = ["jobs", "states", "prepared"] as const;
+const STORES = ["scope", ...PHOTO_STORES] as const;
+type OutboxTransaction<Mode extends "readonly" | "readwrite" = "readonly" | "readwrite"> = IDBPTransaction<OutboxDatabase, typeof STORES, Mode>;
 let database: Promise<IDBPDatabase<OutboxDatabase>> | undefined;
 function db() {
   if (!database) {
@@ -85,10 +86,18 @@ function assertScope(current: OutboxScope | undefined, expected: OutboxScope) {
   if (current?.owner !== expected.owner || current.token !== expected.token) throw sessionChanged();
 }
 
-async function abortWrite(transaction: OutboxTransaction, error: unknown): Promise<never> {
-  try { transaction.abort(); } catch { /* The failing request may already have aborted it. */ }
-  await transaction.done.catch(() => undefined);
-  throw error;
+async function writeScoped<T>(scope: OutboxScope, update: (transaction: OutboxTransaction<"readwrite">) => Promise<T>): Promise<T> {
+  const transaction = (await db()).transaction(STORES, "readwrite");
+  try {
+    assertScope(await transaction.objectStore("scope").get("current"), scope);
+    const result = await update(transaction);
+    await transaction.done;
+    return result;
+  } catch (error) {
+    try { transaction.abort(); } catch { /* The failed request may have already aborted it. */ }
+    await transaction.done.catch(() => undefined);
+    throw error;
+  }
 }
 
 export const deliveryPhotoOutbox: PhotoOutboxStore = {
@@ -99,8 +108,7 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
     if (guard && (!guard.live() || (guard.preserveOwner && scope && scope.owner !== owner))) throw sessionChanged();
     if (scope?.owner !== owner) {
       scope = { owner, token: crypto.randomUUID() };
-      await transaction.objectStore("jobs").clear();
-      await transaction.objectStore("states").clear(); await transaction.objectStore("prepared").clear();
+      for (const name of PHOTO_STORES) await transaction.objectStore(name).clear();
       await transaction.objectStore("scope").put(scope, "current");
     }
     await transaction.done;
@@ -115,19 +123,14 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
     return records.filter((record) => record.version === 1 && record.owner === scope.owner);
   },
   async add(scope, record) {
-    const transaction = (await db()).transaction(STORES, "readwrite");
-    try {
-      assertScope(await transaction.objectStore("scope").get("current"), scope);
+    return writeScoped(scope, async (transaction) => {
       const jobs = transaction.objectStore("jobs");
       assertOutboxCapacity(await readRecords(transaction), record);
       await jobs.add(record, record.job.jobId);
-      await transaction.done;
-    } catch (error) { return abortWrite(transaction, error); }
+    });
   },
   async save(scope, record, worker) {
-    const transaction = (await db()).transaction(STORES, "readwrite");
-    try {
-      assertScope(await transaction.objectStore("scope").get("current"), scope);
+    return writeScoped(scope, async (transaction) => {
       const jobs = transaction.objectStore("jobs");
       const states = transaction.objectStore("states");
       const prepared = transaction.objectStore("prepared");
@@ -152,44 +155,36 @@ export const deliveryPhotoOutbox: PhotoOutboxStore = {
         }
         await states.put(mutableState(record, payload), id);
       }
-      await transaction.done;
-    } catch (error) { return abortWrite(transaction, error); }
+    });
   },
   async claim(scope, id, worker, stage, now, liveWorkers) {
-    const transaction = (await db()).transaction(STORES, "readwrite");
-    try {
-      assertScope(await transaction.objectStore("scope").get("current"), scope);
+    return writeScoped(scope, async (transaction) => {
       const states = transaction.objectStore("states");
       const records = await readRecords(transaction);
       const record = records.find((item) => item.job.jobId === id);
       const alive = (lease: NonNullable<PhotoOutboxRecord["lease"]>) => lease.until > now && (!liveWorkers || liveWorkers.includes(lease.worker));
       const active = records.filter((item) => item.job.jobId !== id && item.lease?.stage === stage && alive(item.lease));
       if (!record || record.job.status === "completed" || record.lease && record.lease.worker !== worker && alive(record.lease)
-        || active.length >= (stage === "prepare" ? 1 : 2)) { await transaction.done; return null; }
+        || active.length >= (stage === "prepare" ? 1 : 2)) return null;
       record.lease = { worker, stage, until: now + LEASE_MS };
-      await states.put(mutableState(record, (await states.get(id))?.payload ?? "original"), id); await transaction.done;
+      await states.put(mutableState(record, (await states.get(id))?.payload ?? "original"), id);
       return record;
-    } catch (error) { return abortWrite(transaction, error); }
+    });
   },
   async remove(scope, id, worker) {
-    const transaction = (await db()).transaction(STORES, "readwrite");
-    try {
-      assertScope(await transaction.objectStore("scope").get("current"), scope);
+    return writeScoped(scope, async (transaction) => {
       const record = (await readRecords(transaction)).find((item) => item.job.jobId === id);
       if (record && (!record.lease || record.lease.worker === worker)) {
-        await transaction.objectStore("jobs").delete(id);
-        await transaction.objectStore("states").delete(id); await transaction.objectStore("prepared").delete(id);
+        for (const name of PHOTO_STORES) await transaction.objectStore(name).delete(id);
       }
-      await transaction.done;
-    } catch (error) { return abortWrite(transaction, error); }
+    });
   },
   async clear(scope) {
     if (typeof indexedDB === "undefined") return;
     const transaction = (await db()).transaction(STORES, "readwrite");
     const current = await transaction.objectStore("scope").get("current");
     if (!scope || current?.owner === scope.owner && current.token === scope.token) {
-      await transaction.objectStore("jobs").clear(); await transaction.objectStore("scope").clear();
-      await transaction.objectStore("states").clear(); await transaction.objectStore("prepared").clear();
+      for (const name of STORES) await transaction.objectStore(name).clear();
     }
     await transaction.done;
   },

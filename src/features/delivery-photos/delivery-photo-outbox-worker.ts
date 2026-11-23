@@ -10,7 +10,7 @@ export class PhotoOutboxWorker {
   private release: (() => void) | undefined;
   private locked = false;
   private poll: ReturnType<typeof setInterval> | undefined;
-  private detach: (() => void) | undefined;
+  private events: AbortController | undefined;
   private restoring = false;
   private waking = false;
   private foregroundWake = false;
@@ -19,9 +19,10 @@ export class PhotoOutboxWorker {
 
   async open(owner: string, live: () => boolean, existingScope: OutboxScope | null = null, preserveOwner = false) {
     try {
-      if (typeof navigator !== "undefined" && navigator.locks) {
+      const locks = globalThis.navigator?.locks;
+      if (locks) {
         await new Promise<void>((ready) => {
-          void navigator.locks.request(LOCK_PREFIX + this.worker, async () => {
+          void locks.request(LOCK_PREFIX + this.worker, async () => {
             if (!live()) { ready(); return; }
             this.locked = true; ready();
             await new Promise<void>((release) => { this.release = release; });
@@ -37,35 +38,25 @@ export class PhotoOutboxWorker {
   start(wake: (foreground?: boolean) => void, suspend: () => void, hasUnsavedSource: () => boolean, intervalMs: number) {
     this.poll = setInterval(() => wake(false), intervalMs); this.poll.unref?.();
     if (typeof window === "undefined") return;
-    const reconnect = () => wake(true);
+    this.events = new AbortController();
+    const options = { signal: this.events.signal };
     const foreground = () => { if (document.visibilityState === "visible") wake(true); };
-    const pageHide = (event: PageTransitionEvent) => {
-      // Only a cached document needs explicit suspension before its restore
-      // reload. External-app navigation can return to the same live document
-      // without a persisted pageshow. Do not revoke that document's uploads.
-      // A genuinely destroyed document releases its timers and Web Lock itself.
+    window.addEventListener("online", () => wake(true), options);
+    window.addEventListener("focus", foreground, options);
+    document.addEventListener("visibilitychange", foreground, options);
+    document.addEventListener("resume", foreground, options);
+    window.addEventListener("pagehide", (event) => {
+      // A bfcache restore reloads this document. An external camera can instead
+      // return to the live document, which still owns its uploads.
       if (!event.persisted) return;
       clearInterval(this.poll); this.release?.(); suspend();
-    };
-    const pageShow = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload(); };
-    const beforeUnload = (event: BeforeUnloadEvent) => {
+    }, options);
+    window.addEventListener("pageshow", (event) => { if (event.persisted) window.location.reload(); }, options);
+    window.addEventListener("beforeunload", (event) => {
       if (hasUnsavedSource()) { event.preventDefault(); event.returnValue = ""; }
-    };
-    window.addEventListener("online", reconnect);
-    window.addEventListener("focus", foreground);
-    document.addEventListener("visibilitychange", foreground);
-    document.addEventListener("resume", foreground);
-    window.addEventListener("pagehide", pageHide);
-    window.addEventListener("pageshow", pageShow);
-    window.addEventListener("beforeunload", beforeUnload);
-    this.detach = () => {
-      window.removeEventListener("online", reconnect); window.removeEventListener("focus", foreground);
-      document.removeEventListener("visibilitychange", foreground); document.removeEventListener("resume", foreground);
-      window.removeEventListener("pagehide", pageHide);
-      window.removeEventListener("pageshow", pageShow); window.removeEventListener("beforeunload", beforeUnload);
-    };
+    }, options);
   }
-  close() { clearInterval(this.poll); this.release?.(); this.detach?.(); }
+  close() { clearInterval(this.poll); this.release?.(); this.events?.abort(); }
   retryDelay(attempt: number) { return RETRY_DELAYS[Math.min(attempt - 1, RETRY_DELAYS.length - 1)]!; }
   async wake(foreground: boolean, state: {
     records: ReadonlyMap<string, PhotoOutboxRecord>; restore: () => Promise<boolean>; live: () => boolean; now: () => number;
@@ -90,17 +81,17 @@ export class PhotoOutboxWorker {
           const retryDue = (job.retryAt || job.updatedAt + RETRY_DELAYS[3]) <= now;
           if (job.status === "failed" && job.errorCategory === "retryable" && job.durable
             && (retryDue || foreground && job.updatedAt + RETRY_DELAYS[0] <= now)
-            && (typeof navigator === "undefined" || navigator.onLine !== false)) await state.retry(job.jobId);
+            && globalThis.navigator?.onLine !== false) await state.retry(job.jobId);
         }
       } while (state.live() && this.foregroundWake);
       return true;
     } finally { this.waking = false; }
   }
   private async liveWorkers() {
-    if (!this.locked || typeof navigator === "undefined" || !navigator.locks) return undefined;
+    if (!this.locked) return;
     try {
       const locks = await navigator.locks.query();
-      return locks.held?.map((lock) => lock.name ?? "").filter((name) => name.startsWith(LOCK_PREFIX)).map((name) => name.slice(LOCK_PREFIX.length));
+      return locks.held?.flatMap(({ name }) => name?.startsWith(LOCK_PREFIX) ? [name.slice(LOCK_PREFIX.length)] : []);
     } catch { return undefined; }
   }
   async claim(id: string, stage: "prepare" | "upload", now: number) {
