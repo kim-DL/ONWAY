@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
+import { DeliveryPhotoInputController } from "../../../src/features/delivery-photos/delivery-photo-input-controller";
 import type { DeliveryPhotoMetadata } from "../../../src/domain/delivery-photo";
 import { deliveryPhotoDateKey } from "../../../src/features/delivery-photos/delivery-photo-memory";
 import { customers as baseCustomers, useDeliveryPhotoData as baseDeliveryPhotoData } from "./customer-ceramic-data";
@@ -48,7 +49,9 @@ export function useRecentCustomers() {
   return { recentCustomers, ready: true, rememberCustomer() {}, clearRecentCustomers() { setRecent([]); } };
 }
 export function useDeliveryPhotoCatalog() {
-  return { customers: params.has("missingTarget") ? customers.slice(1) : customers, status: "ready", retry() {} };
+  const [error, setError] = useState(params.has("catalogError"));
+  return { customers: error ? [] : params.has("missingTarget") ? customers.slice(1) : customers,
+    status: error ? "error" : "ready", retry: () => setError(false) };
 }
 export function useDeliveryPhotoData() {
   const data = baseDeliveryPhotoData();
@@ -57,6 +60,8 @@ export function useDeliveryPhotoData() {
 }
 
 const coordinator = {
+  globalCaptureBlockReason: () => null,
+  captureBlockReason: () => uploadReady ? null : "opening",
   canBegin: () => uploadReady,
   begin(customerId: string, source: "camera" | "album") {
     window.__customerPhotoEntryFixture.captures.push({ customerId, source });
@@ -70,7 +75,7 @@ const coordinator = {
 };
 export function useDeliveryPhotoUploads() {
   const ready = useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => uploadReady, () => uploadReady);
-  return { coordinator: ready ? coordinator : null, jobs: [], byCustomer: new Map(), ready, storageError: false };
+  return { coordinator: ready ? coordinator : null, Inputs: ready ? DeliveryPhotoInputController : null, jobs: [], byCustomer: new Map(), ready, storageError: false };
 }
 
 export const deliveryPhotoHistoryRepository = {

@@ -11,7 +11,7 @@ import { searchCustomers } from "@/features/customers/customer-search";
 import { projectDeliveryPhotoCompletion, resolveDeliveryPhotoDayCustomerIds } from "./delivery-photo-domain";
 import { DeliveryPhotoHistoryLoader } from "./delivery-photo-history-loader";
 import type { DeliveryPhotoCaptureEntryState } from "./delivery-photo-capture-entry";
-import { DeliveryPhotoInputController, type DeliveryPhotoInputControllerHandle } from "./delivery-photo-input-controller";
+import type { DeliveryPhotoInputControllerHandle } from "./delivery-photo-input-controller";
 import { mergeConfirmedDeliveryPhoto, deliveryPhotoDateKey } from "./delivery-photo-memory";
 import { useDeliveryPhotoData } from "./use-delivery-photo-data";
 import { useDeliveryPhotoCatalog } from "./use-delivery-photo-catalog";
@@ -49,6 +49,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
     acceptData((current) => mergeConfirmedDeliveryPhoto(current, photo));
   }, [acceptData, refreshData]);
   const uploads = useDeliveryPhotoUploads(session, acceptConfirmed, Boolean(snapshot), refreshData);
+  const Inputs = uploads.Inputs;
   const activeCustomers = useMemo(() => catalog.customers.filter((customer) => customer.status === "active"), [catalog.customers]);
   const [query, setQuery] = useState("");
   const searching = Boolean(query.trim());
@@ -66,8 +67,8 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
   const requestedCustomer = requestedCustomerId ? byId.get(requestedCustomerId) : undefined;
   const routeIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(snapshot?.route?.customerIds ?? [], null, byId), [snapshot?.route?.customerIds, byId]);
   const day = snapshot?.day;
-  const todayIds = useMemo(() => resolveDeliveryPhotoDayCustomerIds(routeIds,
-    day?.isOverride ? day.customerIds : null, byId), [routeIds, day, byId]);
+  const todayIds = useMemo(() => day?.isOverride
+    ? resolveDeliveryPhotoDayCustomerIds(routeIds, day.customerIds, byId) : routeIds, [routeIds, day, byId]);
   const summaries = useMemo(() => new Map(snapshot?.today.customers.map((item) => [item.customerId, item]) ?? []), [snapshot?.today.customers]);
   const completion = useMemo(() => projectDeliveryPhotoCompletion(todayIds,
     (id) => summaries.get(id)?.count ?? 0), [todayIds, summaries]);
@@ -77,22 +78,31 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
   const capture = (customer: Customer) => { rememberList(); inputs.current?.openCamera(customer.customerId); };
   const album = (customer: Customer) => { inputs.current?.openAlbum(customer.customerId); };
   const retry = (jobId: string) => { void uploads.coordinator?.retry(jobId); };
-  const captureAvailable = (customerId: string) => catalog.status === "ready" && byId.has(customerId) && !data.authBlocked && Boolean(uploads.coordinator?.canBegin(customerId));
+  const globalBlock = uploads.coordinator?.globalCaptureBlockReason();
+  const captureBlockReason = (customerId: string) => {
+    if (data.authBlocked) return "auth";
+    if (catalog.status !== "ready" || !byId.has(customerId)) return "catalog";
+    if (!uploads.coordinator) return uploads.storageError ? "reopen" : "opening";
+    return uploads.coordinator.captureBlockReason(customerId, globalBlock);
+  };
+  const captureAvailable = (customerId: string) => captureBlockReason(customerId) === null;
   const captureEntry: DeliveryPhotoCaptureEntryState = requestedCustomer
-    ? { status: "ready", customer: requestedCustomer, disabled: !captureAvailable(requestedCustomer.customerId), preparing: !uploads.ready && !uploads.storageError }
-    : { status: catalog.status === "ready" ? "unavailable" : "loading" };
+    ? { status: "ready", customer: requestedCustomer, blocked: captureBlockReason(requestedCustomer.customerId) }
+    : { status: catalog.status === "ready" ? "unavailable" : catalog.status };
   const renderRow = (id: string, search = false, directions = false) => {
     const customer = byId.get(id); if (!customer) return null;
     const summary = summaries.get(id);
+    const upload = uploads.byCustomer.get(id);
+    const retryable = upload?.attention?.errorCategory === "retryable" && uploads.coordinator?.canRetry(upload.attention.jobId);
     const inToday = search && todayIds.includes(id);
     return <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt}
-      {...uploads.byCustomer.get(id)} onShowJob={setFocusJob}
-      captureAllowed={captureAvailable(id)} uploadReady={uploads.ready} inToday={inToday}
+      {...upload} onShowJob={setFocusJob}
+      blocked={captureBlockReason(id)} inToday={inToday}
       directions={(directions || (inToday && !summary?.count)) && <DirectionsLink customer={customer} className={styles.directions} />}
-      onView={setHistoryCustomer} onCapture={capture} onMore={(value) => { rememberList(); setMoreCustomer(value); }} onRetry={retry} />;
+      onView={setHistoryCustomer} onCapture={capture} onMore={(value) => { rememberList(); setMoreCustomer(value); }} onRetry={retryable ? retry : undefined} />;
   };
 
-  return <><section hidden={galleryOpen} className={`shell-page ${styles.workspace}`} aria-labelledby="delivery-photo-heading" data-delivery-photo-workspace>
+  return <><section hidden={galleryOpen} className={`shell-page ${styles.workspace}`} aria-label="납품사진" data-delivery-photo-workspace>
     <WorkspacePhotoToolbar session={session} customers={activeCustomers} completion={completion}
       data={data} catalog={catalog} uploads={uploads} targetVisible={Boolean(requestedCustomer)} onEdit={setEditor} query={query} onQueryChange={setQuery}
       galleryOpen={galleryOpen} onOpenGallery={onOpenGallery}>
@@ -101,7 +111,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
         onAlbum={() => { if (requestedCustomer) album(requestedCustomer); }} onReturn={onReturnToCustomer} /> : null}
     </WorkspacePhotoToolbar>
     {!snapshot && data.loading ? <LoadingStatus className={styles.empty} label="오늘 납품처 불러오는 중" detail="오늘 납품 기록을 확인하고 있습니다." /> : null}
-    {captureId && captureId !== requestedCustomerId && byId.has(captureId) ? <ContinuousCapture customerId={captureId} origin={originList}
+    {captureId && captureId !== requestedCustomerId && byId.has(captureId) ? <ContinuousCapture customerId={captureId} completed={completion.completedCustomerIds.includes(captureId)} origin={originList}
       onFinish={() => setCaptureId(null)}><ul className={styles.list}>{renderRow(captureId)}</ul></ContinuousCapture> : null}
     {searching ? <DeliveryPhotoSearchResults matches={matches} show={showInList}
       renderRow={(id) => renderRow(id, true)} /> : null}
@@ -117,6 +127,6 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
     {moreCustomer ? <DeliveryPhotoMoreMenu customer={moreCustomer} albumDisabled={!captureAvailable(moreCustomer.customerId)}
       onAlbum={album} onOpenCustomerDetail={onOpenCustomerDetail} onClose={() => setMoreCustomer(null)}
       onAdd={ready && searching && !todayIds.includes(moreCustomer.customerId) ? (addId) => setEditor({ mode: "day", addId }) : undefined} /> : null}
-    <DeliveryPhotoInputController ref={inputs} coordinator={uploads.coordinator} jobs={uploads.jobs} onSelected={setCaptureId} canSelect={captureAvailable} />
+    {Inputs && <Inputs ref={inputs} coordinator={uploads.coordinator} jobs={uploads.jobs} names={byId} onSelected={setCaptureId} canSelect={captureAvailable} />}
   </section>{galleryOpen && onReturnToCustomer && <WorkspacePhotoGallery session={session} catalog={catalog} data={data} onBack={onReturnToCustomer} />}</>;
 }

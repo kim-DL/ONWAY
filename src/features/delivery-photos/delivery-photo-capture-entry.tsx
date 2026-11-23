@@ -5,16 +5,18 @@ import type { ReactNode, RefObject } from "react";
 import { LoadingStatus } from "@/components/ui/loading-status";
 import type { Customer } from "@/domain/customer";
 
+import { deliveryPhotoCaptureHints, type DeliveryPhotoCaptureBlock } from "./delivery-photo-capture-hint";
 import { DeliveryPhotoActionIcon } from "./delivery-photo-action-icon";
 import styles from "./delivery-photo-capture-entry.module.css";
 
 export type DeliveryPhotoCaptureEntryState =
   | { status: "loading" }
   | { status: "unavailable" }
-  | { status: "ready"; customer: Pick<Customer, "customerId" | "name">; disabled: boolean; preparing: boolean };
+  | { status: "error" }
+  | { status: "ready"; customer: Pick<Customer, "customerId" | "name">; blocked: DeliveryPhotoCaptureBlock | null };
 
-export function ContinuousCapture({ customerId, origin, onFinish, children }: {
-  customerId: string; origin: RefObject<Element | null>; onFinish: () => void; children: ReactNode;
+export function ContinuousCapture({ customerId, completed, origin, onFinish, children }: {
+  customerId: string; completed: boolean; origin: RefObject<Element | null>; onFinish: () => void; children: ReactNode;
 }) {
   const finish = () => {
     onFinish();
@@ -22,7 +24,7 @@ export function ContinuousCapture({ customerId, origin, onFinish, children }: {
       const selector = `[data-camera-customer="${CSS.escape(customerId)}"]`;
       const candidates = [origin.current?.querySelector<HTMLElement>(selector), ...document.querySelectorAll<HTMLElement>(selector)];
       const camera = candidates.find((el) => el?.matches(":enabled") && el.getClientRects().length && !el.closest("details:not([open])"));
-      const heading = document.querySelector<HTMLElement>(document.querySelector(`[data-photo-list=completed] ${selector}`)
+      const heading = document.querySelector<HTMLElement>(completed
         ? "[data-photo-list=completed] summary" : "#delivery-photo-remaining-heading");
       (camera ?? heading)?.focus();
     });
@@ -42,10 +44,10 @@ export default function DeliveryPhotoCaptureEntry({ state, onCamera, onAlbum, on
       {state.status === "ready" ? <strong>{state.customer.name}</strong> : null}</div></div>
     {state.status === "unavailable" ? <p role="alert">이 거래처에는 새 납품사진을 기록할 수 없어요. 거래처 정보를 다시 확인해주세요.</p>
       : state.status === "loading" ? <LoadingStatus label="선택한 거래처 불러오는 중" />
-        : <><p className={styles.hint}>촬영하거나 앨범에서 선택해요</p><div className={styles.entrySources}>
-          <button type="button" aria-label={`${state.customer.name} 사진 촬영`} disabled={state.disabled} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onCamera(); }}><Icon name="camera" size={20} />사진 촬영</button>
-          <button type="button" aria-label={`${state.customer.name} 앨범에서 선택`} disabled={state.disabled} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onAlbum(); }}><Icon name="upload" size={20} />앨범에서 선택</button>
-        </div>{state.preparing ? <p role="status" className={styles.hint}>기기에 보관된 사진을 확인하고 있어요.</p> : null}</>}
+        : state.status === "ready" ? <><p className={styles.hint} id="delivery-photo-source-hint">{state.blocked ? deliveryPhotoCaptureHints[state.blocked] : "촬영하거나 앨범에서 선택해요"}</p><div className={styles.entrySources}>
+          <button type="button" aria-label={`${state.customer.name} 사진 촬영`} disabled={Boolean(state.blocked)} aria-describedby={state.blocked ? "delivery-photo-source-hint" : undefined} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onCamera(); }}><Icon name="camera" size={20} />사진 촬영</button>
+          <button type="button" aria-label={`${state.customer.name} 앨범에서 선택`} disabled={Boolean(state.blocked)} aria-describedby={state.blocked ? "delivery-photo-source-hint" : undefined} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onAlbum(); }}><Icon name="upload" size={20} />앨범에서 선택</button>
+        </div></> : null}
     {onReturn ? <button type="button" className={styles.entryReturn} onClick={onReturn}><Icon name="arrow-left" size={17} />거래처 상세로 돌아가기</button> : null}
   </section>;
 }

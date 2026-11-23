@@ -12,7 +12,7 @@ vi.mock("react", () => ({
 }));
 import { useDeliveryPhotoUploads } from "./use-delivery-photo-uploads";
 
-it("keeps the newest card and retry while counting only pending photos for each customer", () => {
+it("exposes the newest active transfer and the newest recovery action independently of completed photos", () => {
   const job = (jobId: string, customerId: string, status: DeliveryPhotoUploadProjection["status"], errorCategory: DeliveryPhotoUploadProjection["errorCategory"] = null, durable = true): DeliveryPhotoUploadProjection => ({
     jobId, customerId, status, errorCategory, durable, requestId: jobId, source: "camera", message: "", startedAt: 1, updatedAt: 1,
   });
@@ -22,8 +22,7 @@ it("keeps the newest card and retry while counting only pending photos for each 
   const session: AuthenticatedSession = { uid: "test", displayName: "합성 직원", claims: { employeeId: "test", sessionVersion: 1, permissionsVersion: 1, roleScopes: ["delivery"] } };
   const result = useDeliveryPhotoUploads(session, () => undefined);
   const rows = [...result.byCustomer.values()];
-  expect(rows.map(row => row.job.jobId)).toEqual(["newest", "invalid", "paused"]);
+  expect(rows.map(row => row.job.jobId)).toEqual(["retry-new", "queued", "paused"]);
   expect(rows.map(row => row.pendingCount)).toEqual([2, 1, 1]);
-  expect(rows.map(row => row.retryJob?.jobId)).toEqual(["retry-new", undefined, undefined]);
   expect(rows.map(row => row.attention?.jobId)).toEqual(["retry-new", "invalid", "paused"]);
 });

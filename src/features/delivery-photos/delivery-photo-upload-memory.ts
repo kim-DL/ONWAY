@@ -11,6 +11,7 @@ import { lazyDeliveryPhotoOutbox } from "./delivery-photo-outbox-lazy";
 import { PREVIOUS_DAY_MESSAGE, MAX_PENDING_PHOTOS_PER_CUSTOMER, MAX_PENDING_PHOTOS_TOTAL, isActiveDeliveryPhotoUpload,
   type DeliveryPhotoUploadProjection } from "./delivery-photo-upload-state";
 import type { PhotoOutboxWorker } from "./delivery-photo-outbox-worker";
+import type { DeliveryPhotoCaptureBlock } from "./delivery-photo-capture-hint";
 import type { PreparedDeliveryPhoto } from "./delivery-photo-preparation";
 import { deliveryPhotoSelectionError } from "./delivery-photo-selection";
 import { recordPerformanceMetric } from "@/lib/performance/performance-monitor";
@@ -61,6 +62,7 @@ export class DeliveryPhotoUploadCoordinator {
   private epoch = 0;
   private authorized = true;
   private initialized = false;
+  private storageFailed = false;
   private scope: OutboxScope | null = null;
   private readonly worker: string;
   private outboxWorker: PhotoOutboxWorker | undefined;
@@ -74,19 +76,19 @@ export class DeliveryPhotoUploadCoordinator {
   getPreview = (jobId: string) => this.previews.get(jobId);
   private today() { return deliveryPhotoDateKey(new Date(this.dependencies.now())); }
   private live(epoch: number, id?: string) { return this.authorized && this.epoch === epoch && (!id || this.jobs.has(id)); }
-  async retryStorage() {
-    const previous = this.ready;
-    if (!await previous && this.authorized && this.ready === previous) this.ready = this.initialize();
+  retryStorage() {
+    if (this.storageFailed && this.authorized) this.ready = this.initialize(true);
     return this.ready;
   }
-  private async initialize() {
+  private async initialize(preserveOwner = false) {
+    this.storageFailed = false;
     const epoch = this.epoch;
     try {
       if (this.dependencies.store) {
         const { PhotoOutboxWorker } = await import("./delivery-photo-outbox-worker");
         const worker = new PhotoOutboxWorker(this.dependencies.store, this.worker);
         this.outboxWorker = worker;
-        if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch), this.scope)) return false;
+        if (!await worker.open(deliveryPhotoUploadNamespace(this.session), () => this.live(epoch), this.scope, preserveOwner)) return false;
         this.scope = worker.scope;
         if (!await this.wake(true) || !this.live(epoch)) { worker.close(); return false; }
         worker.start((foreground) => { void this.wake(foreground); }, () => {
@@ -97,6 +99,7 @@ export class DeliveryPhotoUploadCoordinator {
       }
       this.initialized = true; this.publish(); this.pumpPreparation(); this.pumpRelays(); return true;
     } catch { this.initialized = false; return false; }
+    finally { this.storageFailed = !this.initialized; }
   }
   private async wake(foreground = false) {
     let expired = false;
@@ -127,13 +130,20 @@ export class DeliveryPhotoUploadCoordinator {
     return restored;
   }
   getPendingCount(customerId: string) { return this.snapshot.filter((job) => job.customerId === customerId && isActiveDeliveryPhotoUpload(job)).length; }
-  canBegin(customerId: string) {
-    return this.initialized && this.authorized && !this.sourceReads.size && this.getPendingCount(customerId) < MAX_PENDING_PHOTOS_PER_CUSTOMER
-      && this.snapshot.filter(isActiveDeliveryPhotoUpload).length < MAX_PENDING_PHOTOS_TOTAL
-      && !this.snapshot.some((job) => job.errorCategory === "storage" && !job.durable)
-      && [...this.records.values()].reduce((sum, record) => sum + outboxBytes(record), 0)
-        + 30 * 1024 * 1024 <= MAX_PENDING_PHOTO_BYTES;
+  globalCaptureBlockReason(): DeliveryPhotoCaptureBlock | null {
+    if (!this.authorized) return "auth";
+    if (!this.initialized) return "opening";
+    if (this.sourceReads.size) return "reading";
+    if (this.snapshot.filter(isActiveDeliveryPhotoUpload).length >= MAX_PENDING_PHOTOS_TOTAL) return "queueLimit";
+    if (this.snapshot.some((job) => job.errorCategory === "storage" && !job.durable)) return "storage";
+    const bytes = [...this.records.values()].reduce((sum, record) => sum + outboxBytes(record), 0);
+    return bytes + 30 * 1024 * 1024 > MAX_PENDING_PHOTO_BYTES ? "capacity" : null;
   }
+  captureBlockReason(customerId: string, globalBlock = this.globalCaptureBlockReason()): DeliveryPhotoCaptureBlock | null {
+    if (globalBlock) return globalBlock;
+    return this.getPendingCount(customerId) >= MAX_PENDING_PHOTOS_PER_CUSTOMER ? "customerLimit" : null;
+  }
+  canBegin(customerId: string) { return this.captureBlockReason(customerId) === null; }
   begin(customerId: string, source: "camera" | "album") {
     if (!this.canBegin(customerId)) return null;
     // Retain this screen's recent confirmed previews without unbounded memory.

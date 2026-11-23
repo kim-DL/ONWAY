@@ -43,3 +43,16 @@ export function DeliveryPhotoMoreMenu({ customer, albumDisabled, onAlbum, onOpen
 }
 
 export default DeliveryPhotoMoreMenu;
+
+export function PendingPhotoChoice({ previousName, nextName, source, disabled, onWait, onReplace }: {
+  previousName: string; nextName: string; source: "camera" | "album"; disabled: boolean;
+  onWait: () => void; onReplace: () => void;
+}) {
+  return <BottomSheet open title={`${previousName} 사진을 기다리고 있어요`} onClose={onWait}
+    description={`${nextName} 사진을 새로 선택하면 이전 사진은 저장되지 않을 수 있어요.`}>
+    <div className={styles.moreActions}>
+      <button type="button" onClick={onWait}>이전 사진 기다리기</button>
+      <button type="button" disabled={disabled} onClick={onReplace}>{source === "camera" ? "새 촬영 시작" : "앨범 열기"}</button>
+    </div>
+  </BottomSheet>;
+}

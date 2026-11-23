@@ -69,10 +69,13 @@ describe("delivery photo memory upload coordinator", () => {
     expect(coordinator.getPendingCount("a")).toBe(2);
     const third = coordinator.begin("a", "camera");
     expect(third).not.toBeNull();
+    expect(coordinator.captureBlockReason("a")).toBe("customerLimit");
+    expect(coordinator.captureBlockReason("b")).toBeNull();
     expect(coordinator.begin("a", "camera")).toBeNull();
     // This test continues with the initial job; discard the two untouched
     // preparations so their pending state cannot affect the relay checks.
     expect(coordinator.dismiss(another!.jobId)).toBe(true);
+    expect(coordinator.captureBlockReason("a")).toBeNull();
     expect(coordinator.dismiss(third!.jobId)).toBe(true);
     const b = coordinator.begin("b", "album")!; await coordinator.acceptSource(b.jobId, source("b"));
     const c = coordinator.begin("c", "camera")!; await coordinator.acceptSource(c.jobId, source("c"));

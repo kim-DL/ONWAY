@@ -8,10 +8,11 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-23.1",
+  id: "2026-11-23.2",
   date: "2026-11-23",
   changes: [
-    { title: "앱 시작", text: "앱을 열면 온누리종합식품 로고와 로딩바가 보여요. 로그인 전에 내려받는 파일도 줄였어요." },
-    { title: "거래처와 재고 목록", text: "마지막 확인 시각을 없애고 재고 목록을 더 빠르게 표시해요. 갱신에 실패하면 기존 정보를 보고 있다는 안내가 나와요." },
+    { title: "납품사진 촬영", text: "사진 보관함을 일시적으로 읽지 못했을 때 앱으로 돌아오면 다시 확인해요. 촬영을 기다려야 하는 이유도 거래처 카드에서 볼 수 있어요." },
+    { title: "카메라에서 돌아올 때", text: "이전 촬영 결과가 아직 도착하지 않았으면 원래 거래처의 사진을 기다리거나 새 촬영을 시작할 수 있어요." },
+    { title: "납품사진 목록", text: "남은 납품처가 먼저 열리고, 사진이 기기에 보관 중인지 서버에 저장됐는지 확인하기 쉬워졌어요." },
   ],
 };
