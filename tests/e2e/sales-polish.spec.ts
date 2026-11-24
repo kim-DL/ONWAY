@@ -20,6 +20,26 @@ async function open(page: Page, state = "") {
   await page.goto(`http://sales-polish.test/?mode=sales&${state}`);
 }
 
+for (const width of [390, 1280]) {
+  test(`school and sales share the workspace scrollbar at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 420 });
+    await open(page);
+    for (const name of ["학교", "영업"]) {
+      await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name, exact: true }).click();
+      const scroller = page.locator(".workspace-content");
+      await scroller.evaluate(el => { el.scrollTop = 0; });
+      const transparent = "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)";
+      await expect(scroller).toHaveCSS("scrollbar-color", transparent);
+      await expect(scroller).toHaveCSS("scrollbar-width", "thin");
+      const before = await scroller.evaluate(el => el.clientWidth);
+      await scroller.evaluate(el => { el.scrollTop = 100; });
+      await expect(scroller).toHaveCSS("scrollbar-color", "rgb(144, 150, 158) rgba(0, 0, 0, 0)");
+      await expect(scroller).toHaveCSS("scrollbar-color", transparent);
+      expect(await scroller.evaluate(el => el.clientWidth)).toBe(before);
+    }
+  });
+}
+
 test("sales home keeps readable actions and school metadata across widths", async ({ page }, info) => {
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   await open(page);

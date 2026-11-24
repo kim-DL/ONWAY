@@ -205,8 +205,8 @@
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { margin-left: 0; }
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { flex: 1; min-height: 0; height: auto; scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
-:is([data-mode="customer"], [data-mode="inventory"]) > .workspace-content { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-:is([data-mode="customer"], [data-mode="inventory"]) > .workspace-content[data-scrolling] { scrollbar-color: #90969e transparent; }
+.workspace-shell > .workspace-content { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.workspace-shell > .workspace-content[data-scrolling] { scrollbar-color: #90969e transparent; }
 
 @media (max-width: 739px) {
   [data-welcome-variant="customer"] { margin-inline: 12px; }
@@ -216,7 +216,8 @@
 }
 
 @media (forced-colors: active) {
-  :is([data-mode="customer"], [data-mode="inventory"]) > .workspace-content { scrollbar-color: auto; }
+  .workspace-shell > .workspace-content,
+  .workspace-shell > .workspace-content[data-scrolling] { scrollbar-color: auto; }
 }
 
 .shell-page {
