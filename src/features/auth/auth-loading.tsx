@@ -63,15 +63,26 @@ interface LaunchScreenProps {
 
 const InitialLaunchContext = createContext<((screen: LaunchScreenProps | null) => void) | null>(null);
 
+const LaunchReadyContext = createContext<(() => void) | null>(null);
+
+export function useLaunchReady(ready: boolean) {
+  const notify = useContext(LaunchReadyContext);
+  useLayoutEffect(() => {
+    if (ready) notify?.();
+  }, [notify, ready]);
+}
+
 export function InitialLaunch({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<LaunchScreenProps | null>(null);
+  const [ready, setReady] = useState(false);
+  const notifyReady = useCallback(() => setReady(true), []);
   const [finished, setFinished] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const firstPaint = useRef<number | null>(null);
 
   useEffect(() => {
     firstPaint.current ??= performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? performance.now();
-    if (finished || pending) return;
+    if (!ready || finished || pending) return;
     const remaining = Math.max(0, 1050 - (performance.now() - firstPaint.current));
     let exitTimer: ReturnType<typeof setTimeout>;
     const holdTimer = setTimeout(() => {
@@ -86,7 +97,7 @@ export function InitialLaunch({ children }: { children: ReactNode }) {
       clearTimeout(holdTimer);
       clearTimeout(exitTimer);
     };
-  }, [finished, pending]);
+  }, [ready, finished, pending]);
 
   const report = useCallback((screen: LaunchScreenProps | null) => {
     setPending(screen);
@@ -94,7 +105,7 @@ export function InitialLaunch({ children }: { children: ReactNode }) {
   }, []);
 
   return <InitialLaunchContext.Provider value={finished ? null : report}>
-    <div style={{ display: "contents" }} inert={!finished}>{children}</div>
+    <div style={{ display: "contents" }} inert={!finished}><LaunchReadyContext.Provider value={notifyReady}>{children}</LaunchReadyContext.Provider></div>
     {!finished && <div className="initial-launch" data-leaving={leaving}>
       <LaunchSurface {...(pending ?? { stage: "boot" })} />
     </div>}

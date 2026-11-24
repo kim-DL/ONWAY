@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AuthLoadingScreen, InitialLaunch, LaunchTimingProvider, useLaunchTiming } from "../../../src/features/auth/auth-loading";
+import { AuthLoadingScreen, InitialLaunch, LaunchTimingProvider, useLaunchReady, useLaunchTiming } from "../../../src/features/auth/auth-loading";
 import { AuthGate } from "../../../src/features/auth/auth-gate";
 import { LoadingStatus } from "../../../src/components/ui/loading-status";
 import { WorkspaceFeatureLoading } from "../../../src/features/app-shell/workspace-feature-loading";
@@ -31,6 +31,11 @@ function DataRetryJourney() {
     {opened ? <InitialWorkspaceTiming navigationKey="customer" startedAt={startedAt}><InitialDataLoading /></InitialWorkspaceTiming> : <AuthLoadingScreen stage="session" />}</>;
 }
 
+function ReadyDestination() {
+  useLaunchReady(true);
+  return <input aria-label="업무 검색" />;
+}
+
 function EntryJourney() {
   const [pending, setPending] = useState(true);
   useEffect(() => {
@@ -39,7 +44,7 @@ function EntryJourney() {
     return () => window.removeEventListener("fixture-ready", ready);
   }, []);
   return <LaunchTimingProvider><InitialLaunch>
-    {pending ? <AuthLoadingScreen stage="session" /> : <input aria-label="업무 검색" />}
+    {pending ? <AuthLoadingScreen stage="session" /> : <ReadyDestination />}
   </InitialLaunch></LaunchTimingProvider>;
 }
 

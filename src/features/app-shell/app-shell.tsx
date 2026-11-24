@@ -16,7 +16,7 @@ import { ToastProvider, useToast } from "@/components/ui/toast";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
-import { useLaunchTiming } from "@/features/auth/auth-loading";
+import { useLaunchReady, useLaunchTiming } from "@/features/auth/auth-loading";
 import { usePwa } from "@/features/pwa/pwa-provider";
 import { isVerifiedAdminSession } from "@/domain/auth";
 import {
@@ -566,6 +566,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 }
 
 export function AppShell({ session }: { session: AuthenticatedSession }) {
+  useLaunchReady(true);
   useEffect(() => {
     markAppBootReady("runtime");
   }, []);

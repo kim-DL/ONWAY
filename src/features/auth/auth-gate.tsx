@@ -7,7 +7,7 @@ import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import { LoadingStatus } from "@/components/ui/loading-status";
 import { markAppBootReady } from "@/lib/performance/performance-monitor";
 import { prepareSessionAuthorization, useAuth } from "./auth-context";
-import { AuthBrand, AuthHeader, AuthLoadingScreen, useLaunchTiming } from "./auth-loading";
+import { AuthBrand, AuthHeader, AuthLoadingScreen, useLaunchReady, useLaunchTiming } from "./auth-loading";
 import { LoginMotion } from "./login-motion";
 import "@/app/styles/login-landing.css";
 import "@/app/styles/login-motion.css";
@@ -189,6 +189,7 @@ function Unconfigured() {
 export function AuthGate() {
   const { state } = useAuth();
   const { restart, consumeSubmission } = useLaunchTiming();
+  useLaunchReady(state.status !== "resolving" && state.status !== "authenticated");
   const previousStatus = useRef(state.status);
 
   useLayoutEffect(() => {
