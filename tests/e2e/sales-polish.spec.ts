@@ -41,10 +41,19 @@ for (const width of [390, 1280]) {
   });
 }
 
+async function expectCenteredCommands(page: Page) {
+  const offset = await page.getByRole("toolbar", { name: "담당 학교 작업" }).evaluate(panel => {
+    const tiles = panel.getBoundingClientRect();
+    const controls = panel.parentElement!.getBoundingClientRect();
+    return Math.abs((tiles.left - controls.left) - (controls.right - tiles.right));
+  });
+  expect(offset).toBeLessThanOrEqual(1);
+}
+
 test("sales home keeps readable actions and school metadata across widths", async ({ page }, info) => {
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   await open(page);
-  for (const width of [320, 390, 430, 1280]) {
+  for (const width of [320, 390, 430, 500, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.locator(".school-assignment-card")).toHaveCount(2);
     await expect(page.locator(".sales-school-list")).toHaveCSS("grid-template-columns", /^(?!.* ).+$/);
@@ -69,6 +78,7 @@ test("sales home keeps readable actions and school metadata across widths", asyn
       const bounds = (await button.boundingBox())!;
       expect(bounds.height).toBeGreaterThanOrEqual(44); expect(bounds.width).toBeGreaterThanOrEqual(44);
     }
+    await expectCenteredCommands(page);
     const rows = await page.locator(".sales-school-command").evaluateAll(elements => elements.map(el => el.getBoundingClientRect().top));
     expect(rows[0]).toBe(rows[1]); expect(rows[2]).toBe(rows[3]); expect(rows[2]).toBeGreaterThan(rows[0]!);
     expect(await page.locator(".sales-school-command, .school-assignment-card").evaluateAll(elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1))).toBe(true);
@@ -113,6 +123,7 @@ test("scope and past month preserve management restrictions", async ({ page }) =
   await expectScopeUnderline();
   await expect(page.locator(".school-assignment-card")).toHaveCount(3);
   await expect(page.locator(".sales-school-command")).toHaveCount(2);
+  await expectCenteredCommands(page);
   await expect(page.getByRole("button", { name: "내 학교 정리" })).toHaveCount(0);
   await page.getByRole("button", { name: "내 학교", exact: true }).click();
   await expectScopeUnderline();
@@ -128,6 +139,7 @@ test("scope and past month preserve management restrictions", async ({ page }) =
   await expect(page.getByRole("button", { name: /학교 추가/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /방문 동선/ })).toHaveCount(0);
   await expect(page.locator(".sales-school-command")).toHaveCount(1);
+  await expectCenteredCommands(page);
   const command = (await page.locator(".sales-school-command").boundingBox())!;
   const panel = (await page.locator(".sales-school-commands").boundingBox())!;
   expect(Math.abs(command.width - panel.width)).toBeLessThanOrEqual(2);
