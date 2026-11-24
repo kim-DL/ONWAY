@@ -31,6 +31,7 @@ for (const width of [390, 1280]) {
       const transparent = "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)";
       await expect(scroller).toHaveCSS("scrollbar-color", transparent);
       await expect(scroller).toHaveCSS("scrollbar-width", "thin");
+      expect(await page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)).toBe(0);
       const before = await scroller.evaluate(el => el.clientWidth);
       await scroller.evaluate(el => { el.scrollTop = 100; });
       await expect(scroller).toHaveCSS("scrollbar-color", "rgb(144, 150, 158) rgba(0, 0, 0, 0)");

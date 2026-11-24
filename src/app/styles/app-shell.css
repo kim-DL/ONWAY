@@ -199,11 +199,12 @@
 }
 
 /* Customer and inventory expose actions and settings without a navigation rail. */
-.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
-.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-header { flex: none; }
+.workspace-shell[data-mode] { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
+.workspace-shell[data-mode] > .workspace-header { flex: none; }
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-header,
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { margin-left: 0; }
-.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { flex: 1; min-height: 0; height: auto; scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.workspace-shell[data-mode] > .workspace-content { flex: 1; min-height: 0; height: auto; }
+.workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) > .workspace-content { scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .workspace-shell:is([data-mode="inventory"], [data-mode="customer"]) .shell-page:not([data-write-actions]) { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .workspace-shell > .workspace-content { scrollbar-width: thin; scrollbar-color: transparent transparent; }
 .workspace-shell > .workspace-content[data-scrolling] { scrollbar-color: #90969e transparent; }
