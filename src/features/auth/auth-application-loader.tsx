@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-import { AuthLoadingScreen, LaunchTimingProvider } from "./auth-loading";
+import { AuthLoadingScreen, InitialLaunch, LaunchTimingProvider } from "./auth-loading";
 
 function ApplicationBootFallback() {
   return <AuthLoadingScreen stage="boot" />;
@@ -14,5 +14,5 @@ const AuthApplication = dynamic(
 );
 
 export function AuthApplicationLoader() {
-  return <LaunchTimingProvider><AuthApplication /></LaunchTimingProvider>;
+  return <LaunchTimingProvider><InitialLaunch><AuthApplication /></InitialLaunch></LaunchTimingProvider>;
 }

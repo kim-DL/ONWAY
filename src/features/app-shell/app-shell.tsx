@@ -386,6 +386,11 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         ? snapshot.school as School
         : null;
       setChosenMode(restoredMode);
+      try {
+        localStorage.setItem(storageKey, restoredMode);
+      } catch {
+        // History navigation also works when preference storage is unavailable.
+      }
       setView(restoredView);
       setSelectedSchool(restoredSchool);
       setCustomerContext(readCustomerNavigationContext(snapshot.customerContext, restoredMode, restoredView));
@@ -397,7 +402,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [availableModes, mode, resumeKey, session.claims.roleScopes, view, writeHistory]);
+  }, [availableModes, mode, resumeKey, session.claims.roleScopes, storageKey, view, writeHistory]);
 
   const openSearch = () => {
     setSearchMounted(true);

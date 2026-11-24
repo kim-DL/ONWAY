@@ -1,6 +1,6 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AuthLoadingScreen, LaunchTimingProvider, useLaunchTiming } from "../../../src/features/auth/auth-loading";
+import { AuthLoadingScreen, InitialLaunch, LaunchTimingProvider, useLaunchTiming } from "../../../src/features/auth/auth-loading";
 import { AuthGate } from "../../../src/features/auth/auth-gate";
 import { LoadingStatus } from "../../../src/components/ui/loading-status";
 import { WorkspaceFeatureLoading } from "../../../src/features/app-shell/workspace-feature-loading";
@@ -31,10 +31,23 @@ function DataRetryJourney() {
     {opened ? <InitialWorkspaceTiming navigationKey="customer" startedAt={startedAt}><InitialDataLoading /></InitialWorkspaceTiming> : <AuthLoadingScreen stage="session" />}</>;
 }
 
+function EntryJourney() {
+  const [pending, setPending] = useState(true);
+  useEffect(() => {
+    const ready = () => setPending(false);
+    window.addEventListener("fixture-ready", ready);
+    return () => window.removeEventListener("fixture-ready", ready);
+  }, []);
+  return <LaunchTimingProvider><InitialLaunch>
+    {pending ? <AuthLoadingScreen stage="session" /> : <input aria-label="업무 검색" />}
+  </InitialLaunch></LaunchTimingProvider>;
+}
+
 function Fixture() {
   const [stage, setStage] = useState<"boot" | "session" | "workspace">("boot");
   const [done, setDone] = useState(false);
   const view = new URL(location.href).searchParams.get("view");
+  if (view === "entry") return <EntryJourney />;
   if (view === "workspace") return <LaunchTimingProvider><WorkspaceJourney /></LaunchTimingProvider>;
   if (view === "data-retry") return <LaunchTimingProvider><DataRetryJourney /></LaunchTimingProvider>;
   if (view === "pin") return <LaunchTimingProvider><AuthGate /></LaunchTimingProvider>;

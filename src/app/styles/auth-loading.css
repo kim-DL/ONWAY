@@ -62,6 +62,19 @@
   letter-spacing: -.035em;
   line-height: 1.3;
 }
+.initial-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: auto;
+  background: #f8fafc;
+}
+.initial-launch[data-leaving="true"] { opacity: 0; transition: opacity 200ms ease-out; }
+.initial-launch .auth-launch-content [data-visible] [data-loading-segment] { visibility: visible; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .initial-launch [data-loading-track] [data-loading-segment] { animation-play-state: running; }
+}
+.initial-launch .auth-launch-brand h1 { animation-duration: 1.45s; }
 /* Keep the highlight inside the glyphs. A short second pass covers a slower
    launch; after that only the progress indicator needs to move. */
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {

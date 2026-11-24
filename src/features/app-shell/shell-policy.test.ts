@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { getAvailableModes, getInitialMode, getNavigation, isSchoolWorkMode, normalizeView } from "./shell-policy";
 
 describe("app shell role policy", () => {
-  it("gates inventory without changing first-login defaults or accepting a disabled saved mode", () => {
+  it("starts in customer mode and restores inventory only when available", () => {
     expect(getAvailableModes(["delivery", "sales"], true)).toEqual(["customer", "delivery", "sales", "inventory"]);
     expect(getAvailableModes(["viewer"], true)).toContain("inventory");
     expect(getAvailableModes([], true)).not.toContain("inventory");
     expect(getAvailableModes(["delivery", "sales"], false)).not.toContain("inventory");
-    expect(getInitialMode(["sales"], undefined, true)).toBe("sales");
+    expect(getInitialMode(["sales"], undefined, true)).toBe("customer");
     expect(getInitialMode(["sales"], "inventory", true)).toBe("inventory");
-    expect(getInitialMode(["sales"], "inventory", false)).toBe("sales");
+    expect(getInitialMode(["sales"], "inventory", false)).toBe("customer");
     expect(getNavigation("inventory").map((item) => item.label)).toEqual(["재고", "설정"]);
     expect(normalizeView("inventory", "activity")).toBe("schools");
   });
@@ -35,8 +35,8 @@ describe("app shell role policy", () => {
     expect(getAvailableModes(["delivery", "sales"])).toEqual(["customer", "delivery", "sales"]);
     expect(getInitialMode(["delivery", "sales"], "delivery")).toBe("delivery");
     expect(getInitialMode(["sales"], "customer")).toBe("customer");
-    expect(getInitialMode(["sales"])).toBe("sales");
-    expect(getInitialMode(["delivery"])).toBe("delivery");
+    expect(getInitialMode(["sales"])).toBe("customer");
+    expect(getInitialMode(["delivery"])).toBe("customer");
     expect(getNavigation("customer", false).map((item) => item.label)).toEqual(["거래처", "설정"]);
     expect(normalizeView("customer", "activity", false)).toBe("schools");
   });
@@ -50,7 +50,7 @@ describe("app shell role policy", () => {
 
   it("restores only an available mode and normalizes unavailable views", () => {
     expect(getInitialMode(["delivery", "sales"], "sales")).toBe("sales");
-    expect(getInitialMode(["delivery"], "sales")).toBe("delivery");
+    expect(getInitialMode(["delivery"], "sales")).toBe("customer");
     expect(normalizeView("delivery", "activity")).toBe("schools");
   });
 });
