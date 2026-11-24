@@ -62,6 +62,7 @@ test("valid PIN persists through reopen and explicit logout clears the session",
   await expect(reopened.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toHaveCount(0);
 
   await reopened.evaluate(() => localStorage.setItem("onnuriway:private:e2e", "remove-me"));
+  await reopened.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await reopened.getByRole("button", { name: "설정" }).click();
   await expect(reopened.getByText("EMP-DELIVERY")).toBeVisible();
   await reopened.getByRole("button", { name: "로그아웃" }).click();
