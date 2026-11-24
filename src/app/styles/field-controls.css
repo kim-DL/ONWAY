@@ -259,6 +259,7 @@
 .workspace-shell[data-mode="sales"] .sales-cycle-toolbar { align-items: center; }
 .workspace-shell[data-mode="sales"] .sales-school-commands {
   width: min(100%, 22rem);
+  justify-self: center;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-flow: row;
