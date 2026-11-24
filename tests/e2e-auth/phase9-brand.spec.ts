@@ -105,6 +105,7 @@ test("company signature stays visible without crowding mobile mode controls and 
     && response.request().method() === "POST", { timeout: 30_000 });
   try {
     await page.getByRole("button", { name: "급식길 시작하기" }).click();
+    await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
     expect((await loginResponse).ok()).toBe(true);
   } finally {
     await testInfo.attach("brand-login-connection-events", {

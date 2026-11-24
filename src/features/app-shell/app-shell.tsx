@@ -16,7 +16,7 @@ import { ToastProvider, useToast } from "@/components/ui/toast";
 import type { School } from "@/domain/school";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useAuth } from "@/features/auth/auth-context";
-import { useLaunchTiming } from "@/features/auth/auth-loading";
+import { useLaunchReady, useLaunchTiming } from "@/features/auth/auth-loading";
 import { usePwa } from "@/features/pwa/pwa-provider";
 import { isVerifiedAdminSession } from "@/domain/auth";
 import {
@@ -386,6 +386,11 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
         ? snapshot.school as School
         : null;
       setChosenMode(restoredMode);
+      try {
+        localStorage.setItem(storageKey, restoredMode);
+      } catch {
+        // History navigation also works when preference storage is unavailable.
+      }
       setView(restoredView);
       setSelectedSchool(restoredSchool);
       setCustomerContext(readCustomerNavigationContext(snapshot.customerContext, restoredMode, restoredView));
@@ -397,7 +402,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [availableModes, mode, resumeKey, session.claims.roleScopes, view, writeHistory]);
+  }, [availableModes, mode, resumeKey, session.claims.roleScopes, storageKey, view, writeHistory]);
 
   const openSearch = () => {
     setSearchMounted(true);
@@ -561,6 +566,7 @@ function AppShellContent({ session }: { session: AuthenticatedSession }) {
 }
 
 export function AppShell({ session }: { session: AuthenticatedSession }) {
+  useLaunchReady(true);
   useEffect(() => {
     markAppBootReady("runtime");
   }, []);

@@ -20,6 +20,7 @@ test("school directions use trusted coordinates and a safe official-name fallbac
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
 
   const search = page.getByRole("combobox", { name: "학교명 검색" });

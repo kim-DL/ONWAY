@@ -38,6 +38,29 @@ async function fixture(page: Page, view = "launch", clock = true) {
   await expect(page.locator("main")).toBeVisible();
 }
 
+for (const slow of [false, true]) {
+  test(`initial launch holds only the remaining reading time, slow=${slow}`, async ({ page }) => {
+    await fixture(page, "entry");
+    const cover = page.locator(".initial-launch");
+    await expect(page.getByRole("status")).toHaveText("로그인 확인 중");
+    await page.clock.runFor(slow ? 1800 : 100);
+    await page.evaluate(() => window.dispatchEvent(new Event("fixture-ready")));
+    await expect(page.locator("input")).toHaveCount(1);
+    if (!slow) {
+      await page.clock.runFor(400);
+      await expect(cover).toHaveAttribute("data-leaving", "false");
+      await expect(page.locator("input")).toBeHidden();
+      await page.clock.runFor(575);
+    } else {
+      await page.clock.runFor(16);
+    }
+    await expect(cover).toHaveAttribute("data-leaving", "true");
+    await page.clock.runFor(210);
+    await expect(cover).toHaveCount(0);
+    await expect(page.getByLabel("업무 검색")).toBeEditable();
+  });
+}
+
 test("launch thresholds survive fallback remounts and completion adds no dwell", async ({ page }) => {
   await fixture(page);
   const indicator = page.locator("[data-loading-indicator]");

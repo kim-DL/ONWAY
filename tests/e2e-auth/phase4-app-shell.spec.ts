@@ -7,6 +7,7 @@ async function login(page: Page, pin: string) {
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: pin === PHASE3_TEST_PINS.delivery ? "학교" : "영업", exact: true }).click();
 }
 
 test("delivery shell exposes role navigation and opens a real school detail shell", async ({ page }) => {

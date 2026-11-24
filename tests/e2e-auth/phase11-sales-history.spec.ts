@@ -53,6 +53,7 @@ async function login(page: Page, pin: string) {
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "영업", exact: true }).click();
   await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -163,6 +164,7 @@ test("delivery mode never loads or reveals the sales archive", async ({ page }) 
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible();
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
   await page.getByRole("combobox", { name: "학교명 검색" }).fill("온누리고");

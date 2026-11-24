@@ -6,6 +6,7 @@ async function login(page: Page) {
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "설정", exact: true }).click();
   await expect(page.getByRole("heading", { name: "설정", exact: true })).toBeVisible();

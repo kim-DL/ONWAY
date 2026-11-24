@@ -22,7 +22,7 @@ test("service failure is not reported as a bad PIN and a retry succeeds", async 
   await expect(page.getByLabel("직원 PIN", { exact: true })).toHaveValue("");
   await page.unroute("**/employeeLogin");
   await submitPin(page);
-  await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible({ timeout: 30_000 });
 });
 
 test("failed custom-token exchange keeps the form and actionable error visible", async ({ page }) => {
@@ -54,7 +54,7 @@ test("failed custom-token exchange keeps the form and actionable error visible",
     await expect(page.getByLabel("직원 PIN", { exact: true })).toBeFocused();
     await page.unroute("**/accounts:signInWithCustomToken*");
     await submitPin(page);
-    await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible({ timeout: 30_000 });
   } finally {
     release();
   }

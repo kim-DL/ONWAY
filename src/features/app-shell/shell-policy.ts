@@ -65,8 +65,7 @@ export function getInitialMode(
   if (isWorkMode(preferredMode) && modes.includes(preferredMode)) {
     return preferredMode;
   }
-  // Retain the established first-login policy and saved delivery/sales values.
-  return modes.find((mode) => mode !== "customer") ?? "customer";
+  return "customer";
 }
 
 export function getNavigation(mode: WorkMode, deliveryPhotosEnabled = DELIVERY_PHOTOS_ENABLED): readonly ShellNavigationItem[] {

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AppIconMark } from "@/components/ui/app-icon-mark";
 import { LoadingStatus } from "@/components/ui/loading-status";
@@ -55,11 +55,74 @@ const launchDetails = {
   workspace: "업무 화면을 준비하고 있습니다.",
 };
 
-export function AuthLoadingScreen({ stage, message, waitingForConnection = false }: {
+interface LaunchScreenProps {
   stage: keyof typeof launchLabels;
   message?: string | undefined;
   waitingForConnection?: boolean | undefined;
-}) {
+}
+
+const InitialLaunchContext = createContext<((screen: LaunchScreenProps | null) => void) | null>(null);
+
+const LaunchReadyContext = createContext<(() => void) | null>(null);
+
+export function useLaunchReady(ready: boolean) {
+  const notify = useContext(LaunchReadyContext);
+  useLayoutEffect(() => {
+    if (ready) notify?.();
+  }, [notify, ready]);
+}
+
+export function InitialLaunch({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState<LaunchScreenProps | null>(null);
+  const [ready, setReady] = useState(false);
+  const notifyReady = useCallback(() => setReady(true), []);
+  const [finished, setFinished] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const firstPaint = useRef<number | null>(null);
+
+  useEffect(() => {
+    firstPaint.current ??= performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? performance.now();
+    if (!ready || finished || pending) return;
+    const remaining = Math.max(0, 1050 - (performance.now() - firstPaint.current));
+    let exitTimer: ReturnType<typeof setTimeout>;
+    const holdTimer = setTimeout(() => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setFinished(true);
+        return;
+      }
+      setLeaving(true);
+      exitTimer = setTimeout(() => setFinished(true), 200);
+    }, remaining);
+    return () => {
+      clearTimeout(holdTimer);
+      clearTimeout(exitTimer);
+    };
+  }, [ready, finished, pending]);
+
+  const report = useCallback((screen: LaunchScreenProps | null) => {
+    setPending(screen);
+    setLeaving(false);
+  }, []);
+
+  return <InitialLaunchContext.Provider value={finished ? null : report}>
+    <div style={{ display: finished || leaving ? "contents" : "none" }}><LaunchReadyContext.Provider value={notifyReady}>{children}</LaunchReadyContext.Provider></div>
+    {!finished && <div className="initial-launch" data-leaving={leaving}>
+      <LaunchSurface {...(pending ?? { stage: "boot" })} />
+    </div>}
+  </InitialLaunchContext.Provider>;
+}
+
+export function AuthLoadingScreen({ stage, message, waitingForConnection }: LaunchScreenProps) {
+  const report = useContext(InitialLaunchContext);
+  useLayoutEffect(() => {
+    if (!report) return;
+    report({ stage, message, waitingForConnection });
+    return () => report(null);
+  }, [report, stage, message, waitingForConnection]);
+  return report ? null : <LaunchSurface stage={stage} message={message} waitingForConnection={waitingForConnection} />;
+}
+
+function LaunchSurface({ stage, message, waitingForConnection = false }: LaunchScreenProps) {
   const { startedAt } = useLaunchTiming();
   return (
     <main className="auth-shell auth-shell--launch" data-auth-stage={waitingForConnection ? "connection" : stage}>

@@ -53,15 +53,16 @@ test("valid PIN persists through reopen and explicit logout clears the session",
   await expect(page.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toBeVisible();
   await submitPin(page, PHASE3_TEST_PINS.delivery);
 
-  await expect(page.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible({ timeout: 15_000 });
 
   await page.close();
   const reopened = await context.newPage();
   await reopened.goto("/");
-  await expect(reopened.getByRole("heading", { name: /학교를 찾고.*현장으로/ })).toBeVisible({ timeout: 15_000 });
+  await expect(reopened.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible({ timeout: 15_000 });
   await expect(reopened.getByRole("region", { name: "직원 PIN 로그인", exact: true })).toHaveCount(0);
 
   await reopened.evaluate(() => localStorage.setItem("onnuriway:private:e2e", "remove-me"));
+  await reopened.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await reopened.getByRole("button", { name: "설정" }).click();
   await expect(reopened.getByText("EMP-DELIVERY")).toBeVisible();
   await reopened.getByRole("button", { name: "로그아웃" }).click();
@@ -110,7 +111,7 @@ test("disabled employee cannot sign in", async ({ page }) => {
 test("authz revocation invalidates an active session without waiting for token expiry", async ({ page }) => {
   await page.goto("/");
   await submitPin(page, PHASE3_TEST_PINS.salesA);
-  await expect(page.getByRole("heading", { name: /내 담당 학교.*월별 방문 현황/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /거래처 정보를.*한눈에/ })).toBeVisible({ timeout: 15_000 });
 
   await setAuthzSessionVersion("uid-sales-a", 2);
   try {

@@ -53,6 +53,7 @@ test("district filters preserve all forty schools for real callable routes from 
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.salesA);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "영업", exact: true }).click();
   await expect(page.locator(".assignment-card")).toHaveCount(40);
   const districts = page.getByRole("radiogroup", { name: "행정구 필터" });
   const seo = districts.getByRole("radio", { name: /^서구,/ });
