@@ -43,6 +43,7 @@ for (const tool of [
       await page.goto("/");
       await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.salesA);
       await page.getByRole("button", { name: "급식길 시작하기" }).click();
+      await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "영업", exact: true }).click();
       await expect(page.locator(".assignment-card").first()).toBeVisible();
       expect(requests).toBe(0);
 

@@ -7,6 +7,7 @@ async function loginAndOpenSearch(page: Page) {
   await page.goto("/");
   await page.getByLabel("직원 PIN", { exact: true }).fill(PHASE3_TEST_PINS.delivery);
   await page.getByRole("button", { name: "급식길 시작하기" }).click();
+  await page.getByRole("group", { name: "업무 모드" }).getByRole("button", { name: "학교", exact: true }).click();
   await page.getByRole("button", { name: /학교 이름으로 찾기/ }).click();
   await expect(page.getByRole("dialog", { name: "어느 학교로 갈까요?" })).toBeVisible();
   await expect(page.getByText("로컬 검색 준비됨")).toBeVisible();

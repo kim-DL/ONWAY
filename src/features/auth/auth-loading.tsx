@@ -105,7 +105,7 @@ export function InitialLaunch({ children }: { children: ReactNode }) {
   }, []);
 
   return <InitialLaunchContext.Provider value={finished ? null : report}>
-    <div style={{ display: "contents" }} inert={!finished}><LaunchReadyContext.Provider value={notifyReady}>{children}</LaunchReadyContext.Provider></div>
+    <div style={{ display: finished || leaving ? "contents" : "none" }}><LaunchReadyContext.Provider value={notifyReady}>{children}</LaunchReadyContext.Provider></div>
     {!finished && <div className="initial-launch" data-leaving={leaving}>
       <LaunchSurface {...(pending ?? { stage: "boot" })} />
     </div>}

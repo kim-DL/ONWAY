@@ -69,7 +69,7 @@
   overflow: auto;
   background: #f8fafc;
 }
-.initial-launch[data-leaving="true"] { opacity: 0; transition: opacity 200ms ease-out; }
+.initial-launch[data-leaving="true"] { opacity: 0; pointer-events: none; transition: opacity 200ms ease-out; }
 .initial-launch .auth-launch-content [data-visible] [data-loading-segment] { visibility: visible; }
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
   .initial-launch [data-loading-track] [data-loading-segment] { animation-play-state: running; }

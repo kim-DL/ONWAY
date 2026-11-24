@@ -49,6 +49,7 @@ for (const slow of [false, true]) {
     if (!slow) {
       await page.clock.runFor(400);
       await expect(cover).toHaveAttribute("data-leaving", "false");
+      await expect(page.locator("input")).toBeHidden();
       await page.clock.runFor(575);
     } else {
       await page.clock.runFor(16);
