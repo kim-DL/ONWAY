@@ -48,6 +48,16 @@ test("persistent round choices stay beside the brand and preserve mode history a
     expect(geometry.controlsLeft).toBeGreaterThan(geometry.brandRight + 3);
     expect(Math.abs(geometry.brandMiddle - geometry.controlsMiddle)).toBeLessThan(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (width < 1024) {
+      const edgeDifference = await header.evaluate(element => {
+        const mark = element.querySelector(".app-brand__mark svg")!.getBoundingClientRect();
+        const name = document.createRange();
+        name.selectNodeContents(element.querySelector("[data-company-wordmark]")!);
+        const text = name.getBoundingClientRect();
+        return Math.max(Math.abs(text.left - mark.left), Math.abs(text.right - mark.right));
+      });
+      expect(edgeDifference).toBeLessThanOrEqual(1);
+    }
     const buttons = header.getByRole("group", { name: "업무 모드" }).getByRole("button");
     await expect(buttons).toHaveText(["거래처", "학교", "영업", "재고"]);
     await expect(header.getByRole("group", { name: "업무 모드" }).locator("svg")).toHaveCount(0);

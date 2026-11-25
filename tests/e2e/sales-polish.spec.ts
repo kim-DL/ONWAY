@@ -114,6 +114,7 @@ test("scope and past month preserve management restrictions", async ({ page }) =
       const line = getComputedStyle(element, "::after");
       return Math.abs(parseFloat(line.left) + parseFloat(line.width) / 2 - selected.offsetLeft - selected.offsetWidth / 2);
     })).toBeLessThanOrEqual(1);
+    expect(await scope.evaluate(el => parseFloat(getComputedStyle(el, "::after").width))).toBeCloseTo(32, 0);
     await expect(scope).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(scope.locator('[aria-pressed="true"]')).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(scope).toHaveCSS("border-top-width", "0px");
