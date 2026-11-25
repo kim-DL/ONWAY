@@ -1,6 +1,6 @@
 .header.header {
   display: grid;
-  grid-template-columns: clamp(72px, 20.5vw, 104px) minmax(0, 1fr);
+  grid-template-columns: clamp(80px, 20.5vw, 104px) minmax(0, 1fr);
   align-items: center;
   column-gap: 10px;
   padding-block: 16px 18px;
@@ -68,7 +68,7 @@
     width: min(100%, var(--signature-width, 92px));
   }
   .header.header :global(.app-brand--signature .app-brand__wordmark strong) {
-    font-size: clamp(.625rem, 2.75vw, .6875rem);
+    font-size: .6875rem;
     text-align-last: justify;
     text-justify: inter-character;
   }
