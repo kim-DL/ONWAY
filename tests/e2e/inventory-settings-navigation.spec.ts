@@ -176,7 +176,8 @@ test("the floating action centers its label on one compact surface in both trans
     expect(layout.height).toBeGreaterThanOrEqual(48);
     expect(layout.width).toBeLessThanOrEqual(2.4 * layout.height);
     await expect(button).toHaveCSS("background-image", "none");
-    await expect(button).toHaveCSS("background-color", value === "reduce" ? "rgb(250, 250, 248)" : /^rgba\(.+, 0\.\d+\)$/);
+    await expect(button).toHaveCSS("backdrop-filter", "none");
+    await expect(button).toHaveCSS("background-color", value === "reduce" ? "rgb(250, 250, 248)" : "rgba(250, 250, 248, 0.25)");
   }
   await page.emulateMedia({ forcedColors: "active" });
   await expect(button).toHaveCSS("background-color", /^rgb\(/);
