@@ -1,6 +1,6 @@
 .header.header {
   display: grid;
-  grid-template-columns: clamp(72px, 20.5vw, 104px) minmax(0, 1fr);
+  grid-template-columns: clamp(80px, 20.5vw, 104px) minmax(0, 1fr);
   align-items: center;
   column-gap: 10px;
   padding-block: 16px 18px;
@@ -16,8 +16,7 @@
 }
 
 .header.header :global(.app-brand--signature .app-brand__mark) {
-  width: 100%;
-  max-width: 92px;
+  width: min(100%, var(--signature-width, 92px));
   height: 34px;
   filter: drop-shadow(0 1px 1px rgb(255 255 255 / 80%)) drop-shadow(0 2px 2px rgb(37 78 98 / 10%));
 }
@@ -60,8 +59,20 @@
 
 @media (min-width: 761px) and (max-width: 1023px) {
   .header.header { grid-template-columns: 108px minmax(0, 1fr); column-gap: 16px; }
-  .header.header :global(.app-brand--signature) { display: grid; width: 108px; text-align: center; }
+  .header.header :global(.app-brand--signature) { --signature-width: 88px; display: grid; width: 108px; text-align: center; }
   .header.header :global(.app-brand--signature .app-brand__wordmark small) { display: none; }
+}
+
+@media (max-width: 1023px) {
+  .header.header :global(.app-brand--signature .app-brand__wordmark) {
+    width: min(100%, var(--signature-width, 92px));
+  }
+  .header.header :global(.app-brand--signature .app-brand__wordmark strong) {
+    font-size: .6875rem;
+    text-align-last: justify;
+    text-justify: inter-character;
+  }
+  .header :global([data-company-wordmark]) { letter-spacing: normal; }
 }
 
 @media (forced-colors: active) {
