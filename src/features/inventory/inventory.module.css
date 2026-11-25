@@ -171,7 +171,7 @@
   position: fixed; bottom: calc(var(--inventory-action-inset) + env(safe-area-inset-bottom)); justify-self: end; z-index: 5;
   margin-inline-end: max(0px, calc(env(safe-area-inset-right) - 12px));
   min-height: 48px; gap: 6px; padding: 10px 17px; border-radius: 99px; font-size: 14px; font-weight: 700;
-  background: var(--solid-glass, #fafaf8a6); backdrop-filter: blur(5px);
+  background: var(--solid-glass, rgb(250 250 248 / 25%)); backdrop-filter: none;
   box-shadow: inset 0 1px #fffc, 0 3px 9px #0002;
 }
 @media (forced-colors: active) { .stickyActions { --solid-glass: ButtonFace; } }

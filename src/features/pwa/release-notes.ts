@@ -8,9 +8,10 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-25.2",
+  id: "2026-11-25.3",
   date: "2026-11-25",
   changes: [
+    { title: "재고 새 품목 버튼", text: "새 품목 버튼의 배경 투명도를 75%로 높이고 흐림 효과를 없애 뒤에 있는 수량을 볼 수 있어요." },
     { title: "영업 모드 작업 버튼", text: "학교 찾기와 방문 동선 등 작업 버튼을 학교 범위 탭 아래 가운데에 맞췄어요." },
     { title: "학교·영업 모드 스크롤", text: "화면 오른쪽에 겹쳐 보이던 큰 스크롤바를 없앴어요. 긴 목록은 본문 안에서 스크롤할 수 있어요." },
   ],
