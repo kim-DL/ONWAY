@@ -65,7 +65,8 @@
 
 @media (max-width: 1023px) {
   .header.header :global(.app-brand--signature .app-brand__wordmark) {
-    width: min(100%, var(--signature-width, 92px));
+    width: max(4.8125rem, calc(min(100%, var(--signature-width, 92px)) - 6px));
+    max-width: 100%;
   }
   .header.header :global(.app-brand--signature .app-brand__wordmark strong) {
     font-size: .6875rem;
