@@ -6,11 +6,13 @@ import type { Customer } from "@/domain/customer";
 import { DEFAULT_DELIVERY_VEHICLE, PLANNING_NOTICE, type PhotoBatchResult, type PhotoAlias, type PlanningContext, type PlanningLists, type RouteRecommendation } from "@/domain/delivery-planning";
 import type { DeliveryPhotoDayResult } from "@/features/delivery-photos/delivery-photo-repository";
 import { planningError, planningRepository, type PlanningRepository } from "./planning-repository";
-import { PlanningSettingsForm } from "./planning-settings";
 import styles from "./planning.module.css";
 
 function PlanningLoading() { return <p role="status">준비 중…</p>; }
 
+const PlanningSettingsForm = dynamic(() => import("./planning-settings").then(module => module.PlanningSettingsForm), {
+  ssr: false, loading: PlanningLoading,
+});
 const PhotoBatchReview = dynamic(() => import("./photo-batch-review").then((module) => module.PhotoBatchReview), {
   ssr: false, loading: PlanningLoading,
 });
