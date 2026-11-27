@@ -9,11 +9,13 @@ import { planningError, planningRepository, type PlanningRepository } from "./pl
 import { PlanningSettingsForm } from "./planning-settings";
 import styles from "./planning.module.css";
 
+function PlanningLoading() { return <p role="status">준비 중…</p>; }
+
 const PhotoBatchReview = dynamic(() => import("./photo-batch-review").then((module) => module.PhotoBatchReview), {
-  ssr: false, loading: () => <p role="status">준비 중…</p>,
+  ssr: false, loading: PlanningLoading,
 });
 const PhotoAliasManager = dynamic(() => import("./photo-alias-manager").then((module) => module.PhotoAliasManager), {
-  ssr: false, loading: () => <p role="status">준비 중…</p>,
+  ssr: false, loading: PlanningLoading,
 });
 
 type Scan = { id: string; state: "waiting" | "reading" | "failed" | "done"; result?: PhotoBatchResult; error?: string };
