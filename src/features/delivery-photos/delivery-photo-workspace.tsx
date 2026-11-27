@@ -98,7 +98,7 @@ export function DeliveryPhotoWorkspace({ session, onOpenCustomerDetail, requeste
     return <DeliveryPhotoRow key={id} customer={customer} count={summary?.count} latestAt={summary?.latest?.createdAt}
       {...upload} onShowJob={setFocusJob}
       blocked={captureBlockReason(id)} inToday={inToday}
-      directions={(directions || (inToday && !summary?.count)) && <DirectionsLink customer={customer} className={styles.directions} />}
+      directions={(search || directions) && <DirectionsLink customer={customer} className={styles.directions} />}
       onView={setHistoryCustomer} onCapture={capture} onMore={(value) => { rememberList(); setMoreCustomer(value); }} onRetry={retryable ? retry : undefined} />;
   };
 
