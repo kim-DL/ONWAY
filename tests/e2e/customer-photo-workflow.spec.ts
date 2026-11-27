@@ -109,6 +109,23 @@ test("one tap in the remaining list or its search result uses the same verified 
   expect(lookups).toEqual(["대전광역시 서구 예시로 1"]);
 });
 
+test("search opens the delivery destination for a customer outside today's list", async ({ page, context, isMobile }) => {
+  await install(context);
+  await context.route("**/api/getDeliveryPhotoDay", route => route.fulfill({
+    json: { deliveryDateKey: today, isOverride: true, revision: 1, customerIds: [] },
+  }));
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto(origin);
+  await page.getByRole("searchbox", { name: "납품사진 거래처 검색" }).fill("예시");
+  const result = page.getByRole("region", { name: "거래처 검색 결과" });
+  const directions = result.getByRole("link", { name: /납품지 길안내$/ });
+  await expect(result.getByRole("button", { name: /카메라 촬영$/ })).toBeVisible();
+  await expect(directions).toBeInViewport();
+  const destination = isMobile ? Promise.resolve(page) : context.waitForEvent("page");
+  await directions.click();
+  await expect(await destination).toHaveURL(/https:\/\/map\.kakao\.com\/link\/to\/[^/]+,36\.4,127\.5$/);
+});
+
 test("selected day waits for its own query and finds a photo beyond the first thirty", async ({ page, context }) => {
   const day = gate(); await install(context, { date: day.wait });
   await page.goto(origin); await page.getByRole("button", { name: / 사진 기록$/ }).click();
