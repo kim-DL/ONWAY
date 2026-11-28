@@ -58,6 +58,17 @@ describe("inventory scan evidence", () => {
     expect(readLabelResponse(raw({ kind: "single", name: printed("단호박 미니전") })).casePack).toBeNull();
     expect(labelReadingSchema.safeParse({ ...good, initialStock: 18 }).success).toBe(false);
   });
+  it("requires product-country evidence and accepts dates printed on either side of the expiry label", () => {
+    const date = "2027-02-17";
+    const expiry = (quote: string) => readLabelResponse(raw({ kind: "single", expiry: { value: date, quote } })).expiry?.value;
+    for (const quote of ["EXP. 2027/02/17", "2027.02.17까지 (소비기한)", "유통기한 27년 2월 17일까지", "MFG 2026-11-01 / EXP 20270217"]) expect(expiry(quote), quote).toBe(date);
+    for (const quote of ["품질유지기한 2027.02.17", "2027.02.17", "소비기한 별도 표기 / 포장일 2027.02.17", "제조일 2027.02.17 소비기한 별도 표기", "EXP 2027.02.17 / 2027.03.20", "2027.03.20 / 2027.02.17 (소비기한)"]) expect(expiry(quote), quote).toBeUndefined();
+    expect(readLabelResponse(raw({kind: "single", expiry: {value: "2005-06-07", quote: "EXP 05/06/07"}})).expiry).toBeNull();
+    const origin = (quote: string, value: string) => readLabelResponse(raw({ kind: "single", origin: { value, quote } })).origin?.value;
+    for (const [quote, value] of [["원산지: 국내산", "국내산"], ["제조국명: 베트남", "베트남"], ["Product of Italy", "Italy"], ["Made in Korea", "Korea"]]) expect(origin(quote!, value!), quote).toBe(value);
+    expect(origin("원산지: 돼지고기(국내산)", "돼지고기(국내산)")).toBeUndefined();
+    for (const quote of ["원재료명 | 원산지: 국내산", "판매원 주소: 국내산", "돼지고기 원산지: 국내산", "원재료: 국내산", "원산지: 돼지고기(국내산)"]) expect(origin(quote, "국내산"), quote).toBeUndefined();
+  });
   it("returns only active exact GTIN matches and never converts shelf life into an expiry", async () => {
     const row = { BAR_CD: "8801791000192", END_DT: "", CLSBIZ_DT: "", PRDLST_REPORT_NO: "110", PRDLST_NM: "쌈장", BSSH_NM: "검증식품", PRDLST_DCNM: "혼합장", POG_DAYCNT: "제조일로부터 24개월" };
     const get = fetchResult({ C005: { RESULT: { CODE: "INFO-000" }, row: [row, { ...row, PRDLST_REPORT_NO: "111", END_DT: "20150202" },

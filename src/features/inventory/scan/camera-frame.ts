@@ -67,7 +67,7 @@ export function drawFrame(source: CanvasImageSource, width: number, height: numb
 
 function abortError() { return new DOMException("촬영을 닫았어요.", "AbortError"); }
 
-export async function frameFromFile(source: File, signal: AbortSignal) {
+export async function frameFromFile(source: Blob, signal: AbortSignal) {
   if (signal.aborted) throw abortError();
   if (typeof createImageBitmap === "function") {
     try {
@@ -97,6 +97,29 @@ export async function frameFromFile(source: File, signal: AbortSignal) {
     });
     return drawFrame(image, image.naturalWidth, image.naturalHeight);
   } finally { URL.revokeObjectURL(url); }
+}
+
+/** Prefer a camera still for small print. Freeze the shutter frame in case the still is unavailable or late. */
+export async function captureLabelFrame(video: HTMLVideoElement, track: MediaStreamTrack, signal: AbortSignal) {
+  const fallback = drawFrame(video, video.videoWidth, video.videoHeight);
+  if (signal.aborted || typeof ImageCapture !== "function") return fallback;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: (() => void) | undefined;
+  try {
+    const deadline = new Promise<null>(resolve => {
+      cancel = () => resolve(null);
+      signal.addEventListener("abort", cancel, { once: true });
+      timer = setTimeout(cancel, 1500);
+    });
+    const still = await Promise.race([new ImageCapture(track).takePhoto(), deadline]);
+    if (!still?.size || signal.aborted) return fallback;
+    const frame = await frameFromFile(still, signal);
+    return frame.width * frame.height >= fallback.width * fallback.height ? frame : fallback;
+  } catch { return fallback; }
+  finally {
+    clearTimeout(timer);
+    if (cancel) signal.removeEventListener("abort", cancel);
+  }
 }
 
 function jpegBlob(frame: HTMLCanvasElement, quality: number): Promise<Blob> {

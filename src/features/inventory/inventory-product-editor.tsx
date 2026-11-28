@@ -76,7 +76,11 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
     if (!explicit && !autoFillAllowed(item, editorValue(field, draft, initialLot), edits.has(field))) return;
     if (explicit) edits.mark(field);
     if (field === "manufacturer") { setMakerQuery(item.value); return; }
-    if (field === "expiry") { setInitialLot(old => ({ ...old, expiryState: "dated", expiryDate: item.value })); return; }
+    if (field === "expiry") {
+      setInitialLot(old => explicit || autoFillAllowed(item, editorValue(field, draft, old), edits.has(field))
+        ? { ...old, expiryState: "dated", expiryDate: item.value } : old);
+      return;
+    }
     if (field === "boxPackSize") {
       if (!sameText(item.unit ?? "", draft.unitLabel)) return;
       clearCalculatedStock();
@@ -133,7 +137,7 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
           onChange={(event) => { set("boxPackSize", event.target.value === "" ? null : event.target.valueAsNumber); if (initialPackages) { setInitialQuantity(Number.NaN); setInitialPackages(undefined); } }} /><span>{draft.unitLabel || "기준 단위"}</span></div>
         <small id={`${id}-pack-help`} className={formStyles.packageHelp}>한 박스에 들어 있는 {draft.unitLabel || "기준 단위"} 수를 입력하세요. 모르면 비워두고 나중에 등록할 수 있어요.</small>
       </label>
-      {!product ? <><LotFields draft={initialLot} onChange={lot => { edits.mark("expiry"); setInitialLot(lot); }} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} key={scanPanel ? [draft.unitLabel, draft.boxPackSize].join("-") : draft.boxPackSize ?? "unknown"} value={initialQuantity} onChange={(total, packages) => { setInitialQuantity(total); setInitialPackages(packages); }} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
+      {!product ? <><LotFields draft={initialLot} onChange={lot => { if (lot.expiryState !== initialLot.expiryState || lot.expiryDate !== initialLot.expiryDate) edits.mark("expiry"); setInitialLot(lot); }} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} key={scanPanel ? [draft.unitLabel, draft.boxPackSize].join("-") : draft.boxPackSize ?? "unknown"} value={initialQuantity} onChange={(total, packages) => { setInitialQuantity(total); setInitialPackages(packages); }} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
       <details><summary className={styles.label}>참고 메모 (선택)</summary><label className={styles.field}>메모<textarea maxLength={2000} rows={2} value={draft.note} onChange={(event) => set("note", event.target.value)} disabled={busy} /></label></details>
       </div>
       {validationError ? <p role="alert" className={styles.error}>{validationError}</p> : null}

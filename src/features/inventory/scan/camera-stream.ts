@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 type CameraStatus =
-  | { kind: "opening" | "ready" | "paused" }
+  | { kind: "opening" | "paused" }
+  | { kind: "ready"; track: MediaStreamTrack }
   | { kind: "permission" | "unavailable"; message: string };
 
 function cameraErrorStatus(error: unknown): CameraStatus {
@@ -18,6 +19,7 @@ export function useCameraStream(videoRef: RefObject<HTMLVideoElement | null>, on
   const [status, setStatus] = useState<CameraStatus>({ kind: "opening" });
   const start = useRef<() => void>(() => {});
   const stop = useRef<() => void>(() => {});
+  const pauseStream = useRef<() => void>(() => {});
   useEffect(() => {
     let version = 0;
     let stream: MediaStream | null = null;
@@ -47,17 +49,16 @@ export function useCameraStream(videoRef: RefObject<HTMLVideoElement | null>, on
       try {
         const camera = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 2400 }, height: { ideal: 1800 } },
         });
         if (requested !== version) { camera.getTracks().forEach((track) => track.stop()); return; }
         stream = camera;
-        for (const track of camera.getVideoTracks()) track.onended = () => {
-          release();
-          setStatus({ kind: "paused" });
-        };
+        const [track] = camera.getVideoTracks();
+        if (!track) throw new Error("영상 트랙이 없어요.");
+        track.onended = pause;
         video.srcObject = camera;
         await video.play();
-        if (requested === version) setStatus({ kind: "ready" });
+        if (requested === version) setStatus({ kind: "ready", track });
       } catch (error) {
         if (requested !== version) return;
         release();
@@ -69,14 +70,16 @@ export function useCameraStream(videoRef: RefObject<HTMLVideoElement | null>, on
     window.addEventListener("pagehide", pause);
     start.current = () => { void open(); };
     stop.current = release;
+    pauseStream.current = pause;
     void open();
     return () => {
       document.removeEventListener("visibilitychange", hide);
       window.removeEventListener("pagehide", pause);
       start.current = () => {};
       stop.current = () => {};
+      pauseStream.current = () => {};
       release();
     };
   }, [videoRef, onSuspend]);
-  return { status, start, stop };
+  return { status, start, stop, pause: pauseStream };
 }

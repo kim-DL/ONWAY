@@ -1043,17 +1043,22 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   const barcode = "8801791000192";
   let calls = 0;
   let saves = 0;
+  let submittedWidth = 0, regionWidth = 0;
   page.on("request", req => { if (req.method() === "POST" && req.url().endsWith("/saveInventoryProduct")) saves++; });
   await page.route("**/analyzeInventoryProductLabel", async route => {
     if (route.request().method() !== "POST") return route.continue();
     calls++;
-    const result = { kind: "single", name: calls === 1 ? printed(name) : null, manufacturer: null, origin: null,
+    if (calls === 1) submittedWidth = (await sharp(Buffer.from(route.request().postDataJSON().data.fileBase64, "base64")).metadata()).width ?? 0;
+    if (calls === 3) regionWidth = (await sharp(Buffer.from(route.request().postDataJSON().data.fileBase64, "base64")).metadata()).width ?? 0;
+    const result = { kind: "single", name: calls === 1 ? printed(name) : calls === 3 ? printed("확대 영역에는 품명 없음") : null, manufacturer: null,
+      origin: calls === 1 ? { value: "대한민국", quote: "원산지: 대한민국" } : { value: "베트남", quote: "제조국: 베트남" },
       netContent: calls === 1 ? printed("750g") : null, innerContents: calls === 1 ? printed("25g × 30개") : null,
-      casePack: calls === 1 ? { count: 8, unit: "봉", quote: "1박스 = 8봉" } : null, expiry: calls === 2 ? { value: date, quote: "소비기한 " + date } : null };
+      casePack: calls === 1 ? { count: 8, unit: "봉", quote: "1박스 = 8봉" } : null, expiry: calls >= 2 ? { value: date, quote: "소비기한 " + date } : null };
     await route.fulfill({ json: { result }, headers: { "access-control-allow-origin": INVENTORY_E2E_ORIGIN } });
   });
   await page.evaluate(() => {
     Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => {
+      Object.defineProperty(navigator.mediaDevices, "getSupportedConstraints", { configurable: true, value: () => ({ pointsOfInterest: true }) });
       const frame = document.createElement("canvas"); frame.width = 640; frame.height = 600;
       const ctx = frame.getContext("2d")!;
       function draw() {
@@ -1068,6 +1073,18 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
       }
       draw();
       const stream = frame.captureStream(12);
+      const track = stream.getVideoTracks()[0]!;
+      Object.defineProperties(track, {
+        getCapabilities: { value: () => ({ focusMode: ["continuous"], zoom: { min: 1, max: 3, step: 0.1 }, torch: [true, false] }) },
+        applyConstraints: { value: async (input: MediaTrackConstraints) => { document.documentElement.dataset.scanLens = JSON.stringify(input.advanced?.[0]); } },
+      });
+      Object.defineProperty(window, "ImageCapture", { configurable: true, value: class {
+        async takePhoto() {
+          const high = document.createElement("canvas"); high.width = 1280; high.height = 1200;
+          high.getContext("2d")!.drawImage(frame, 0, 0, high.width, high.height);
+          return new Promise<Blob | null>(resolve => high.toBlob(resolve, "image/jpeg"));
+        }
+      } });
       const timer = window.setInterval(() => {
         if (stream.getTracks().every(track => track.readyState === "ended")) { clearInterval(timer); return; }
         draw();
@@ -1079,6 +1096,15 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   const camera = page.getByRole("dialog", { name: "제품 스캔", exact: true });
   const review = page.getByRole("dialog", { name: "AI 스캔 등록", exact: true });
   await expect(camera.getByRole("button", { name: "사진 촬영", exact: true })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-scan-lens", /"focusMode":"continuous"/);
+  const torch = camera.getByRole("button", { name: "손전등", exact: true });
+  await torch.click();
+  await expect(torch).toHaveAttribute("aria-pressed", "true");
+  await camera.getByRole("button", { name: "작은 글씨 확대" }).click();
+  await camera.getByRole("button", { name: "누른 곳에 초점 맞추기" }).press("Enter");
+  await expect.poll(async () => JSON.parse((await page.locator("html").getAttribute("data-scan-lens")) ?? "{}")).toMatchObject({ torch: true, zoom: 2, focusMode: "continuous", pointsOfInterest: [{ x: 0.5, y: 0.5 }] });
+  await torch.click();
+  await expect(torch).toHaveAttribute("aria-pressed", "false");
   await capture(page, info, "scan-camera-mobile");
   const photograph = (bytes: Buffer) => camera.locator('input[type=file]:not([capture])').setInputFiles({ name: "fixture.jpg", mimeType: "image/jpeg", buffer: bytes });
   const shutter = camera.getByRole("button", { name: "사진 촬영", exact: true });
@@ -1096,12 +1122,33 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   await expect(review.getByLabel(/품목명.*필수/)).toHaveValue(name);
   await expect(review.getByLabel("초기 수량 (필수) (봉)", { exact: true })).toHaveValue("");
   await expect(review.getByLabel("박스 입수 수량", { exact: true })).toHaveValue("");
+  expect(submittedWidth).toBe(1280);
+  await expect(review.getByLabel("원산지 직접입력")).toHaveValue("대한민국");
+  await review.getByLabel("원산지 직접입력").fill("한국");
   await review.getByLabel(/품목명.*필수/).fill(finalName);
   await review.getByRole("button", { name: "다른 면 촬영" }).click();
   await photograph(replacementPhoto);
-  await review.getByRole("button", { name: "이번 입고 소비기한 " + date + " 확인" }).click();
+  await expect(review.getByLabel("원산지 직접입력")).toHaveValue("한국");
   await expect(review.getByLabel(/품목명.*필수/)).toHaveValue(finalName);
   await expect(review.getByLabel("첫 유통기한 날짜", { exact: true })).toHaveValue(date);
+  await review.getByRole("button", { name: "사진에서 날짜·원산지 선택" }).click();
+  const region = page.getByRole("dialog", { name: "날짜·원산지 영역 선택" });
+  await region.getByLabel("촬영 사진").selectOption({ label: "1번 사진" });
+  await region.getByRole("button", { name: "범위 좁히기" }).click();
+  const image = region.getByRole("button", { name: "판독 영역 위치, 방향키로 이동" });
+  const picture = (await image.boundingBox())!;
+  await page.mouse.move(picture.x + picture.width * .2, picture.y + picture.height * .3);
+  await page.mouse.down();
+  await page.mouse.move(picture.x + picture.width * .65, picture.y + picture.height * .65);
+  await page.mouse.up();
+  await image.press("ArrowRight");
+  await region.getByRole("button", { name: "이 영역 읽기" }).click();
+  await expect(review.getByText("선택한 영역에서 읽은 값과 표시 원문을 확인해 주세요.")).toBeVisible();
+  expect(regionWidth / submittedWidth).toBeCloseTo(.45, 1);
+  await expect(review.getByText(/이번 입고 소비·유통기한.*사진 1 · 선택 영역/)).toBeVisible();
+  await expect(review.getByLabel(/품목명.*필수/)).toHaveValue(finalName);
+  await expect(review.getByLabel("원산지 직접입력")).toHaveValue("한국");
+  await expect(review.getByText(/촬영 사진 2장/)).toBeVisible();
   await review.getByRole("button", { name: "박스 입수 8 확인" }).click();
   await expect(review.getByLabel("박스 수", { exact: true })).toHaveValue("");
   await review.getByRole("button", { name: "다른 면 촬영" }).click();
@@ -1126,7 +1173,7 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   const done = page.getByRole("dialog", { name: "품목 등록 완료", exact: true });
   await expect(done.getByText(finalName)).toBeVisible();
   const stored = (await db().collection(INVENTORY_PRODUCT_PATH).where("name", "==", finalName).get()).docs[0]!;
-  expect(stored.data()).toMatchObject({ boxPackSize: 8, unitsPerBox: 1, quantityByLocation: { refrigerated: 17 }, photo: null });
+  expect(stored.data()).toMatchObject({ origin: "한국", boxPackSize: 8, unitsPerBox: 1, quantityByLocation: { refrigerated: 17 }, photo: null });
   expect((await stored.ref.collection("lots").get()).docs[0]!.get("expiryDate")).toBe(date);
   expect((await db().doc("companies/onnuri/inventoryBarcodes/0" + barcode).get()).data()).toMatchObject({ level: "case", productId: stored.id });
   await done.getByRole("button", { name: "다음 품목 스캔" }).click();
@@ -1139,7 +1186,7 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   await submitScanMutation(receiveSheet, "입고 기록", "recordInventoryMovement");
   await expect(page.getByRole("dialog", { name: "입고 기록 완료" })).toBeVisible();
   expect((await stored.ref.get()).get("quantityByLocation")).toMatchObject({ refrigerated: 17, freezer1: 8 });
-  expect(calls).toBe(2); expect(saves).toBe(1);
+  expect(calls).toBe(3); expect(saves).toBe(1);
   await expect.poll(async () => {
     const rows = await db().collection("companies/onnuri/inventoryRegistrationMetrics").where("mode", "==", "scan").get();
     return rows.docs.some(row => row.get("outcome") === "registered" && row.get("photos") === 2 && row.get("corrected").includes("name"))

@@ -8,7 +8,8 @@ import { readCustomerPhotoSource, validateCustomerPhotoFile } from "@/features/c
 import { detectFrameGtin } from "./camera-decoder";
 import { ScanFeedback } from "./camera-feedback";
 import { readScanMuted, writeScanMuted } from "./audio-gesture";
-import { drawFrame, fitFrame, frameFromFile, frameToFile, sampleAim, type AimSample, type AimState } from "./camera-frame";
+import { captureLabelFrame, fitFrame, frameFromFile, frameToFile, sampleAim, type AimSample, type AimState } from "./camera-frame";
+import { CameraLensControls } from "./camera-lens";
 import { ScanShutter } from "./scan-shutter";
 import { useCameraStream } from "./camera-stream";
 import styles from "./camera.module.css";
@@ -20,7 +21,7 @@ interface CameraProps {
   hint?: string;
 }
 const aimText: Record<AimState, string> = {
-  searching: "제품명이나 바코드를 중앙에 맞춰주세요",
+  searching: "작은 글씨가 흐리면 조금 물러나세요",
   moving: "잠시 멈춰서 글씨를 맞춰주세요",
   steady: "탭해서 촬영 · 길게 눌러 포착",
   dark: "글씨가 잘 보이도록 빛을 비춰주세요",
@@ -141,10 +142,10 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
   }
   async function takePhoto() {
     const camera = video.current;
-    if (!camera?.videoWidth || camera.readyState < 2) { setError("카메라 화면이 보이면 다시 촬영해주세요."); return; }
+    if (stream.status.kind !== "ready" || !camera?.videoWidth || camera.readyState < 2) { setError("카메라 화면이 보이면 다시 촬영해주세요."); return; }
     const task = begin();
     if (!task) return;
-    try { await acceptFrame(drawFrame(camera, camera.videoWidth, camera.videoHeight), task); }
+    try { await acceptFrame(await captureLabelFrame(camera, stream.status.track, task.signal), task); }
     catch (cause) { failed(task, cause); }
   }
   async function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -184,6 +185,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
             if (media.videoHeight) media.parentElement?.style.setProperty("--camera-ratio", String(media.videoWidth / media.videoHeight));
           }} />
           <canvas ref={still} aria-hidden="true" className={styles.still} />
+          {stream.status.kind === "ready" && <CameraLensControls key={stream.status.track.id} track={stream.status.track} video={video} disabled={busy} />}
           <button type="button" className={styles.sound} aria-label="효과음" aria-pressed={!muted} onClick={toggleSound}>
             <SoundGlyph muted={muted} />효과음 {muted ? "꺼짐" : "켜짐"}
           </button>
@@ -201,6 +203,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
             onCapture={() => { unlockSound(); if (live) void takePhoto(); else nativeCamera.current?.click(); }} />
           <button type="button" className={styles.sideAction} disabled={busy} aria-expanded={manual} aria-controls={codeId} onClick={() => { setManual(!manual); setInvalidCode(false); }}><BarcodeGlyph /><span>번호 입력</span></button>
         </div>
+        {live && !busy && <button type="button" className={styles.nativeHelp} onClick={() => { stream.pause.current(); nativeCamera.current?.click(); }}>초점이 흐릴 때 · 기기 카메라로 촬영</button>}
         <input ref={album} type="file" accept="image/*" hidden onChange={(event) => { void selectPhoto(event); }} />
         <input ref={nativeCamera} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { void selectPhoto(event); }} />
         {stream.status.kind === "permission" ? <details className={styles.permissionHelp}>

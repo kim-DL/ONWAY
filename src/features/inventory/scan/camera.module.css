@@ -10,10 +10,17 @@
 .viewer[data-live="true"] .video { opacity: 1; }
 .still { visibility: hidden; }
 .viewer[data-captured="true"] .still { visibility: visible; background: #14232d; }
-.sound, .fallback button { min-height: 36px; border: 1px solid #ffffff61; border-radius: 999px; background: #152530eb; color: #fff; font: inherit; }
+.sound, .fallback button, .lensTools button { min-height: 40px; border: 1px solid #ffffff61; border-radius: 999px; background: #152530eb; color: #fff; font: inherit; }
 .sound { position: absolute; z-index: 2; top: 9px; right: 9px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
+.lensTools { position: absolute; z-index: 2; top: 9px; left: 9px; display: flex; gap: 4px; }
+.lensTools button { min-height: 44px; padding: 4px 9px; font-size: 12px; font-weight: 600; }
+.lensTools button[aria-pressed="true"] { background: #e6f3fc; color: #16364d; }
+.focusPad { position: absolute; inset: 0; width: 100%; border: 0; background: transparent; }
+.focusHint { position: absolute; left: 9px; top: 57px; color: white; background: #152530dc; padding: 2px 6px; border-radius: 5px; font-size: 11px; }
+.lensMessage { position: absolute; z-index: 2; inset: auto 9px 9px; padding: 6px; border-radius: 8px; background: #152530; color: white; text-align: center; font-size: 13px; }
+.nativeHelp { justify-self: start; min-height: 36px; border: 0; padding: 0 3px; color: #295c80; background: transparent; font: inherit; font-size: 13px; text-decoration: underline; }
 .guide {
-  position: absolute; left: 50%; top: 50%; translate: var(--guide-position, -50% -50%); color: #eaf6fd;
+  pointer-events: none; position: absolute; left: 50%; top: 50%; translate: var(--guide-position, -50% -50%); color: #eaf6fd;
   width: 72%; height: 52%;
   width: min(72cqw, calc(72cqh * var(--camera-ratio, 1.333)));
   height: min(52cqh, calc(52cqw / var(--camera-ratio, 1.333)));
@@ -32,6 +39,7 @@
   margin: 0; padding: 6px 11px; border-radius: 8px; background: #102330e8; color: #fff;
   text-align: center; word-break: keep-all; font-size: 13px; line-height: 1.4;
 }
+.aim, .still, .lensMessage { pointer-events: none; }
 .acquired { background: #16485a; font-weight: 650; }
 .fallback { position: absolute; inset: 44px 15px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; }
 .fallback > svg { color: #b8d8e4; flex-shrink: 0; }

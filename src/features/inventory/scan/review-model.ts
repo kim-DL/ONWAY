@@ -6,7 +6,7 @@ export type Suggestion = {
   net?: string; inner?: string; replaces?: string;
 };
 export const scanFieldLabels: Record<ScanField, string> = {
-  name: "품목명", manufacturer: "제조사", origin: "원산지", specification: "규격", boxPackSize: "박스 입수", expiry: "이번 입고 소비기한",
+  name: "품목명", manufacturer: "제조사", origin: "원산지", specification: "규격", boxPackSize: "박스 입수", expiry: "이번 입고 소비·유통기한",
 };
 export const sameText = (a: string, b: string) => a.normalize("NFKC").replace(/\s/g, "").toLocaleLowerCase("ko") === b.normalize("NFKC").replace(/\s/g, "").toLocaleLowerCase("ko");
 export function labelSuggestions(reading: LabelReading, source: string): Suggestion[] {
@@ -43,7 +43,7 @@ export function editorValue(field: ScanField, draft: InventoryProductDraft, lot:
   return field === "expiry" ? lot.expiryState === "dated" ? lot.expiryDate ?? "" : "미확인" : String(draft[field] ?? "");
 }
 export function autoFillAllowed(s: Suggestion, current: string, touched: boolean) {
-  return !touched && (!current || (!!s.replaces && sameText(current, s.replaces))) && ["name", "origin", "specification"].includes(s.field);
+  return !touched && (!current || (!!s.replaces && sameText(current, s.replaces))) && ["name", "origin", "specification", "expiry"].includes(s.field);
 }
 export function similarProducts(products: InventoryProduct[], name: string) {
   const key = name.normalize("NFKC").replace(/\s/g, "").toLocaleLowerCase("ko");

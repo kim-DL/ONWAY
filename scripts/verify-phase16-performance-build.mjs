@@ -212,11 +212,13 @@ const inventoryPanZoomJavascriptGzipBytes = [...inventoryPanZoomAssets].filter((
 const inventoryPanZoomStylesheetRawBytes = inventoryPanZoomStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryPanZoomStylesheetGzipBytes = inventoryPanZoomStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const scanEntry = dynamicEntries.find(entry => entry.boundary.endsWith("/scan/registration"));
+const regionEntry = dynamicEntries.find(entry => entry.boundary.endsWith("/region") && entry.boundary.includes("scan"));
 const decoderEntry = dynamicEntries.find(entry => entry.boundary.endsWith("/camera-zxing"));
 const scanAssets = new Set(scanEntry?.files);
 const scanStylesheets = stylesheets.filter(asset => scanAssets.has(asset.asset));
 const jsGzip = files => (files ?? []).filter(file => file.endsWith(".js")).reduce((sum, file) => sum + sizeAsset(file).gzipBytes, 0);
 const scanJavascriptGzipBytes = jsGzip(scanEntry?.files);
+const regionJavascriptGzipBytes = jsGzip(regionEntry?.files);
 const decoderJavascriptGzipBytes = jsGzip(decoderEntry?.files);
 const inventoryManufacturerEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-picker"));
 const inventoryManufacturerFieldEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-field"));
@@ -349,9 +351,12 @@ for (const asset of [...scanAssets, ...decoderEntry.files]) {
 }
 assertBudget(decoderEntry.files.every(file => !scanAssets.has(file)), "barcode fallback must load only after capture");
 // Gesture audio, the hold shutter and visual candidates load only on opening the scanner.
-assertBudget(scanJavascriptGzipBytes <= 18.5 * 1024 && decoderJavascriptGzipBytes <= 16 * 1024, "deferred inventory scan JavaScript exceeded its budget");
-assertBudget(scanStylesheets.reduce((n, file) => n + file.rawBytes, 0) <= 8.5 * 1024
-  && scanStylesheets.reduce((n, file) => n + file.gzipBytes, 0) <= 2.75 * 1024, "deferred scan CSS exceeded its budget");
+// Track controls, high-resolution photos and field review load with the scanner. The region picker loads on demand.
+assertBudget(regionEntry && regionEntry.files.every(file => !scanAssets.has(file) && !initialAssets.has(file) && !initialStylesheets.has(file)), "field region picker must remain deferred");
+assertBudget(regionJavascriptGzipBytes <= 2.125 * 1024, `region picker ${regionJavascriptGzipBytes}B gzip exceeds its budget`);
+assertBudget(scanJavascriptGzipBytes <= 21 * 1024 && decoderJavascriptGzipBytes <= 16 * 1024, `scan ${scanJavascriptGzipBytes}B / decoder ${decoderJavascriptGzipBytes}B gzip exceeded the deferred scan budget`);
+assertBudget(scanStylesheets.reduce((n, file) => n + file.rawBytes, 0) <= 9.75 * 1024
+  && scanStylesheets.reduce((n, file) => n + file.gzipBytes, 0) <= 2.875 * 1024, `scan CSS ${scanStylesheets.reduce((n, f) => n + f.rawBytes, 0)}B raw / ${scanStylesheets.reduce((n, f) => n + f.gzipBytes, 0)}B gzip exceeded its budget`);
 for (const asset of inventoryManufacturerFieldAssetNames) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `manufacturer trigger asset ${asset} must stay deferred`);
 }
@@ -613,7 +618,8 @@ const report = {
     inventoryStylesheetRawBytes: 30.5 * 1024,
     inventoryStylesheetGzipBytes: 7 * 1024,
     inventoryJavascriptGzipBytes: 25.75 * 1024,
-    scanJavascriptGzipBytes: 18.5 * 1024,
+    scanJavascriptGzipBytes: 21 * 1024,
+    regionJavascriptGzipBytes: 2.125 * 1024,
     decoderJavascriptGzipBytes: 16 * 1024,
     inventoryViewerJavascriptGzipBytes: 2.25 * 1024,
   },
@@ -667,6 +673,7 @@ const report = {
     inventoryStylesheetGzipBytes,
     inventoryJavascriptGzipBytes,
     scanJavascriptGzipBytes,
+    regionJavascriptGzipBytes,
     decoderJavascriptGzipBytes,
     inventoryWorkspaceJavascriptGzipBytes,
     inventoryViewerJavascriptGzipBytes,
