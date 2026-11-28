@@ -53,6 +53,10 @@
 .manual button { min-width: 52px; min-height: 44px; border: 1px solid #a8bbc8; border-radius: 8px; background: #edf4f8; color: #1f4f6e; font: inherit; font-weight: 650; }
 .error { margin: 0; color: #993c32; font-size: 13px; line-height: 1.45; }
 .manual .error { margin-top: 5px; }
+.permissionHelp { color: #34566e; font-size: 14px; line-height: 1.5; word-break: keep-all; }
+.permissionHelp summary { padding: 10px 0; cursor: pointer; font-weight: 650; }
+.permissionHelp ul { margin: 0; padding-left: 20px; }
+.permissionHelp li + li, .permissionHelp p { margin: 6px 0 0; }
 @media (max-width: 480px) and (orientation: portrait) {
   .viewer { aspect-ratio: 1 / 1.05; max-height: min(49dvh, 430px); }
 }

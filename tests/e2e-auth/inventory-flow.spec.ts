@@ -116,7 +116,7 @@ async function capture(page: Page, info: TestInfo, name: string) {
 async function checkGlassPreference(page: Page) {
   if (page.context().browser()?.browserType().name() !== "chromium") return;
   const session = await page.context().newCDPSession(page);
-  const button = page.getByRole("button", { name: "새 품목 등록", exact: true });
+  const button = page.getByRole("button", { name: "직접 입력", exact: true });
   const webgl = await page.evaluate(() => {
     const context = document.createElement("canvas").getContext("webgl2");
     context?.getExtension("WEBGL_lose_context")?.loseContext();
@@ -183,7 +183,7 @@ async function captureInventoryList(page: Page, info: TestInfo, name: string) {
 }
 async function verifyFloatingAction(page: Page, cards: Locator, info: TestInfo, name: string) {
   const scroller = page.locator(".workspace-content");
-  const fab = page.getByRole("button", { name: "새 품목 등록", exact: true });
+  const fab = page.getByRole("group", { name: "새 품목 등록 방식" });
   await scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
   const before = await fab.boundingBox();
   expect(before).not.toBeNull();
@@ -465,7 +465,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
   await coworker.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
   try {
     const admin = await loginAdmin(operator);
-    const adminButton = operator.getByRole("button", { name: "새 품목 등록", exact: true });
+    const adminButton = operator.getByRole("group", { name: "새 품목 등록 방식" });
     await expect(adminButton).toBeVisible();
     for (const width of [390, 800, 1280]) {
       await operator.setViewportSize({ width, height: 900 });
@@ -542,7 +542,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await expect(stockRow).toHaveAccessibleName(name + ", 579 봉, 상세 보기");
     await page.unroute("**/getInventoryProduct", holdStock);
     await expect(search).toBeFocused();
-    const addButton = page.getByRole("button", { name: "새 품목 등록", exact: true });
+    const addButton = page.getByRole("group", { name: "새 품목 등록 방식" });
     const checkActionPosition = async () => {
       const button = (await addButton.boundingBox())!;
       const viewport = (await page.locator(".workspace-content").boundingBox())!;
@@ -567,7 +567,7 @@ test("inventory notices follow assignment, live adjustments and silent reconnect
     await checkActionPosition();
     await capture(page, info, "notice-desktop");
     const cardBounds = (await card.boundingBox())!;
-    const addBounds = (await page.getByRole("button", { name: "새 품목 등록", exact: true }).boundingBox())!;
+    const addBounds = (await addButton.boundingBox())!;
     expect(cardBounds.y + cardBounds.height).toBeLessThanOrEqual(addBounds.y);
     await expect(card).toHaveCount(0, { timeout: 9000 });
     const confirmedRead = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/acknowledgeInventoryInbox"));
@@ -791,7 +791,7 @@ test("manufacturer picker preloads once and keeps cached choices usable during s
   let listRequests = 0;
   page.on("request", (request) => { if (new URL(request.url()).pathname.endsWith("/listInventoryManufacturers")) listRequests += 1; });
   const preloaded = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/listInventoryManufacturers"));
-  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  await page.getByRole("button", { name: "직접 입력", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   expect((await preloaded).ok()).toBe(true);
   await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
@@ -857,7 +857,7 @@ test("admin manages manufacturers through the real callable without changing the
   expect(createdResponse.status).toBe(200); expect(duplicateResponse.status).toBe(200);
   const created = createdResponse.body.result as { manufacturerId: string; revision: number; normalizedName: string };
 
-  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  await page.getByRole("button", { name: "직접 입력", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "제조사 선택", exact: true });
@@ -948,6 +948,42 @@ test("admin manages manufacturers through the real callable without changing the
   expect((await db().doc(`auditLogs/inventory-${updateRequest!.requestId}`).get()).data()).toMatchObject({
     eventType: "INVENTORY_MANUFACTURER_UPDATED", targetId: created.manufacturerId, changedFields: ["active"],
   });
+});
+
+test("AI scan registration recovers after camera permission is changed", async () => {
+  // Headless Shell cannot capture video. Use Chromium's real permission checks and a virtual camera.
+  const browser = await chromium.launch({ channel: "chromium", args: ["--use-fake-device-for-media-stream"] });
+  try {
+    const context = await browser.newContext({ baseURL: INVENTORY_E2E_ORIGIN });
+    const page = await context.newPage();
+    await page.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+    const media = await context.newCDPSession(page);
+    const { targetInfo } = await media.send("Target.getTargetInfo");
+    if (!targetInfo.browserContextId) throw new Error("An isolated browser context is required for the camera permission test.");
+    const permission = { permission: { name: "camera" }, origin: INVENTORY_E2E_ORIGIN, browserContextId: targetInfo.browserContextId };
+    await media.send("Browser.setPermission", { ...permission, setting: "denied" });
+    await login(page, PHASE3_TEST_PINS.delivery);
+    await page.getByRole("button", { name: "AI 스캔 등록", exact: true }).click();
+    const camera = page.getByRole("dialog", { name: "제품 스캔", exact: true });
+    const help = camera.getByText("카메라 권한 설정 방법", { exact: true });
+    await help.click();
+    await expect(camera.getByText("아이폰 Safari", { exact: true })).toBeVisible();
+    await expect(camera.getByText("안드로이드 Chrome", { exact: true })).toBeVisible();
+    await expect(camera.getByRole("button", { name: "앨범", exact: true })).toBeEnabled();
+    await expect(camera.getByRole("button", { name: "번호 입력", exact: true })).toBeEnabled();
+
+    await media.send("Browser.setPermission", { ...permission, setting: "granted" });
+    await camera.getByRole("button", { name: "카메라 다시 열기" }).click();
+    await expect(camera.getByRole("button", { name: "사진 촬영" })).toBeEnabled();
+    await expect(help).toHaveCount(0);
+    const stream = await camera.locator("video").evaluateHandle(video => (video as HTMLVideoElement).srcObject as MediaStream);
+    expect(await stream.evaluate(s => s.getTracks().map(track => track.kind))).toEqual(["video"]);
+    await camera.getByRole("button", { name: "닫기", exact: true }).click();
+    expect(await stream.evaluate(s => s.getTracks().every(track => track.readyState === "ended"))).toBe(true);
+    await stream.dispose();
+  } finally {
+    await browser.close();
+  }
 });
 
 test("AI scan registration keeps edits, confirms the first receipt and reuses the barcode", async ({ page }, info) => {
@@ -1136,7 +1172,7 @@ test(`HEIC product capture converts before authenticated upload (${output})`, as
   page.on("request", (request) => {
     if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/uploadInventoryPhoto")) uploads.push(request.postDataJSON().data);
   });
-  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  await page.getByRole("button", { name: "직접 입력", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(name);
   await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (봉)", exact: true }).fill("1");
@@ -1176,7 +1212,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
   await closeListOptions(listOptions);
   let manufacturerListRequests = 0;
   page.on("request", (request) => { if (new URL(request.url()).pathname.endsWith("/listInventoryManufacturers")) manufacturerListRequests += 1; });
-  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  await page.getByRole("button", { name: "직접 입력", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(productName);
   await editor.getByRole("button", { name: "제조사 선택하기", exact: true }).click();
@@ -1458,7 +1494,7 @@ test("PIN user registers a photographed product, receives/counts/issues stock, a
 test("viewer uses the same PIN UI but all stock/photo/admin writes are denied by real callables", async ({ page }, info) => {
   const token = await login(page, PHASE3_TEST_PINS.salesB);
   await expect(page.getByText(/개 품목 · 읽기 전용/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "새 품목 등록", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "직접 입력", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "AI 스캔 등록", exact: true })).toHaveCount(0);
   const options = await openListOptions(page);
   await expect(options.getByRole("button", { name: /앱 설정/ })).toBeVisible();
@@ -1510,7 +1546,7 @@ test("staff cannot change admin settings and revoked PIN sessions cannot read pr
 test("a staff member deactivates, reactivates and deletes stock with history while preserving an administrator audit trail", async ({ page }, info) => {
   const token = await login(page, PHASE3_TEST_PINS.delivery);
   const name = "직원 상태변경 검증 품목";
-  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  await page.getByRole("button", { name: "직접 입력", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(name);
   await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (봉)", exact: true }).fill("20");
@@ -1570,7 +1606,7 @@ test("an offline registration draft stays in memory and saves only after an expl
   page.on("request", (request) => {
     if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/saveInventoryProduct")) saveRequests += 1;
   });
-  await page.getByRole("button", { name: "새 품목 등록", exact: true }).click();
+  await page.getByRole("button", { name: "직접 입력", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "새 품목 등록", exact: true });
   await editor.getByLabel(/품목명/).fill(draftName);
   await editor.getByRole("spinbutton", { name: "초기 수량 (필수) (봉)", exact: true }).fill("1");

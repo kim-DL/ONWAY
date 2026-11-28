@@ -82,7 +82,7 @@ try{ for(const variant of (process.env.INVENTORY_EDITOR_VARIANTS||"baseline").sp
  });
  const trace:unknown[]=[];cdp.on("Tracing.dataCollected",e=>trace.push(...e.value));if(variant!=="plain")await cdp.send("Tracing.start",{categories:"devtools.timeline,blink.user_timing",transferMode:"ReportEvents"});
  if(variant!=="plain"){await cdp.send("Profiler.enable");await cdp.send("Profiler.setSamplingInterval",{interval:1000});await cdp.send("Profiler.start");}
- await page.getByRole("button",{name:"새 품목 등록",exact:true}).click();
+ await page.getByRole("button",{name:/^(직접 입력|새 품목 등록)$/}).click();
  await expect(page.getByRole("dialog",{name:"새 품목 등록",exact:true}).getByLabel(/품목명/)).toBeEditable();
  await page.waitForTimeout(1000);
  const {profile}=variant==="plain"?{profile:null}:await cdp.send("Profiler.stop");

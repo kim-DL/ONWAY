@@ -362,15 +362,15 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     {loading ? <LoadingStatus className={styles.message} label="재고 불러오는 중" detail="등록된 품목과 현재 재고를 확인하고 있습니다." startedAt={loadingStartedAt} /> : <>{productList}{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
     </div>
     {context?.canWrite ? <div className={styles.stickyActions} role="group" aria-label="새 품목 등록 방식">
-      <GlassButton aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}>{online && <InventoryGlassLens />}<Icon name="plus" size={16} />직접 입력</GlassButton>
+      <GlassButton disabled={!online} onClick={() => setEditorOpen(true)}>{online && <InventoryGlassLens />}<Icon name="plus" size={16} />직접 입력</GlassButton>
       <GlassButton variant="primary" disabled={!online} onClick={() => setEditorOpen("scan")}><Icon name="camera" size={17} />AI 스캔 등록</GlassButton>
     </div> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => { setSelected(null); restoreInventoryProductFocus(selectedId); }} onSaved={saved} onCountSaved={countSaved} /> : null}
-    {context?.canWrite && editorOpen === true ? <InventoryProductEditor product={null} location={newLocation} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={closeEditor} onSaved={(product, detail) => { saved(product); openRegistered(product, detail); }} /> : null}
-    {context?.canWrite && editorOpen === "scan" ? <Suspense fallback={<OpeningInventoryForm title="AI 스캔 등록" onClose={closeEditor} />}>
+    {context?.canWrite && editorOpen && (editorOpen === "scan" ? <Suspense fallback={<OpeningInventoryForm title="AI 스캔 등록" onClose={closeEditor} />}>
       <InventoryScanRegistration products={products} location={newLocation} canAdmin={context.canAdmin}
         onClose={closeEditor} onCommit={applyProduct} onOpen={openRegistered} />
-    </Suspense> : null}
+    </Suspense> : <InventoryProductEditor product={null} location={newLocation} canManageManufacturers={context.canAdmin}
+      onClose={closeEditor} onSaved={(product, detail) => { saved(product); openRegistered(product, detail); }} />)}
     {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}
     {context?.canWrite || onOpenAppSettings ? <BottomSheet open={optionsOpen} title="목록 옵션" onClose={() => {
       setOptionsOpen(false);

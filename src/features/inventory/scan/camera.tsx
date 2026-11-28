@@ -164,7 +164,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
     if (!canonicalGtin(digits)) { setInvalidCode(true); numberInput.current?.focus(); return; }
     onCode(digits);
   }
-  const statusText = stream.status.kind === "unavailable" ? stream.status.message
+  const statusText = "message" in stream.status ? stream.status.message
     : stream.status.kind === "paused" ? "카메라가 잠시 꺼졌어요."
     : "카메라를 여는 중이에요";
   const captured = work === "captured";
@@ -198,6 +198,14 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
         </div>
         <input ref={album} type="file" accept="image/*" hidden onChange={(event) => { void selectPhoto(event); }} />
         <input ref={nativeCamera} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { void selectPhoto(event); }} />
+        {stream.status.kind === "permission" ? <details className={styles.permissionHelp}>
+          <summary>카메라 권한 설정 방법</summary>
+          <ul>
+            <li><strong>안드로이드 Chrome</strong> 설정 → 사이트 설정 → 카메라에서 급식길을 선택하고 허용하세요.</li>
+            <li><strong>아이폰 Safari</strong> 급식길을 연 뒤 페이지 메뉴의 웹사이트 설정에서 카메라를 허용하세요.</li>
+          </ul>
+          <p>휴대전화에서 카메라 접근을 꺼 두었다면 기기 설정도 확인해주세요. 돌아와서 ‘카메라 다시 열기’를 누르면 돼요.</p>
+        </details> : null}
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
         <div id={codeId} hidden={!manual} className={styles.manual}>
           <label htmlFor={codeId + "-input"}>바코드 아래 숫자</label>

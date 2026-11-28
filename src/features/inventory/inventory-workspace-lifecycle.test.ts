@@ -64,7 +64,7 @@ afterEach(() => { clearInventoryWorkspaceSnapshot(); vi.unstubAllGlobals(); vi.u
 async function openEditor() {
   render(); const cleanup = harness.effects[0]!() as () => void; await settle();
   const tree = render();
-  const button = find(tree, (_type, props) => props["aria-label"] === "새 품목 등록");
+  const button = find(tree, (_type, props) => textContent(props.children) === "직접 입력");
   (button!.onClick as () => void)(); expect(hasEditor(render())).toBe(true);
   return cleanup;
 }
@@ -84,7 +84,7 @@ describe("inventory in-memory draft lifecycle", () => {
     expect(find(render(), (type) => typeof type === "function" && type.name === "InventoryDetail")).not.toBeNull();
     (find(render(), (type, props) => type === "button" && textContent(props.children) === "냉동1")!.onClick as () => void)();
     (searchField().onChange as (value: string) => void)("private query");
-    (find(render(), (_type, props) => props["aria-label"] === "새 품목 등록")!.onClick as () => void)();
+    (find(render(), (_type, props) => textContent(props.children) === "직접 입력")!.onClick as () => void)();
     reportInventoryAccessFailure(cause, session.uid);
     expect(hasEditor(render())).toBe(false);
     expectNoPrivateSurfaces();
@@ -317,7 +317,7 @@ describe("inventory in-memory draft lifecycle", () => {
     });
     render(); const secondCleanup = harness.effects[0]!() as () => void; await settle();
     expect(card(original.productId)?.product).toEqual(reloaded);
-    (find(render(), (_type, props) => props["aria-label"] === "새 품목 등록")!.onClick as () => void)();
+    (find(render(), (_type, props) => textContent(props.children) === "직접 입력")!.onClick as () => void)();
     const editor = find(render(), (type) => typeof type === "function" && type.name === "InventoryProductEditor")!;
     (editor.onSaved as (product: InventoryProduct) => void)(committed);
     finishOld(); await settle();

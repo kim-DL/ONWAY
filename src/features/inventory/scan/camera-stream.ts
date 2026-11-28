@@ -2,13 +2,16 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 type CameraStatus =
   | { kind: "opening" | "ready" | "paused" }
-  | { kind: "unavailable"; message: string };
+  | { kind: "permission" | "unavailable"; message: string };
 
-function unavailableReason(error: unknown): string {
+function cameraErrorStatus(error: unknown): CameraStatus {
   const name = error instanceof DOMException ? error.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") return "카메라 접근을 허용하면 여기서 촬영할 수 있어요.";
-  if (name === "NotReadableError") return "다른 앱이 카메라를 사용 중이에요. 앱을 닫고 다시 열어주세요.";
-  return "카메라를 열 수 없어요. 기기 카메라나 앨범을 이용해주세요.";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return { kind: "permission", message: "촬영하려면 카메라 사용을 허용해주세요." };
+  }
+  return { kind: "unavailable", message: name === "NotReadableError"
+    ? "다른 앱이 카메라를 사용 중이에요. 앱을 닫고 다시 열어주세요."
+    : "카메라를 열 수 없어요. 기기 카메라나 앨범을 이용해주세요." };
 }
 
 export function useCameraStream(videoRef: RefObject<HTMLVideoElement | null>, onSuspend: () => void) {
@@ -30,7 +33,7 @@ export function useCameraStream(videoRef: RefObject<HTMLVideoElement | null>, on
     function pause() {
       release();
       onSuspend();
-      setStatus({ kind: "paused" });
+      setStatus(current => current.kind === "permission" ? current : { kind: "paused" });
     }
     async function open() {
       release();
@@ -58,7 +61,7 @@ export function useCameraStream(videoRef: RefObject<HTMLVideoElement | null>, on
       } catch (error) {
         if (requested !== version) return;
         release();
-        setStatus({ kind: "unavailable", message: unavailableReason(error) });
+        setStatus(cameraErrorStatus(error));
       }
     }
     const hide = () => { if (document.hidden) pause(); };
