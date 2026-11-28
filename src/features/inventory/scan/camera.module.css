@@ -13,18 +13,18 @@
 .sound, .fallback button { min-height: 36px; border: 1px solid #ffffff61; border-radius: 999px; background: #152530eb; color: #fff; font: inherit; }
 .sound { position: absolute; z-index: 2; top: 9px; right: 9px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
 .guide {
-  position: absolute; left: 50%; top: 50%; translate: -50% -50%; color: #eaf6fd;
+  position: absolute; left: 50%; top: 50%; translate: var(--guide-position, -50% -50%); color: #eaf6fd;
   width: 72%; height: 52%;
   width: min(72cqw, calc(72cqh * var(--camera-ratio, 1.333)));
   height: min(52cqh, calc(52cqw / var(--camera-ratio, 1.333)));
-  filter: drop-shadow(0 1px 2px #123348ab); transition: transform 160ms ease-out, color 160ms ease-out;
+  filter: drop-shadow(0 1px 2px #123348ab); transition: transform 160ms, translate 180ms, color 160ms;
 }
 .guide i { position: absolute; width: 21px; height: 21px; border: 0 solid currentColor; }
 .guide i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; border-top-left-radius: 7px; }
 .guide i:nth-child(2) { top: 0; right: 0; border-width: 2px 2px 0 0; border-top-right-radius: 7px; }
 .guide i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-bottom-left-radius: 7px; }
 .guide i:nth-child(4) { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-bottom-right-radius: 7px; }
-.viewer[data-aim="moving"] .guide { transform: scale(1.045); }
+.viewer[data-aim="moving"] .guide, .viewer[data-aim="searching"] .guide { transform: scale(calc(1.06 - var(--aim-strength, 0) * .08)); }
 .viewer[data-aim="steady"] .guide { color: #9af5d5; transform: scale(.97); }
 .viewer[data-aim="dark"] .guide, .viewer[data-aim="glare"] .guide { color: #ffe3a7; }
 .aim, .acquired {
@@ -42,7 +42,9 @@
 .shutter { color: #245a7c; }
 .shutterRing { display: grid; width: 50px; height: 50px; place-items: center; color: #fff; background: #245b7c; border: 3px solid white; outline: 2px solid #4a7490; border-radius: 50%; }
 .shutter:active .shutterRing { background: #16445f; }
+.shutter[data-holding="true"] .shutterRing { outline-color: #76c8aa; background: conic-gradient(#227a61 var(--hold-angle), #16445f 0); }
 .scanner button { cursor: pointer; touch-action: manipulation; }
+.scanner .shutter { touch-action: none; user-select: none; -webkit-touch-callout: none; }
 .scanner button:disabled { opacity: .5; cursor: default; }
 .scanner :is(button, input):focus-visible { outline: 3px solid #2579ae; outline-offset: 3px; }
 .viewer button:focus-visible { outline-color: #c4ecff; }
@@ -65,6 +67,6 @@
   .fallback { inset: 5px 88px; gap: 3px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .viewer .guide { transition: none; }
+  .viewer .guide { transition: none; translate: -50% -50%; }
   .viewer[data-aim] .guide { transform: none; }
 }

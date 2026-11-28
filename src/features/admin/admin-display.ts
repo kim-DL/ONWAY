@@ -98,6 +98,7 @@ export const AUDIT_EVENT_LABELS: Record<string, string> = {
   SALES_ASSIGNMENT_CHANGED: "영업 배정 변경",
   SALES_ASSIGNMENTS_CREATED: "영업 배정 생성",
   SALES_ASSIGNMENTS_RELEASED: "영업 배정 제외",
+  INVENTORY_LOCATION_OWNERS_UPDATED: "보관 장소 담당자 변경",
   SALES_ASSIGNMENTS_CLAIMED: "담당자 학교 가져오기",
   SALES_CYCLE_CREATED: "영업 Cycle 생성",
   SALES_CYCLE_PRODUCTS_UPDATED: "월별 홍보 제품 변경",

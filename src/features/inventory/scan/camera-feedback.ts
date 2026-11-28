@@ -1,32 +1,20 @@
-const muteKey = "onnuriway.inventory-scan.muted";
-
-export function readScanMuted(): boolean {
-  try { return localStorage.getItem(muteKey) === "1"; } catch { return false; }
-}
-
-export function writeScanMuted(value: boolean) {
-  try { localStorage.setItem(muteKey, value ? "1" : "0"); } catch { /* Session control works with storage off. */ }
-}
+import { activateScanAudio, takeScanAudio } from "./audio-gesture";
 
 /** Audio is optional on devices that require the first tap to unlock playback. */
 export class ScanFeedback {
   private audio: AudioContext | null = null;
-  private ticks = 0;
+  private opened = false;
   private lastTick = -Infinity;
   private captureEnd = 0;
+  private lastPulse = -Infinity;
 
   unlock() {
-    try {
-      const Audio = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Audio) return;
-      this.audio ??= new Audio();
-      if (this.audio.state === "suspended") void this.audio.resume().catch(() => {});
-    } catch { /* Silent controls and viewfinder remain usable. */ }
+    this.audio = activateScanAudio(this.audio ?? takeScanAudio());
   }
 
   private tone(startHz: number, endHz: number, offset: number, duration: number) {
     const audio = this.audio;
-    if (!audio || audio.state !== "running" || document.hidden) return;
+    if (!audio || audio.state === "closed" || document.hidden) return;
     try {
       const start = audio.currentTime + offset;
       const oscillator = audio.createOscillator();
@@ -35,7 +23,8 @@ export class ScanFeedback {
       oscillator.frequency.setValueAtTime(startHz, start);
       oscillator.frequency.exponentialRampToValueAtTime(endHz, start + duration);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.045, start + 0.007);
+      gain.gain.exponentialRampToValueAtTime(0.14, start + 0.008);
+      gain.gain.setValueAtTime(0.14, start + duration * 0.52);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
       oscillator.connect(gain).connect(audio.destination);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
@@ -45,30 +34,58 @@ export class ScanFeedback {
     } catch { /* A device audio interruption must not discard a successful capture. */ }
   }
 
+  ready() {
+    if (this.opened || !this.audio) return;
+    this.opened = true;
+    this.preview();
+  }
+  preview() { this.tone(560, 720, 0, 0.09); }
+
+  pulse(strength: number, holding = false) {
+    if (!this.audio || (!holding && strength < 0.12)) return;
+    const now = performance.now();
+    const spacing = holding ? 178 - strength * 95 : 800 - strength * 450;
+    if (now - this.lastPulse < spacing) return;
+    this.lastPulse = now;
+    const hz = holding ? 850 + 380 * strength : 480 + 300 * strength;
+    this.tone(hz, hz, 0, holding ? 0.047 : 0.055);
+  }
+
   settled() {
-    if (this.audio?.state !== "running" || this.ticks >= 3 || performance.now() - this.lastTick < 3000) return;
-    this.ticks += 1;
+    if (!this.audio || performance.now() - this.lastTick < 2200) return;
     this.lastTick = performance.now();
-    this.tone(680, 680, 0, 0.034);
-    this.tone(680, 680, 0.075, 0.034);
+    this.tone(660, 660, 0, 0.055);
+    this.tone(760, 760, 0.085, 0.055);
+    this.tone(860, 860, 0.17, 0.06);
   }
 
   captured() {
-    this.captureEnd = this.tone(620, 1020, 0, 0.13) ?? 0;
+    this.tone(720, 780, 0, 0.08);
+    this.tone(920, 960, 0.055, 0.09);
+    this.captureEnd = this.tone(1140, 1320, 0.115, 0.14) ?? 0;
   }
 
-  /** A fast barcode match can close the sheet before the 130 ms shutter cue ends. */
+  /** Allow the accepted-frame cue to finish across the transition to review. */
   finishCapture() {
     const audio = this.audio;
-    if (!audio || audio.state !== "running" || audio.currentTime >= this.captureEnd || document.hidden) return;
+    if (!audio || !this.captureEnd || audio.currentTime >= this.captureEnd || document.hidden) return;
     this.audio = null;
     const close = () => {
       clearTimeout(timer);
+      audio.removeEventListener("statechange", finish);
       document.removeEventListener("visibilitychange", close);
       window.removeEventListener("pagehide", close);
       void audio.close().catch(() => {});
     };
-    const timer = window.setTimeout(close, Math.min(140, Math.ceil((this.captureEnd - audio.currentTime) * 1000) + 5));
+    const end = this.captureEnd;
+    let timer = window.setTimeout(close, 1800);
+    function finish() {
+      if (audio?.state !== "running") return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(close, Math.max(0, end - audio.currentTime) * 1000 + 100);
+    }
+    audio.addEventListener("statechange", finish);
+    finish();
     document.addEventListener("visibilitychange", close, { once: true });
     window.addEventListener("pagehide", close, { once: true });
   }
@@ -77,6 +94,8 @@ export class ScanFeedback {
     const audio = this.audio;
     this.audio = null;
     this.captureEnd = 0;
+    this.opened = false;
+    this.lastTick = -Infinity;
     if (audio && audio.state !== "closed") void audio.close().catch(() => {});
   }
 }

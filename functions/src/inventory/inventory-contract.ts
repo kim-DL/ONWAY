@@ -100,7 +100,7 @@ export const inventoryCycleSchema = z.object({
 }).strict();
 export const inventoryContextSchema = z.object({
   settings: inventorySettingsSchema, cycle: inventoryCycleSchema, today: inventoryDateSchema,
-  canWrite: z.boolean(), canAdmin: z.boolean(),
+  canWrite: z.boolean(), canAdmin: z.boolean(), assignedLocations: z.array(inventoryLocationSchema).max(4).optional(),
 }).strict();
 export const inventoryListInputSchema = z.object({ afterId: inventoryIdSchema.nullable().default(null), includeSummary: z.boolean().optional(), includePackaging: z.boolean().optional() }).strict();
 export const inventoryListPageSchema = z.object({ products: z.array(inventoryProductSchema).max(100), nextCursor: inventoryIdSchema.nullable() }).strict();

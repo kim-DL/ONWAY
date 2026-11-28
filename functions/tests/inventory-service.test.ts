@@ -132,6 +132,24 @@ async function stocked() {
   return { ...state, product: first.product, lotId: first.event.lines[0]!.lotId };
 }
 
+describe("inventory location assignments", () => {
+  it("checks administrator, eligible staff, request replay and revision before changing a location", async () => {
+    const state = fixture();
+    const employee = state.values.get(`employees/${actor.employeeId}`)!;
+    employee.displayName = "재고 직원";
+    const owners = { refrigerated: null, freezer1: null, freezer2: actor.employeeId, sample: null };
+    const input = { owners, expectedRevision: 0, requestId: randomUUID() };
+    await expect(state.service.saveLocationAssignments(input, actor)).rejects.toMatchObject({ code: "permission-denied" });
+    await expect(state.service.saveLocationAssignments({ ...input, owners: { ...owners, sample: viewer.employeeId } }, admin)).rejects.toMatchObject({ code: "failed-precondition" });
+    const saved = await state.service.saveLocationAssignments(input, admin);
+    expect(saved).toEqual({ owners, revision: 1 });
+    expect(await state.service.saveLocationAssignments(input, admin)).toEqual(saved);
+    await expect(state.service.saveLocationAssignments({ ...input, requestId: randomUUID() }, admin)).rejects.toMatchObject({ code: "aborted" });
+    expect(state.values.get("auditLogs/inventory-" + input.requestId)).toMatchObject({ changedFields: ["freezer2"], actorEmployeeId: admin.employeeId });
+    expect((await state.service.saveLocationAssignments({ owners: { ...owners, freezer2: null }, expectedRevision: 1, requestId: randomUUID() }, admin)).revision).toBe(2);
+  });
+});
+
 describe("inventory movement notices", () => {
   it("projects only a committed, nonzero manual delta and deduplicates concurrent retries", async () => {
     const state = await stocked();

@@ -24,6 +24,9 @@ import { InventoryManufacturerService } from "./inventory-manufacturer-service.j
 import { InventoryPhotoDependencyError, InventoryPhotoService, inventoryPhotoErrorDiagnostic } from "./inventory-photo-service.js";
 import { InventoryService } from "./inventory-service.js";
 import { assignNoticeRecipientSchema, setNoticePreferenceSchema } from "./inventory-notification-contract.js";
+import { getAdminFirestore } from "../shared/firebase-admin.js";
+import { locationRoster, personalLocations } from "./inventory-location-assignments.js";
+import { locationAssignmentsSchema, locationRosterSchema, saveLocationAssignmentsSchema } from "./inventory-location-contract.js";
 import { inventorySummaryResponse } from "./inventory-stock-summary.js";
 import { fieldStage, fieldCompute, observeFieldCount } from "../shared/field-latency.js";
 
@@ -69,9 +72,17 @@ export const assignInventoryNoticeRecipient = onCall(options, handler(assignNoti
   (input, actor) => new InventoryService().changeNoticePolicy(input, actor), false));
 export const setInventoryNoticePreference = onCall(options, handler(setNoticePreferenceSchema, noticeRevision, "read",
   (input, actor) => new InventoryService().changeNoticePolicy(input, actor), false));
-export const getInventoryContext = onCall(options, handler(empty, inventoryContextSchema, "read", async (_input, actor) => ({
-  ...await new InventoryService().context(), canWrite: inventoryActorCanWrite(actor), canAdmin: actor.isAdmin,
-})));
+export const getInventoryLocationAssignments = onCall(options, handler(empty, locationRosterSchema, "admin",
+  () => locationRoster(getAdminFirestore()), false));
+export const setInventoryLocationAssignments = onCall(options, handler(saveLocationAssignmentsSchema, locationAssignmentsSchema, "admin",
+  (input, actor) => new InventoryService().saveLocationAssignments(input, actor), false));
+const contextInput = z.object({ includeAssignedLocations: z.literal(true).optional() }).strict();
+export const getInventoryContext = onCall(options, handler(contextInput, inventoryContextSchema, "read", async (input, actor) => {
+  const canWrite = inventoryActorCanWrite(actor);
+  const [context, assigned] = await Promise.all([new InventoryService().context(),
+    input.includeAssignedLocations && canWrite ? personalLocations(getAdminFirestore(), actor.employeeId) : undefined]);
+  return { ...context, canWrite, canAdmin: actor.isAdmin, ...(assigned ? { assignedLocations: assigned } : {}) };
+}, false));
 export const listInventoryProducts = onCall(options, handler(inventoryListWithManufacturerInputSchema, inventoryListPageWithManufacturerSchema, "read", (input) => new InventoryService().list(input.afterId)));
 export const getInventoryProduct = onCall(options, handler(getInventoryProductWithManufacturerInputSchema, inventoryProductDetailWithManufacturerSchema, "read", (input, actor) => new InventoryService().detail(input.productId, actor)));
 export const saveInventoryProduct = onCall(options, handler(saveInventoryProductWithManufacturerInputSchema, inventoryProductSaveResultWithManufacturerSchema, "write", (input, actor) => new InventoryService().save(input, actor)));

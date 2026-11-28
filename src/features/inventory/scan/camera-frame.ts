@@ -3,6 +3,9 @@ export type AimState = "searching" | "moving" | "steady" | "dark" | "glare";
 export interface AimSample {
   pixels: Uint8ClampedArray;
   settledFrames: number;
+  aimStrength: number;
+  focusX: number;
+  focusY: number;
   state: AimState;
 }
 
@@ -12,12 +15,19 @@ export function sampleAim(rgba: Uint8ClampedArray, width: number, previous?: Aim
   let light = 0;
   let edges = 0;
   let movement = 0;
+  let weightedX = 0;
+  let weightedY = 0;
   for (let index = 0; index < pixels.length; index += 1) {
     const offset = index * 4;
     const level = (rgba[offset]! + 2 * rgba[offset + 1]! + rgba[offset + 2]!) / 4;
     pixels[index] = level;
     light += level;
-    if (index % width) edges += Math.abs(level - pixels[index - 1]!);
+    if (index % width) {
+      const edge = Math.abs(level - pixels[index - 1]!);
+      edges += edge;
+      weightedX += edge * (index % width + 0.5) / width;
+      weightedY += edge * (Math.floor(index / width) + 0.5) * width / pixels.length;
+    }
     if (previous) movement += Math.abs(level - previous.pixels[index]!);
   }
   const meanLight = light / pixels.length;
@@ -29,7 +39,11 @@ export function sampleAim(rgba: Uint8ClampedArray, width: number, previous?: Aim
   else if (meanLight > 236 && texture < 6) state = "glare";
   else if (drifting) state = "moving";
   else if (texture > 2.5 && settledFrames >= 2) state = "steady";
-  return { pixels, state, settledFrames };
+  const aimStrength = state === "dark" || state === "glare" ? 0
+    : Math.min(1, texture / 12) * Math.max(0, 1 - movement / pixels.length / 60);
+  // Nudge the guide toward visible detail while keeping the whole package inside the frame.
+  const focus = (weighted: number, last = 0) => last * 0.5 + (aimStrength > 0.12 ? (weighted / edges - 0.5) * 10 : 0);
+  return { pixels, state, settledFrames, aimStrength, focusX: focus(weightedX, previous?.focusX), focusY: focus(weightedY, previous?.focusY) };
 }
 
 export function fitFrame(width: number, height: number, maxEdge: number) {

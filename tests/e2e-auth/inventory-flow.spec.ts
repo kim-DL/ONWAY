@@ -950,6 +950,30 @@ test("admin manages manufacturers through the real callable without changing the
   });
 });
 
+test("AI scan registration uses the administrator's location and lets staff change it", async ({ page, browser }) => {
+  await loginAdmin(page);
+  const staff = await browser.newContext({ baseURL: INVENTORY_E2E_ORIGIN });
+  try {
+    await page.getByRole("button", { name: "재고 설정" }).click();
+    await page.getByRole("button", { name: "보관 장소 담당자" }).click();
+    const owners = page.getByRole("dialog", { name: "보관 장소 담당자" });
+    await owners.getByLabel("냉동2 담당자").selectOption("EMP-DELIVERY");
+    await submitScanMutation(owners, "담당자 저장", "setInventoryLocationAssignments");
+    await expect(owners).toHaveCount(0);
+    const employee = await staff.newPage();
+    const token = await login(employee, PHASE3_TEST_PINS.delivery);
+    expect((await call("getInventoryLocationAssignments", token, {})).status).toBe(403);
+    const old = await call("getInventoryContext", token, {});
+    expect(old.body.result).not.toHaveProperty("assignedLocations");
+    await employee.getByRole("button", { name: "AI 스캔 등록", exact: true }).click();
+    await employee.getByRole("dialog", { name: "제품 스캔", exact: true }).getByRole("button", { name: "닫기", exact: true }).click();
+    const location = employee.getByRole("combobox", { name: "기본 보관 장소", exact: true });
+    await expect(location).toHaveValue("freezer2");
+    await location.selectOption("refrigerated");
+    await expect(location).toHaveValue("refrigerated");
+  } finally { await staff.close(); await db().doc("companies/onnuri/inventorySettings/locationOwners").delete(); }
+});
+
 test("AI scan registration recovers after camera permission is changed", async () => {
   // Headless Shell cannot capture video. Use Chromium's real permission checks and a virtual camera.
   const browser = await chromium.launch({ channel: "chromium", args: ["--use-fake-device-for-media-stream"] });
@@ -957,6 +981,24 @@ test("AI scan registration recovers after camera permission is changed", async (
     const context = await browser.newContext({ baseURL: INVENTORY_E2E_ORIGIN });
     const page = await context.newPage();
     await page.route("**/*", route => allowedOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+    await page.addInitScript(() => {
+      const original = AudioNode.prototype.connect;
+      AudioNode.prototype.connect = function(this: AudioNode, ...args: Parameters<typeof original>) {
+        if (args[0] instanceof AudioDestinationNode) {
+          const meter = this.context.createAnalyser();
+          meter.fftSize = 256;
+          Reflect.apply(original, this, [meter]);
+          const wave = new Float32Array(meter.fftSize);
+          let samples = 0;
+          const timer = setInterval(() => {
+            meter.getFloatTimeDomainData(wave);
+            if (wave.some(value => Math.abs(value) > 0.015)) document.documentElement.dataset.scanAudioHeard = "yes";
+            if (++samples > 65) { clearInterval(timer); meter.disconnect(); }
+          }, 8);
+        }
+        return Reflect.apply(original, this, args);
+      } as typeof original;
+    });
     const media = await context.newCDPSession(page);
     const { targetInfo } = await media.send("Target.getTargetInfo");
     if (!targetInfo.browserContextId) throw new Error("An isolated browser context is required for the camera permission test.");
@@ -976,11 +1018,17 @@ test("AI scan registration recovers after camera permission is changed", async (
     await camera.getByRole("button", { name: "카메라 다시 열기" }).click();
     await expect(camera.getByRole("button", { name: "사진 촬영" })).toBeEnabled();
     await expect(help).toHaveCount(0);
+    await expect(page.locator("html")).toHaveAttribute("data-scan-audio-heard", "yes");
     const stream = await camera.locator("video").evaluateHandle(video => (video as HTMLVideoElement).srcObject as MediaStream);
     expect(await stream.evaluate(s => s.getTracks().map(track => track.kind))).toEqual(["video"]);
     await camera.getByRole("button", { name: "닫기", exact: true }).click();
     expect(await stream.evaluate(s => s.getTracks().every(track => track.readyState === "ended"))).toBe(true);
     await stream.dispose();
+    await page.getByRole("dialog", { name: "AI 스캔 등록", exact: true }).getByRole("button", { name: "닫기", exact: true }).click();
+    await page.evaluate(() => { delete document.documentElement.dataset.scanAudioHeard; });
+    await page.getByRole("button", { name: "AI 스캔 등록", exact: true }).click();
+    await expect(camera.getByRole("button", { name: "사진 촬영" })).toBeEnabled();
+    await expect(page.locator("html")).toHaveAttribute("data-scan-audio-heard", "yes");
   } finally {
     await browser.close();
   }
@@ -1033,7 +1081,18 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   await expect(camera.getByRole("button", { name: "사진 촬영", exact: true })).toBeVisible();
   await capture(page, info, "scan-camera-mobile");
   const photograph = (bytes: Buffer) => camera.locator('input[type=file]:not([capture])').setInputFiles({ name: "fixture.jpg", mimeType: "image/jpeg", buffer: bytes });
-  await camera.getByRole("button", { name: "사진 촬영", exact: true }).click();
+  const shutter = camera.getByRole("button", { name: "사진 촬영", exact: true });
+  const box = (await shutter.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(shutter).toHaveAttribute("data-holding", "true");
+  await page.mouse.move(box.x - 8, box.y);
+  await page.mouse.up();
+  await expect(camera).toBeVisible();
+  expect(calls).toBe(0);
+  await shutter.hover();
+  await page.mouse.down();
+  try { await expect(camera).toHaveCount(0); } finally { await page.mouse.up(); }
   await expect(review.getByLabel(/품목명.*필수/)).toHaveValue(name);
   await expect(review.getByLabel("초기 수량 (필수) (봉)", { exact: true })).toHaveValue("");
   await expect(review.getByLabel("박스 입수 수량", { exact: true })).toHaveValue("");
@@ -1054,7 +1113,8 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   await enterBarcode();
   await review.getByLabel("바코드 포장 단위").selectOption("case");
   await review.getByRole("button", { name: "다른 면 촬영" }).click();
-  await enterBarcode();
+  const [foodResponse] = await Promise.all([waitForMutationResponse(page, "searchInventoryFoodProducts"), enterBarcode()]);
+  expect(foodResponse.ok()).toBe(true);
   await expect(review.getByLabel("바코드 포장 단위")).toHaveValue("case");
   await expect(review.getByText(/식품안전나라 조회 설정이 필요/)).toBeVisible();
   await review.getByLabel("박스 수", { exact: true }).fill("2");
@@ -1073,11 +1133,12 @@ test("AI scan registration keeps edits, confirms the first receipt and reuses th
   await enterBarcode();
   await review.getByRole("button", { name: "이 품목 입고하기" }).click();
   const receiveSheet = page.getByRole("dialog", { name: "입고 기록", exact: true });
+  await receiveSheet.getByLabel("이번 입고 보관 장소").selectOption("freezer1");
   await receiveSheet.getByLabel("미확인", { exact: true }).check();
   await receiveSheet.getByLabel("박스 수", { exact: true }).fill("1");
   await submitScanMutation(receiveSheet, "입고 기록", "recordInventoryMovement");
   await expect(page.getByRole("dialog", { name: "입고 기록 완료" })).toBeVisible();
-  expect((await stored.ref.get()).get("quantityByLocation.refrigerated")).toBe(25);
+  expect((await stored.ref.get()).get("quantityByLocation")).toMatchObject({ refrigerated: 17, freezer1: 8 });
   expect(calls).toBe(2); expect(saves).toBe(1);
   await expect.poll(async () => {
     const rows = await db().collection("companies/onnuri/inventoryRegistrationMetrics").where("mode", "==", "scan").get();
@@ -1104,7 +1165,7 @@ test("AI scan registration reviews the public candidate, manufacturer and a chos
       return route.fulfill({ status: 503, json: { error: { status: "UNAVAILABLE", message: "provider unavailable" } },
         headers: { "access-control-allow-origin": INVENTORY_E2E_ORIGIN } });
     }
-    await route.fulfill({ json: { result: { kind: "single", name: { value: name, quote: name }, manufacturer: null, origin: null,
+    await route.fulfill({ json: { result: { kind: "single", name: null, visual: { name, clues: "상자에 초승달 모양 만두 그림이 보여요." }, manufacturer: null, origin: null,
       netContent: null, innerContents: null, casePack: null, expiry: null } }, headers: { "access-control-allow-origin": INVENTORY_E2E_ORIGIN } });
   });
   await page.route("**/searchInventoryFoodProducts", async route => {
@@ -1117,9 +1178,12 @@ test("AI scan registration reviews the public candidate, manufacturer and a chos
   const review = page.getByRole("dialog", { name: "AI 스캔 등록", exact: true });
   await camera.locator('input[type=file]:not([capture])').setInputFiles({ name: "front.jpg", mimeType: "image/jpeg", buffer: firstPhoto });
   await review.getByRole("button", { name: "이 사진 판독하기", exact: true }).click();
+  await expect(review.getByText("AI 제품 추정 · 사진 1")).toBeVisible();
+  await expect(review.getByLabel(/품목명.*필수/)).toHaveValue("");
+  await review.getByRole("button", { name: "이 이름 사용" }).click();
   await expect(review.getByLabel(/품목명.*필수/)).toHaveValue(name);
   expect(attempts).toEqual([{ requestId: expect.any(String), retryFailed: undefined }, { requestId: attempts[0]!.requestId, retryFailed: true }]);
-  await review.getByRole("button", { name: "제품명으로 조회" }).click();
+  await review.getByRole("button", { name: "식품안전나라 제품명 조회" }).click();
   await review.getByRole("button", { name: new RegExp(reportNo) }).click();
   await review.getByRole("button", { name: "제조사 " + maker + " 확인" }).click();
   const picker = page.getByRole("dialog", { name: "제조사 선택", exact: true });

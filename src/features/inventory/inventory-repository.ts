@@ -67,7 +67,7 @@ async function list(onProgress?: (products: contract.InventoryProduct[], progres
 }
 export const inventoryRepository = {
   list,
-  context: () => call("getInventoryContext", {}, contract.inventoryContextSchema),
+  context: () => call("getInventoryContext", { includeAssignedLocations: true }, contract.inventoryContextSchema),
   detail: (productId: string) => call("getInventoryProduct", contract.getInventoryProductInputSchema.parse({ productId, includeSummary: true, includePackaging: true }), contract.inventoryProductDetailSchema),
   save: ({ scanBarcodes, ...input }: contract.SaveInventoryProductInput) => {
     const product = contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true, includePackaging: true });

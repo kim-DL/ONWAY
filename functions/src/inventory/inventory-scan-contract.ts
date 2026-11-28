@@ -11,10 +11,11 @@ export const labelReadingSchema = z.object({
   name: printed, manufacturer: printed, origin: printed, netContent: printed, innerContents: printed,
   casePack: z.object({ count, unit: z.string().trim().min(1).max(20), quote }).strict().nullable(),
   expiry: z.object({ value: inventoryDateSchema, quote }).strict().nullable(),
+  visual: z.object({ name: short, clues: quote }).strict().optional(),
 }).strict();
 export type LabelReading = z.infer<typeof labelReadingSchema>;
 export const scanImageInput = z.object({ requestId: z.uuid(), contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-  fileBase64: z.string().min(4).max(8 * 1024 * 1024), retryFailed: z.literal(true).optional() }).strict();
+  fileBase64: z.string().min(4).max(8 * 1024 * 1024), includeVisual: z.literal(true).optional(), retryFailed: z.literal(true).optional() }).strict();
 export const barcodeQuery = z.object({ code: gtinSchema }).strict();
 export const barcodeMatchSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("missing") }).strict(), z.object({ status: z.literal("inactive") }).strict(),

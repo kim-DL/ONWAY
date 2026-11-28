@@ -6,8 +6,10 @@ import { Icon } from "@/components/ui/icon";
 import { canonicalGtin } from "@/domain/inventory-scan";
 import { readCustomerPhotoSource, validateCustomerPhotoFile } from "@/features/customers/customer-photo-preparation";
 import { detectFrameGtin } from "./camera-decoder";
-import { readScanMuted, ScanFeedback, writeScanMuted } from "./camera-feedback";
+import { ScanFeedback } from "./camera-feedback";
+import { readScanMuted, writeScanMuted } from "./audio-gesture";
 import { drawFrame, fitFrame, frameFromFile, frameToFile, sampleAim, type AimSample, type AimState } from "./camera-frame";
+import { ScanShutter } from "./scan-shutter";
 import { useCameraStream } from "./camera-stream";
 import styles from "./camera.module.css";
 
@@ -20,7 +22,7 @@ interface CameraProps {
 const aimText: Record<AimState, string> = {
   searching: "제품명이나 바코드를 중앙에 맞춰주세요",
   moving: "잠시 멈춰서 글씨를 맞춰주세요",
-  steady: "화면이 안정됐어요. 촬영해주세요",
+  steady: "탭해서 촬영 · 길게 눌러 포착",
   dark: "글씨가 잘 보이도록 빛을 비춰주세요",
   glare: "빛이 반사되면 각도를 조금 바꿔주세요",
 };
@@ -53,6 +55,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
   const busy = work !== "idle";
 
   useEffect(() => {
+    if (!readScanMuted()) feedback.unlock();
     return () => { operation.current?.abort(); feedback.release(); };
   }, [feedback]);
   useEffect(() => {
@@ -60,7 +63,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
   }, [manual]);
   useEffect(() => {
     if (!live || busy || manual) return;
-    if (!muted) feedback.unlock();
+    if (!muted) { feedback.unlock(); feedback.ready(); }
     const sample = document.createElement("canvas");
     sample.width = 48;
     sample.height = 32;
@@ -75,6 +78,9 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
         const h = camera.videoHeight;
         context.drawImage(camera, w * 0.18, h * 0.25, w * 0.64, h * 0.5, 0, 0, sample.width, sample.height);
         const reading = sampleAim(context.getImageData(0, 0, sample.width, sample.height).data, sample.width, previous);
+        camera.parentElement?.style.setProperty("--aim-strength", reading.aimStrength.toFixed(2));
+        camera.parentElement?.style.setProperty("--guide-position", `${reading.focusX - 50}% ${reading.focusY - 50}%`);
+        if (!muted && reading.state !== "steady" && !operation.current) feedback.pulse(reading.aimStrength);
         if (reading.state !== previous?.state) {
           setAim(reading.state);
           if (reading.state === "steady" && !muted) feedback.settled();
@@ -91,7 +97,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
     setMuted(next);
     writeScanMuted(next);
     if (next) feedback.release();
-    else feedback.unlock();
+    else { feedback.unlock(); feedback.ready(); }
   }
   function close() {
     suspend();
@@ -170,7 +176,7 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
   const captured = work === "captured";
   return (
     <BottomSheet open title="제품 스캔" onClose={close}>
-      <div className={styles.scanner} onPointerDownCapture={unlockSound} onKeyDownCapture={unlockSound}>
+      <div className={styles.scanner} onPointerDownCapture={unlockSound} onClickCapture={unlockSound} onKeyDownCapture={unlockSound}>
         <p className={styles.hint}>{hint || "포장이나 박스에서 제품명이 보이는 면을 비춰주세요. 바코드만 찍어도 돼요."}</p>
         <div className={styles.viewer} data-live={live || captured} data-captured={captured} data-aim={aim}>
           <video ref={video} autoPlay muted playsInline aria-hidden="true" className={styles.video} onLoadedMetadata={(event) => {
@@ -191,9 +197,8 @@ export function InventoryScanCamera({ onCapture, onCode, onClose, hint }: Camera
         </div>
         <div className={styles.controls}>
           <button type="button" className={styles.sideAction} disabled={busy} onClick={() => album.current?.click()}><Icon name="images" size={22} /><span>앨범</span></button>
-          <button type="button" className={styles.shutter} disabled={busy} aria-label={live ? "사진 촬영" : "기기 카메라로 촬영"} onClick={() => { if (live) void takePhoto(); else nativeCamera.current?.click(); }}>
-            <span className={styles.shutterRing}><Icon name="camera" size={25} /></span><span>{live ? "촬영" : "기기 카메라"}</span>
-          </button>
+          <ScanShutter live={live} disabled={busy} onHold={progress => { if (!muted) feedback.pulse(progress, true); }}
+            onCapture={() => { unlockSound(); if (live) void takePhoto(); else nativeCamera.current?.click(); }} />
           <button type="button" className={styles.sideAction} disabled={busy} aria-expanded={manual} aria-controls={codeId} onClick={() => { setManual(!manual); setInvalidCode(false); }}><BarcodeGlyph /><span>번호 입력</span></button>
         </div>
         <input ref={album} type="file" accept="image/*" hidden onChange={(event) => { void selectPhoto(event); }} />

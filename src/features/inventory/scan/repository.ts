@@ -10,7 +10,7 @@ export const scanRepository = {
     const generation = inventoryAccessGeneration();
     const uid = getFirebaseClientServices()?.auth.currentUser?.uid;
     const fileBase64 = await inventoryPhotoBase64(file);
-    return callInventory("analyzeInventoryProductLabel", { requestId, contentType: file.type, fileBase64, ...(retryFailed ? { retryFailed: true } : {}) }, labelReadingSchema,
+    return callInventory("analyzeInventoryProductLabel", { requestId, contentType: file.type, fileBase64, includeVisual: true, ...(retryFailed ? { retryFailed: true } : {}) }, labelReadingSchema,
       () => { if (!uid || uid !== getFirebaseClientServices()?.auth.currentUser?.uid || generation !== inventoryAccessGeneration()) throw inventoryAuthenticationError(); });
   },
   barcode: (code: string) => callInventory("lookupInventoryBarcode", { code }, barcodeMatchSchema),

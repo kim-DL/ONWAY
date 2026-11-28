@@ -41,8 +41,8 @@ for (const port of [3103, 4000, 4400, 4500, 5001, 8080, 9099, 9199]) {
     server.listen(port, "127.0.0.1", () => server.close(resolve));
   });
 }
-function run(args, cwd = root) {
-  const result = spawnSync(process.execPath, args, { cwd, env: environment, stdio: "inherit", windowsHide: true });
+function run(args, cwd = root, env = environment) {
+  const result = spawnSync(process.execPath, args, { cwd, env, stdio: "inherit", windowsHide: true });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`Inventory E2E helper exited ${result.status ?? 1}.`);
 }
@@ -73,8 +73,14 @@ try {
     'export { acknowledgeInventoryInbox } from "./inventory/notice-delivery.js";',
     'export { analyzeInventoryProductLabel, lookupInventoryBarcode, bindInventoryProductBarcode, searchInventoryFoodProducts, recordInventoryRegistrationOutcome } from "./inventory/scan-callables.js";',
     'export { assignInventoryNoticeRecipient, setInventoryNoticePreference } from "./inventory/callables.js";',
-    'export { getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct, recordInventoryMovement, recordInventoryCount, updateInventoryLot, setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings, listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer, uploadInventoryPhoto, getInventoryPhoto } from "./inventory/callables.js";',
+    'export { getInventoryContext, getInventoryLocationAssignments, setInventoryLocationAssignments, listInventoryProducts, getInventoryProduct, saveInventoryProduct, recordInventoryMovement, recordInventoryCount, updateInventoryLot, setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings, listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer, uploadInventoryPhoto, getInventoryPhoto } from "./inventory/callables.js";',
   ].join("\n"));
+  if (process.platform === "win32") {
+    // Generate the SDK's manifest directly instead of discovering the Windows npm shim over localhost.
+    run([join(root, "node_modules/firebase-functions/lib/bin/firebase-functions.js")], functionsRoot, {
+      ...environment, FUNCTIONS_EMULATOR: "true", FUNCTIONS_MANIFEST_OUTPUT_PATH: join(functionsRoot, "functions.yaml"),
+    });
+  }
   writeFileSync(join(functionsRoot, ".secret.local"), `PIN_LOOKUP_SECRET=${environment.PIN_LOOKUP_SECRET}\nPIN_PEPPER=${environment.PIN_PEPPER}\n`);
   for (const name of ["firestore.rules", "firestore.indexes.json", "storage.rules"]) cpSync(join(root, name), join(runtime, name));
   const configuration = { functions: { source: "functions", runtime: "nodejs22" },

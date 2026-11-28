@@ -101,6 +101,15 @@ describe("camera frame and local aim signal", () => {
     expect(fitFrame(4000, 3000, 2400)).toEqual({ width: 2400, height: 1800 });
     expect(fitFrame(480, 640, 2400)).toEqual({ width: 480, height: 640 });
   });
+  it("moves the guide toward texture and recenters when there is no detail", () => {
+    const pixels = new Uint8ClampedArray(16 * 8 * 4).fill(90);
+    for (let y = 0; y < 8; y++) for (let x = 10; x < 16; x += 2) pixels.fill(205, (y * 16 + x) * 4, (y * 16 + x) * 4 + 3);
+    const sample = sampleAim(pixels, 16);
+    expect(sample.focusX).toBeGreaterThan(0);
+    expect(Math.abs(sample.focusY)).toBeLessThan(0.1);
+    const flat = sampleAim(new Uint8ClampedArray(pixels.length).fill(80), 16, sample);
+    expect(flat.focusX).toBeLessThan(sample.focusX);
+  });
   it("requires repeated textured samples for a steady cue and flags glare or low light", () => {
     const [pixels, width] = raster([ean13("4006381333931")]);
     const first = sampleAim(pixels, width);

@@ -18,6 +18,8 @@ import {
   inventoryProductWithManufacturerSchema,
   type SaveInventoryProductWithManufacturerInput,
 } from "./inventory-manufacturer-contract.js";
+import { eligibleLocationEmployee, locationAssignments, locationAssignmentsPath } from "./inventory-location-assignments.js";
+import type { SaveLocationAssignments } from "./inventory-location-contract.js";
 import { resolveInventoryPhotoChange } from "./inventory-photo-store.js";
 import { prepareBarcodeLinks, barcodePath } from "./inventory-barcode-store.js";
 import type { BarcodeMatch, bindBarcodeInput } from "./inventory-scan-contract.js";
@@ -440,6 +442,24 @@ export class InventoryService {
       const next = nextInventorySettings(current, input.weekday, input.urgentDays, now, actor.employeeId);
       transaction.set(ref, persisted(next));
       this.audit(transaction, input, actor, now, "INVENTORY_SETTINGS_UPDATED", "settings", ["weekday", "urgentDays"]);
+      return next;
+    });
+  }
+  async saveLocationAssignments(input: SaveLocationAssignments, actor: InventoryActor) {
+    return this.mutation("setInventoryLocationAssignments", input, actor, "admin", async (transaction, now) => {
+      const ref = this.db.doc(locationAssignmentsPath);
+      const current = locationAssignments((await transaction.get(ref)).data());
+      if (current.revision !== input.expectedRevision) throw new HttpsError("aborted", "담당 구역이 변경됐어요. 최신 담당자를 확인해주세요.");
+      const changed = INVENTORY_LOCATIONS.filter(location => input.owners[location] !== current.owners[location]);
+      if (!changed.length) return current;
+      const ids = [...new Set(changed.map(location => input.owners[location]).filter((id): id is string => id !== null))];
+      const employees = ids.length ? await transaction.getAll(...ids.map(id => this.db.doc(`employees/${id}`))) : [];
+      if (employees.some(doc => !eligibleLocationEmployee(doc.id, doc.data()))) {
+        throw new HttpsError("failed-precondition", "재고를 입력할 수 있는 활성 직원을 선택해주세요.");
+      }
+      const next = { revision: current.revision + 1, owners: input.owners };
+      transaction.set(ref, { ...next, updatedBy: actor.employeeId, updatedAt: Timestamp.fromDate(now) });
+      this.audit(transaction, input, actor, now, "INVENTORY_LOCATION_OWNERS_UPDATED", "locationOwners", changed);
       return next;
     });
   }

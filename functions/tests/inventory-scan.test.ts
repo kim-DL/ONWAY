@@ -34,6 +34,12 @@ describe("inventory scan evidence", () => {
     expect(scanBarcodesSchema.safeParse(duplicate).success).toBe(false);
     expect(saveInventoryProductWithManufacturerInputSchema.shape.scanBarcodes.safeParse(duplicate).success).toBe(false);
   });
+  it("returns a visual candidate separately when the package has no readable name", () => {
+    const visual = { name: "반달형 만두", clues: "투명 봉지에 주름진 반달 모양이 보입니다." };
+    expect(readLabelResponse(raw({ kind: "single", visual }))).toMatchObject({ name: null, visual, casePack: null, expiry: null });
+    expect(readLabelResponse(raw({ kind: "multiple", visual }))).not.toHaveProperty("visual");
+    expect(readLabelResponse(raw({ kind: "single", visual: { name: "만두", clues: "" } }))).not.toHaveProperty("visual");
+  });
   it("keeps clear printed names while rejecting unsupported fields and lot dates", () => {
     const fields = { kind: "single", name: printed("들깨수제비"), manufacturer: { value: "판매업체", quote: "판매원 판매업체" },
       netContent: { value: "750g", quote: "총 내용량 750g" }, innerContents: printed("20입"),
