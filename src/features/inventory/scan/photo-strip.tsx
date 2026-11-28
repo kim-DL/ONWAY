@@ -5,7 +5,7 @@ import type { LabelReading } from "@/domain/inventory-scan";
 import { registerPrivateBlobUrl, forgetPrivateBlobUrl } from "@/features/auth/private-client-state";
 import styles from "./review.module.css";
 export type ScanPhoto = { id: string; ordinal: number; file: File; visual?: LabelReading["visual"] };
-function Thumbnail({ file, label }: { file: File; label: string }) {
+export function Thumbnail({ file, label }: { file: File; label: string }) {
   const element = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const next = URL.createObjectURL(file); registerPrivateBlobUrl(next);

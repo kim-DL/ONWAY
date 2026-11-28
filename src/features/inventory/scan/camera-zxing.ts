@@ -42,23 +42,11 @@ function compressedUpc(row: BitArray): RowCode | undefined {
 }
 
 /** Sample both axes in either reading direction. A fixed number of rows bounds CPU work on phones. */
-export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height: number): string | undefined {
-  const luminance = new Uint8ClampedArray(width * height);
-  const turned = new Uint8ClampedArray(width * height);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = y * width + x;
-      const offset = index * 4;
-      const level = (rgba[offset]! + 2 * rgba[offset + 1]! + rgba[offset + 2]!) / 4;
-      luminance[index] = level;
-      turned[x * height + height - 1 - y] = level;
-    }
-  }
+export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height: number, detections: DetectedCode[] = []): string | undefined {
   const hints = new Map<DecodeHintType, number[]>([
     [DecodeHintType.POSSIBLE_FORMATS, [...formats.keys()]], [DecodeHintType.ALLOWED_LENGTHS, [14]],
   ]);
   const readers = [new MultiFormatUPCEANReader(hints), new ITFReader()];
-  const detections: DetectedCode[] = [];
   function readRow(row: BitArray, y: number): RowCode | undefined {
     for (const reader of readers) {
       try {
@@ -87,12 +75,21 @@ export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height:
     if (!adjacent) { strip.reverse(); adjacent = readRow(strip, y); }
     if (adjacent) detections.push(adjacent);
   }
-  function scan(pixels: Uint8ClampedArray, w: number, h: number) {
-    const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(pixels, w, h)));
+  function scan(vertical: boolean) {
+    const w = vertical ? height : width, h = vertical ? width : height;
+    const rows = Math.min(72, h);
+    const pixels = new Uint8ClampedArray(w * rows);
+    // Only the scan lines are needed, even at full still-photo resolution.
+    for (let line = 0; line < rows; line++) {
+      const y = Math.floor((line + 0.5) * h / rows);
+      for (let x = 0; x < w; x++) {
+        const offset = 4 * (vertical ? (height - 1 - x) * width + y : y * width + x);
+        pixels[line * w + x] = (rgba[offset]! + 2 * rgba[offset + 1]! + rgba[offset + 2]!) / 4;
+      }
+    }
+    const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(pixels, w, rows)));
     let row = new BitArray(w);
-    const rows = Math.min(24, h);
-    for (let line = 0; line < rows; line += 1) {
-      const y = Math.min(h - 1, Math.floor((line + 0.5) * h / rows));
+    for (let y = 0; y < rows; y++) {
       try { row = bitmap.getBlackRow(y, row); } catch { continue; }
       for (let direction = 0; direction < 2; direction += 1) {
         if (direction) row.reverse();
@@ -105,8 +102,8 @@ export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height:
       }
     }
   }
-  scan(luminance, width, height);
-  scan(turned, height, width);
+  scan(false);
+  scan(true);
   const valid = uniqueRetailCodes(detections);
   return valid.length === 1 ? valid[0] : undefined;
 }

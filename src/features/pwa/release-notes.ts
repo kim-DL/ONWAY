@@ -8,10 +8,10 @@ export interface AppReleaseNotes {
 // arrive before a device reopens the app.
 export const releaseNotesRequest = "ONNURIWAY_RELEASE_NOTES";
 export const appRelease: AppReleaseNotes = {
-  id: "2026-11-28.2",
+  id: "2026-11-28.3",
   date: "2026-11-28",
   changes: [
-    { title: "카메라 조준음과 AI 제품 추정", text: "제품을 비추고 촬영 버튼을 누르거나 길게 누르세요. AI가 포장 글씨와 제품 모양을 살펴보고 이름을 제안해요." },
-    { title: "담당 보관 장소", text: "운영자가 재고 설정에서 담당자를 지정하면 스캔할 때 담당 장소가 먼저 선택돼요. 이번 입고 장소는 바꿀 수 있어요." },
+    { title: "어두운 창고와 작은 글씨 촬영", text: "지원하는 카메라에서 손전등을 켜거나 글씨를 눌러 초점을 맞출 수 있어요. 작은 바코드는 사진 해상도를 살려 확인해요." },
+    { title: "원산지와 이번 입고 기한", text: "포장에 표시된 원산지와 소비·유통기한을 초안에 채워요. 이미 찍은 사진에서 작은 표시만 골라 다시 읽을 수 있어요." },
   ],
 };

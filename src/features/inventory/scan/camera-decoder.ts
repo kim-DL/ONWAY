@@ -42,8 +42,13 @@ export async function detectFrameGtin(frame: HTMLCanvasElement, signal: AbortSig
   const decoder = await bounded(import("./camera-zxing"), 1800, null, signal);
   if (!decoder || signal.aborted) return;
   try {
-    const reduced = drawFrame(frame, frame.width, frame.height, 1440);
-    const rgba = reduced.getContext("2d")?.getImageData(0, 0, reduced.width, reduced.height).data;
-    return rgba && decoder.decodeGtinPixels(rgba, reduced.width, reduced.height);
+    const found: DetectedCode[] = [];
+    function read(canvas: HTMLCanvasElement) {
+      const rgba = canvas.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data;
+      return rgba && decoder!.decodeGtinPixels(rgba, canvas.width, canvas.height, found);
+    }
+    const fullSize = read(frame);
+    if (Math.max(frame.width, frame.height) <= 1440 || uniqueRetailCodes(found).length > 1) return fullSize;
+    return read(drawFrame(frame, frame.width, frame.height, 1440));
   } catch { return; }
 }

@@ -5,7 +5,15 @@ import styles from "./review.module.css";
 
 export function SuggestedFields({ suggestions, editor }: { suggestions: Suggestion[]; editor: ScanEditor }) {
   if (!suggestions.length) return null;
-  return <div className={styles.fields}>{suggestions.map(item => {
+  const grouped = new Map<string, Suggestion>();
+  for (const item of suggestions) {
+    const key = [item.field, item.value, item.unit].join("|");
+    const earlier = grouped.get(key);
+    grouped.set(key, earlier ? { ...item, source: [...new Set([...earlier.source.split(" + "), item.source])].join(" + ") } : item);
+  }
+  const conflicts = (["expiry", "origin"] as const).filter(field =>
+    new Set(suggestions.filter(item => item.field === field).map(item => item.value)).size > 1);
+  return <div className={styles.fields}>{conflicts.length > 0 && <small role="status">{conflicts.map(field => scanFieldLabels[field]).join(" · ")} 표시가 사진마다 달라요. 이번 제품의 값을 확인해 주세요.</small>}{[...grouped.values()].map(item => {
     const current = editorValue(item.field, editor.draft, editor.lot);
     const wrongUnit = item.field === "boxPackSize" && !sameText(item.unit ?? "", editor.draft.unitLabel);
     const applied = !wrongUnit && sameText(current, item.value);

@@ -83,6 +83,24 @@ describe("native camera decoder", () => {
     expect(detect).toHaveBeenCalledWith(frame);
     expect(await detectFrameGtin(frame, signal)).toBeUndefined();
   });
+  it("checks the full-size print and refuses conflicting codes seen at the second scale", async () => {
+    vi.stubGlobal("window", {});
+    const code = "4006381333931";
+    function canvas(symbol: string, width: number) {
+      const height = 100;
+      const rgba = new Uint8ClampedArray(width * height * 4).fill(255);
+      for (let y = 20; y < 60; y++) for (let x = 0; x < symbol.length; x++) {
+        if (symbol[x] === "1") rgba.fill(0, (y * width + x + 90) * 4, (y * width + x + 90) * 4 + 3);
+      }
+      return { width, height, getContext: () => ({ fillRect() {}, drawImage() {}, getImageData: () => ({ data: rgba }) }) };
+    }
+    const full = canvas(ean13(code), 2400) as unknown as HTMLCanvasElement;
+    let reduced = canvas("", 1440);
+    vi.stubGlobal("document", { createElement: () => reduced });
+    expect(await detectFrameGtin(full, new AbortController().signal)).toBe(code);
+    reduced = canvas(ean13("5901234123457"), 1440);
+    expect(await detectFrameGtin(full, new AbortController().signal)).toBeUndefined();
+  });
   it("releases a pending lookup on cancellation and ignores its late native result", async () => {
     const { promise, resolve } = Promise.withResolvers<{ format: string; rawValue: string }[]>();
     const detect = vi.fn(() => promise);
