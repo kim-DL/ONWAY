@@ -19,6 +19,7 @@ describe("inventory scan evidence", () => {
     try {
       const { searchInventoryFoodProducts, analyzeInventoryProductLabel } = await import("../src/inventory/scan-callables.js");
       expect(declared.includes("FOODSAFETY_API_KEY")).toBe(enabled);
+      expect(searchInventoryFoodProducts.__endpoint).toMatchObject({ maxInstances: 1, concurrency: 1 });
       expect(searchInventoryFoodProducts.__endpoint.secretEnvironmentVariables?.map(binding => binding.key) ?? []).toEqual(enabled ? ["FOODSAFETY_API_KEY"] : []);
       expect(analyzeInventoryProductLabel.__endpoint.secretEnvironmentVariables?.map(binding => binding.key)).toEqual(["OPENAI_API_KEY"]);
     } finally { vi.doUnmock("firebase-functions/params"); vi.unstubAllEnvs(); vi.resetModules(); }
@@ -57,6 +58,17 @@ describe("inventory scan evidence", () => {
       { ...row, PRDLST_REPORT_NO: "112", CLSBIZ_DT: "20250101" }, { ...row, PRDLST_REPORT_NO: "113", BAR_CD: "036000291452" }] } });
     expect(await findFoodProducts({ by: "code", value: row.BAR_CD }, "test", get)).toEqual({ status: "ok", more: false,
       items: [{ reportNo: "110", name: "쌈장", manufacturer: "검증식품", category: "혼합장" }] });
+  });
+  it("retries a busy provider key once and returns a recoverable status if it stays busy", async () => {
+    const busy = { RESULT: { CODE: "INFO-500" } };
+    const query = { by: "name", value: "고기만두" } as const;
+    const recover = fetchResult(busy).mockImplementationOnce(async () => Response.json(busy))
+      .mockImplementationOnce(async () => Response.json({ I1250: { RESULT: { CODE: "INFO-200" } } }));
+    expect((await findFoodProducts(query, "test", recover)).status).toBe("ok");
+    expect(recover).toHaveBeenCalledTimes(2);
+    const occupied = fetchResult(busy);
+    expect((await findFoodProducts(query, "test", occupied)).status).toBe("unavailable");
+    expect(occupied).toHaveBeenCalledTimes(2);
   });
   it("keeps same-name candidates separate by report, filters discontinued rows, and degrades without a key", async () => {
     const row = { PRDLST_REPORT_NO: "100", PRDLST_NM: "고기만두", BSSH_NM: "A", PRODUCTION: "아니오" };

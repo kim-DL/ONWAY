@@ -33,7 +33,15 @@
 2. 운영 반영 시 서버 Secret Manager의 `FOODSAFETY_API_KEY`에 키를 설정하고 Functions의 `INVENTORY_FOOD_LOOKUP_ENABLED=true`를 적용한다. 이 플래그를 Firebase 배포 소스 분석과 런타임 양쪽에 제공해야 해당 조회 함수에만 키가 연결된다. 발급 전에는 플래그 기본값 false로 운영할 수 있다. 키를 브라우저 공개 변수에 넣지 않는다.
 3. 릴리스 범위는 Hosting 화면, 기존 `saveInventoryProduct` 갱신, 새 Callable 5개, Firestore의 필드 인덱스·TTL 정책이다. 새 함수는 `analyzeInventoryProductLabel`, `lookupInventoryBarcode`, `bindInventoryProductBarcode`, `searchInventoryFoodProducts`, `recordInventoryRegistrationOutcome`이다. 운영에서는 기존 재고 쓰기 권한과 App Check를 사용한다. 판독과 공공 조회 함수 각각에 필요한 Secret 접근을 확인한다.
 
-공공 조회는 유통 바코드 일치 여부와 생산중단·폐업 또는 생산종료 상태를 확인한다. 검색 결과는 최대 6개까지 보여준다. 제품명이 비슷하거나 제조사가 여럿이면 직원이 후보를 고른다. 공공자료에 ‘제조일로부터 12개월’이라고 적혀 있으면 이번 입고분에 찍힌 실제 소비기한을 별도로 확인한다. 공개 샘플에서 `8801791000192`는 ‘쌈장용된장’ 한 건이었고, ‘고기만두’는 여러 제조 보고서가 나왔다. 생산중단된 샘플 바코드는 후보에서 제외됐다. 실제 발급 키의 사업장 제품 조회율은 현장 검증 항목이다.
+공공 조회는 유통 바코드 일치 여부와 생산중단·폐업 또는 생산종료 상태를 확인한다. 검색 결과는 최대 6개까지 보여준다. 제품명이 비슷하거나 제조사가 여럿이면 직원이 후보를 고른다. 공공자료에 ‘제조일로부터 12개월’이라고 적혀 있으면 이번 입고분에 찍힌 실제 소비기한을 별도로 확인한다. 공개 샘플로 생산중단된 제품이 후보에서 제외되는지 확인했다. 현장에서 쓰는 제품 중 몇 퍼센트가 공공 목록에서 찾아지는지는 실사 때 측정할 항목이다.
+
+### 2026년 11월 28일 운영 연결
+
+식품안전나라에서 급식길의 사내 제품 조회 용도로 C005와 I1250 사용 승인을 받았다. 발급 키는 Google Cloud Secret Manager의 `FOODSAFETY_API_KEY` 버전 1로 보관한다. 운영 반영 범위는 서울 리전의 `searchInventoryFoodProducts`이며, 현재 리비전은 `searchinventoryfoodproducts-00001-vux`다. 카메라 등록 화면과 나머지 함수는 후속 배포 대상이다. [식품안전나라 인증키 신청·이용약관](https://www.foodsafetykorea.go.kr/api/newUserApiAplcKey.do) · [서비스 신청 현황](https://www.foodsafetykorea.go.kr/api/newUserApiAplcDtl.do)
+
+- 실제 키로 바코드 `8801791000192`에서 ‘쌈장용된장’ 한 건을 확인했다. 제품명 ‘고기만두’는 서로 다른 후보 여섯 건을 반환했고 추가 결과도 있었다. 같은 운영 코드를 사용한 데모 직원 세션에서도 두 조회가 성공했다. [바코드연계제품정보](https://www.foodsafetykorea.go.kr/api/openApiInfo.do?svc_no=C005) · [식품(첨가물)품목제조보고](https://www.foodsafetykorea.go.kr/api/openApiInfo.do?svc_no=I1250)
+- 두 서비스에 동시에 요청했을 때 기관이 인증키 사용 중(`INFO-500`)을 반환했다. 이 조회 함수는 요청을 한 건씩 처리하고, 같은 오류가 오면 0.6초 후 한 번 재시도한다.
+- 운영 주소는 앱 인증을 거치며 익명 요청에 `401 UNAUTHENTICATED`를 반환했다. 배포 소스와 검증한 패키지의 핵심 파일 7개가 일치했다. 재고 회귀 테스트 562개가 통과했다. 실사 직원의 휴대전화에서 촬영부터 등록까지의 검증은 화면 배포 후 진행한다.
 
 ## 비용과 검증
 

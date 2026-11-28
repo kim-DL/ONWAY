@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { canonicalGtin } from "./inventory-barcode-contract.js";
 import { foodItemSchema, type FoodCandidate, type FoodQuery, type foodSearchResult } from "./inventory-scan-contract.js";
@@ -7,6 +8,12 @@ const entry = z.record(z.string(), z.unknown());
 const feed = z.object({ RESULT: z.object({ CODE: z.string() }), total_count: z.coerce.number().optional(), row: z.array(entry).optional() });
 const result = (status: Result["status"]): Result => ({ status, items: [], more: false });
 const norm = (value: string) => value.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase("ko");
+async function readBatch(url: string, service: string, signal: AbortSignal, fetcher: typeof fetch) {
+  const response = await fetcher(url, { signal, redirect: "error" });
+  if (!response.ok) return null;
+  const body = entry.parse(await response.json());
+  return feed.parse(body[service] ?? body);
+}
 export async function findFoodProducts(query: FoodQuery, key: string, fetcher: typeof fetch = fetch): Promise<Result> {
   if (!key) return result("unconfigured");
   const byCode = query.by === "code";
@@ -23,10 +30,13 @@ export async function findFoodProducts(query: FoodQuery, key: string, fetcher: t
     for (const value of queries) {
       const url = "https://openapi.foodsafetykorea.go.kr/api/" + encodeURIComponent(key) + "/" + service + "/json/1/30/"
         + (byCode ? "BAR_CD=" : "PRDLST_NM=") + encodeURIComponent(value);
-      const response = await fetcher(url, { signal: AbortSignal.timeout(6500), redirect: "error" });
-      if (!response.ok) return result("unavailable");
-      const body = entry.parse(await response.json());
-      const batch = feed.parse(body[service] ?? body);
+      const signal = AbortSignal.timeout(6500);
+      let batch = await readBatch(url, service, signal, fetcher);
+      if (batch?.RESULT.CODE === "INFO-500") {
+        await delay(600, undefined, { signal });
+        batch = await readBatch(url, service, signal, fetcher);
+      }
+      if (!batch) return result("unavailable");
       const code = batch.RESULT.CODE;
       if (code === "INFO-200") continue;
       if (["INFO-100", "INFO-110", "INFO-120", "INFO-400", "INFO-600"].includes(code)) return result("unconfigured");

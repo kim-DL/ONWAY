@@ -26,7 +26,8 @@ export const lookupInventoryBarcode = onCall(options, inventoryHandler(barcodeQu
   (input, actor) => new InventoryService().lookupBarcode(input.code, actor), false));
 export const bindInventoryProductBarcode = onCall(options, inventoryHandler(bindBarcodeInput, boundBarcodeResult, "write",
   (input, actor) => new InventoryService().bindBarcode(input, actor), false));
-export const searchInventoryFoodProducts = onCall({ ...options, secrets: foodKey ? [foodKey] : [] },
+// C005 and I1250 share one provider key. Overlapping requests receive INFO-500.
+export const searchInventoryFoodProducts = onCall({ ...options, maxInstances: 1, concurrency: 1, secrets: foodKey ? [foodKey] : [] },
   inventoryHandler(foodQuerySchema, foodSearchResult, "write", input => findFoodProducts(input,
     emulator ? process.env.FOODSAFETY_API_KEY ?? "" : foodKey?.value() ?? ""), false));
 export const recordInventoryRegistrationOutcome = onCall(options, inventoryHandler(registrationOutcomeSchema, z.object({ recorded: z.boolean() }),
