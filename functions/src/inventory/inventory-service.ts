@@ -19,6 +19,9 @@ import {
   type SaveInventoryProductWithManufacturerInput,
 } from "./inventory-manufacturer-contract.js";
 import { resolveInventoryPhotoChange } from "./inventory-photo-store.js";
+import { prepareBarcodeLinks, barcodePath } from "./inventory-barcode-store.js";
+import type { BarcodeMatch, bindBarcodeInput } from "./inventory-scan-contract.js";
+import type { z } from "zod";
 import { inventoryProductRecord, inventoryProductWire, summarizeInventoryLotGroups,
   type InventoryProductRecord } from "./inventory-stock-summary.js";
 
@@ -141,6 +144,27 @@ export class InventoryService {
       return { product: { ...inventoryProductWire(product), lotSummary: summarizeInventoryLotGroups(lots) }, lots };
     });
   }
+  async lookupBarcode(code: string, actor: InventoryActor): Promise<BarcodeMatch> {
+    return this.db.runTransaction(async (tx) => {
+      await verifyInventoryTransactionActor(this.db, tx, actor, "write");
+      const link = (await tx.get(this.db.doc(barcodePath(code)))).data();
+      if (!link) return { status: "missing" };
+      const product = await this.product(tx, link.productId);
+      if (product.status !== "active") return { status: "inactive" };
+      return { status: "matched", productId: product.productId, name: product.name, level: link.level };
+    });
+  }
+  async bindBarcode(input: z.infer<typeof bindBarcodeInput>, actor: InventoryActor) {
+    return this.mutation("bindInventoryProductBarcode", input, actor, "write", async (tx, now) => {
+      const product = await this.product(tx, input.productId);
+      if (product.revision !== input.expectedRevision) conflict(product);
+      if (product.status !== "active") throw new HttpsError("failed-precondition", "사용 중인 품목에만 연결할 수 있습니다.");
+      const commit = await prepareBarcodeLinks(this.db, tx, input.scanBarcodes, product.productId, actor, now);
+      commit();
+      this.audit(tx, input, actor, now, "INVENTORY_PRODUCT_UPDATED", product.productId, ["barcode"]);
+      return { productId: product.productId };
+    });
+  }
   async save(input: SaveInventoryProductWithManufacturerInput, actor: InventoryActor): Promise<InventoryProductSaveResult> {
     return this.mutation("saveInventoryProduct", input, actor, "write", async (transaction, now) => {
       const productId = input.productId ?? input.requestId;
@@ -183,7 +207,10 @@ export class InventoryService {
         }
         draft = { ...draft, manufacturerId, manufacturer: newlyLinked ? manufacturer.name : current!.manufacturer };
       }
+      if (input.scanBarcodes && current && current.status !== "active") throw new HttpsError("failed-precondition", "사용 중인 품목에만 연결할 수 있습니다.");
+      const commitBarcodes = await prepareBarcodeLinks(this.db, transaction, input.scanBarcodes, productId, actor, now);
       const photo = await resolveInventoryPhotoChange(this.db, transaction, input, current, actor, Timestamp.fromDate(now));
+      commitBarcodes();
       const updated = inventoryProductWithManufacturerSchema.parse({ ...draft,
         productId, companyId: INVENTORY_COMPANY_ID, status: current?.status ?? "active", revision: (current?.revision ?? 0) + 1,
         // A first-receipt form may already have converted boxes using the old
@@ -196,7 +223,7 @@ export class InventoryService {
         createdAt: current?.createdAt ?? now.toISOString(), updatedAt: now.toISOString(),
         createdBy: current?.createdBy ?? actor.employeeId, updatedBy: actor.employeeId });
       const changedFields = [...Object.keys(draft), ...(clearManufacturerReference && current?.manufacturerId ? ["manufacturerId"] : []),
-        ...(input.photoChange ? ["photo"] : [])];
+        ...(input.photoChange ? ["photo"] : []), ...(input.scanBarcodes ? ["barcode"] : [])];
       if (input.initialStock) {
         const locationId = input.draft.defaultLocationId;
         const lot = inventoryLotSchema.parse({ ...input.initialStock.lot,

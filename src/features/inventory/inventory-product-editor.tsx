@@ -8,6 +8,8 @@ import { InventoryPhotoPicker, inventoryPhotoBase64 } from "./inventory-photo-pi
 import { inventoryRepository } from "./inventory-repository";
 import { useInventoryEditorReady } from "./use-inventory-editor-ready";
 import type { InventoryManufacturerCurrent } from "./inventory-manufacturer-picker";
+import type { ScanBarcodeLink } from "@/domain/inventory-scan";
+import { autoFillAllowed, editorValue, sameText, type Suggestion } from "./scan/review-model";
 import { FormFooter, LotFields, QuantityFields, blankLot, useInventoryAction, validLotDraft, type InventoryProductEditorProps } from "./inventory-forms";
 import styles from "./inventory.module.css";
 import formStyles from "./inventory-form.module.css";
@@ -22,13 +24,20 @@ function PresetChoices({ label, presets, selected, disabled, displayLabel, wideC
 }
 const newDraft = (location: InventoryLocation): InventoryProductDraft => ({ name: "", manufacturer: "", specification: "", origin: "", note: "", unitLabel: "봉", unitsPerBox: 1, boxPackSize: null, defaultLocationId: location, urgent: false });
 
-export function InventoryProductEditorImpl({ product, location, canCreateManufacturer = true, canManageManufacturers = false, onClose, onSaved }: InventoryProductEditorProps) {
+export function InventoryProductEditorImpl({ product, location, canCreateManufacturer = true, canManageManufacturers = false, scanPanel, onClose, onSaved }: InventoryProductEditorProps) {
   const ready = useInventoryEditorReady();
   const id = useId();
   const [draft, setDraft] = useState<InventoryProductDraft>(() => product ? { name: product.name, manufacturer: product.manufacturer, specification: product.specification, origin: product.origin, note: product.note, unitLabel: product.unitLabel, unitsPerBox: product.unitsPerBox, boxPackSize: product.boxPackSize ?? null, defaultLocationId: product.defaultLocationId, urgent: product.urgent } : newDraft(location));
   const [file, setFile] = useState<File | null>(null);
   const [removed, setRemoved] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [scanLinks, setScanLinks] = useState<ScanBarcodeLink[]>([]);
+  const [scanBlocked, setScanBlocked] = useState(false);
+  const [makerQuery, setMakerQuery] = useState<string | null>(null);
+  const [edits] = useState(() => {
+    const fields = new Set<string>();
+    return { mark: (field: string) => fields.add(field), has: (field: string) => fields.has(field) };
+  });
   const [initialQuantity, setInitialQuantity] = useState<number>(Number.NaN);
   const [initialPackages, setInitialPackages] = useState<InventoryPackageQuantity | undefined>();
   const [initialLot, setInitialLot] = useState<InventoryLotDraft>(blankLot);
@@ -38,26 +47,58 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
   const [focusCustom, setFocusCustom] = useState<keyof Pick<InventoryProductDraft, "origin" | "specification" | "unitLabel"> | null>(null);
   const upload = useRef<{ file: File; id: string; ready: boolean } | null>(null);
   const manufacturerSave = useRef<((input: SaveInventoryProductInput) => Promise<InventoryProductSaveResult>) | null>(null);
+  const [openedAt] = useState(Date.now);
   const action = useInventoryAction();
+  function manualOutcome(outcome: "closed" | "registered") {
+    if (!product && !scanPanel) void import("./scan/metrics").then(({ registrationMetrics }) =>
+      registrationMetrics("manual", openedAt).finish(outcome)).catch(() => undefined);
+  }
+  function close() { manualOutcome("closed"); onClose(); }
   const busy = action.busy || photoBusy;
   const manufacturerCurrent: InventoryManufacturerCurrent = product && !draft.manufacturerId && !clearManufacturerReference
     ? { kind: "persisted", productId: product.productId, name: draft.manufacturer }
     : { kind: "draft", name: draft.manufacturer, manufacturerId: draft.manufacturerId };
-  const set = <K extends keyof InventoryProductDraft>(key: K, value: InventoryProductDraft[K]) => setDraft((old) => ({ ...old, [key]: value }));
+  function clearCalculatedStock() {
+    if (initialPackages) { setInitialQuantity(Number.NaN); setInitialPackages(undefined); }
+  }
+  function set<K extends keyof InventoryProductDraft>(key: K, value: InventoryProductDraft[K]) {
+    edits.mark(key);
+    const unitChanged = key === "unitLabel" && value !== draft.unitLabel;
+    if (unitChanged && scanPanel) {
+      clearCalculatedStock();
+      setInitialQuantity(Number.NaN);
+    }
+    setDraft(old => ({ ...old, [key]: value, ...(unitChanged && scanPanel ? { boxPackSize: null } : {}) }));
+  }
+  function applyScan(item: Suggestion, explicit: boolean) {
+    if (busy) return;
+    const field = item.field;
+    if (!explicit && !autoFillAllowed(item, editorValue(field, draft, initialLot), edits.has(field))) return;
+    if (explicit) edits.mark(field);
+    if (field === "manufacturer") { setMakerQuery(item.value); return; }
+    if (field === "expiry") { setInitialLot(old => ({ ...old, expiryState: "dated", expiryDate: item.value })); return; }
+    if (field === "boxPackSize") {
+      if (!sameText(item.unit ?? "", draft.unitLabel)) return;
+      clearCalculatedStock();
+      setDraft(old => ({ ...old, boxPackSize: Number(item.value) }));
+      return;
+    }
+    setDraft(old => explicit || autoFillAllowed(item, old[field], edits.has(field)) ? { ...old, [field]: item.value.slice(0, 200) } : old);
+  }
   const isCustom = (key: "origin" | "specification" | "unitLabel", presets: string[]) => focusCustom === key || !!draft[key] && !presets.includes(draft[key]);
   const unitPreset = draft.unitLabel === "낱개" ? "개" : UNIT_PRESETS.includes(draft.unitLabel) ? draft.unitLabel : null;
   const customUnit = focusCustom === "unitLabel" || !!draft.unitLabel && unitPreset === null;
   function selectPreset(key: "origin" | "specification" | "unitLabel", value: string | null) { setFocusCustom(value === null ? key : null); set(key, value ?? ""); }
   const customInput = (label: string, key: "origin" | "specification" | "unitLabel", maxLength = 200, required = false) => <label className={styles.field}>{label}<input autoFocus={focusCustom === key} required={required} maxLength={maxLength} value={draft[key]} onChange={(event) => set(key, event.target.value)} disabled={busy || key === "unitLabel" && !!product?.hasHistory} /></label>;
   async function submit(event: FormEvent) {
-    event.preventDefault(); if (busy) return;
+    event.preventDefault(); if (busy || scanBlocked) return;
     setValidationError("");
     if (!product && (!Number.isSafeInteger(initialQuantity) || initialQuantity < 1 || initialQuantity > INVENTORY_MAX_QUANTITY)) { setValidationError("초기 수량을 1 이상의 정수로 입력해주세요."); return; }
     if (!product && !validLotDraft(initialLot)) { setValidationError(initialLot.expiryState === "dated" ? "첫 유통기한에 실제 날짜를 YYYY-MM-DD로 입력해주세요." : "유통기한 정보를 확인해주세요."); return; }
     if (file && upload.current?.file !== file) upload.current = { file, id: crypto.randomUUID(), ready: false };
     const staged = file ? upload.current : null;
     const photoChange: SaveInventoryProductInput["photoChange"] = staged ? { action: "replace", uploadId: staged.id } : removed ? { action: "remove" } : undefined;
-    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { includeDetail: true, initialStock: { quantity: initialQuantity, lot: initialLot, ...(initialPackages ? { packageQuantity: initialPackages } : {}) } } : {}), ...(photoChange ? { photoChange } : {}) };
+    const input: Omit<SaveInventoryProductInput, "requestId"> = { productId: product?.productId ?? null, expectedRevision: product?.revision ?? null, refreshOnReplay: true, draft, ...(scanLinks.length ? { scanBarcodes: scanLinks } : {}), ...(clearManufacturerReference ? { clearManufacturerReference: true } : {}), ...(!product ? { includeDetail: true, initialStock: { quantity: initialQuantity, lot: initialLot, ...(initialPackages ? { packageQuantity: initialPackages } : {}) } } : {}), ...(photoChange ? { photoChange } : {}) };
     await action.run(input, async (requestId, assertCurrent) => {
       if (staged && !staged.ready) {
         const fileBase64 = await inventoryPhotoBase64(staged.file);
@@ -68,17 +109,18 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
       assertCurrent();
       const saveInput = { ...input, requestId };
       return manufacturerSave.current ? manufacturerSave.current(saveInput) : inventoryRepository.save(saveInput);
-    }, (result) => { const { detail, ...saved } = result; if (detail) onSaved(saved, detail); else onSaved(saved); });
+    }, (result) => { manualOutcome("registered"); const { detail, ...saved } = result; if (detail) onSaved(saved, detail); else onSaved(saved); });
   }
-  return <BottomSheet open title={product ? "품목 정보 수정" : "새 품목 등록"} onClose={onClose} dismissible={!busy}>
+  return <BottomSheet open title={product ? "품목 정보 수정" : scanPanel ? "AI 스캔 등록" : "새 품목 등록"} onClose={close} dismissible={!busy}>
     {ready ? <>
     <form id={id} onSubmit={submit} className={`${styles.sheet} ${formStyles.productForm}`} aria-busy={busy}>
-      <InventoryPhotoPicker product={product} file={file} removed={removed} disabled={action.busy} onBusyChange={setPhotoBusy} onChange={(next, remove) => { setFile(next); setRemoved(remove); }} />
+      {scanPanel ? scanPanel({ draft, lot: initialLot, file, busy, links: scanLinks, setLinks: setScanLinks, apply: applyScan,
+        setPhoto: setFile, blockSave: setScanBlocked }) : <InventoryPhotoPicker product={product} file={file} removed={removed} disabled={action.busy} onBusyChange={setPhotoBusy} onChange={(next, remove) => { setFile(next); setRemoved(remove); }} />}
       <div className={formStyles.productSection}>
       <label className={styles.field}>품목명 <span className={styles.required}>필수</span><input required maxLength={200} value={draft.name} onChange={(event) => set("name", event.target.value)} disabled={busy} autoComplete="off" /></label>
       <label className={styles.field}>기본 보관 장소<select value={draft.defaultLocationId} onChange={(event) => set("defaultLocationId", event.target.value as InventoryLocation)} disabled={busy}>{INVENTORY_LOCATIONS.map((item) => <option key={item} value={item}>{INVENTORY_LOCATION_LABELS[item]}</option>)}</select></label>
       <hr className={formStyles.divider} />
-      <div className={styles.field}><span>제조사</span><Suspense fallback={<span className={styles.muted} role="status">제조사 선택 준비 중…</span>}><InventoryManufacturerField current={manufacturerCurrent} allowCreate={canCreateManufacturer} canAdmin={canManageManufacturers} disabled={busy} onSelect={(manufacturer, saveProduct) => { manufacturerSave.current = saveProduct; setDraft((old) => ({ ...old, manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name })); setClearManufacturerReference(false); }} onClear={(saveProduct) => { manufacturerSave.current = saveProduct; setDraft((old) => { const next = { ...old, manufacturer: "" }; delete next.manufacturerId; return next; }); setClearManufacturerReference(true); }} /></Suspense></div>
+      <div className={styles.field}><span>제조사</span><Suspense fallback={<span className={styles.muted} role="status">제조사 선택 준비 중…</span>}><InventoryManufacturerField current={manufacturerCurrent} scanQuery={makerQuery} onScanDismiss={() => setMakerQuery(null)} allowCreate={canCreateManufacturer} canAdmin={canManageManufacturers} disabled={busy} onSelect={(manufacturer, saveProduct) => { edits.mark("manufacturer"); manufacturerSave.current = saveProduct; setDraft((old) => ({ ...old, manufacturerId: manufacturer.manufacturerId, manufacturer: manufacturer.name })); setClearManufacturerReference(false); }} onClear={(saveProduct) => { edits.mark("manufacturer"); manufacturerSave.current = saveProduct; setDraft((old) => { const next = { ...old, manufacturer: "" }; delete next.manufacturerId; return next; }); setClearManufacturerReference(true); }} /></Suspense></div>
       <PresetChoices label="원산지" presets={ORIGIN_PRESETS} selected={isCustom("origin", ORIGIN_PRESETS) ? null : draft.origin} disabled={busy} onSelect={(value) => selectPreset("origin", value)} />
       {isCustom("origin", ORIGIN_PRESETS) ? customInput("원산지 직접입력", "origin") : null}
       <GlassButton className={formStyles.select} aria-haspopup="dialog" aria-expanded={specificationPicker} disabled={busy} onClick={() => setSpecificationPicker(true)}>{draft.specification ? `규격 · ${draft.specification}` : "규격 선택하기"}</GlassButton>
@@ -91,12 +133,12 @@ export function InventoryProductEditorImpl({ product, location, canCreateManufac
           onChange={(event) => { set("boxPackSize", event.target.value === "" ? null : event.target.valueAsNumber); if (initialPackages) { setInitialQuantity(Number.NaN); setInitialPackages(undefined); } }} /><span>{draft.unitLabel || "기준 단위"}</span></div>
         <small id={`${id}-pack-help`} className={formStyles.packageHelp}>한 박스에 들어 있는 {draft.unitLabel || "기준 단위"} 수를 입력하세요. 모르면 비워두고 나중에 등록할 수 있어요.</small>
       </label>
-      {!product ? <><LotFields draft={initialLot} onChange={setInitialLot} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} key={draft.boxPackSize ?? "unknown"} value={initialQuantity} onChange={(total, packages) => { setInitialQuantity(total); setInitialPackages(packages); }} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
+      {!product ? <><LotFields draft={initialLot} onChange={lot => { edits.mark("expiry"); setInitialLot(lot); }} disabled={busy} dateLabel="첫 유통기한 날짜" compact /><hr className={formStyles.divider} /><QuantityFields product={draft} key={scanPanel ? [draft.unitLabel, draft.boxPackSize].join("-") : draft.boxPackSize ?? "unknown"} value={initialQuantity} onChange={(total, packages) => { setInitialQuantity(total); setInitialPackages(packages); }} disabled={busy} minimum={1} label="초기 수량 (필수)" /></> : null}
       <details><summary className={styles.label}>참고 메모 (선택)</summary><label className={styles.field}>메모<textarea maxLength={2000} rows={2} value={draft.note} onChange={(event) => set("note", event.target.value)} disabled={busy} /></label></details>
       </div>
       {validationError ? <p role="alert" className={styles.error}>{validationError}</p> : null}
       {action.error ? <p role="alert" className={styles.error}>{action.error}</p> : null}
-    </form><FormFooter id={id} busy={busy} onClose={onClose} label={product ? "변경 저장" : "품목 등록"} />
+    </form><FormFooter id={id} busy={busy} disabled={scanBlocked} onClose={close} label={product ? "변경 저장" : "품목 등록"} />
     {specificationPicker ? <BottomSheet open title="규격 선택" onClose={() => setSpecificationPicker(false)}><PresetChoices label="규격" presets={SPECIFICATION_PRESETS} selected={isCustom("specification", SPECIFICATION_PRESETS) ? null : draft.specification} disabled={busy} onSelect={(value) => { selectPreset("specification", value); setSpecificationPicker(false); }} /></BottomSheet> : null}
     </> : <p role="status" className={`${styles.sheet} ${styles.muted}`}>품목 입력 화면 여는 중</p>}
   </BottomSheet>;

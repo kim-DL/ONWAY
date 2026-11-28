@@ -65,12 +65,15 @@ export function FormFooter({ id, busy, disabled = false, label, onClose, childre
   return <BottomSheetActions busy={busy} className={styles.formActions ?? ""}>{!online ? <p role="alert">{INVENTORY_OFFLINE_DRAFT_MESSAGE}</p> : null}{children}<GlassButton disabled={busy} onClick={onClose}>취소</GlassButton><GlassButton variant="primary" type="submit" form={id} disabled={busy || disabled || !online}>{busy ? "저장 중…" : label}</GlassButton></BottomSheetActions>;
 }
 export function validLotDraft(draft: InventoryLotDraft, allowLegacy = false) { return (allowLegacy || draft.expiryState !== "not_applicable") && inventoryLotDraftSchema.safeParse(draft).success && (draft.expiryState !== "dated" || isInventoryInputDate(draft.expiryDate ?? "")); }
-export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; canManageManufacturers?: boolean; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void };
+export type InventoryProductEditorProps = { product: InventoryProduct | null; location: InventoryLocation; canCreateManufacturer?: boolean; canManageManufacturers?: boolean; scanPanel?: import("./scan/editor-types").ScanSlot; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void };
+export function OpeningInventoryForm({ title, onClose }: { title: string; onClose: () => void }) {
+  return <BottomSheet open title={title} onClose={onClose}><p role="status" className={styles.muted}>등록 화면 여는 중</p></BottomSheet>;
+}
 export function InventoryProductEditor(props: InventoryProductEditorProps) {
   // Latch the component type for this form's lifetime. Switching a mounted lazy
   // editor to its resolved component would discard the employee's draft.
   const [Editor] = useState(() => getLoadedInventoryProductEditor() ?? InventoryProductEditorImpl);
-  return <Suspense fallback={<BottomSheet open title={props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose}><p role="status" className={styles.muted}>품목 입력 화면 여는 중</p></BottomSheet>}><Editor {...props} /></Suspense>;
+  return <Suspense fallback={<OpeningInventoryForm title={props.scanPanel ? "AI 스캔 등록" : props.product ? "품목 정보 수정" : "새 품목 등록"} onClose={props.onClose} />}><Editor {...props} /></Suspense>;
 }
 
 export function LotFields({ draft, onChange, disabled, dateLabel = "유통기한 날짜", compact = false }: { draft: InventoryLotDraft; onChange: (draft: InventoryLotDraft) => void; disabled: boolean; dateLabel?: string; compact?: boolean }) {
@@ -80,12 +83,12 @@ export function LotFields({ draft, onChange, disabled, dateLabel = "유통기한
 export const blankLot: InventoryLotDraft = { label: "", expiryState: "dated", expiryDate: "" };
 const lotOption = (lot: InventoryLot, product: InventoryProduct) => `${inventoryLotDateLabel(lot)} · ${lot.quantity.toLocaleString("ko-KR")} ${inventoryUnitDisplayLabel(product.unitLabel)}${lot.label ? ` · ${lot.label}` : ""}`;
 
-export function InventoryMovementForm({ detail, location, kind, initialLotId, inspectionCycleId, onClose, onSaved }: { detail: InventoryProductDetail; location: InventoryLocation; kind: InventoryMovementInput["kind"]; initialLotId?: string; inspectionCycleId?: string; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void }) {
+export function InventoryMovementForm({ detail, location, kind, initialLotId, inspectionCycleId, initialLotDraft, onClose, onSaved }: { detail: InventoryProductDetail; location: InventoryLocation; kind: InventoryMovementInput["kind"]; initialLotId?: string; inspectionCycleId?: string; initialLotDraft?: InventoryLotDraft; onClose: () => void; onSaved: (product: InventoryProduct, detail?: InventoryProductDetail) => void }) {
   const id = useId(); const action = useInventoryAction();
   const lots = detail.lots.filter((lot) => lot.locationId === location).sort((a, b) => (a.expiryDate ?? "9999").localeCompare(b.expiryDate ?? "9999"));
   const [lotId, setLotId] = useState(initialLotId ?? (kind === "receive" ? "" : lots[0]?.lotId ?? ""));
   const [quantity, setQuantity] = useState(kind === "adjust" ? lots.find((lot) => lot.lotId === (initialLotId ?? lots[0]?.lotId))?.quantity ?? Number.NaN : Number.NaN);
-  const [draft, setDraft] = useState<InventoryLotDraft>(blankLot);
+  const [draft, setDraft] = useState<InventoryLotDraft>(initialLotDraft ?? blankLot);
   const [packageQuantity, setPackageQuantity] = useState<InventoryPackageQuantity | undefined>();
   const [toLocation, setToLocation] = useState<InventoryLocation | "">("");
   const title = kind === "receive" ? "입고 기록" : kind === "issue" ? "출고 기록" : kind === "transfer" ? "보관 장소 이동" : "수량 조정";

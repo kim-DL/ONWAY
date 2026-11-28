@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS, type InventoryContext, type InventoryLocation, type InventoryProductDetail, type InventoryProduct } from "@/domain/inventory";
 import type { AuthenticatedSession } from "@/features/auth/auth-context";
 import { useInitialWorkspaceStartedAt } from "@/features/app-shell/initial-workspace-timing";
@@ -26,7 +26,7 @@ import {
   updateInventoryWorkspaceUi, type InventoryWorkspaceSnapshot,
 } from "./inventory-workspace-snapshot";
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
-import { InventoryProductEditor, InventorySettingsForm } from "./inventory-forms";
+import { InventoryProductEditor, InventorySettingsForm, OpeningInventoryForm } from "./inventory-forms";
 import { InventoryGlassLens } from "./inventory-glass-lens";
 import { InventoryNoticeStockSync } from "@/features/inventory-notices/inventory-notices";
 import { scheduleInventoryProductEditorPreload } from "./inventory-editor-loader";
@@ -34,6 +34,7 @@ import { revalidationFreshnessText, type RevalidationFreshness } from "@/lib/rev
 import { rememberWorkspaceScroll } from "@/lib/workspace-scroll-memory";
 import styles from "./inventory.module.css";
 
+const InventoryScanRegistration = lazy(() => import("./scan/registration"));
 function preferenceStorage() { try { return window.sessionStorage; } catch { return undefined; } }
 
 function AppSettingsOption({ onRequest }: { onRequest: () => void }) {
@@ -58,7 +59,7 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   const [urgentOnly, setUrgentOnly] = useState(initialUi.urgentOnly);
   const [limit, setLimit] = useState(initialUi.limit);
   const [selected, setSelected] = useState<{ productId: string; location?: InventoryLocation; detail?: InventoryProductDetail; sequence?: number } | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState<boolean | "scan">(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(initialUi.showInactive);
   const [notice, setNotice] = useState({ message: "", sequence: 0 });
@@ -107,6 +108,12 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     const updated = updateInventorySnapshotProduct(sessionKey, product);
     if (updated) setProducts(updated);
   }, [sessionKey, workspaceSession, currentReconciler]);
+  const closeEditor = () => setEditorOpen(false);
+  const newLocation = location === "all" ? "refrigerated" : location;
+  function openRegistered(product: InventoryProduct, detail?: InventoryProductDetail) {
+    setEditorOpen(false);
+    setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) });
+  }
   function saved(product: InventoryProduct) {
     applyProduct(product);
     // Mutations return the complete changed product; do not reread 1,000 rows
@@ -354,9 +361,16 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     {error ? <div role="alert" className={styles.message}>{error}<GlassButton onClick={refresh}>다시 확인</GlassButton></div> : null}
     {loading ? <LoadingStatus className={styles.message} label="재고 불러오는 중" detail="등록된 품목과 현재 재고를 확인하고 있습니다." startedAt={loadingStartedAt} /> : <>{productList}{!filtered.length && !error ? <p className={styles.message}>{query || urgentOnly ? "조건에 맞는 품목이 없어요." : `${locationLabel}에 등록된 품목이 없어요.`}</p> : null}{filtered.length > limit ? <GlassButton className={styles.loadMore} onClick={() => setLimit((value) => value + 60)}>품목 더 보기</GlassButton> : null}</>}
     </div>
-    {context?.canWrite ? <GlassButton className={styles.stickyActions} aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}>{online && <InventoryGlassLens />}<Icon name="plus" size={16} />새 품목</GlassButton> : null}
+    {context?.canWrite ? <div className={styles.stickyActions} role="group" aria-label="새 품목 등록 방식">
+      <GlassButton aria-label="새 품목 등록" disabled={!online} onClick={() => setEditorOpen(true)}>{online && <InventoryGlassLens />}<Icon name="plus" size={16} />직접 입력</GlassButton>
+      <GlassButton variant="primary" disabled={!online} onClick={() => setEditorOpen("scan")}><Icon name="camera" size={17} />AI 스캔 등록</GlassButton>
+    </div> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => { setSelected(null); restoreInventoryProductFocus(selectedId); }} onSaved={saved} onCountSaved={countSaved} /> : null}
-    {context?.canWrite && editorOpen ? <InventoryProductEditor product={null} location={location === "all" ? "refrigerated" : location} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={() => setEditorOpen(false)} onSaved={(product, detail) => { saved(product); setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) }); }} /> : null}
+    {context?.canWrite && editorOpen === true ? <InventoryProductEditor product={null} location={newLocation} canCreateManufacturer={context.canWrite} canManageManufacturers={context.canAdmin} onClose={closeEditor} onSaved={(product, detail) => { saved(product); openRegistered(product, detail); }} /> : null}
+    {context?.canWrite && editorOpen === "scan" ? <Suspense fallback={<OpeningInventoryForm title="AI 스캔 등록" onClose={closeEditor} />}>
+      <InventoryScanRegistration products={products} location={newLocation} canAdmin={context.canAdmin}
+        onClose={closeEditor} onCommit={applyProduct} onOpen={openRegistered} />
+    </Suspense> : null}
     {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}
     {context?.canWrite || onOpenAppSettings ? <BottomSheet open={optionsOpen} title="목록 옵션" onClose={() => {
       setOptionsOpen(false);

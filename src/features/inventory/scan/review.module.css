@@ -1,0 +1,32 @@
+.panel, .group, .controls, .fields { display: grid; gap: 9px; min-width: 0; }
+.panel { padding: 14px; color: #27394b; border: 1px solid #b9cddd; border-radius: 12px; background: #f6f9fc; }
+.heading, .row, .completion { display: flex; align-items: center; gap: 8px; }
+.heading svg, .applied { color: #285e87; }
+.panel p, .completion p, .group p { margin: 0; line-height: 1.5; font-size: 14px; }
+.controls { border: 0; margin: 0; padding: 0; }
+.fields, .group { border: 1px solid #d6e1e8; border-radius: 8px; background: #fff; }
+.fields { gap: 0; }
+.group { padding: 12px; overflow-wrap: anywhere; }
+.field { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 10px; }
+.field + .field { border-top: 1px solid #e4ebef; }
+.field > div, .choice, .group label { display: grid; gap: 3px; }
+.field strong, .choice strong { overflow-wrap: anywhere; font-size: 14px; }
+.field button, .applied { flex: none; }
+.group small, .field small, .photos small, .hint, .field > div > span, .choice span, .applied { font-size: 12px; color: #51667a; }
+.row { flex-wrap: wrap; }
+.group select, .matches input { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #c5d2dc; border-radius: 7px; background: #fff; color: inherit; font: inherit; }
+.textButton { justify-self: start; padding: 6px 0; border: 0; background: transparent; color: #245d89; font: inherit; text-decoration: underline; }
+.code { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.photos, .matches { min-width: 0; border-top: 1px solid #d5e0e8; font-size: 13px; }
+.photos summary, .matches summary { padding: 10px 0; cursor: pointer; }
+.photos > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.photos button { display: grid; gap: 4px; padding: 4px; border: 1px solid #c5d2dc; border-radius: 6px; color: inherit; background: white; }
+.photos button[aria-pressed=true] { outline: 2px solid #306ba4; }
+.photos img { width: 72px; height: 55px; object-fit: cover; }
+.shot, .enlarged { display: grid; gap: 6px; }
+.shot button { min-height: 36px; justify-content: center; }
+.enlarged img { width: 100%; max-height: 65dvh; object-fit: contain; }
+.enlarged button { min-height: 44px; justify-self: start; }
+.choice { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px; text-align: start; color: inherit; background: white; border: 1px solid #cfdae1; border-radius: 6px; }
+.completion { padding: 16px; }
+.completion svg { flex: none; color: #33734c; }

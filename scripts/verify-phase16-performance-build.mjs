@@ -211,6 +211,13 @@ const inventoryPanZoomStylesheets = stylesheets.filter((asset) => inventoryPanZo
 const inventoryPanZoomJavascriptGzipBytes = [...inventoryPanZoomAssets].filter((asset) => asset.endsWith(".js")).map(sizeAsset).reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const inventoryPanZoomStylesheetRawBytes = inventoryPanZoomStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const inventoryPanZoomStylesheetGzipBytes = inventoryPanZoomStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
+const scanEntry = dynamicEntries.find(entry => entry.boundary.endsWith("/scan/registration"));
+const decoderEntry = dynamicEntries.find(entry => entry.boundary.endsWith("/camera-zxing"));
+const scanAssets = new Set(scanEntry?.files);
+const scanStylesheets = stylesheets.filter(asset => scanAssets.has(asset.asset));
+const jsGzip = files => (files ?? []).filter(file => file.endsWith(".js")).reduce((sum, file) => sum + sizeAsset(file).gzipBytes, 0);
+const scanJavascriptGzipBytes = jsGzip(scanEntry?.files);
+const decoderJavascriptGzipBytes = jsGzip(decoderEntry?.files);
 const inventoryManufacturerEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-picker"));
 const inventoryManufacturerFieldEntries = dynamicEntries.filter((entry) => entry.boundary.endsWith("/inventory-manufacturer-field"));
 const inventoryEntries = [...inventoryWorkspaceEntries, ...inventoryPhotoEntries];
@@ -255,7 +262,7 @@ const loginStylesheets = stylesheets.filter((asset) => loginEntry?.files.include
 const loginStylesheetAssets = new Set(loginStylesheets.map((asset) => asset.asset));
 const loginCssRawBytes = loginStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const loginCssGzipBytes = loginStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
-const legacyStylesheets = stylesheets.filter((asset) => !noticeAssets.has(asset.asset) && !galleryAssets.includes(asset.asset) && !loginStylesheetAssets.has(asset.asset) && !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !pinChangeAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
+const legacyStylesheets = stylesheets.filter((asset) => !noticeAssets.has(asset.asset) && !galleryAssets.includes(asset.asset) && !loginStylesheetAssets.has(asset.asset) && !customerAssetNames.has(asset.asset) && !deliveryPhotoAssetNames.has(asset.asset) && !deliveryPhotoFieldAssetNames.has(asset.asset) && !deliveryPhotoHistoryStylesheetAssets.has(asset.asset) && !deliveryPhotoHistoryDatesStylesheetAssets.has(asset.asset) && !adminInterfaceAssets.has(asset.asset) && !pinChangeAssets.has(asset.asset) && !photoMorphAssets.has(asset.asset) && !scanAssets.has(asset.asset) && !inventoryAssetNames.has(asset.asset) && !inventoryManufacturerAssetNames.has(asset.asset) && !inventoryPanZoomAssets.has(asset.asset));
 const legacyStylesheetRawBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
 const legacyStylesheetGzipBytes = legacyStylesheets.reduce((sum, asset) => sum + asset.gzipBytes, 0);
 const customerStylesheetRawBytes = customerStylesheets.reduce((sum, asset) => sum + asset.rawBytes, 0);
@@ -335,6 +342,15 @@ for (const [label, assets, owners] of [
       `delivery photo ${label} asset ${asset} must not load with unrelated work modes`);
   }
 }
+assertBudget(scanEntry && decoderEntry && scanStylesheets.length > 0, "scan view and barcode fallback must retain their own deferred entries");
+for (const asset of [...scanAssets, ...decoderEntry.files]) {
+  assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset) && !inventoryWorkspaceAssetNames.has(asset),
+    "the scan UI and decoder must load after the inventory workspace");
+}
+assertBudget(decoderEntry.files.every(file => !scanAssets.has(file)), "barcode fallback must load only after capture");
+assertBudget(scanJavascriptGzipBytes <= 17.5 * 1024 && decoderJavascriptGzipBytes <= 16 * 1024, "deferred inventory scan JavaScript exceeded its budget");
+assertBudget(scanStylesheets.reduce((n, file) => n + file.rawBytes, 0) <= 8.5 * 1024
+  && scanStylesheets.reduce((n, file) => n + file.gzipBytes, 0) <= 2.75 * 1024, "deferred scan CSS exceeded its budget");
 for (const asset of inventoryManufacturerFieldAssetNames) {
   assertBudget(!initialAssets.has(asset) && !initialStylesheets.has(asset), `manufacturer trigger asset ${asset} must stay deferred`);
 }
@@ -379,7 +395,7 @@ for (const asset of photoMorphStylesheets) {
   assertBudget(owners.length === 4 && photoViewerEntries.every((entry) => owners.includes(entry)),
     "photo transition CSS must load only with the four approved photo viewers");
 }
-const stylesheetPartitions = [...loginStylesheets, ...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...galleryStylesheets, ...noticeStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...pinChangeStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets];
+const stylesheetPartitions = [...loginStylesheets, ...legacyStylesheets, ...customerStylesheets, ...deliveryPhotoStylesheets, ...deliveryPhotoFieldStylesheets, ...galleryStylesheets, ...noticeStylesheets, ...deliveryPhotoHistoryStylesheets, ...deliveryPhotoHistoryDatesStylesheets, ...adminInterfaceStylesheets, ...pinChangeStylesheets, ...photoMorphStylesheets, ...inventoryStylesheets, ...inventoryManufacturerStylesheets, ...inventoryPanZoomStylesheets, ...scanStylesheets];
 assertBudget(stylesheetPartitions.length === stylesheets.length && new Set(stylesheetPartitions.map((asset) => asset.asset)).size === stylesheets.length,
   "every stylesheet must be accounted for exactly once across feature and shared budgets");
 assertBudget(adminInterfaceStylesheets.length === 1, "admin interface must retain its isolated CSS module");
@@ -539,7 +555,10 @@ assertBudget(inventoryStylesheetGzipBytes <= 7 * 1024, `inventory CSS gzip ${inv
 // 25,861B gzip vs the previous 25,563B (+298B). Allocate 384B over 25KiB;
 // initial assets, CSS, other features and the
 // complete inventory/photo 31KiB envelope below remain unchanged.
-assertBudget(inventoryJavascriptGzipBytes <= 25.375 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25.375KiB`);
+// The direct/scan choice and draft handoff measured 26,064 B gzip. Allocate
+// 128 B to the existing inventory boundary. Scan UI and decoder have separate
+// event-loaded budgets above, and the complete inventory/photo limit applies below.
+assertBudget(inventoryJavascriptGzipBytes <= 25.5 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25.5KiB`);
 assertBudget(inventoryViewerJavascriptGzipBytes <= 2.25 * 1024, `inventory photo viewer JavaScript gzip ${inventoryViewerJavascriptGzipBytes}B exceeds 2.25KiB`);
 assertBudget(inventoryPanZoomJavascriptGzipBytes <= 6 * 1024, `inventory pan/zoom JavaScript gzip ${inventoryPanZoomJavascriptGzipBytes}B exceeds 6KiB`);
 assertBudget(inventoryPanZoomStylesheetRawBytes <= 2 * 1024 && inventoryPanZoomStylesheetGzipBytes <= .75 * 1024, "inventory pan/zoom CSS exceeds its 2KiB raw / .75KiB gzip allowance");
@@ -590,7 +609,9 @@ const report = {
     salesWorkspaceGzipBytes: 14 * 1024,
     inventoryStylesheetRawBytes: 30.5 * 1024,
     inventoryStylesheetGzipBytes: 7 * 1024,
-    inventoryJavascriptGzipBytes: 25.375 * 1024,
+    inventoryJavascriptGzipBytes: 25.5 * 1024,
+    scanJavascriptGzipBytes: 17.5 * 1024,
+    decoderJavascriptGzipBytes: 16 * 1024,
     inventoryViewerJavascriptGzipBytes: 2.25 * 1024,
   },
   measurements: {
@@ -642,6 +663,8 @@ const report = {
     inventoryStylesheetRawBytes,
     inventoryStylesheetGzipBytes,
     inventoryJavascriptGzipBytes,
+    scanJavascriptGzipBytes,
+    decoderJavascriptGzipBytes,
     inventoryWorkspaceJavascriptGzipBytes,
     inventoryViewerJavascriptGzipBytes,
     inventoryPanZoomJavascriptGzipBytes,

@@ -14,24 +14,28 @@ const loadInventoryManufacturerPicker = () => import("./inventory-manufacturer-p
   .then((module) => ({ default: module.InventoryManufacturerPicker }));
 const InventoryManufacturerPicker = lazy(loadInventoryManufacturerPicker);
 
-export function InventoryManufacturerField({ current, allowCreate, canAdmin = false, disabled, onSelect, onClear }: {
+export function InventoryManufacturerField({ current, allowCreate, canAdmin = false, disabled, scanQuery, onScanDismiss, onSelect, onClear }: {
   current: InventoryManufacturerCurrent;
   allowCreate: boolean;
   canAdmin?: boolean;
   disabled: boolean;
+  scanQuery?: string | null;
+  onScanDismiss?: () => void;
   onSelect: (manufacturer: { manufacturerId: string; name: string }, saveProduct: (input: SaveInventoryProductInput) => Promise<InventoryProduct>) => void;
   onClear: (saveProduct: (input: SaveInventoryProductInput) => Promise<InventoryProduct>) => void;
 }) {
   const auth = useAuth();
   const sessionNamespace = auth.state.status === "authenticated"
     ? `${auth.state.session.uid}:${auth.state.session.claims.sessionVersion}:${auth.state.session.claims.permissionsVersion}` : "signed-out";
-  const [open, setOpen] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const open = opened || !!scanQuery;
+  function setOpen(value: boolean) { setOpened(value); if (!value) onScanDismiss?.(); }
   useEffect(() => {
     if (sessionNamespace === "signed-out" || !navigator.onLine) return;
     void loadInventoryManufacturerPicker().catch(() => undefined);
     void inventoryManufacturerRepository.list(sessionNamespace).catch(() => undefined);
   }, [sessionNamespace]);
   return <><GlassButton className={formStyles.select} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(true)}><span>{current.name || "제조사 선택하기"}</span><Icon name="chevron-right" size={16} /></GlassButton>
-    {open ? <Suspense fallback={<BottomSheet open title="제조사 선택" onClose={() => setOpen(false)}><p role="status">선택 목록 여는 중</p></BottomSheet>}><InventoryManufacturerPicker key={sessionNamespace} current={current} sessionNamespace={sessionNamespace} allowCreate={allowCreate} canAdmin={canAdmin} onSelect={(manufacturer, saveProduct) => { onSelect(manufacturer, saveProduct); setOpen(false); }} onClear={(saveProduct) => { onClear(saveProduct); setOpen(false); }} onClose={() => setOpen(false)} /></Suspense> : null}
+    {open ? <Suspense fallback={<BottomSheet open title="제조사 선택" onClose={() => setOpen(false)}><p role="status">선택 목록 여는 중</p></BottomSheet>}><InventoryManufacturerPicker key={sessionNamespace} initialQuery={scanQuery ?? ""} current={current} sessionNamespace={sessionNamespace} allowCreate={allowCreate} canAdmin={canAdmin} onSelect={(manufacturer, saveProduct) => { onSelect(manufacturer, saveProduct); setOpen(false); }} onClear={(saveProduct) => { onClear(saveProduct); setOpen(false); }} onClose={() => setOpen(false)} /></Suspense> : null}
   </>;
 }
