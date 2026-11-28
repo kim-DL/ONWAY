@@ -51,7 +51,8 @@ type ManufacturerManagement = {
   mode: "menu" | "rename" | "deactivate";
 };
 
-export function InventoryManufacturerPicker({ current, sessionNamespace, allowCreate, canAdmin, onSelect, onClear, onClose }: {
+export function InventoryManufacturerPicker({ current, sessionNamespace, allowCreate, canAdmin, initialQuery = "", onSelect, onClear, onClose }: {
+  initialQuery?: string;
   current: InventoryManufacturerCurrent;
   sessionNamespace: string;
   allowCreate: boolean;
@@ -74,7 +75,7 @@ export function InventoryManufacturerPicker({ current, sessionNamespace, allowCr
   const [checking, setChecking] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [mode, setMode] = useState<"select" | "add">("select");
   const [newName, setNewName] = useState("");
   const [createError, setCreateError] = useState("");

@@ -39,7 +39,7 @@ function safeInventoryError(error: unknown): HttpsError {
   logger.error("Inventory operation failed.", { category: error instanceof z.ZodError ? "contract" : "internal" });
   return new HttpsError("internal", "재고 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.");
 }
-function handler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, access: InventoryAccess,
+export function inventoryHandler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, access: InventoryAccess,
   action: (input: T, actor: InventoryActor) => Promise<R>, filterProductCompatibility = true) {
   return async (request: CallableRequest<unknown>): Promise<R> => {
     setPrivateCallableResponse(request);
@@ -62,6 +62,7 @@ function handler<T, R>(inputSchema: z.ZodType<T>, resultSchema: z.ZodType<R>, ac
     } catch (error) { throw safeInventoryError(error); }
   };
 }
+const handler = inventoryHandler;
 const empty = z.object({}).strict();
 const noticeRevision = z.object({ revision: z.number().int().positive() }).strict();
 export const assignInventoryNoticeRecipient = onCall(options, handler(assignNoticeRecipientSchema, noticeRevision, "admin",

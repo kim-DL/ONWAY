@@ -24,6 +24,7 @@ Object.assign(environment, {
   NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY: "", NEXT_PUBLIC_USE_FIREBASE_EMULATORS: "true", NEXT_PUBLIC_ENABLE_INVENTORY: "true",
   NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY: "", FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080", FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
   FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9199", STORAGE_EMULATOR_HOST: "http://127.0.0.1:9199",
+  OPENAI_API_KEY: "", FOODSAFETY_API_KEY: "", INVENTORY_FOOD_LOOKUP_ENABLED: "false",
   PIN_LOOKUP_SECRET: "demo-only-phase3-pin-lookup-secret-change-before-production-2026",
   PIN_PEPPER: "demo-only-phase3-pin-pepper-change-before-production-2026-secret",
   TARGET_EDUCATION_OFFICE_CODE: "G10",
@@ -70,6 +71,7 @@ try {
     'export { employeeLogin, employeeLogout } from "./auth/callables.js";',
     'export { activateAdminSession, getAdminWorkspace } from "./admin/callables.js";',
     'export { acknowledgeInventoryInbox } from "./inventory/notice-delivery.js";',
+    'export { analyzeInventoryProductLabel, lookupInventoryBarcode, bindInventoryProductBarcode, searchInventoryFoodProducts, recordInventoryRegistrationOutcome } from "./inventory/scan-callables.js";',
     'export { assignInventoryNoticeRecipient, setInventoryNoticePreference } from "./inventory/callables.js";',
     'export { getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct, recordInventoryMovement, recordInventoryCount, updateInventoryLot, setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings, listInventoryHistory, listInventoryManufacturers, createInventoryManufacturer, updateInventoryManufacturer, uploadInventoryPhoto, getInventoryPhoto } from "./inventory/callables.js";',
   ].join("\n"));

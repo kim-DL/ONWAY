@@ -14,6 +14,9 @@ import { InventoryManufacturerService } from "../src/inventory/inventory-manufac
 import { InventoryService } from "../src/inventory/inventory-service.js";
 import { NOTICE_FEED_PATH, NOTICE_POLICY_PATH } from "../src/inventory/inventory-notification-contract.js";
 import { backfillInventoryLotSummary } from "../../scripts/backfill-inventory-lot-summary.js";
+import sharp from "sharp";
+import { analyzeInventoryImage, recordRegistrationOutcome } from "../src/inventory/inventory-scan-service.js";
+import { barcodePath } from "../src/inventory/inventory-barcode-store.js";
 
 // Opt-in only. The hard host/project boundary below runs before creating any
 // client, so an accidentally inherited production credential cannot be used.
@@ -93,6 +96,67 @@ describe.skipIf(!enabled)("inventory isolated Firestore emulator integration", (
     await service.changeNoticePolicy({ ...cmd, expectedRevision: 4, requestId: randomUUID() }, admin);
     await assertFails(getDocFromServer(doc(feed, ref.id)));
   }, 40_000);
+
+  it("atomically claims a scan barcode with first stock and rejects a competing product", async () => {
+    const code = "08801791000192";
+    const draft = inventoryProductDraftSchema.parse({ name: "스캔 거래 검증", unitLabel: "봉", unitsPerBox: 1, boxPackSize: 10,
+      defaultLocationId: "freezer1", manufacturer: "", specification: "750g · 30개", origin: "", note: "", urgent: false });
+    const input: SaveInventoryProductInput = { requestId: randomUUID(), productId: null, expectedRevision: null, draft,
+      scanBarcodes: [{ code, level: "case" }], initialStock: { quantity: 2, lot: { label: "", expiryState: "unknown", expiryDate: null } } };
+    const rival = { ...input, requestId: randomUUID() };
+    const attempts = await Promise.allSettled([service.save(input, member), service.save(rival, member)]);
+    expect(attempts.filter(result => result.status === "rejected")).toMatchObject([{ reason: { code: "already-exists" } }]);
+    const winner = attempts[0]!.status === "fulfilled" ? input : rival;
+    const loser = winner === input ? rival : input;
+    const saved = await service.save(winner, member);
+    expect(saved.quantityByLocation.freezer1).toBe(2);
+    expect((await db.doc(INVENTORY_PRODUCT_PATH + "/" + loser.requestId).get()).exists).toBe(false);
+    expect(await service.lookupBarcode(code, member)).toEqual({ status: "matched", productId: saved.productId, name: draft.name, level: "case" });
+    const cmd = { requestId: randomUUID(), productId: saved.productId, expectedRevision: 1, scanBarcodes: [{ code, level: "unit" as const }] };
+    await expect(service.bindBarcode(cmd, member)).rejects.toMatchObject({ code: "already-exists" });
+    await expect(service.bindBarcode({ ...cmd, expectedRevision: 2 }, member)).rejects.toMatchObject({ code: "aborted" });
+    await expect(service.lookupBarcode(code, viewer)).rejects.toMatchObject({ code: "permission-denied" });
+    await assertFails(getDocFromServer(doc(environment.authenticatedContext(member.uid).firestore(), barcodePath(code))));
+    const other = { ...cmd, scanBarcodes: [{ code: "00036000291452", level: "unit" as const }] };
+    await service.bindBarcode(other, member); await service.bindBarcode(other, member);
+    expect((await service.detail(saved.productId, member)).product.quantityByLocation.freezer1).toBe(2);
+  }, 30_000);
+
+  it("bounds paid requests, replays only their owner's identical input, and keeps image bytes out of storage", async () => {
+    const fileBase64 = (await sharp({ create: { width: 8, height: 8, channels: 3, background: "#fff" } }).jpeg().toBuffer()).toString("base64");
+    const input = { requestId: randomUUID(), contentType: "image/jpeg" as const, fileBase64 };
+    const reading = { kind: "unsupported" as const, name: null, manufacturer: null, origin: null, netContent: null, innerContents: null, casePack: null, expiry: null };
+    let calls = 0;
+    const reader = async () => { calls++; return reading; };
+    const day = new Date("2026-11-28T00:00:00Z");
+    await expect(analyzeInventoryImage(db, input, viewer, reader, day)).rejects.toMatchObject({ code: "permission-denied" });
+    await Promise.allSettled([analyzeInventoryImage(db, input, member, reader, day), analyzeInventoryImage(db, input, member, reader, day)]);
+    expect(await analyzeInventoryImage(db, input, member, reader, day)).toEqual(reading);
+    await expect(analyzeInventoryImage(db, input, admin, reader, day)).rejects.toMatchObject({ code: "already-exists" });
+    expect(calls).toBe(1);
+    const path = "companies/onnuri/inventoryScanRequests/" + input.requestId;
+    const stored = (await db.doc(path).get()).data()!;
+    expect(stored).toMatchObject({ state: "ready", reading }); expect(JSON.stringify(stored)).not.toContain(fileBase64);
+    const client = environment.authenticatedContext(member.uid).firestore();
+    await assertFails(getDocFromServer(doc(client, path)));
+    await assertFails(setDoc(doc(client, path), { state: "ready" }));
+    const failed = { ...input, requestId: randomUUID() };
+    const failOnce = async () => { throw new Error("provider unavailable"); };
+    await expect(analyzeInventoryImage(db, failed, member, failOnce, day)).rejects.toThrow("provider unavailable");
+    await expect(analyzeInventoryImage(db, failed, member, reader, day)).rejects.toMatchObject({ code: "failed-precondition" });
+    const retry = { ...failed, retryFailed: true as const };
+    await Promise.allSettled([analyzeInventoryImage(db, retry, member, reader, day), analyzeInventoryImage(db, retry, member, reader, day)]);
+    expect(await analyzeInventoryImage(db, retry, member, reader, day)).toEqual(reading);
+    expect((await db.doc("companies/onnuri/inventoryScanUsage/2026-11-28").get()).get("count")).toBe(3);
+    await db.doc("companies/onnuri/inventoryScanUsage/2026-11-28").set({ count: 250 });
+    await expect(analyzeInventoryImage(db, { ...input, requestId: randomUUID() }, member, reader, day)).rejects.toMatchObject({ code: "resource-exhausted" });
+    expect(calls).toBe(2);
+    const metric = { requestId: randomUUID(), mode: "scan" as const, outcome: "registered" as const,
+      seconds: 40, analysisSeconds: 4, reviewSeconds: 20, photos: 1, suggested: [], corrected: [] };
+    await Promise.all([recordRegistrationOutcome(db, metric, member), recordRegistrationOutcome(db, metric, member)]);
+    const metrics = await db.collection("companies/onnuri/inventoryRegistrationMetrics").get();
+    expect(metrics.size).toBe(1); expect(metrics.docs[0]!.data()).not.toHaveProperty("uid");
+  }, 30_000);
 
   it("preserves legacy stock and history when adding packaging and commits a box movement exactly once", async () => {
     const draft = inventoryProductDraftSchema.parse({ name: "박스 계산 보존 통합검증", unitLabel: "봉", unitsPerBox: 1,

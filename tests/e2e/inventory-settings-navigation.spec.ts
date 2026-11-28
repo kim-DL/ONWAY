@@ -30,7 +30,7 @@ test("read-only staff can reach settings without gaining write controls", async 
   await expect(page.getByRole("button", { name: "앱 설정", exact: true })).toBeVisible();
   await expect(page.getByRole("switch", { name: "재고조사 모드" })).toHaveCount(0);
   await expect(page.getByRole("checkbox")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "새 품목 등록" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "직접 입력", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "앱 설정", exact: true }).click();
   await expect(page.getByRole("button", { name: "재고로 돌아가기" })).toBeVisible();
   await page.goBack();
@@ -137,7 +137,7 @@ test("inventory has no empty nav space and other modes retain navigation", async
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true);
     await expect(page.locator(".workspace-content")).toHaveCSS("margin-left", "0px");
-    const button = page.getByRole("button", { name: "새 품목 등록" });
+    const button = page.getByRole("button", { name: "직접 입력", exact: true });
     await expect(button).toBeVisible();
     const box = (await button.boundingBox())!;
     expect(844 - box.y - box.height).toBeLessThan(35);
@@ -150,7 +150,7 @@ test("inventory has no empty nav space and other modes retain navigation", async
 test("the inventory action opens the editor by keyboard when WebGL is unavailable", async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(window, "WebGL2RenderingContext", { value: undefined }));
   await open(page);
-  const button = page.getByRole("button", { name: "새 품목 등록" });
+  const button = page.getByRole("button", { name: "직접 입력", exact: true });
   await button.focus();
   await expect(button).toBeFocused();
   await expect(button.locator("canvas")).toHaveCount(0);
@@ -160,7 +160,7 @@ test("the inventory action opens the editor by keyboard when WebGL is unavailabl
 
 test("the floating action centers its label on one compact surface in both transparency modes", async ({ page }) => {
   await open(page);
-  const button = page.getByRole("button", { name: "새 품목 등록" });
+  const button = page.getByRole("button", { name: "직접 입력", exact: true });
   const media = await page.context().newCDPSession(page);
   for (const value of ["no-preference", "reduce"]) {
     await media.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value }] });
@@ -172,7 +172,7 @@ test("the floating action centers its label on one compact surface in both trans
       const group = content.getBoundingClientRect();
       return { width: face.width, height: face.height, left: group.left - face.left, right: face.right - group.right };
     });
-    expect(Math.abs(layout.left - layout.right), "equal space on either side of + 새 품목").toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.left - layout.right), "equal spacing around the manual entry label").toBeLessThanOrEqual(1);
     expect(layout.height).toBeGreaterThanOrEqual(48);
     expect(layout.width).toBeLessThanOrEqual(2.4 * layout.height);
     await expect(button).toHaveCSS("background-image", "none");

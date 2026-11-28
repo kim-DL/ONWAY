@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit && npm run typecheck --workspace functions",
     "test": "vitest run --maxWorkers=6",
     "test:unit": "vitest run",
-    "test:inventory": "vitest run src/features/inventory functions/tests/inventory-authorization.test.ts functions/tests/inventory-calendar.test.ts functions/tests/inventory-callables.test.ts functions/tests/inventory-manufacturer-service.test.ts functions/tests/inventory-photo.test.ts functions/tests/inventory-service.test.ts functions/tests/inventory-stock-summary.test.ts functions/tests/inventory-e2e-safety.test.ts",
+    "test:inventory": "vitest run src/features/inventory functions/tests/inventory-authorization.test.ts functions/tests/inventory-calendar.test.ts functions/tests/inventory-callables.test.ts functions/tests/inventory-manufacturer-service.test.ts functions/tests/inventory-photo.test.ts functions/tests/inventory-scan.test.ts functions/tests/inventory-service.test.ts functions/tests/inventory-stock-summary.test.ts functions/tests/inventory-e2e-safety.test.ts",
     "test:e2e:inventory": "node scripts/run-inventory-e2e.mjs",
     "test:neis": "vitest run functions/tests/neis-initial-import.test.ts",
     "test:neis:emulator": "node scripts/firebase-emulators.mjs phase5",
@@ -89,6 +89,7 @@
   "dependencies": {
     "@serwist/next": "^9.5.12",
     "@serwist/window": "^9.5.12",
+    "@zxing/library": "0.21.3",
     "firebase": "^12.18.0",
     "idb": "^8.0.3",
     "next": "16.4.6",

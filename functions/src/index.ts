@@ -25,6 +25,7 @@ export {
   saveDeliveryPhotoDay,
   saveDeliveryPhotoRoute,
 } from "./delivery-photo/delivery-photo-callables.js";
+export { analyzeInventoryProductLabel, lookupInventoryBarcode, bindInventoryProductBarcode, searchInventoryFoodProducts, recordInventoryRegistrationOutcome } from "./inventory/scan-callables.js";
 export { acknowledgeInventoryInbox, configureInventoryPush, deliverInventoryPush } from "./inventory/notice-delivery.js";
 export {
   getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct,

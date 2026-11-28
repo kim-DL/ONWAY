@@ -14,6 +14,7 @@ test.beforeAll(async () => {
       createRoot(document.getElementById('root')).render(<main className="workspace-shell"><div className="workspace-content"><InventoryWorkspace session={session}/></div></main>);
     ` : `
       import {inventoryLocationMap} from './src/domain/inventory';
+      export async function callInventory() { throw Error('Unexpected callable in a read-only inventory fixture'); }
       import {inventoryKoreaDate} from './src/features/inventory/inventory-calendar';
       const failedPart=new URLSearchParams(location.search).get('fail');
       const context={today:inventoryKoreaDate(),canWrite:false,canAdmin:false,settings:{urgentDays:7,weekday:1,revision:1},cycle:{cycleId:'test',startDate:'2026-01-01',nextDate:'2099-01-01',weekday:1}};

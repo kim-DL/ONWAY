@@ -67,6 +67,10 @@
     }
   ],
   "fieldOverrides": [
-    { "collectionGroup": "customers", "fieldPath": "*", "indexes": [] }
+    { "collectionGroup": "customers", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "inventoryScanRequests", "fieldPath": "reading", "indexes": [] },
+    { "collectionGroup": "inventoryScanRequests", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "inventoryScanUsage", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "inventoryRegistrationMetrics", "fieldPath": "expiresAt", "ttl": true, "indexes": [] }
   ]
 }

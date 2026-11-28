@@ -10,7 +10,7 @@ export function buildInventorySettingsFixture() {
     builder.onResolve({ filter: /auth-context$/ }, () => ({ path: "auth", namespace: "inventory-settings" }));
     builder.onResolve({ filter: /pwa-provider$/ }, () => ({ path: "pwa", namespace: "inventory-settings" }));
     builder.onLoad({ filter: /.*/, namespace: "inventory-settings" }, ({ path }) => ({ loader: "js", resolveDir: root, contents:
-      path === "repository" ? `export {inventoryRepository,inventoryErrorMessage} from ${data}` :
+      path === "repository" ? `export {inventoryRepository,inventoryErrorMessage} from ${data}; export {callInventory} from './tests/e2e/fixtures/inventory-scan-calls';` :
       path === "auth" ? `import {session} from ${data};export function useAuth(){return {state:{status:'authenticated',session},logout:async()=>{document.documentElement.dataset.logoutRequests=String(Number(document.documentElement.dataset.logoutRequests||0)+1);if(new URLSearchParams(location.search).has('logout-fail'))throw Error('fixture logout failure');}}}` :
       `export function usePwa(){return {installState:'installed',isOnline:true,install:async()=>{}}}`,
     }));

@@ -192,11 +192,11 @@ jobs:
         with:
           java: "true"
           chromium: "true"
-      - name: Inventory photo regression
+      - name: Inventory photos and scan registration
         run: npm run test:e2e:inventory
         env:
           INVENTORY_E2E_STATIC: "true"
-          INVENTORY_E2E_GREP: HEIC product capture|PIN user registers a photographed product
+          INVENTORY_E2E_GREP: HEIC product capture|PIN user registers a photographed product|AI scan registration
   delivery-photos:
     needs: plan
     if: ${{ contains(fromJSON(needs.plan.outputs.required), 'delivery-photos') }}

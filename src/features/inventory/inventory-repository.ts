@@ -8,6 +8,7 @@ import { getFirebaseClientServices } from "@/lib/firebase/client";
 
 export function inventoryErrorMessage(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  if (code.endsWith("already-exists") && error instanceof Error) return error.message;
   if (code.endsWith("aborted")) return "다른 직원이 재고를 변경했어요. 이 창을 닫고 품목을 다시 열어 최신 수량을 확인해주세요.";
   if (code.endsWith("permission-denied") || code.endsWith("unauthenticated")) return "사용 권한을 확인하지 못했어요. 다시 로그인하거나 관리자에게 문의해주세요.";
   if (code.endsWith("failed-precondition")) return "현재 재고 상태나 실사 기간을 다시 확인해야 해요. 이 창을 닫고 품목을 다시 열어주세요.";
@@ -37,6 +38,7 @@ async function call<T>(name: string, input: unknown, schema: z.ZodType<T>, asser
   }
 }
 
+export { call as callInventory };
 export type InventoryListProgress = { pageCount: number; complete: boolean };
 async function list(onProgress?: (products: contract.InventoryProduct[], progress: InventoryListProgress) => void, isCurrent: () => boolean = () => true): Promise<contract.InventoryProduct[]> {
   const initialUid = getFirebaseClientServices()?.auth.currentUser?.uid;
@@ -67,7 +69,10 @@ export const inventoryRepository = {
   list,
   context: () => call("getInventoryContext", {}, contract.inventoryContextSchema),
   detail: (productId: string) => call("getInventoryProduct", contract.getInventoryProductInputSchema.parse({ productId, includeSummary: true, includePackaging: true }), contract.inventoryProductDetailSchema),
-  save: (input: contract.SaveInventoryProductInput) => call("saveInventoryProduct", contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryProductSaveResultSchema),
+  save: ({ scanBarcodes, ...input }: contract.SaveInventoryProductInput) => {
+    const product = contract.saveInventoryProductInputSchema.parse({ ...input, includeSummary: true, includePackaging: true });
+    return call("saveInventoryProduct", scanBarcodes ? { ...product, scanBarcodes } : product, contract.inventoryProductSaveResultSchema);
+  },
   movement: (input: contract.InventoryMovementInput) => call("recordInventoryMovement", contract.inventoryMovementInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryMutationResultSchema),
   count: (input: contract.InventoryCountInput) => call("recordInventoryCount", contract.inventoryCountInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryMutationResultSchema),
   updateLot: (input: contract.UpdateInventoryLotInput) => call("updateInventoryLot", contract.updateInventoryLotInputSchema.parse({ ...input, includeSummary: true, includePackaging: true }), contract.inventoryMutationResultSchema),

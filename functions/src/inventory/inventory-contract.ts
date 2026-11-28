@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ScanBarcodeLink } from "./inventory-barcode-contract.js";
 import { INVENTORY_LOCATIONS } from "./inventory-labels.js";
 export { INVENTORY_LOCATIONS, INVENTORY_LOCATION_LABELS } from "./inventory-labels.js";
 
@@ -224,6 +225,7 @@ export type InventoryProductDetail = Omit<z.infer<typeof inventoryProductDetailS
 export type InventoryProductSaveResult = InventoryProduct & { detail?: InventoryProductDetail | undefined };
 export type SaveInventoryProductInput = Omit<z.infer<typeof saveInventoryProductInputSchema>, "draft"> & {
   draft: InventoryProductDraft; includeManufacturerReference?: boolean | undefined; clearManufacturerReference?: boolean | undefined;
+  scanBarcodes?: ScanBarcodeLink[] | undefined;
 };
 export type InventoryMovementInput = z.infer<typeof inventoryMovementInputSchema>;
 export type InventoryCountInput = z.infer<typeof inventoryCountInputSchema>;

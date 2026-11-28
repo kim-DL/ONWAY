@@ -12,7 +12,7 @@ export async function buildCustomerCeramicFixture(photosEnabled = true, photoEnt
     "use-customers": `export {useCustomers} from ${data}`,
     "use-recent-customers": `export {useRecentCustomers} from ${data}`,
     "customer-repository": `export {customerRepository,customerErrorMessage} from ${data}`,
-    "inventory-repository": `import {inventoryRepository as source,context} from ${inventoryData};import {blockedWrite} from ${data};export {inventoryErrorMessage} from ${inventoryData};export const inventoryRepository=new Proxy({...source,context:async()=>({...context,canWrite:false})},{get:(target,key)=>target[key]??blockedWrite});`,
+    "inventory-repository": `import {inventoryRepository as source,context} from ${inventoryData};import {blockedWrite} from ${data};export {blockedWrite as callInventory};export {inventoryErrorMessage} from ${inventoryData};export const inventoryRepository=new Proxy({...source,context:async()=>({...context,canWrite:false})},{get:(target,key)=>target[key]??blockedWrite});`,
     "use-delivery-photo-data": `export {useDeliveryPhotoData} from ${data}`,
     "use-delivery-photo-catalog": `export {useDeliveryPhotoCatalog} from ${data}`,
     "use-delivery-photo-uploads": `export {useDeliveryPhotoUploads} from ${data}`,
