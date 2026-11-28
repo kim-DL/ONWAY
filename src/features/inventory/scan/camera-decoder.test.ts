@@ -101,6 +101,36 @@ describe("native camera decoder", () => {
     reduced = canvas(ean13("5901234123457"), 1440);
     expect(await detectFrameGtin(full, new AbortController().signal)).toBeUndefined();
   });
+  it("reads oblique bars from the still and reconciles differently oriented or native results", async () => {
+    const width = 840, height = 320;
+    const rgba = new Uint8ClampedArray(width * height * 4).fill(255);
+    const first = "4006381333931", second = "5901234123457";
+    function print(code: string, centerX: number, angle: number) {
+      const bits = ean13(code);
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const dx = x + 0.5 - centerX, dy = y + 0.5 - height / 2;
+        const along = dx * Math.cos(angle) + dy * Math.sin(angle);
+        const across = dy * Math.cos(angle) - dx * Math.sin(angle);
+        if (Math.abs(across) > 42 || bits[Math.floor(along / 3 + bits.length / 2)] !== "1") continue;
+        const start = 4 * (y * width + x);
+        rgba.fill(0, start, start + 3);
+      }
+    }
+    const frame = { width, height, getContext: () => ({ getImageData: () => ({ data: rgba }) }) } as unknown as HTMLCanvasElement;
+    const { signal } = new AbortController();
+    vi.stubGlobal("window", {});
+    for (const angle of [-Math.PI / 4, Math.PI / 4]) {
+      rgba.fill(255);
+      print(second, 620, angle);
+      expect(await detectFrameGtin(frame, signal)).toBe(second);
+      print(first, 210, 0);
+      expect(await detectFrameGtin(frame, signal)).toBeUndefined();
+    }
+    rgba.fill(255);
+    print(second, 620, Math.PI / 4);
+    vi.stubGlobal("window", { BarcodeDetector: class { async detect() { return [{ rawValue: first, format: "ean_13" }]; } } });
+    expect(await detectFrameGtin(frame, signal)).toBeUndefined();
+  });
   it("releases a pending lookup on cancellation and ignores its late native result", async () => {
     const { promise, resolve } = Promise.withResolvers<{ format: string; rawValue: string }[]>();
     const detect = vi.fn(() => promise);

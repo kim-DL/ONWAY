@@ -41,7 +41,7 @@ function compressedUpc(row: BitArray): RowCode | undefined {
   if (oneCheck >= 0) return { rawValue: "1" + data + oneCheck, format: "upc_e", start: start[0]!, end: end[1]! };
 }
 
-/** Sample both axes in either reading direction. A fixed number of rows bounds CPU work on phones. */
+/** Sample four orientations in either reading direction, with bounded work on each still photo. */
 export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height: number, detections: DetectedCode[] = []): string | undefined {
   const hints = new Map<DecodeHintType, number[]>([
     [DecodeHintType.POSSIBLE_FORMATS, [...formats.keys()]], [DecodeHintType.ALLOWED_LENGTHS, [14]],
@@ -75,6 +75,17 @@ export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height:
     if (!adjacent) { strip.reverse(); adjacent = readRow(strip, y); }
     if (adjacent) detections.push(adjacent);
   }
+  function readBothDirections(row: BitArray, y: number) {
+    for (let direction = 0; direction < 2; direction += 1) {
+      if (direction) row.reverse();
+      const result = readRow(row, y);
+      if (!result) continue;
+      detections.push(result);
+      checkAdjacent(row, y, 0, Math.floor(result.start));
+      checkAdjacent(row, y, Math.ceil(result.end), row.getSize());
+      return;
+    }
+  }
   function scan(vertical: boolean) {
     const w = vertical ? height : width, h = vertical ? width : height;
     const rows = Math.min(72, h);
@@ -91,19 +102,38 @@ export function decodeGtinPixels(rgba: Uint8ClampedArray, width: number, height:
     let row = new BitArray(w);
     for (let y = 0; y < rows; y++) {
       try { row = bitmap.getBlackRow(y, row); } catch { continue; }
-      for (let direction = 0; direction < 2; direction += 1) {
-        if (direction) row.reverse();
-        const result = readRow(row, y);
-        if (!result) continue;
-        detections.push(result);
-        checkAdjacent(row, y, 0, Math.floor(result.start));
-        checkAdjacent(row, y, Math.ceil(result.end), w);
-        break;
+      readBothDirections(row, y);
+    }
+  }
+  // Traverse the actual pixels on each diagonal. A short printed code can fit
+  // between horizontal scan lines or end before an angled line crosses all its bars.
+  function scanDiagonals(upward: boolean) {
+    const pixels = new Uint8ClampedArray(Math.min(width, height));
+    const intercepts = width + height - 1;
+    const count = Math.min(72, intercepts);
+    const stride = 4 * (1 + (upward ? -width : width));
+    for (let line = 0; line < count; line++) {
+      const intercept = Math.floor((line + 0.5) * intercepts / count) - width + 1;
+      const x = Math.max(0, -intercept);
+      const y = x + intercept;
+      const length = Math.min(width - x, height - y);
+      if (length < 51) continue;
+      let offset = 4 * ((upward ? height - 1 - y : y) * width + x);
+      for (let i = 0; i < length; i++, offset += stride) {
+        pixels[i] = (rgba[offset]! + 2 * rgba[offset + 1]! + rgba[offset + 2]!) / 4;
       }
+      const bitmap = new HybridBinarizer(new RGBLuminanceSource(pixels.subarray(0, length), length, 1));
+      let row: BitArray;
+      try { row = bitmap.getBlackRow(0, new BitArray(length)); } catch { continue; }
+      readBothDirections(row, line);
     }
   }
   scan(false);
   scan(true);
+  if (uniqueRetailCodes(detections).length <= 1) {
+    scanDiagonals(false);
+    scanDiagonals(true);
+  }
   const valid = uniqueRetailCodes(detections);
   return valid.length === 1 ? valid[0] : undefined;
 }
