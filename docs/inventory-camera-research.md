@@ -13,6 +13,8 @@
 
 CameraX·ML Kit의 카메라 연동과 Apple의 AVFoundation·VisionKit 예제는 네이티브 앱용이다. 현재 급식길 PWA에서는 렌즈별 최소 초점 거리와 매크로 렌즈 전환을 브라우저 공통 API로 지정할 수 없다. 화면의 ‘초점 요청’은 카메라에 보낸 동작을 뜻한다. 실물 글씨에 초점이 맞았는지는 직원이 미리보기와 사진을 보고 확인할 수 있다. [웹 카메라 제어 명세](https://w3c.github.io/mediacapture-image/)
 
+Chromium은 구현 문서에서 영상 해상도의 프레임과 정지 사진, 미리보기 동안 켜 두는 손전등과 셔터 순간의 플래시를 구분한다. WebKit은 Safari 18.4에서 Image Capture API 지원을 발표했다. 급식길은 브라우저 제품명으로 기능을 가정하지 않고 매 카메라 세션에서 지원을 확인한다. Google Lens 팀은 흐리거나 가려진 문자에 주변 단어의 문맥을 쓰는 과정을 설명한다. 급식길도 날짜 숫자와 ‘제조일·소비기한’ 표제를 함께 읽고, 원산지와 원재료의 국가를 구분한다. [Chromium Image Capture 구현 문서](https://chromium.googlesource.com/chromium/src/third_party/+/master/blink/renderer/modules/imagecapture/README.md) · [WebKit Safari 18.4 릴리스 노트](https://webkit.org/blog/16574/webkit-features-in-safari-18-4/) · [Google Lens의 문자 인식 기술 노트](https://research.google/blog/giving-lens-new-reading-capabilities-in-google-go/)
+
 ## 같은 사진으로 비교한 바코드 판독기
 
 2400×1400 합성 사진에 EAN-13 한 개를 그렸다. 가장 가는 막대 폭 1·1.5·2·3px, 촬영 각도 0·30·45·60·90도, 흐림 0·1.3px를 조합한 40장이다. 모두 동일하게 JPEG 품질 0.9로 인코딩 후 다시 열었다. 브라우저 내장 바코드 API를 끄고 Chromium 151.0.7922.34에서 각 판독기에 같은 픽셀을 입력했다. 표의 숫자는 실제 번호와 일치한 장수다.
@@ -27,6 +29,74 @@ CameraX·ML Kit의 카메라 연동과 Apple의 AVFoundation·VisionKit 예제�
 - 준비된 데스크톱 브라우저에서 사진별 판독 시간 중앙값은 두 방향 67ms, 새 방식 128ms, WebAssembly 27ms였다. 기존 방식으로 사진 전체를 회전해 재시도하는 데는 중앙값 99ms가 더 들었다. 실험 코드는 첫 실행 준비 시간을 제외하고 사진별 처리 시간을 함께 기록한다. 실제 직원 전화에서의 시간은 별도 측정 대상이다.
 - 서로 다른 두 번호를 같은 방향에 놓았을 때 급식길은 한 제품에 자동 연결하지 않았다. 한 번호만 45도로 돌린 대조 사진에서는 기존 두 방향 판독과 WebAssembly가 가로 번호 하나만 보고했다. 새 구현은 두 번호를 발견해 연결을 보류했다. 브라우저 내장 인식과 보조 판독이 서로 다른 번호를 읽는 경우도 단위 테스트에 넣었다. 빈 사진에서 나온 번호와 40장에서 나온 잘못된 번호는 모두 0개였다.
 - 단일 바코드 **22장은 새 방식으로도 읽히지 않았다.** 반사, 구겨짐, 손떨림, 손전등, 렌즈 간 자동 전환은 이 합성 시험 범위를 벗어난다. 직원에게 제공할 사용 팁은 ‘작은 바코드가 흐리면 조금 물러난 뒤 확대하고, 한 제품의 바코드 전체와 양옆 흰 여백을 화면에 담기’다. [Google 입력 가이드](https://developers.google.com/ml-kit/vision/barcode-scanning/android) · [Apple 바코드 기술 노트 TN2325](https://developer.apple.com/library/archive/technotes/tn2325/_index.html)
+
+## 공개 바코드 사진 62장
+
+합성 사진에 더해 ZXing 공개 검증 자료의 `ean13-1` 34장과 `ean13-2` 28장을 빠짐없이 읽었다. 두 번째 묶음은 원 개발자가 조명이 까다로운 환경에서 휴대전화로 촬영한 480×360 사진이라고 설명한다. 각 PNG 옆의 정답 파일과 대조했으며, 여러 번호를 반환한 경우에는 정답 하나를 확정한 것으로 세지 않았다. 책 표지처럼 인쇄 번호가 여러 개인 사진도 들어 있다. [첫 번째 사진 묶음](https://github.com/zxing/zxing/tree/7777b180d8e878133b5018bd62fa05277a22a5a9/core/src/test/resources/blackbox/ean13-1) · [두 번째 묶음과 촬영 조건](https://github.com/zxing/zxing/blob/7777b180d8e878133b5018bd62fa05277a22a5a9/core/src/test/java/com/google/zxing/oned/EAN13BlackBox2TestCase.java)
+
+| 공개 정답 하나를 반환한 사진 | 두 방향 대조 구현 | WebAssembly | 급식길 네 방향 |
+| --- | ---: | ---: | ---: |
+| 첫 번째 34장, Chromium | 31 | 31 | 30 |
+| 조명이 까다로운 휴대전화 사진 28장, Chromium | 14 | 15 | 14 |
+| **합계 62장, Chromium** | **45** | **46** | **44** |
+| 합계 62장, WebKit 26.5 | 43 | 46 | 42 |
+
+급식길이 정답과 다른 단일 번호를 반환한 경우는 두 브라우저 모두 0건이었다. 첫 묶음에서 더 보류한 한 장에는 ISBN과 보조 기호가 나란히 있었다. 로그에서 ISBN을 13번, 서로 다른 8자리 후보를 한 번 읽었다. 인쇄 기호가 여러 개인 다른 사진에서는 정답 외의 두 번째 실제 번호도 한 줄에서만 발견됐다. 적게 나온 후보를 일괄 무시하면 상자·낱개 포장을 잘못 연결할 수 있어, 이 경우는 직원 확인으로 넘긴다. WebAssembly는 양쪽 브라우저에서 3장에 여러 번호, 1장에 공개 정답과 다른 번호 하나를 반환했다. 실제 창고의 기기·식품 포장 구성은 이 공개 자료와 다르다.
+
+<details>
+<summary>같은 공개 사진을 급식길 판독기에 넣어 결과 재현하기</summary>
+
+저장소 루트에서 공개 자료를 가져온다. 아래 JavaScript를 `output/camera-photos.mjs`로 저장한 뒤 마지막 명령을 실행한다. 브라우저 내장 인식기를 끄고, 사용자가 사진을 찍은 뒤 호출되는 `detectFrameGtin`을 사용한다.
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/zxing/zxing.git output/zxing-camera-corpus
+git -C output/zxing-camera-corpus sparse-checkout set core/src/test/resources/blackbox/ean13-1 core/src/test/resources/blackbox/ean13-2
+git -C output/zxing-camera-corpus checkout 7777b180d8e878133b5018bd62fa05277a22a5a9
+npx playwright install chromium webkit
+node output/camera-photos.mjs output/zxing-camera-corpus/core/src/test/resources/blackbox
+```
+
+```js
+import fs from "node:fs";
+import path from "node:path";
+import { build } from "esbuild";
+import { chromium, webkit } from "playwright";
+
+const bundle = await build({ entryPoints: ["src/features/inventory/scan/camera-decoder.ts"],
+  bundle: true, format: "iife", globalName: "Reader", write: false });
+for (const engine of [chromium, webkit]) {
+  const browser = await engine.launch();
+  try {
+    const page = await browser.newPage();
+    await page.addScriptTag({ content: bundle.outputFiles[0].text });
+    await page.evaluate(() => Object.defineProperty(window, "BarcodeDetector", { value: undefined }));
+    for (const group of ["ean13-1", "ean13-2"]) {
+      const dir = path.join(process.argv[2], group);
+      let correct = 0, other = 0, noSingleCode = 0;
+      for (const photo of fs.readdirSync(dir).filter(f => f.endsWith(".png"))) {
+        const truth = fs.readFileSync(path.join(dir, photo.replace(/\.png$/, ".txt")), "utf8").trim();
+        const url = "data:image/png;base64," + fs.readFileSync(path.join(dir, photo)).toString("base64");
+        const code = await page.evaluate(async src => {
+          const img = new Image();
+          img.src = src;
+          await img.decode();
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0);
+          return await Reader.detectFrameGtin(canvas, new AbortController().signal) ?? null;
+        }, url);
+        if (!code) noSingleCode++;
+        else if (code.padStart(14, "0") === truth.padStart(14, "0")) correct++;
+        else other++;
+      }
+      console.log(engine.name(), group, { correct, other, noSingleCode });
+    }
+  } finally { await browser.close(); }
+}
+```
+
+</details>
 
 ## 초점 점수와 날짜·원산지 판독
 
