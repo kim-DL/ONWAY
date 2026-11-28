@@ -172,7 +172,7 @@
   margin-inline-end: max(0px, calc(env(safe-area-inset-right) - 12px));
   display: flex; gap: 6px;
 }
-.stickyActions > button { position: relative; min-height: 48px; padding: 10px 15px; border-radius: 99px; font-weight: 700; }
+.stickyActions > button { position: relative; min-height: 48px; padding: 10px; border-radius: 99px; font-weight: 700; }
 .stickyActions > button:first-child { isolation: isolate;
   background: var(--solid-glass, rgb(250 250 248 / 25%)); backdrop-filter: none;
   box-shadow: inset 0 1px #fffc, 0 3px 9px #0002;

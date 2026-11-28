@@ -53,7 +53,7 @@ async function bundle(candidate: boolean) {
     }));
     builder.onResolve({ filter: /inventory-repository$|inventory-detail$|inventory-forms$|inventory-editor-loader$|^client-only$|firebase\/client$/ }, args => ({ path: args.path, namespace: "card-update-isolated" }));
     builder.onLoad({ filter: /.*/, namespace: "card-update-isolated" }, ({ path }) => ({ loader: "tsx", resolveDir: root,
-      contents: path.endsWith("inventory-repository") ? `export { inventoryRepository, inventoryErrorMessage } from ${data};` :
+      contents: path.endsWith("inventory-repository") ? `export { inventoryRepository, inventoryErrorMessage } from ${data}; export {callInventory} from './tests/e2e/fixtures/inventory-scan-calls';` :
         path.endsWith("inventory-detail") ? `export { InventoryDetail } from ${data};` :
         path.endsWith("inventory-forms") ? "export function InventoryProductEditor(){return null} export function InventorySettingsForm(){return null}" :
         path.endsWith("inventory-editor-loader") ? "export const scheduleInventoryProductEditorPreload=()=>()=>{}" :

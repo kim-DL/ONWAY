@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   fixture = await buildInventoryPhotoFixture("tests/e2e/fixtures/inventory-packaging.tsx", [{ name: "packaging-isolation", setup(builder) {
     builder.onResolve({ filter: /(?:inventory-repository|inventory-manufacturer-repository|auth-context|use-inventory-editor-ready|lib\/firebase\/client)$/ }, args => ({ path: args.path, namespace: "packaging" }));
     builder.onLoad({ filter: /.*/, namespace: "packaging" }, ({ path }) => ({ loader: "js", resolveDir: root, contents:
-      path.endsWith("inventory-repository") ? `export {inventoryRepository,inventoryErrorMessage} from ${data}` :
+      path.endsWith("inventory-repository") ? `export {inventoryRepository,inventoryErrorMessage} from ${data}; export {callInventory} from './tests/e2e/fixtures/inventory-scan-calls';` :
       path.endsWith("inventory-manufacturer-repository") ? `export const inventoryManufacturerRepository={list:async()=>[]};` :
       path.endsWith("auth-context") ? "export function useAuth(){return {state:{status:'authenticated',session:{uid:'fixture',claims:{employeeId:'fixture',sessionVersion:1,permissionsVersion:1,roleScopes:['delivery']}}}}}" :
       path.endsWith("use-inventory-editor-ready") ? "export function useInventoryEditorReady(){return true}" :
