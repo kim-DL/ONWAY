@@ -10,7 +10,8 @@ vi.mock("./use-inventory-editor-ready", () => ({ useInventoryEditorReady: () => 
 vi.mock("@/features/auth/auth-context", () => ({ useAuth: () => ({ state: { status: "unauthenticated" } }) }));
 vi.mock("./inventory-repository", () => ({ inventoryRepository: {}, inventoryErrorMessage: () => "검증용 오류" }));
 import { InventoryCard } from "./inventory-card";
-import { InventoryCountForm, InventoryMovementForm, InventorySettingsForm } from "./inventory-forms";
+import InventorySettingsForm from "./inventory-settings-form";
+import { InventoryCountForm, InventoryMovementForm } from "./inventory-forms";
 import { InventoryProductEditorImpl as InventoryProductEditor } from "./inventory-product-editor";
 import { ShellHeader } from "@/features/app-shell/app-shell-header";
 import { Icon } from "@/components/ui/icon";

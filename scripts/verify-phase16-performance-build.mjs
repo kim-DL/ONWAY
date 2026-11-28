@@ -348,7 +348,8 @@ for (const asset of [...scanAssets, ...decoderEntry.files]) {
     "the scan UI and decoder must load after the inventory workspace");
 }
 assertBudget(decoderEntry.files.every(file => !scanAssets.has(file)), "barcode fallback must load only after capture");
-assertBudget(scanJavascriptGzipBytes <= 17.5 * 1024 && decoderJavascriptGzipBytes <= 16 * 1024, "deferred inventory scan JavaScript exceeded its budget");
+// Gesture audio, the hold shutter and visual candidates load only on opening the scanner.
+assertBudget(scanJavascriptGzipBytes <= 18.5 * 1024 && decoderJavascriptGzipBytes <= 16 * 1024, "deferred inventory scan JavaScript exceeded its budget");
 assertBudget(scanStylesheets.reduce((n, file) => n + file.rawBytes, 0) <= 8.5 * 1024
   && scanStylesheets.reduce((n, file) => n + file.gzipBytes, 0) <= 2.75 * 1024, "deferred scan CSS exceeded its budget");
 for (const asset of inventoryManufacturerFieldAssetNames) {
@@ -558,7 +559,9 @@ assertBudget(inventoryStylesheetGzipBytes <= 7 * 1024, `inventory CSS gzip ${inv
 // The direct/scan choice and draft handoff measured 26,064 B gzip. Allocate
 // 128 B to the existing inventory boundary. Scan UI and decoder have separate
 // event-loaded budgets above, and the complete inventory/photo limit applies below.
-assertBudget(inventoryJavascriptGzipBytes <= 25.5 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25.5KiB`);
+// Priming audio in the opening tap and resolving the staff default measured 26,196 B.
+// The location management form loads only when an operator opens settings.
+assertBudget(inventoryJavascriptGzipBytes <= 25.75 * 1024, `inventory JavaScript gzip ${inventoryJavascriptGzipBytes}B exceeds 25.75KiB`);
 assertBudget(inventoryViewerJavascriptGzipBytes <= 2.25 * 1024, `inventory photo viewer JavaScript gzip ${inventoryViewerJavascriptGzipBytes}B exceeds 2.25KiB`);
 assertBudget(inventoryPanZoomJavascriptGzipBytes <= 6 * 1024, `inventory pan/zoom JavaScript gzip ${inventoryPanZoomJavascriptGzipBytes}B exceeds 6KiB`);
 assertBudget(inventoryPanZoomStylesheetRawBytes <= 2 * 1024 && inventoryPanZoomStylesheetGzipBytes <= .75 * 1024, "inventory pan/zoom CSS exceeds its 2KiB raw / .75KiB gzip allowance");
@@ -609,8 +612,8 @@ const report = {
     salesWorkspaceGzipBytes: 14 * 1024,
     inventoryStylesheetRawBytes: 30.5 * 1024,
     inventoryStylesheetGzipBytes: 7 * 1024,
-    inventoryJavascriptGzipBytes: 25.5 * 1024,
-    scanJavascriptGzipBytes: 17.5 * 1024,
+    inventoryJavascriptGzipBytes: 25.75 * 1024,
+    scanJavascriptGzipBytes: 18.5 * 1024,
     decoderJavascriptGzipBytes: 16 * 1024,
     inventoryViewerJavascriptGzipBytes: 2.25 * 1024,
   },

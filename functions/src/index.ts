@@ -28,7 +28,7 @@ export {
 export { analyzeInventoryProductLabel, lookupInventoryBarcode, bindInventoryProductBarcode, searchInventoryFoodProducts, recordInventoryRegistrationOutcome } from "./inventory/scan-callables.js";
 export { acknowledgeInventoryInbox, configureInventoryPush, deliverInventoryPush } from "./inventory/notice-delivery.js";
 export {
-  getInventoryContext, listInventoryProducts, getInventoryProduct, saveInventoryProduct,
+  getInventoryContext, getInventoryLocationAssignments, setInventoryLocationAssignments, listInventoryProducts, getInventoryProduct, saveInventoryProduct,
   recordInventoryMovement, recordInventoryCount, updateInventoryLot,
   assignInventoryNoticeRecipient, setInventoryNoticePreference,
   setInventoryProductStatus, deleteInventoryProduct, updateInventorySettings,

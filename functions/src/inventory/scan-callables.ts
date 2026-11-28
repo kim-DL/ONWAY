@@ -16,11 +16,15 @@ const openai = defineSecret("OPENAI_API_KEY");
 // Declaring a Secret also registers a deployment parameter, even without a binding.
 const foodKey = !emulator && process.env.INVENTORY_FOOD_LOOKUP_ENABLED === "true" ? defineSecret("FOODSAFETY_API_KEY") : undefined;
 export const analyzeInventoryProductLabel = onCall({ ...options, memory: "1GiB", concurrency: 1, timeoutSeconds: 100, secrets: emulator ? [] : [openai] },
-  inventoryHandler(scanImageInput, labelReadingSchema, "write", (input, actor) => {
+  inventoryHandler(scanImageInput, labelReadingSchema, "write", async (input, actor) => {
     const key = emulator ? process.env.OPENAI_API_KEY : openai.value();
     if (!key) throw new HttpsError("failed-precondition", "사진 판독 서비스 설정을 확인해주세요.");
-    return analyzeInventoryImage(getAdminFirestore(), input, actor,
+    const reading = await analyzeInventoryImage(getAdminFirestore(), input, actor,
       image => analyzeLabel(image, key, process.env.INVENTORY_SCAN_OPENAI_MODEL || "gpt-6-luna"));
+    if (input.includeVisual || !reading.visual) return reading;
+    const printed = { ...reading };
+    delete printed.visual;
+    return printed;
   }, false));
 export const lookupInventoryBarcode = onCall(options, inventoryHandler(barcodeQuery, barcodeMatchSchema, "write",
   (input, actor) => new InventoryService().lookupBarcode(input.code, actor), false));

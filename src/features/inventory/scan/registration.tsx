@@ -8,6 +8,7 @@ import type { InventoryLocation, InventoryProduct, InventoryProductDetail } from
 import type { ScanBarcodeLink } from "@/domain/inventory-scan";
 import { InventoryMovementForm, InventoryProductEditor, useInventoryAction } from "../inventory-forms";
 import type { ExistingReceipt } from "./editor-types";
+import { primeScanSound } from "./audio-gesture";
 import { registrationMetrics } from "./metrics";
 import { ScanReview } from "./review";
 import { scanRepository } from "./repository";
@@ -44,12 +45,12 @@ function Registration({ location, products, canAdmin, onClose, onCommit, onOpen,
     <div className={styles.completion}><Icon name="check" size={28} /><div><strong>{complete.product.name}</strong>
       <p>{complete.received ? "입고 수량을 재고에 반영했어요." : "새 품목과 첫 입고를 저장했어요."}</p></div></div>
     <BottomSheetActions><GlassButton onClick={() => onOpen(complete.product, complete.detail)}>품목 보기</GlassButton>
-      <GlassButton variant="primary" onClick={onNext}>다음 품목 스캔</GlassButton></BottomSheetActions></BottomSheet>;
+      <GlassButton variant="primary" onClick={() => { primeScanSound(); onNext(); }}>다음 품목 스캔</GlassButton></BottomSheetActions></BottomSheet>;
   return <><InventoryProductEditor product={null} location={location} canCreateManufacturer canManageManufacturers={canAdmin}
     onClose={() => { metrics.finish("closed"); onClose(); }} onSaved={finish}
     scanPanel={editor => <ScanReview editor={editor} products={products} metrics={metrics} onExisting={startExisting} />} />
     {existing && (movement ? <InventoryMovementForm detail={existing.detail} location={existing.location} kind="receive"
-      initialLotDraft={existing.lot} onClose={() => { setExisting(null); setMovement(false); }} onSaved={finish} /> :
+      initialLotDraft={existing.lot} onLocationChange={location => setExisting({ ...existing, location })} onClose={() => { setExisting(null); setMovement(false); }} onSaved={finish} /> :
       <BottomSheet open title="기존 품목에 바코드 연결" onClose={() => setExisting(null)} dismissible={!binding.busy}>
         <div className={styles.group}><strong>{existing.detail.product.name}</strong>
           {existing.links.map(link => <span key={link.code}>{link.level === "case" ? "박스" : "기준 단위 포장"} · {link.code}</span>)}

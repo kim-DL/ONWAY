@@ -1,9 +1,10 @@
 /* eslint-disable @next/next/no-img-element -- Session-owned local camera frames. */
 import { useEffect, useRef, useState } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import type { LabelReading } from "@/domain/inventory-scan";
 import { registerPrivateBlobUrl, forgetPrivateBlobUrl } from "@/features/auth/private-client-state";
 import styles from "./review.module.css";
-export type ScanPhoto = { id: string; ordinal: number; file: File };
+export type ScanPhoto = { id: string; ordinal: number; file: File; visual?: LabelReading["visual"] };
 function Thumbnail({ file, label }: { file: File; label: string }) {
   const element = useRef<HTMLImageElement>(null);
   useEffect(() => {

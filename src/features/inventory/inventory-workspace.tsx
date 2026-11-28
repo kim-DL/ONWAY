@@ -27,6 +27,7 @@ import {
 } from "./inventory-workspace-snapshot";
 import { INVENTORY_OFFLINE_DRAFT_MESSAGE, useInventoryConnection } from "./use-inventory-connection";
 import { InventoryProductEditor, InventorySettingsForm, OpeningInventoryForm } from "./inventory-forms";
+import { primeScanSound } from "./scan/audio-gesture";
 import { InventoryGlassLens } from "./inventory-glass-lens";
 import { InventoryNoticeStockSync } from "@/features/inventory-notices/inventory-notices";
 import { scheduleInventoryProductEditorPreload } from "./inventory-editor-loader";
@@ -110,6 +111,8 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
   }, [sessionKey, workspaceSession, currentReconciler]);
   const closeEditor = () => setEditorOpen(false);
   const newLocation = location === "all" ? "refrigerated" : location;
+  const assigned = context?.assignedLocations;
+  const scanLocation = (location !== "all" && assigned?.includes(location) ? location : assigned?.[0]) ?? newLocation;
   function openRegistered(product: InventoryProduct, detail?: InventoryProductDetail) {
     setEditorOpen(false);
     setSelected({ productId: product.productId, location: product.defaultLocationId, ...(detail ? { detail } : {}) });
@@ -363,15 +366,15 @@ export function InventoryWorkspace({ session, admin = false, onOpenAppSettings }
     </div>
     {context?.canWrite ? <div className={styles.stickyActions} role="group" aria-label="새 품목 등록 방식">
       <GlassButton disabled={!online} onClick={() => setEditorOpen(true)}>{online && <InventoryGlassLens />}<Icon name="plus" size={16} />직접 입력</GlassButton>
-      <GlassButton variant="primary" disabled={!online} onClick={() => setEditorOpen("scan")}><Icon name="camera" size={17} />AI 스캔 등록</GlassButton>
+      <GlassButton variant="primary" disabled={!online} onClick={() => { primeScanSound(); setEditorOpen("scan"); }}><Icon name="camera" size={17} />AI 스캔 등록</GlassButton>
     </div> : null}
     {context && selectedId && selectedProduct ? <InventoryDetail openingSequence={selected?.sequence ?? 0} productId={selectedId} initialProduct={selectedProduct} {...(selected?.detail ? { initialDetail: selected.detail } : {})} initialLocation={selected?.location ?? inventoryOpeningLocation(selectedProduct, location)} context={context} calendarReady={calendarReady} countMode={countMode} onClose={() => { setSelected(null); restoreInventoryProductFocus(selectedId); }} onSaved={saved} onCountSaved={countSaved} /> : null}
     {context?.canWrite && editorOpen && (editorOpen === "scan" ? <Suspense fallback={<OpeningInventoryForm title="AI 스캔 등록" onClose={closeEditor} />}>
-      <InventoryScanRegistration products={products} location={newLocation} canAdmin={context.canAdmin}
+      <InventoryScanRegistration products={products} location={scanLocation} canAdmin={context.canAdmin}
         onClose={closeEditor} onCommit={applyProduct} onOpen={openRegistered} />
     </Suspense> : <InventoryProductEditor product={null} location={newLocation} canManageManufacturers={context.canAdmin}
       onClose={closeEditor} onSaved={(product, detail) => { saved(product); openRegistered(product, detail); }} />)}
-    {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}
+    {context?.canAdmin && settingsOpen ? <InventorySettingsForm context={context} onAssignmentsSaved={() => { showNotice("보관 장소 담당자를 저장했어요."); refresh(); }} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); showNotice("재고 설정을 저장했어요."); refresh(); }} /> : null}
     {context?.canWrite || onOpenAppSettings ? <BottomSheet open={optionsOpen} title="목록 옵션" onClose={() => {
       setOptionsOpen(false);
       // Finish the sheet's history Back before creating the settings entry.
